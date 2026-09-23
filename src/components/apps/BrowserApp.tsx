@@ -28,6 +28,10 @@ const KIND_BADGE: Record<string, { label: string; cls: string }> = {
   demand_down: { label: 'Спрос падает', cls: 'bg-red-100 text-red-700' },
   fashion: { label: 'Тренд', cls: 'bg-purple-100 text-purple-700' },
   crisis: { label: 'Кризис', cls: 'bg-orange-100 text-orange-700' },
+  opu: { label: 'Дефицит', cls: 'bg-fuchsia-100 text-fuchsia-700' },
+  tax_raid: { label: 'Проверка ФНС', cls: 'bg-slate-200 text-slate-700' },
+  supply: { label: 'Поставки', cls: 'bg-teal-100 text-teal-700' },
+  garage: { label: 'Гаражная распродажа', cls: 'bg-yellow-100 text-yellow-700' },
 }
 
 const SITES = [

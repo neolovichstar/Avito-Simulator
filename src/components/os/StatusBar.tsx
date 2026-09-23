@@ -8,6 +8,7 @@ import {
   BatteryLow,
   BatteryMedium,
   BatteryWarning,
+  Bell,
   Signal,
   Wifi,
 } from 'lucide-react'
@@ -35,10 +36,11 @@ function useClock(): Date | null {
   return ts ? new Date(ts) : null
 }
 
-export default function StatusBar({ variant }: { variant: 'light' | 'dark' }) {
+export default function StatusBar({ variant, onBell }: { variant: 'light' | 'dark'; onBell?: () => void }) {
   const battery = useOS((s) => s.battery)
   const charging = useOS((s) => s.charging)
   const online = useOS((s) => s.online)
+  const unreadNotifs = useOS((s) => s.notifications.filter((n) => !n.readAt).length)
   const now = useClock()
 
   const batteryEl = batteryIndicator(battery, charging)
@@ -71,6 +73,21 @@ export default function StatusBar({ variant }: { variant: 'light' | 'dark' }) {
           {batteryEl}
           <span className="text-xs font-medium tabular-nums">{battery}%</span>
         </span>
+        {onBell && (
+          <button
+            type="button"
+            onClick={onBell}
+            aria-label={`Уведомления: ${unreadNotifs} непрочитанных`}
+            className="relative -mr-1 flex h-8 w-8 items-center justify-center rounded-full transition-transform active:scale-90"
+          >
+            <Bell className="h-4 w-4" aria-hidden="true" />
+            {unreadNotifs > 0 && (
+              <span className="absolute right-0.5 top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[#FF4053] px-0.5 text-[9px] font-bold text-white">
+                {unreadNotifs > 9 ? '9+' : unreadNotifs}
+              </span>
+            )}
+          </button>
+        )}
       </div>
     </header>
   )

@@ -25,8 +25,23 @@ export function levelProgress(xp: number): number {
   return Math.min(100, Math.round(((xp - cur) / Math.max(1, next - cur)) * 100))
 }
 
-export function loanLimitFor(level: number): number {
-  return 15_000 + level * 10_000
+export function loanLimitFor(level: number, creditScore = 500): number {
+  const base = 15_000 + level * 10_000
+  // рейтинг 300..850 → множитель 0.6x..1.4x
+  const k = 0.6 + Math.max(0, Math.min(1, (creditScore - 300) / 550)) * 0.8
+  return Math.round((base * k) / 500) * 500
+}
+
+export function creditRateFor(creditScore: number): number {
+  // базовая ставка 15%, хороший рейтинг снижает до 9%, плохой поднимает до 25%
+  return Math.round((25 - Math.max(0, Math.min(1, (creditScore - 300) / 550)) * 16) * 10) / 10
+}
+
+export function creditLabel(score: number): { label: string; cls: string } {
+  if (score >= 750) return { label: 'Отличный', cls: 'text-emerald-600' }
+  if (score >= 620) return { label: 'Хороший', cls: 'text-green-600' }
+  if (score >= 480) return { label: 'Средний', cls: 'text-amber-600' }
+  return { label: 'Низкий', cls: 'text-red-500' }
 }
 
 export function repairCost(baseValue: number): number {

@@ -8,10 +8,11 @@ import {
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
-import { fmtNum, fmtMoney, timeAgo } from '@/lib/format'
+import { fmtNum, fmtMoney, timeAgo, initials, hueColor } from '@/lib/format'
 import { CATEGORY_LABEL, CONDITION_LABEL } from '@/lib/catalog-types'
 import { DELIVERY_FEE } from '@/lib/economy'
 import type { ListingDetailData } from '@/lib/types'
+import type { SpecItem } from '@/lib/specs'
 import { ConditionBadge } from './AvitoApp'
 
 export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
@@ -20,7 +21,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
   onOpenChat: (chatId: string) => void
   onGoSell: () => void
 }) {
-  const [data, setData] = useState<(ListingDetailData & { sellerOnline: boolean; sellerRating: number }) | null>(null)
+  const [data, setData] = useState<(ListingDetailData & { sellerOnline: boolean; sellerRating: number; specs?: SpecItem[] }) | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [buyOpen, setBuyOpen] = useState(false)
@@ -34,7 +35,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
     setLoading(true)
     try {
       const d = await api.listing(id)
-      setData(d as ListingDetailData & { sellerOnline: boolean; sellerRating: number })
+      setData(d as ListingDetailData & { sellerOnline: boolean; sellerRating: number; specs?: SpecItem[] })
       setError('')
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Ошибка загрузки')
@@ -168,8 +169,11 @@ export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
 
           {/* продавец */}
           <div className="flex items-center gap-3 bg-neutral-50 rounded-2xl p-3">
-            <div className="w-11 h-11 rounded-full bg-neutral-200 flex items-center justify-center text-sm font-bold text-neutral-500">
-              {data.seller.displayName.slice(0, 1)}
+            <div
+              className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
+              style={{ background: hueColor(data.seller.id.length * 47 % 360) }}
+            >
+              {initials(data.seller.displayName)}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
@@ -184,6 +188,21 @@ export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
               </div>
             </div>
           </div>
+
+          {/* характеристики товара */}
+          {data.specs && data.specs.length > 0 && (
+            <div>
+              <h2 className="text-sm font-semibold text-neutral-900 mb-2">Характеристики</h2>
+              <div className="rounded-2xl border border-neutral-100 divide-y divide-neutral-100">
+                {data.specs.map((s) => (
+                  <div key={s.label} className="flex items-center justify-between px-3 py-2">
+                    <span className="text-xs text-neutral-400">{s.label}</span>
+                    <span className="text-xs font-semibold text-neutral-800">{s.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* описание */}
           <div>

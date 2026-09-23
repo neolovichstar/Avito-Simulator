@@ -1,6 +1,6 @@
 import { db } from '@/lib/db'
 import { getSessionUser, unauthorized } from '@/lib/session'
-import { loanLimitFor, LOAN_RATE, LOAN_DAYS } from '@/lib/economy'
+import { loanLimitFor, LOAN_DAYS, creditRateFor } from '@/lib/economy'
 import { notifyUser } from '@/lib/deals'
 import { fmtMoney } from '@/lib/format'
 
@@ -38,7 +38,10 @@ export async function POST(req: Request) {
     })
     const fresh = await db.user.findUnique({ where: { id: user.id } })
     if (fresh && fresh.debt === 0) {
-      await notifyUser(user.id, 'system', 'Кредит закрыт', 'Долг погашен полностью. Банк снова готов кредитовать.')
+      // аккуратное погашение повышает кредитный рейтинг
+      const newScore = Math.min(850, fresh.creditScore + 40)
+      await db.user.update({ where: { id: fresh.id }, data: { creditScore: newScore } })
+      await notifyUser(user.id, 'system', 'Кредит закрыт', `Долг погашен полностью. Кредитный рейтинг повышен: ${newScore}. Лимит и ставка улучшились.`)
     }
     return Response.json({ ok: true, balance: fresh?.balance ?? user.balance, debt: fresh?.debt ?? 0 })
   }
@@ -46,23 +49,24 @@ export async function POST(req: Request) {
   // Взятие кредита
   const amount = Math.round(Number(body.amount))
   if (!Number.isFinite(amount) || amount < 1000) return Response.json({ error: 'Минимум 1 000 ₽' }, { status: 400 })
-  const limit = loanLimitFor(user.level)
+  const limit = loanLimitFor(user.level, user.creditScore)
   if (user.debt > 0) return Response.json({ error: 'Сначала погасите текущий кредит' }, { status: 400 })
-  if (amount > limit) return Response.json({ error: `Ваш лимит: ${fmtMoney(limit)}. Растите уровень` }, { status: 400 })
+  if (amount > limit) return Response.json({ error: `Ваш лимит: ${fmtMoney(limit)}. Растите уровень и рейтинг` }, { status: 400 })
 
-  const owed = Math.round(amount * (1 + LOAN_RATE))
+  const rate = creditRateFor(user.creditScore)
+  const owed = Math.round(amount * (1 + rate / 100))
   await db.user.update({
     where: { id: user.id },
     data: { balance: { increment: amount }, debt: { increment: owed } },
   })
   await db.loan.create({
     data: {
-      userId: user.id, principal: amount, owed, rate: Math.round(LOAN_RATE * 100),
+      userId: user.id, principal: amount, owed, rate,
       dueAt: new Date(Date.now() + LOAN_DAYS * 86_400_000),
     },
   })
   await db.transaction.create({
-    data: { userId: user.id, type: 'loan', amount, note: `Кредит на ${LOAN_DAYS} дней под ${Math.round(LOAN_RATE * 100)}%` },
+    data: { userId: user.id, type: 'loan', amount, note: `Кредит на ${LOAN_DAYS} дней под ${rate}%` },
   })
   await notifyUser(user.id, 'system', 'Кредит выдан', `${fmtMoney(amount)} зачислено на счёт. К возврату ${fmtMoney(owed)} до ${new Date(Date.now() + LOAN_DAYS * 86_400_000).toLocaleDateString('ru-RU')}.`)
   const fresh = await db.user.findUnique({ where: { id: user.id } })

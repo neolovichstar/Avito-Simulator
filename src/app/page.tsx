@@ -143,7 +143,7 @@ export default function Home() {
     <main className="min-h-[100dvh] flex items-center justify-center bg-neutral-950">
       <PhoneFrame>
         {/* статус-бар */}
-        <StatusBar variant={currentApp ? 'light' : 'dark'} />
+        <StatusBar variant={currentApp ? 'light' : 'dark'} onBell={() => setNotifOpen(true)} />
 
         {/* контент */}
         <div className="absolute inset-0 top-10 bottom-12 overflow-hidden bg-black">

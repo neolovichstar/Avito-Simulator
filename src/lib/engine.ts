@@ -3,13 +3,14 @@
 import { db } from '@/lib/db'
 import { CATALOG } from '@/lib/catalog-data'
 import { PERSONAS } from '@/lib/personas-data'
-import { CATEGORY_IMAGE, CONDITIONS, CONDITION_MULT } from '@/lib/catalog-types'
+import { CATEGORY_IMAGE, CONDITIONS, CONDITION_MULT, CATEGORY_LABEL } from '@/lib/catalog-types'
 import { estValueFor, completeSale, deliverDue, notifyUser } from '@/lib/deals'
 import { ensureDailyQuests } from '@/lib/quest-engine'
 import { botOpener } from '@/lib/chat-engine'
 import { auctionStep } from '@/lib/economy'
 import { emitTo } from '@/lib/realtime-emit'
 import { fmtMoney } from '@/lib/format'
+import { cache } from '@/lib/cache'
 
 const g = globalThis as unknown as {
   __avitoEngine?: { started: boolean; tick: number; lastSpecialDay?: string }
@@ -54,6 +55,10 @@ async function randomBot() {
   return bots.length ? rnd(bots) : null
 }
 
+function catLabel(key: string): string {
+  return CATEGORY_LABEL[key] ?? key
+}
+
 function personaOfId(personaId: string | null | undefined) {
   return PERSONAS.find((p) => p.id === personaId) ?? PERSONAS[0]
 }
@@ -76,12 +81,12 @@ async function marketTick(tick: number) {
     const magnitude = 0.05 + Math.random() * 0.12
     const templates = up
       ? [
-          `Спрос на «${c.category}» вырос: покупатели смели лучшие предложения`,
-          `Аналитики: категория ${c.category} недооценена, толпа ринулась скупать`,
+          `Спрос на «${catLabel(c.category)}» вырос: покупатели смели лучшие предложения`,
+          `Аналитики: категория «${catLabel(c.category)}» недооценена, толпа ринулась скупать`,
         ]
       : [
-          `На рынок выбросили партию товаров категории ${c.category} — цены поехали вниз`,
-          `Сезонный спад: ${c.category} теряет в цене`,
+          `На рынок выбросили партию товаров категории «${catLabel(c.category)}» — цены поехали вниз`,
+          `Сезонный спад: «${catLabel(c.category)}» теряет в цене`,
         ]
     await db.marketEvent.create({
       data: {
@@ -90,6 +95,10 @@ async function marketTick(tick: number) {
         expiresAt: new Date(Date.now() + randInt(2, 6) * 3_600_000),
       },
     })
+  }
+  // гаражные распродажи — отдельный цикл, примерно раз в 2 часа
+  if (tick % 8 === 0 && Math.random() < 0.12) {
+    await spawnGarageSale().catch((e) => console.error('[engine] garage:', e))
   }
   // ежедневное крупное событие
   await dailySpecial()
@@ -163,22 +172,81 @@ async function dailySpecial() {
     await db.marketEvent.create({
       data: {
         category: c.category, kind: 'fashion', magnitude: 0.15 + Math.random() * 0.15,
-        headline: `Блогеры подняли хайп: категория «${c.category}» на пике`, body: 'Мода непредсказуема, но кошелёк — предсказуемо тяжелее.',
+        headline: `Блогеры подняли хайп: категория «${catLabel(c.category)}» на пике`, body: 'Мода непредсказуема, но кошелёк — предсказуемо тяжелее.',
         expiresAt: new Date(Date.now() + 10 * 3_600_000),
       },
     })
+  } else if (roll < 0.9) {
+    // ГАРАЖНАЯ РАСПРОДАЖА — гарантированная в ежедневном ролле
+    await spawnGarageSale()
   } else {
     // ПОСТАВКИ
     const c = rnd(cats)
     await db.marketEvent.create({
       data: {
         category: c.category, kind: 'supply', magnitude: -(0.1 + Math.random() * 0.15),
-        headline: `Фура с товаром пришла в срок: «${c.category}» дешевеет`, body: 'Поставки восстановлены, продавцы демпингуют.',
+        headline: `Фура с товаром пришла в срок: «${catLabel(c.category)}» дешевеет`, body: 'Поставки восстановлены, продавцы демпингуют.',
         expiresAt: new Date(Date.now() + 8 * 3_600_000),
       },
     })
   }
   if (g.__avitoEngine) g.__avitoEngine.lastSpecialDay = today
+}
+
+// Гаражная распродажа: пачка discounted-объявлений в двух категориях + новость
+export async function spawnGarageSale() {
+  const active = await db.marketEvent.findFirst({
+    where: { kind: 'garage', expiresAt: { gt: new Date() } },
+  })
+  if (active) return // одна распродажа за раз
+  const cats = await db.marketIndex.findMany()
+  if (!cats.length) return
+  const cityNames = ['Черёмушках', 'Ярославском шоссе', 'Гавриловой-Яме', 'Лиговке', 'Бутове', 'Уралмаше']
+  const catA = rnd(cats)
+  let catB = rnd(cats)
+  if (catB.category === catA.category) catB = rnd(cats)
+  const botsAll = await db.user.findMany({ where: { isBot: true }, take: 100 })
+  if (!botsAll.length) return
+  let spawned = 0
+  for (const cat of [catA, catB]) {
+    const mult = cat.multiplier
+    const pool = CATALOG.filter((i) => i.category === cat.category && !i.key.startsWith('trash-'))
+    const n = Math.min(pool.length, randInt(4, 6))
+    for (let i = 0; i < n; i++) {
+      const item = rnd(pool)
+      const cond = conditionWeighted()
+      const full = item.basePrice * (CONDITION_MULT[cond] ?? 0.8) * mult
+      const price = Math.max(50, Math.round(full * (0.5 + Math.random() * 0.22)))
+      const bot = rnd(botsAll)
+      await db.listing.create({
+        data: {
+          sellerId: bot.id, itemKey: item.key, title: item.title,
+          description: `Гаражная распродажа, всё за полцены. ${rnd(item.desc)}`,
+          category: item.category, condition: cond, price, baseValue: item.basePrice,
+          image: CATEGORY_IMAGE[item.category] ?? '/img/cat-electronics.jpg',
+          city: bot.city, createdAt: new Date(),
+        },
+      })
+      spawned++
+    }
+  }
+  await db.marketEvent.create({
+    data: {
+      category: catA.category, kind: 'garage', magnitude: 0,
+      headline: `Гаражная распродажа в ${rnd(cityNames)}: ${spawned} лотов за полцены`,
+      body: `Соседи выносят всё: «${catLabel(catA.category)}» и «${catLabel(catB.category)}» почти даром. Успей, пока не разобрали.`,
+      expiresAt: new Date(Date.now() + 4 * 3_600_000),
+    },
+  })
+  cache.invalidate('feed')
+  // пуш всем живым игрокам
+  const players = await db.user.findMany({ where: { isBot: false }, take: 100 })
+  for (const p of players) {
+    await notifyUser(
+      p.id, 'market', 'Гаражная распродажа',
+      `${spawned} товаров за полцены в категориях «${catLabel(catA.category)}» и «${catLabel(catB.category)}». Рынок не будет ждать.`,
+    )
+  }
 }
 
 // ---------- БОТЫ ----------
@@ -473,7 +541,14 @@ async function financeTick() {
   const overdue = await db.loan.findMany({ where: { status: 'active', dueAt: { lt: new Date() } } })
   for (const l of overdue) {
     await db.loan.update({ where: { id: l.id }, data: { status: 'overdue' } })
-    await notifyUser(l.userId, 'system', 'Кредит просрочен', 'Банк ждёт погашения. Покупки ограничены при долге свыше 30 000 ₽.')
+    const owner = await db.user.findUnique({ where: { id: l.userId } })
+    if (owner && !owner.isBot) {
+      const newScore = Math.max(300, owner.creditScore - 80)
+      await db.user.update({ where: { id: owner.id }, data: { creditScore: newScore } })
+      await notifyUser(l.userId, 'system', 'Кредит просрочен', `Банк ждёт погашения. Кредитный рейтинг упал до ${newScore} — лимит срезан, ставка выросла. Покупки ограничены при долге свыше 30 000 ₽.`)
+    } else {
+      await notifyUser(l.userId, 'system', 'Кредит просрочен', 'Банк ждёт погашения. Покупки ограничены при долге свыше 30 000 ₽.')
+    }
   }
 }
 

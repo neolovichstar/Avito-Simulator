@@ -25,6 +25,7 @@ model User {
   ratingCount Int      @default(0)
   taxDebt     Int      @default(0)
   taxPenaltyAt DateTime?
+  creditScore Int      @default(500)
   city        String   @default("Москва")
   bio         String?
   achievements String  @default("[]")

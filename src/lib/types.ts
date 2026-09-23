@@ -101,6 +101,8 @@ export interface BankData {
   loanLimit: number
   cardNumber: string
   level: number
+  creditScore?: number
+  creditRate?: number
   transactions: TransactionDTO[]
   activeLoan: { principal: number; owed: number; rate: number; dueAt: string } | null
 }

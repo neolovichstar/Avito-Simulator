@@ -3,7 +3,7 @@
 // Приложение «Банк» — стиль Сбербанк-онлайн: белый фон, зелёный акцент #21A038.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  ArrowDownToLine, ArrowUpFromLine, Banknote, CreditCard, HandCoins, Landmark,
+  ArrowDownToLine, ArrowUpFromLine, Banknote, CreditCard, Gauge, HandCoins, Landmark,
   Loader2, PiggyBank, TrendingUp,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
@@ -11,6 +11,7 @@ import { useOS } from '@/lib/store'
 import { fmtMoney, timeAgo } from '@/lib/format'
 import { TX_TYPE_LABEL } from '@/lib/types'
 import type { BankData, SessionUser } from '@/lib/types'
+import { creditLabel } from '@/lib/economy'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
@@ -237,7 +238,18 @@ export default function BankApp() {
                       <Banknote className="size-3.5 text-emerald-600" /> Лимит кредита
                     </div>
                     <div className="mt-1 text-lg font-semibold">{fmtMoney(data.loanLimit)}</div>
-                    <div className="text-[11px] text-neutral-400">зависит от уровня {data.level}</div>
+                    <div className="text-[11px] text-neutral-400">уровень {data.level} + рейтинг</div>
+                  </div>
+                  <div className="rounded-2xl border border-neutral-100 bg-neutral-50 p-3.5">
+                    <div className="flex items-center gap-1.5 text-xs text-neutral-500">
+                      <Gauge className="size-3.5 text-emerald-600" /> Кредитный рейтинг
+                    </div>
+                    <div className={`mt-1 text-lg font-semibold ${creditLabel(data.creditScore ?? 500).cls}`}>
+                      {data.creditScore ?? 500}
+                    </div>
+                    <div className="text-[11px] text-neutral-400">
+                      {creditLabel(data.creditScore ?? 500).label} · ставка {data.creditRate ?? 15}%
+                    </div>
                   </div>
                   <div className="rounded-2xl border border-neutral-100 bg-neutral-50 p-3.5">
                     <div className="flex items-center gap-1.5 text-xs text-neutral-500">
@@ -323,7 +335,7 @@ export default function BankApp() {
                       </div>
                       <div className="flex justify-between">
                         <span>Ставка</span>
-                        <span className="font-medium text-neutral-700">{Math.round(data.activeLoan.rate * 100)}%</span>
+                        <span className="font-medium text-neutral-700">{data.activeLoan.rate}%</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Срок до</span>
@@ -398,7 +410,7 @@ export default function BankApp() {
                       {busy ? <Loader2 className="size-4 animate-spin" /> : 'Взять кредит'}
                     </Button>
                     <p className="mt-2 text-center text-[11px] leading-relaxed text-neutral-400">
-                      Ставка 15%, срок 7 дней. Кредит блокирует новые кредиты до погашения.
+                      Ставка {data.creditRate ?? 15}%, срок 7 дней. Погашение вовремя повышает рейтинг (+40), просрочка роняет его (−80).
                     </p>
                   </>
                 )}

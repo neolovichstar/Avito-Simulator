@@ -3,6 +3,7 @@ import { getSessionUser } from '@/lib/session'
 import { listingDTO, isOnline, ratingOf } from '@/lib/dto'
 import { getCategoryMult } from '@/lib/engine'
 import { CONDITION_MULT } from '@/lib/catalog-types'
+import { specsFor } from '@/lib/specs'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +20,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
   const mult = await getCategoryMult(listing.category)
   const est = Math.round(listing.baseValue * (CONDITION_MULT[listing.condition] ?? 0.8) * mult)
-  const marginHint = listing.price > 0 ? Math.round(((est - listing.price) / listing.price) * 100) : 100
+  const raw = listing.price > 0 ? Math.round(((est - listing.price) / listing.price) * 100) : 100
+  const marginHint = Math.min(90, raw)
 
   return Response.json({
     ...listingDTO(listing, user?.id ?? null),
@@ -29,5 +31,6 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     sellerJoined: listing.seller.createdAt.toISOString(),
     sellerOnline: isOnline(listing.seller),
     sellerRating: ratingOf(listing.seller),
+    specs: specsFor(listing.itemKey, listing.category, listing.id),
   })
 }
