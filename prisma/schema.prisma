@@ -1,0 +1,278 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  telegramId  String?  @unique
+  username    String   @unique
+  displayName String
+  photoUrl    String?
+  isBot       Boolean  @default(false)
+  personaId   String?
+  balance     Int      @default(35000)
+  debt        Int      @default(0)
+  deposit     Int      @default(0)
+  depositAt   DateTime?
+  xp          Int      @default(0)
+  level       Int      @default(1)
+  ratingSum   Int      @default(0)
+  ratingCount Int      @default(0)
+  taxDebt     Int      @default(0)
+  taxPenaltyAt DateTime?
+  city        String   @default("Москва")
+  bio         String?
+  achievements String  @default("[]")
+  stats       String   @default("{}")
+  questDay    String?
+  lastSeenAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  listings     Listing[]
+  items        Item[]
+  reviewsGiven Review[]  @relation("reviewFrom")
+  reviewsGot   Review[]  @relation("reviewTo")
+  notifications Notification[]
+  taxBills     TaxBill[]
+  loans        Loan[]
+  transactions Transaction[]
+  quests       Quest[]
+  repairs      RepairOrder[]
+  deliveries   Delivery[]
+  auctionBids  AuctionBid[]
+}
+
+model Listing {
+  id          String    @id @default(cuid())
+  sellerId    String
+  seller      User      @relation(fields: [sellerId], references: [id])
+  itemId      String?
+  itemKey     String
+  title       String
+  description String
+  category    String
+  condition   String
+  price       Int
+  baseValue   Int
+  image       String
+  city        String
+  status      String    @default("active") // active | sold | removed
+  views       Int       @default(0)
+  boostedUntil DateTime?
+  createdAt   DateTime  @default(now())
+  soldAt      DateTime?
+
+  chats     Chat[]
+  reviews   Review[]
+}
+
+model Item {
+  id            String   @id @default(cuid())
+  ownerId       String
+  owner         User     @relation(fields: [ownerId], references: [id])
+  itemKey       String
+  title         String
+  category      String
+  condition     String
+  image         String
+  baseValue     Int
+  purchasePrice Int
+  fromUserId    String?
+  createdAt     DateTime @default(now())
+
+}
+
+model Chat {
+  id           String   @id @default(cuid())
+  listingId    String
+  listing      Listing  @relation(fields: [listingId], references: [id])
+  buyerId      String
+  sellerId     String
+  lastMessageAt DateTime @default(now())
+  meta         String   @default("{}")
+  createdAt    DateTime @default(now())
+
+  messages Message[]
+}
+
+model Message {
+  id         String    @id @default(cuid())
+  chatId     String
+  chat       Chat      @relation(fields: [chatId], references: [id])
+  senderType String    // user | bot | system
+  senderId   String
+  senderName String
+  kind       String    @default("text") // text | invoice | system
+  text       String
+  amount     Int?
+  invoiceId  String?
+  paid       Boolean?
+  createdAt  DateTime  @default(now())
+  readAt     DateTime?
+}
+
+model Transaction {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  type           String   // purchase | sale | loan | repay | tax | deposit | withdraw | boost | penalty | interest
+  amount         Int
+  counterpartyId String?
+  counterpartyName String?
+  listingId      String?
+  note           String?
+  createdAt      DateTime @default(now())
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id])
+  fromUserId String
+  from      User     @relation("reviewFrom", fields: [fromUserId], references: [id])
+  toUserId  String
+  to        User     @relation("reviewTo", fields: [toUserId], references: [id])
+  rating    Int
+  text      String
+  createdAt DateTime @default(now())
+}
+
+model TaxBill {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  amount    Int
+  reason    String
+  status    String    @default("unpaid") // unpaid | paid
+  createdAt DateTime  @default(now())
+  dueAt     DateTime
+  paidAt    DateTime?
+}
+
+model Loan {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  principal Int
+  owed      Int
+  rate      Int
+  dueAt     DateTime
+  status    String   @default("active") // active | repaid | overdue
+  takenAt   DateTime @default(now())
+  repaidAt  DateTime?
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  kind      String    // deal | message | tax | market | system
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model MarketIndex {
+  category   String   @id
+  multiplier Float    @default(1)
+  updatedAt  DateTime @default(now())
+}
+
+model MarketEvent {
+  id        String   @id @default(cuid())
+  category  String
+  kind      String   // demand_up | demand_down | fashion | crisis | opu | tax_raid | supply
+  magnitude Float
+  headline  String
+  body      String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}
+
+model RepairOrder {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  itemId       String
+  fromCondition String
+  toCondition  String
+  cost         Int
+  status       String   @default("in_progress") // in_progress | ready | done
+  startedAt    DateTime @default(now())
+  readyAt      DateTime
+  doneAt       DateTime?
+}
+
+model Delivery {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  listingId   String
+  title       String
+  image       String
+  price       Int
+  itemKey     String
+  category    String
+  listedCondition String
+  realCondition String
+  baseValue   Int
+  courier     String
+  status      String   @default("in_transit") // in_transit | delivered
+  createdAt   DateTime @default(now())
+  eta         DateTime
+  deliveredAt DateTime?
+}
+
+model AuctionLot {
+  id          String   @id @default(cuid())
+  itemKey     String
+  title       String
+  image       String
+  category    String
+  condition   String
+  baseValue   Int
+  startPrice  Int
+  currentBid  Int?
+  currentBidderId String?
+  currentBidderName String?
+  bidCount    Int      @default(0)
+  status      String   @default("active") // active | finished | cancelled
+  createdAt   DateTime @default(now())
+  endsAt      DateTime
+  finishedAt  DateTime?
+  bids        AuctionBid[]
+}
+
+model AuctionBid {
+  id        String   @id @default(cuid())
+  lotId     String
+  lot       AuctionLot @relation(fields: [lotId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  userName  String
+  amount    Int
+  createdAt DateTime @default(now())
+}
+
+model Quest {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  questId   String
+  title     String
+  desc      String
+  kind      String
+  target    Int
+  progress  Int      @default(0)
+  reward    Int
+  xpReward  Int      @default(50)
+  claimed   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  day       String
+}

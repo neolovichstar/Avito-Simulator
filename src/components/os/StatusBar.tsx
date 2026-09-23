@@ -1,0 +1,77 @@
+'use client'
+
+import { useSyncExternalStore } from 'react'
+import type { ReactElement } from 'react'
+import {
+  BatteryCharging,
+  BatteryFull,
+  BatteryLow,
+  BatteryMedium,
+  BatteryWarning,
+  Signal,
+  Wifi,
+} from 'lucide-react'
+import { useOS } from '@/lib/store'
+
+function batteryIndicator(battery: number, charging: boolean): ReactElement {
+  const cls = 'h-4 w-4'
+  if (charging) return <BatteryCharging className={cls} aria-hidden="true" />
+  if (battery >= 85) return <BatteryFull className={cls} aria-hidden="true" />
+  if (battery >= 40) return <BatteryMedium className={cls} aria-hidden="true" />
+  if (battery >= 15) return <BatteryLow className={cls} aria-hidden="true" />
+  return <BatteryWarning className={cls} aria-hidden="true" />
+}
+
+// Живые тики каждые 1000 мс без setState в эффекте (useSyncExternalStore).
+function useClock(): Date | null {
+  const ts = useSyncExternalStore(
+    (onStoreChange) => {
+      const id = setInterval(onStoreChange, 1000)
+      return () => clearInterval(id)
+    },
+    () => Math.floor(Date.now() / 1000) * 1000,
+    () => 0,
+  )
+  return ts ? new Date(ts) : null
+}
+
+export default function StatusBar({ variant }: { variant: 'light' | 'dark' }) {
+  const battery = useOS((s) => s.battery)
+  const charging = useOS((s) => s.charging)
+  const online = useOS((s) => s.online)
+  const now = useClock()
+
+  const batteryEl = batteryIndicator(battery, charging)
+  const isDark = variant === 'dark'
+
+  return (
+    <header
+      className={`absolute inset-x-0 top-0 z-40 flex h-10 items-center justify-between px-5 ${
+        isDark ? 'text-white' : 'text-slate-900'
+      }`}
+    >
+      <time className="text-sm font-semibold tabular-nums" suppressHydrationWarning>
+        {now
+          ? now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+          : ''}
+      </time>
+
+      <div className="flex items-center gap-2">
+        <span
+          className={`flex items-center gap-1 text-xs tabular-nums ${
+            isDark ? 'text-white/80' : 'text-slate-900/70'
+          }`}
+        >
+          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          {online}
+        </span>
+        <Signal className="h-4 w-4" aria-hidden="true" />
+        <Wifi className="h-4 w-4" aria-hidden="true" />
+        <span className="flex items-center gap-1">
+          {batteryEl}
+          <span className="text-xs font-medium tabular-nums">{battery}%</span>
+        </span>
+      </div>
+    </header>
+  )
+}

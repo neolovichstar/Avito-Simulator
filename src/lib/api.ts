@@ -1,0 +1,121 @@
+'use client'
+
+// Единый клиент API игры. Токен сессии хранится в localStorage.
+import type {
+  SessionUser, FeedListing, ListingDetailData, ChatListItem, ChatDetailData, ChatMessageDTO,
+  BankData, TaxData, MarketStats, NotificationDTO, InventoryItemDTO, ProfileData,
+  RepairOrderDTO, RepairQuoteDTO, DeliveryDTO, AuctionData, AuctionLotDTO, CareerData,
+} from '@/lib/types'
+import type { CatalogItem, CategoryKey } from '@/lib/catalog-types'
+
+const TOKEN_KEY = 'avito_sim_token'
+
+export function getToken(): string {
+  if (typeof window === 'undefined') return ''
+  return localStorage.getItem(TOKEN_KEY) ?? ''
+}
+
+export function setToken(t: string) {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(TOKEN_KEY, t)
+}
+
+export class ApiError extends Error {
+  status: number
+  constructor(status: number, message: string) {
+    super(message)
+    this.status = status
+  }
+}
+
+async function req<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(path, {
+    ...init,
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${getToken()}`,
+      ...(init?.headers ?? {}),
+    },
+  })
+  const data = (await res.json().catch(() => ({}))) as T & { error?: string }
+  if (!res.ok) throw new ApiError(res.status, data?.error ?? `Ошибка ${res.status}`)
+  return data
+}
+
+const post = <T,>(path: string, body?: unknown) =>
+  req<T>(path, { method: 'POST', body: body !== undefined ? JSON.stringify(body) : undefined })
+
+export const api = {
+  // auth
+  auth: (initData: string | null) =>
+    post<{ token: string; user: SessionUser }>('/api/auth', { initData, devName: 'Игрок' }),
+
+  // avito
+  feed: (params: { q?: string; category?: CategoryKey | 'all'; sort?: 'new' | 'cheap' | 'expensive'; page?: number; limit?: number; mine?: boolean }) => {
+    const sp = new URLSearchParams()
+    if (params.q) sp.set('q', params.q)
+    if (params.category && params.category !== 'all') sp.set('category', params.category)
+    if (params.sort) sp.set('sort', params.sort)
+    if (params.page) sp.set('page', String(params.page))
+    if (params.limit) sp.set('limit', String(params.limit))
+    if (params.mine) sp.set('mine', '1')
+    return req<{ items: FeedListing[]; total: number }>('/api/listings?' + sp.toString())
+  },
+  listing: (id: string) => req<ListingDetailData>(`/api/listings/${id}`),
+  createListing: (body: { itemId?: string; itemKey?: string; title: string; description: string; category: CategoryKey; condition: string; price: number }) =>
+    post<{ listing: FeedListing }>('/api/listings', body),
+  boostListing: (id: string) => post<{ ok: boolean; balance: number }>(`/api/listings/${id}/boost`),
+  removeListing: (id: string) => post<{ ok: boolean }>(`/api/listings/${id}/remove`),
+  buyListing: (id: string, opts?: { courier?: boolean }) =>
+    post<{ ok: boolean; balance: number; item?: InventoryItemDTO; deliveryId?: string }>(`/api/listings/${id}/buy`, { courier: opts?.courier ?? false }),
+
+  // каталог и инвентарь
+  catalog: () => req<{ items: CatalogItem[] }>('/api/catalog'),
+  inventory: () => req<{ items: InventoryItemDTO[] }>('/api/inventory'),
+
+  // чаты
+  chats: () => req<{ items: ChatListItem[] }>('/api/chats'),
+  openChat: (listingId: string) => post<ChatDetailData>('/api/chats', { listingId }),
+  chat: (id: string) => req<ChatDetailData>(`/api/chats/${id}`),
+  sendMessage: (id: string, text: string) => post<{ messages: ChatMessageDTO[] }>(`/api/chats/${id}/messages`, { text }),
+  sendInvoice: (id: string, amount: number) => post<{ messages: ChatMessageDTO[] }>(`/api/chats/${id}/messages`, { invoice: amount }),
+  payInvoice: (id: string, invoiceId: string) => post<{ ok: boolean; balance: number; messages: ChatMessageDTO[] }>(`/api/chats/${id}/pay`, { invoiceId }),
+
+  // банк
+  bank: () => req<BankData>('/api/bank'),
+  takeLoan: (amount: number) => post<{ ok: boolean; balance: number }>('/api/bank/loan', { amount }),
+  repayLoan: (amount: number) => post<{ ok: boolean; balance: number; debt: number }>('/api/bank/loan', { repay: amount }),
+  depositOp: (amount: number, op: 'top' | 'withdraw') => post<{ ok: boolean; balance: number; deposit: number }>('/api/bank/deposit', { amount, op }),
+
+  // налоги
+  taxes: () => req<TaxData>('/api/taxes'),
+  payTaxes: () => post<{ ok: boolean; balance: number; taxDebt: number }>('/api/taxes', { action: 'pay' }),
+
+  // ремонт
+  repair: () => req<{ orders: RepairOrderDTO[]; repairable: InventoryItemDTO[] }>('/api/repair'),
+  repairStart: (itemId: string) =>
+    post<{ ok: boolean; balance: number; order: RepairOrderDTO; quote: RepairQuoteDTO }>('/api/repair', { itemId }),
+  repairPickup: (orderId: string) =>
+    post<{ ok: boolean; item: InventoryItemDTO }>('/api/repair/pickup', { orderId }),
+
+  // доставки (курьер)
+  deliveries: () => req<{ items: DeliveryDTO[] }>('/api/deliveries'),
+
+  // аукцион
+  auction: () => req<AuctionData>('/api/auction'),
+  auctionBid: (lotId: string, amount: number) =>
+    post<{ ok: boolean; balance: number; lot: AuctionLotDTO }>('/api/auction', { lotId, amount }),
+
+  // карьера: задания и достижения
+  career: () => req<CareerData>('/api/career'),
+  claimQuest: (questId: string) => post<{ ok: boolean; balance: number; xp: number }>('/api/career', { questId }),
+
+  // рынок
+  market: () => req<MarketStats>('/api/market'),
+
+  // профиль и прочее
+  profile: () => req<ProfileData>('/api/profile'),
+  notifications: () => req<{ items: NotificationDTO[] }>('/api/notifications'),
+  readNotifications: () => post<{ ok: boolean }>('/api/notifications', { action: 'read' }),
+  stats: () => req<{ online: number }>('/api/stats'),
+}
