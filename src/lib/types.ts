@@ -315,6 +315,8 @@ export interface AchievementDTO {
   desc: string
   reward: number
   unlocked: boolean
+  /** секретное: условие скрыто, пока не открыто */
+  secret: boolean
 }
 
 export interface CareerData {
@@ -325,6 +327,8 @@ export interface CareerData {
   levelProgress: number
   unlockedCount: number
   totalCount: number
+  /** доступна ли бесплатная замена задания сегодня */
+  rerollAvailable: boolean
 }
 
 export interface ProfileData {

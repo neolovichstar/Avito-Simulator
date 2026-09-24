@@ -47,6 +47,16 @@ export const QUEST_POOL: QuestDef[] = [
   { id: 'q_free_2', title: 'Спасатель халявы', desc: (t) => `Заберите ${t} вещи «Отдам даром» за день`, kind: 'free', target: 2, reward: 1500, xpReward: 60, weight: 1 },
   { id: 'q_spend_25000', title: 'Инвестор дня', desc: (t) => `Вложите ${t.toLocaleString('ru-RU')} ₽ в закупки за день`, kind: 'spend', target: 25000, reward: 4200, xpReward: 150, weight: 1 },
   { id: 'q_fav_6', title: 'Разум и чувства', desc: (t) => `Добавьте ${t} объявлений в избранное за день`, kind: 'fav', target: 6, reward: 900, xpReward: 45, weight: 1 },
+  { id: 'q_sell_3', title: 'Стабильный поток', desc: (t) => `Продайте ${t} товара за день без остановки`, kind: 'sell', target: 3, reward: 3200, xpReward: 120, weight: 2 },
+  { id: 'q_profit_5000', title: 'Хороший день', desc: (t) => `Заработайте ${t.toLocaleString('ru-RU')} ₽ прибыли за день`, kind: 'profit', target: 5000, reward: 3800, xpReward: 140, weight: 2 },
+  { id: 'q_boost_3', title: 'Рекламная кампания', desc: (t) => `Продвиньте ${t} объявления за день`, kind: 'boost', target: 3, reward: 1900, xpReward: 85, weight: 2 },
+  { id: 'q_bid_3', title: 'Тактик молотка', desc: (t) => `Сделайте ${t} ставки на аукционе за день`, kind: 'bid', target: 3, reward: 2000, xpReward: 85, weight: 2 },
+  { id: 'q_repair_3', title: 'Конвейер качества', desc: (t) => `Отремонтируйте ${t} вещи за день`, kind: 'repair', target: 3, reward: 4400, xpReward: 170, weight: 1 },
+  { id: 'q_chat_40', title: 'Переговорная машина', desc: (t) => `Отправьте ${t} сообщений в чатах за день`, kind: 'chat', target: 40, reward: 4200, xpReward: 180, weight: 1 },
+  { id: 'q_deposit_2', title: 'Копилка растёт', desc: (t) => `Откройте ${t} вклада за день — деньги работают`, kind: 'deposit', target: 2, reward: 1800, xpReward: 80, weight: 1 },
+  { id: 'q_review_4', title: 'Голос площадки', desc: (t) => `Оставьте ${t} отзыва о сделках за день`, kind: 'review', target: 4, reward: 1500, xpReward: 70, weight: 2 },
+  { id: 'q_tax_2', title: 'Двойная чистая совесть', desc: (t) => `Погасите ${t} налоговых счёта без просрочки`, kind: 'tax', target: 2, reward: 2200, xpReward: 95, weight: 1 },
+  { id: 'q_fav_10', title: 'Витрина желаний', desc: (t) => `Добавьте ${t} объявлений в избранное за день`, kind: 'fav', target: 10, reward: 1400, xpReward: 60, weight: 1 },
 ]
 
 export interface AchievementDef {
@@ -54,6 +64,8 @@ export interface AchievementDef {
   title: string
   desc: string
   reward: number
+  /** секретное достижение: в UI видна только подсказка, пока не открыто */
+  secret?: boolean
 }
 
 export const ACHIEVEMENTS: AchievementDef[] = [
@@ -98,6 +110,20 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'chatter_1000', title: 'Легенда чатов', desc: 'Отправьте 1000 сообщений в чатах', reward: 40000 },
   { id: 'level_20', title: 'Живая легенда', desc: 'Достигните 20 уровня', reward: 120000 },
   { id: 'collector_50', title: 'Весь склад — мой', desc: 'Имейте 50 вещей в инвентаре одновременно', reward: 30000 },
+  { id: 'tycoon_250k', title: 'Четверть миллиона', desc: 'Накопите 250 000 ₽', reward: 14000 },
+  { id: 'deals_200', title: 'Двести хладнокровных', desc: 'Совершите 200 сделок', reward: 90000 },
+  { id: 'profit_250k', title: 'Средний бизнес', desc: 'Заработайте 250 000 ₽ прибыли', reward: 28000 },
+  // ----- секретные: условие скрыто, пока не открыто -----
+  { id: 'night_owl', title: 'Ночной перекуп', desc: 'Заключите 5 сделок глубокой ночью (с 00:00 до 06:00)', reward: 12000, secret: true },
+  { id: 'big_fish', title: 'Крупная рыба', desc: 'Проведите сделку на 100 000 ₽ и больше', reward: 18000, secret: true },
+  { id: 'profit_1m', title: 'Миллион чистыми', desc: 'Заработайте 1 000 000 ₽ прибыли', reward: 250000, secret: true },
+  { id: 'level_25', title: 'Сверхновая', desc: 'Достигните 25 уровня', reward: 300000, secret: true },
+  { id: 'repairs_30', title: 'Хирург цеха', desc: 'Отремонтируйте 30 вещей', reward: 30000, secret: true },
+  { id: 'free_30', title: 'Спасатель вселенной', desc: 'Заберите 30 вещей «Отдам даром»', reward: 22000, secret: true },
+  { id: 'chatter_2500', title: 'Титан диалога', desc: 'Отправьте 2500 сообщений в чатах', reward: 90000, secret: true },
+  { id: 'bargain_30', title: 'Ценовой сенсей', desc: 'Купите 30 вещей на 30%+ дешевле рынка', reward: 35000, secret: true },
+  { id: 'haggler_100', title: 'Сотка торга', desc: 'Выторгуйте скидку 5%+ в 100 сделках', reward: 70000, secret: true },
+  { id: 'collector_75', title: 'Ангар переполнен', desc: 'Имейте 75 вещей в инвентаре одновременно', reward: 60000, secret: true },
 ]
 
 export interface PlayerStats {
@@ -119,6 +145,10 @@ export interface PlayerStats {
   reviews: number
   deposits: number
   loans: number
+  /** сделки в ночное время 00:00–05:59 (секретная ачивка) */
+  nightDeals: number
+  /** сделки на 100 000 ₽ и больше (секретная ачивка) */
+  bigDeals: number
 }
 
 export function defaultStats(): PlayerStats {
@@ -126,6 +156,7 @@ export function defaultStats(): PlayerStats {
     dealsBuy: 0, dealsSell: 0, dealsTotal: 0, profit: 0, chat: 0, freePicked: 0,
     repairs: 0, courierBuys: 0, auctionWins: 0, bids: 0, boosts: 0, spent: 0,
     taxPaid: 0, haggles: 0, bargains: 0, reviews: 0, deposits: 0, loans: 0,
+    nightDeals: 0, bigDeals: 0,
   }
 }
 
@@ -183,5 +214,19 @@ export function achievedIds(stats: PlayerStats, level: number, balance: number, 
   add('chatter_1000', stats.chat >= 1000)
   add('level_20', level >= 20)
   add('collector_50', inventoryCount >= 50)
+  add('tycoon_250k', balance >= 250_000)
+  add('deals_200', stats.dealsTotal >= 200)
+  add('profit_250k', stats.profit >= 250_000)
+  // секретные
+  add('night_owl', stats.nightDeals >= 5)
+  add('big_fish', stats.bigDeals >= 1)
+  add('profit_1m', stats.profit >= 1_000_000)
+  add('level_25', level >= 25)
+  add('repairs_30', stats.repairs >= 30)
+  add('free_30', stats.freePicked >= 30)
+  add('chatter_2500', stats.chat >= 2500)
+  add('bargain_30', stats.bargains >= 30)
+  add('haggler_100', stats.haggles >= 100)
+  add('collector_75', inventoryCount >= 75)
   return out
 }

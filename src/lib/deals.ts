@@ -198,12 +198,18 @@ export async function completeSale(opts: {
 
   // статистика, квесты, ачивки
   const estVal = Math.round(listing.baseValue)
+  // ночные сделки (00:00–05:59) и крупные сделки (100k+) — секретные ачивки
+  const hourNow = new Date().getHours()
+  const nightNow = hourNow < 6
+  const bigNow = price >= 100_000
   if (buyerIsPlayer) {
     const patch: Partial<PlayerStats> = {
       dealsBuy: 1, dealsTotal: 1, spent: price,
       ...(opts.courier ? { courierBuys: 1 } : {}),
       ...(price > 0 && price <= estVal * 0.7 ? { bargains: 1 } : {}),
       ...(opts.via === 'chat' && price <= listing.price * 0.95 ? { haggles: 1 } : {}),
+      ...(nightNow ? { nightDeals: 1 } : {}),
+      ...(bigNow ? { bigDeals: 1 } : {}),
     }
     await bumpStats(opts.buyer.id, patch)
     await bumpQuests(opts.buyer.id, 'buy')
@@ -222,7 +228,11 @@ export async function completeSale(opts: {
       const soldItem = await db.item.findUnique({ where: { id: listing.itemId } })
       if (soldItem) profitDelta = price - soldItem.purchasePrice
     }
-    await bumpStats(seller.id, { dealsSell: 1, dealsTotal: 1, profit: Math.max(0, profitDelta) })
+    await bumpStats(seller.id, {
+      dealsSell: 1, dealsTotal: 1, profit: Math.max(0, profitDelta),
+      ...(nightNow ? { nightDeals: 1 } : {}),
+      ...(bigNow ? { bigDeals: 1 } : {}),
+    })
     await bumpQuests(seller.id, 'sell')
     if (profitDelta > 0) await bumpQuests(seller.id, 'profit', profitDelta)
     await addXp(seller.id, Math.max(10, Math.round(price * 0.004)))

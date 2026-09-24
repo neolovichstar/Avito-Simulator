@@ -31,6 +31,7 @@ model User {
   achievements String  @default("[]")
   stats       String   @default("{}")
   questDay    String?
+  rerollDay   String?
   bonusStreak Int      @default(0)
   lastBonusAt DateTime?
   lastSeenAt  DateTime @default(now())

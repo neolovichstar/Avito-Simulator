@@ -6,7 +6,7 @@
 // инвертируется через .theme-dark в globals.css.
 import { useCallback, useEffect, useState } from 'react'
 import {
-  CalendarClock, CheckCircle2, Coins, Flame, Loader2, Lock, Medal, Trophy, Zap,
+  CalendarClock, CheckCircle2, Coins, Flame, Loader2, Lock, Medal, RefreshCw, Sparkles, Trophy, Zap,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
@@ -60,6 +60,7 @@ function medalTier(reward: number): { ring: string; chip: string; icon: string; 
 
 function AchievementCard({ a }: { a: AchievementDTO }) {
   const tier = medalTier(a.reward)
+  const hidden = a.secret && !a.unlocked
   return (
     <div
       className={
@@ -71,25 +72,29 @@ function AchievementCard({ a }: { a: AchievementDTO }) {
       {a.unlocked && <span className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-[#a78bfa] to-transparent" aria-hidden />}
       <div className="flex items-start justify-between">
         <div className={'relative flex size-11 items-center justify-center rounded-2xl ' + (a.unlocked ? tier.ring : 'bg-neutral-100')}>
-          <Medal className={'size-5.5 ' + (a.unlocked ? tier.icon : 'text-neutral-400')} aria-hidden />
+          {hidden ? (
+            <Sparkles className="size-5 text-violet-400" aria-hidden />
+          ) : (
+            <Medal className={'size-5.5 ' + (a.unlocked ? tier.icon : 'text-neutral-400')} aria-hidden />
+          )}
           {!a.unlocked && (
             <span className="absolute -bottom-1 -right-1 flex size-5 items-center justify-center rounded-full border border-neutral-200 bg-white">
               <Lock className="size-2.5 text-neutral-500" aria-hidden />
             </span>
           )}
         </div>
-        <span className={'rounded-full border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider ' + (a.unlocked ? tier.chip : 'border-neutral-200 bg-neutral-100 text-neutral-400')}>
-          {tier.label}
+        <span className={'rounded-full border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider ' + (hidden ? 'border-violet-200 bg-violet-50 text-violet-500' : a.unlocked ? tier.chip : 'border-neutral-200 bg-neutral-100 text-neutral-400')}>
+          {hidden ? 'Секрет' : tier.label}
         </span>
       </div>
       <div className={'mt-2.5 text-[13px] font-semibold leading-snug ' + (a.unlocked ? 'text-neutral-900' : 'text-neutral-400')}>
-        {a.title}
+        {hidden ? 'Секретное достижение' : a.title}
       </div>
       <div className={'mt-0.5 flex-1 text-[11px] leading-relaxed ' + (a.unlocked ? 'text-neutral-500' : 'text-neutral-400')}>
-        {a.desc}
+        {hidden ? 'Условие скрыто. Играйте — и однажды оно откроется.' : a.desc}
       </div>
       <div className="mt-2.5 flex items-center justify-between gap-1">
-        <span className="text-[11px] font-semibold text-emerald-600">+{fmtMoney(a.reward)}</span>
+        <span className="text-[11px] font-semibold text-emerald-600">{hidden ? '+ ???' : `+${fmtMoney(a.reward)}`}</span>
         {a.unlocked && (
           <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700">
             <CheckCircle2 className="size-2.5" aria-hidden /> Открыто
@@ -108,6 +113,7 @@ export default function CareerApp() {
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('quests')
   const [claimBusy, setClaimBusy] = useState<string | null>(null)
+  const [rerollBusy, setRerollBusy] = useState<string | null>(null)
   const [claimError, setClaimError] = useState<string | null>(null)
   const [bonus, setBonus] = useState<BonusState | null>(null)
 
@@ -141,6 +147,20 @@ export default function CareerApp() {
       setClaimError(e instanceof ApiError ? e.message : 'Не удалось забрать награду')
     } finally {
       setClaimBusy(null)
+    }
+  }
+
+  const reroll = async (quest: QuestDTO) => {
+    setRerollBusy(quest.id)
+    setClaimError(null)
+    try {
+      await api.rerollQuest(quest.questId)
+      useOS.getState().pushToast('Карьера', 'Задание заменено — новое уже в списке')
+      await load()
+    } catch (e) {
+      setClaimError(e instanceof ApiError ? e.message : 'Не удалось заменить задание')
+    } finally {
+      setRerollBusy(null)
     }
   }
 
@@ -311,19 +331,31 @@ export default function CareerApp() {
                   data.quests.map((q) => {
                     const done = q.progress >= q.target
                     const pct = Math.min(100, Math.round((q.progress / Math.max(1, q.target)) * 100))
+                    const isMega = q.questId.startsWith('mega_')
+                    const rerollable = data.rerollAvailable && !q.claimed && q.progress === 0 && !isMega
                     return (
                       <div
                         key={q.id}
                         className={
-                          'rounded-2xl border p-4 ' +
+                          'relative overflow-hidden rounded-2xl border p-4 ' +
                           (done && !q.claimed
                             ? 'border-violet-300 bg-violet-50 shadow-[0_0_24px_-10px_rgba(124,92,255,0.55)]'
-                            : 'border-neutral-200 bg-white shadow-sm')
+                            : isMega
+                              ? 'border-amber-300 bg-white shadow-[0_0_24px_-12px_rgba(212,160,23,0.65)]'
+                              : 'border-neutral-200 bg-white shadow-sm')
                         }
                       >
+                        {isMega && <span className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-400 via-amber-200 to-amber-400" aria-hidden />}
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <div className="text-sm font-semibold text-neutral-900">{q.title}</div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="min-w-0 truncate text-sm font-semibold text-neutral-900">{q.title}</span>
+                              {isMega && (
+                                <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-amber-400 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-amber-950">
+                                  <Zap className="size-2.5" aria-hidden /> Мега ×2
+                                </span>
+                              )}
+                            </div>
                             <div className="mt-0.5 text-xs leading-relaxed text-neutral-500">{q.desc}</div>
                           </div>
                           {q.claimed && (
@@ -352,13 +384,25 @@ export default function CareerApp() {
 
                         <div className="mt-2.5 flex items-center justify-between gap-2">
                           <span className="flex items-center gap-2 text-[11px] font-medium">
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
+                            <span className={'inline-flex items-center gap-1 rounded-full px-2 py-1 ' + (isMega ? 'bg-amber-100 font-semibold text-amber-700' : 'bg-emerald-50 text-emerald-700')}>
                               <Coins className="size-3" aria-hidden />+{fmtMoney(q.reward)}
                             </span>
                             <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-1 text-violet-700">
                               <Zap className="size-3" aria-hidden />+{q.xpReward} XP
                             </span>
                           </span>
+                          {rerollable && (
+                            <button
+                              type="button"
+                              onClick={() => void reroll(q)}
+                              disabled={rerollBusy === q.id}
+                              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1.5 text-[10px] font-medium text-neutral-500 transition hover:border-violet-300 hover:text-violet-600 active:scale-95 disabled:opacity-50"
+                              aria-label={`Заменить задание: ${q.title}`}
+                            >
+                              {rerollBusy === q.id ? <Loader2 className="size-3 animate-spin" aria-hidden /> : <RefreshCw className="size-3" aria-hidden />}
+                              Заменить
+                            </button>
+                          )}
                         </div>
 
                         {done && !q.claimed && (
@@ -380,8 +424,11 @@ export default function CareerApp() {
                   })
                 )}
 
-                <div className="flex items-center justify-center gap-1.5 text-[11px] text-neutral-400">
-                  <CalendarClock className="size-3.5" aria-hidden /> Новые задания каждый день
+                <div className="flex flex-col items-center gap-1 text-center">
+                  <div className="flex items-center justify-center gap-1.5 text-[11px] text-neutral-400">
+                    <CalendarClock className="size-3.5" aria-hidden /> Новые задания каждый день
+                  </div>
+                  <div className="text-[10px] text-neutral-400">Одну замену задания в день можно сделать бесплатно</div>
                 </div>
               </div>
             )}

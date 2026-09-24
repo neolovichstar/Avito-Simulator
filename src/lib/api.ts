@@ -4,7 +4,7 @@
 import type {
   SessionUser, FeedListing, ListingDetailData, ChatListItem, ChatDetailData, ChatMessageDTO,
   BankData, TaxData, MarketStats, NotificationDTO, InventoryItemDTO, ProfileData,
-  RepairOrderDTO, RepairQuoteDTO, DeliveryDTO, AuctionData, AuctionLotDTO, CareerData,
+  RepairOrderDTO, RepairQuoteDTO, DeliveryDTO, AuctionData, AuctionLotDTO, CareerData, QuestDTO,
   SavedSearchDTO, SellerProfile, BonusState, PulseItemDTO, RivalsData, BlockedSellerDTO,
 } from '@/lib/types'
 import type { CatalogItem, CategoryKey } from '@/lib/catalog-types'
@@ -167,6 +167,7 @@ export const api = {
   // карьера: задания и достижения
   career: () => req<CareerData>('/api/career'),
   claimQuest: (questId: string) => post<{ ok: boolean; balance: number; xp: number }>('/api/career', { questId }),
+  rerollQuest: (questId: string) => post<{ ok: boolean; quest: QuestDTO }>('/api/career/reroll', { questId }),
 
   // рынок
   market: () => req<MarketStats>('/api/market'),

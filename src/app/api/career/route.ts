@@ -19,6 +19,7 @@ export async function GET(req: Request) {
   const unlocked = new Set<string>(JSON.parse(user.achievements || '[]') as string[])
   const achievements: AchievementDTO[] = ACHIEVEMENTS.map((a) => ({
     id: a.id, title: a.title, desc: a.desc, reward: a.reward, unlocked: unlocked.has(a.id),
+    secret: a.secret ?? false,
   }))
   const questDto: QuestDTO[] = quests.map((q) => ({
     id: q.id, questId: q.questId, title: q.title, desc: q.desc,
@@ -33,6 +34,7 @@ export async function GET(req: Request) {
     levelProgress: levelProgress(user.xp),
     unlockedCount: unlocked.size,
     totalCount: ACHIEVEMENTS.length,
+    rerollAvailable: user.rerollDay !== new Date().toISOString().slice(0, 10),
   })
 }
 
