@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   ChevronLeft, MapPin, Eye, Star, Truck, HandCoins, MessageSquare, ShoppingBag,
-  TrendingDown, Zap, Loader2, PackageCheck, AlertTriangle, Clock,
+  TrendingDown, Zap, Loader2, PackageCheck, AlertTriangle, Clock, BadgeCheck, PenLine,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
@@ -30,6 +30,11 @@ export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const [okMsg, setOkMsg] = useState('')
+  const [revStars, setRevStars] = useState(0)
+  const [revHover, setRevHover] = useState(0)
+  const [revText, setRevText] = useState('')
+  const [revSent, setRevSent] = useState(false)
+  const [sellerReviews, setSellerReviews] = useState<{ id: string; from: string; rating: number; text: string; listing: string; createdAt: string }[] | null>(null)
   const session = useOS((s) => s.session)
   const refreshSession = useOS((s) => s.refreshSession)
 
@@ -39,6 +44,8 @@ export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
       const d = await api.listing(id)
       setData(d as ListingDetailData & { sellerOnline: boolean; sellerRating: number; specs?: SpecItem[] })
       setError('')
+      // отзывы о продавце — вторым запросом, не блокируя карточку
+      api.userReviews(d.seller.id).then((r) => setSellerReviews(r.items)).catch(() => setSellerReviews([]))
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Ошибка загрузки')
     } finally {
@@ -132,9 +139,11 @@ export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
   if (!data) return null
 
   const isMine = data.mine
+  const sold = data.status === 'sold'
   const total = mode === 'courier' ? data.price + DELIVERY_FEE : data.price
   const balance = session?.balance ?? 0
   const longDesc = data.description.length > 120
+  const joined = data.sellerJoined ? new Date(data.sellerJoined).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }) : ''
 
   return (
     <div className="h-full flex flex-col bg-white relative">
@@ -149,7 +158,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
         <div className="p-3 space-y-4">
           {/* фото */}
           <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-neutral-100">
-            <img src={data.image} alt={data.title} className="w-full h-full object-cover" />
+            <img src={data.image} alt={data.title} className={`w-full h-full object-cover ${sold ? 'opacity-75 saturate-50' : ''}`} />
             {data.price === 0 && (
               <span className="absolute top-3 left-3 bg-[#04E061] text-white text-xs font-bold px-2 py-1 rounded-lg">Отдам даром</span>
             )}
@@ -157,6 +166,11 @@ export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
               <span className="absolute top-3 right-3 bg-[#965EEB] text-white text-xs font-bold px-2 py-1 rounded-lg flex items-center gap-1">
                 <Zap size={12} aria-hidden /> ТОП
               </span>
+            )}
+            {sold && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/25" aria-hidden>
+                <span className="bg-white/95 text-neutral-900 font-extrabold text-lg px-5 py-2.5 rounded-2xl shadow-lg">Продано</span>
+              </div>
             )}
           </div>
 
@@ -186,33 +200,65 @@ export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
           </div>
 
           {/* продавец */}
-          <div className="flex items-center gap-3 bg-neutral-50 rounded-2xl p-3">
-            <div
-              className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
-              style={{ background: hueColor(data.seller.id.length * 47 % 360) }}
-              aria-hidden
-            >
-              {initials(data.seller.displayName)}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-semibold text-neutral-900 truncate">{data.seller.displayName}</span>
-                {data.sellerOnline && <span className="w-2 h-2 rounded-full bg-[#04E061] shrink-0" aria-label="Продавец онлайн" />}
+          <div className="bg-neutral-50 rounded-2xl p-3 space-y-2">
+            <div className="flex items-center gap-3">
+              <div
+                className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
+                style={{ background: hueColor(data.seller.id.length * 47 % 360) }}
+                aria-hidden
+              >
+                {initials(data.seller.displayName)}
               </div>
-              <div className="text-xs text-neutral-400 flex items-center gap-1 mt-0.5">
-                <Star size={11} className="text-amber-400 fill-amber-400" aria-hidden />
-                {data.sellerRating > 0 ? Math.min(5, data.sellerRating).toFixed(1) : 'новый'}
-                <span>({data.seller.ratingCount})</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-semibold text-neutral-900 truncate">{data.seller.displayName}</span>
+                  {data.sellerOnline && <span className="w-2 h-2 rounded-full bg-[#04E061] shrink-0" aria-label="Продавец онлайн" />}
+                </div>
+                <div className="text-xs text-neutral-400 flex items-center gap-1 mt-0.5">
+                  <Star size={11} className="text-amber-400 fill-amber-400" aria-hidden />
+                  {data.sellerRating > 0 ? Math.min(5, data.sellerRating).toFixed(1) : 'новый'}
+                  <span>({data.seller.ratingCount})</span>
+                </div>
               </div>
+              <button
+                onClick={chat}
+                disabled={busy}
+                className="h-11 px-4 rounded-2xl bg-[#00AAFF]/10 text-[#00AAFF] font-semibold text-sm flex items-center gap-1.5 shrink-0 active:scale-[0.98] transition-transform disabled:opacity-50"
+              >
+                <MessageSquare size={16} aria-hidden /> Написать
+              </button>
             </div>
-            <button
-              onClick={chat}
-              disabled={busy}
-              className="h-11 px-4 rounded-2xl bg-[#00AAFF]/10 text-[#00AAFF] font-semibold text-sm flex items-center gap-1.5 shrink-0 active:scale-[0.98] transition-transform disabled:opacity-50"
-            >
-              <MessageSquare size={16} aria-hidden /> Написать
-            </button>
+            {joined && (
+              <div className="flex items-center gap-1 text-[11px] text-neutral-400 pt-2 border-t border-black/5">
+                <BadgeCheck size={12} className="text-[#00AAFF]" aria-hidden />
+                На Авито с {joined}
+              </div>
+            )}
           </div>
+
+          {/* отзывы о продавце */}
+          {sellerReviews && sellerReviews.length > 0 && (
+            <div>
+              <h2 className="text-sm font-semibold text-neutral-900 mb-2">Отзывы о продавце</h2>
+              <div className="space-y-2">
+                {sellerReviews.map((r) => (
+                  <div key={r.id} className="rounded-2xl border border-neutral-100 p-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-semibold text-neutral-800 truncate">{r.from}</span>
+                      <span className="flex gap-0.5" aria-label={`Оценка ${r.rating} из 5`}>
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <Star key={i} size={10} className={i < r.rating ? 'text-amber-400 fill-amber-400' : 'text-neutral-200'} aria-hidden />
+                        ))}
+                      </span>
+                      <span className="text-[10px] text-neutral-300 ml-auto shrink-0">{timeAgo(r.createdAt)}</span>
+                    </div>
+                    <p className="text-xs text-neutral-600 mt-1 line-clamp-2">{r.text}</p>
+                    <p className="text-[10px] text-neutral-400 mt-0.5 truncate">{r.listing}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* характеристики */}
           {data.specs && data.specs.length > 0 && (
@@ -243,6 +289,71 @@ export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
               </button>
             )}
           </div>
+
+          {/* отзыв о сделке */}
+          {sold && data.purchasedByMe && (
+            <div className="bg-[#fffbe8] rounded-2xl p-3 space-y-2.5">
+              <div className="text-xs font-semibold text-neutral-800 flex items-center gap-1.5">
+                <PenLine size={14} className="text-amber-500" aria-hidden />
+                Оцените сделку
+              </div>
+              {data.reviewedByMe || revSent ? (
+                <p className="text-xs text-neutral-500 flex items-center gap-1.5">
+                  <BadgeCheck size={14} className="text-green-600" aria-hidden />
+                  Отзыв отправлен. Продавец увидит вашу оценку
+                </p>
+              ) : (
+                <>
+                  <div className="flex items-center gap-1" role="radiogroup" aria-label="Оценка от 1 до 5" onMouseLeave={() => setRevHover(0)}>
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button
+                        key={n}
+                        role="radio"
+                        aria-checked={revStars === n}
+                        aria-label={`${n} из 5`}
+                        onClick={() => setRevStars(n)}
+                        onMouseEnter={() => setRevHover(n)}
+                        className="p-1 active:scale-90 transition-transform"
+                      >
+                        <Star size={26} className={(revHover || revStars) >= n ? 'text-amber-400 fill-amber-400' : 'text-neutral-300'} aria-hidden />
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    value={revText}
+                    onChange={(e) => setRevText(e.target.value)}
+                    placeholder="Расскажите, как прошла сделка (необязательно)"
+                    rows={2}
+                    maxLength={300}
+                    className="w-full rounded-xl border border-black/10 bg-white p-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-300"
+                  />
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={async () => {
+                        if (revStars < 1) return
+                        setBusy(true)
+                        setMsg('')
+                        try {
+                          await api.leaveReview(id, revStars, revText)
+                          setRevSent(true)
+                          setOkMsg('Отзыв сохранён — +20 XP')
+                        } catch (e) {
+                          setMsg(e instanceof ApiError ? e.message : 'Не удалось отправить отзыв')
+                        } finally {
+                          setBusy(false)
+                        }
+                      }}
+                      disabled={busy || revStars < 1}
+                      className="h-11 px-5 rounded-2xl bg-amber-400 text-white font-bold text-sm disabled:opacity-50 active:scale-[0.98] transition-transform"
+                    >
+                      Отправить
+                    </button>
+                    <span className="text-[11px] text-neutral-400">+20 XP за отзыв</span>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {isMine && (
             <div className="bg-[#f0f7ff] rounded-2xl p-3 space-y-2.5">
@@ -277,14 +388,20 @@ export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
       {/* покупка — sticky bottom */}
       {!isMine && (
         <div className="shrink-0 p-3 border-t border-black/5 bg-white/95 backdrop-blur">
-          <button
-            onClick={() => { setMode('pickup'); setBuyOpen(true); setMsg('') }}
-            disabled={busy || balance < data.price}
-            className="w-full h-11 rounded-2xl bg-[#00AAFF] text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-40"
-          >
-            <ShoppingBag size={17} aria-hidden />
-            {data.price === 0 ? 'Забрать даром' : `Купить за ${fmtNum(data.price)} ₽`}
-          </button>
+          {sold ? (
+            <div className="w-full h-11 rounded-2xl bg-neutral-100 text-neutral-400 font-bold text-sm flex items-center justify-center gap-2">
+              <PackageCheck size={17} aria-hidden /> Продано
+            </div>
+          ) : (
+            <button
+              onClick={() => { setMode('pickup'); setBuyOpen(true); setMsg('') }}
+              disabled={busy || balance < data.price}
+              className="w-full h-11 rounded-2xl bg-[#00AAFF] text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-40"
+            >
+              <ShoppingBag size={17} aria-hidden />
+              {data.price === 0 ? 'Забрать даром' : `Купить за ${fmtNum(data.price)} ₽`}
+            </button>
+          )}
         </div>
       )}
       {msg && !buyOpen && <div className="shrink-0 px-4 pb-2 text-xs text-red-500">{msg}</div>}

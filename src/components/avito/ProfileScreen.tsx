@@ -3,7 +3,7 @@
 // Профиль Avito: статистика, мои объявления, инвентарь, отзывы
 import { useCallback, useEffect, useState } from 'react'
 import {
-  Loader2, Star, Package, Tag, Zap, Trash2, ChevronLeft, MessageSquareText, Wallet, TrendingUp,
+  Loader2, Star, Package, Tag, Zap, Trash2, ChevronLeft, MessageSquareText, Wallet, TrendingUp, ShoppingBag, PenLine, BadgeCheck,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
@@ -21,7 +21,7 @@ export default function ProfileScreen({ onOpenListing, onGoSell }: {
   const [myListings, setMyListings] = useState<FeedListing[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [subTab, setSubTab] = useState<'listings' | 'inventory'>('listings')
+  const [subTab, setSubTab] = useState<'listings' | 'inventory' | 'purchases'>('listings')
   const [busy, setBusy] = useState('')
   const refreshSession = useOS((s) => s.refreshSession)
 
@@ -131,10 +131,18 @@ export default function ProfileScreen({ onOpenListing, onGoSell }: {
         >
           <Package size={13} /> Инвентарь ({items.length})
         </button>
+        <button
+          onClick={() => setSubTab('purchases')}
+          className={`flex-1 h-9 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 ${
+            subTab === 'purchases' ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-500'
+          }`}
+        >
+          <ShoppingBag size={13} /> Покупки ({data.purchases.length})
+        </button>
       </div>
 
       <div className="px-3 pb-4">
-        {subTab === 'listings' ? (
+        {subTab === 'listings' && (
           myListings.length === 0 ? (
             <div className="bg-white rounded-2xl p-8 text-center">
               <p className="text-sm text-neutral-500">Нет активных объявлений</p>
@@ -177,7 +185,9 @@ export default function ProfileScreen({ onOpenListing, onGoSell }: {
               ))}
             </div>
           )
-        ) : items.length === 0 ? (
+        )}
+
+        {subTab === 'inventory' && (items.length === 0 ? (
           <div className="bg-white rounded-2xl p-8 text-center">
             <p className="text-sm text-neutral-500">Инвентарь пуст</p>
             <p className="text-xs text-neutral-400 mt-1">Купите товары на главной — или ловите «Отдам даром»</p>
@@ -209,6 +219,44 @@ export default function ProfileScreen({ onOpenListing, onGoSell }: {
               )
             })}
           </div>
+        ))}
+
+        {subTab === 'purchases' && (
+          data.purchases.length === 0 ? (
+            <div className="bg-white rounded-2xl p-8 text-center">
+              <p className="text-sm text-neutral-500">Покупок пока нет</p>
+              <p className="text-xs text-neutral-400 mt-1">Купите что-нибудь — и оцените сделку</p>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {data.purchases.map((p) => (
+                <div key={p.listingId} className="bg-white rounded-2xl p-3">
+                  <button onClick={() => onOpenListing(p.listingId)} className="w-full flex gap-3 text-left">
+                    <img src={p.image} alt={p.title} className="w-16 h-16 rounded-xl object-cover bg-neutral-100 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-neutral-900 truncate">{p.title}</p>
+                      <p className="text-sm font-bold text-neutral-900 mt-0.5">{p.price === 0 ? 'Даром' : `${fmtNum(p.price)} ₽`}</p>
+                      <p className="text-[11px] text-neutral-400 mt-0.5">{timeAgo(p.createdAt)}</p>
+                    </div>
+                  </button>
+                  <div className="flex gap-2 mt-2">
+                    {p.reviewed ? (
+                      <span className="h-8 px-3 rounded-lg bg-green-50 text-green-600 text-[11px] font-semibold flex items-center gap-1">
+                        <BadgeCheck size={12} /> Отзыв отправлен
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => onOpenListing(p.listingId)}
+                        className="h-8 px-3 rounded-lg bg-amber-50 text-amber-600 text-[11px] font-semibold flex items-center gap-1"
+                      >
+                        <PenLine size={12} /> Оценить сделку
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
         )}
 
         {/* отзывы */}

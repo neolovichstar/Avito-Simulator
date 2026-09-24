@@ -1,13 +1,14 @@
 import { db } from '@/lib/db'
 import { getSessionUser, unauthorized } from '@/lib/session'
 import { ratingOf } from '@/lib/dto'
+import { itemImage } from '@/lib/item-images'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: Request) {
   const user = await getSessionUser(req)
   if (!user) return unauthorized()
-  const [reviews, activeListings, soldCount, inventoryItems] = await Promise.all([
+  const [reviews, activeListings, soldCount, inventoryItems, purchaseTx] = await Promise.all([
     db.review.findMany({
       where: { toUserId: user.id },
       orderBy: { createdAt: 'desc' },
@@ -17,7 +18,31 @@ export async function GET(req: Request) {
     db.listing.count({ where: { sellerId: user.id, status: 'active' } }),
     db.listing.count({ where: { sellerId: user.id, status: 'sold' } }),
     db.item.findMany({ where: { ownerId: user.id } }),
+    db.transaction.findMany({
+      where: { userId: user.id, type: 'purchase', amount: { lt: 0 }, listingId: { not: null } },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: { listingId: true, createdAt: true, amount: true },
+    }),
   ])
+  // дедупликация по объявлению (доставка могла разбить платеж)
+  const seen = new Set<string>()
+  const purchaseRows = purchaseTx.filter((t) => {
+    if (!t.listingId || seen.has(t.listingId)) return false
+    seen.add(t.listingId)
+    return true
+  })
+  const listingIds = purchaseRows.map((t) => t.listingId as string)
+  const [listings, myReviews] = await Promise.all([
+    db.listing.findMany({
+      where: { id: { in: listingIds } },
+      select: { id: true, title: true, price: true, itemKey: true, category: true },
+    }),
+    db.review.findMany({ where: { fromUserId: user.id, listingId: { in: listingIds } }, select: { listingId: true } }),
+  ])
+  const reviewedSet = new Set(myReviews.map((r) => r.listingId))
+  const listingMap = new Map(listings.map((l) => [l.id, l]))
+
   return Response.json({
     user: {
       id: user.id, username: user.username, displayName: user.displayName, photoUrl: user.photoUrl,
@@ -34,5 +59,17 @@ export async function GET(req: Request) {
     soldCount,
     inventoryValue: inventoryItems.reduce((s, i) => s + i.baseValue, 0),
     dealsCount: user.ratingCount,
+    purchases: purchaseRows.flatMap((t) => {
+      const l = listingMap.get(t.listingId as string)
+      if (!l) return []
+      return [{
+        listingId: l.id,
+        title: l.title,
+        price: Math.abs(t.amount),
+        image: itemImage(l.itemKey, l.category),
+        createdAt: t.createdAt.toISOString(),
+        reviewed: reviewedSet.has(l.id),
+      }]
+    }),
   })
 }

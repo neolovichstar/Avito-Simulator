@@ -2,7 +2,7 @@
 
 export type QuestKind =
   | 'sell' | 'buy' | 'profit' | 'chat' | 'free' | 'repair'
-  | 'courier' | 'bid' | 'boost' | 'spend'
+  | 'courier' | 'bid' | 'boost' | 'spend' | 'review'
 
 export interface QuestDef {
   id: string
@@ -29,6 +29,7 @@ export const QUEST_POOL: QuestDef[] = [
   { id: 'q_bid_2', title: 'Аукционщик', desc: (t) => `Сделайте ${t} ставки на аукционе`, kind: 'bid', target: 2, reward: 1400, xpReward: 60, weight: 2 },
   { id: 'q_boost_1', title: 'Реклама — двигатель', desc: (t) => `Продвиньте ${t} объявление`, kind: 'boost', target: 1, reward: 600, xpReward: 40, weight: 2 },
   { id: 'q_spend_10000', title: 'Разгон капитала', desc: (t) => `Потратьте ${t.toLocaleString('ru-RU')} ₽ на закупки`, kind: 'spend', target: 10000, reward: 2000, xpReward: 90, weight: 2 },
+  { id: 'q_review_2', title: 'Репутация решает', desc: (t) => `Оставьте ${t} отзыва о сделках`, kind: 'review', target: 2, reward: 700, xpReward: 50, weight: 2 },
 ]
 
 export interface AchievementDef {
@@ -57,6 +58,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'collector_15', title: 'Коллекционер', desc: 'Имейте 15 вещей в инвентаре одновременно', reward: 4000 },
   { id: 'taxpayer_5k', title: 'Законопослушный', desc: 'Заплатите 5 000 ₽ налогов', reward: 2000 },
   { id: 'chatter_100', title: 'Душа площадки', desc: 'Отправьте 100 сообщений в чатах', reward: 3000 },
+  { id: 'reviewer_10', title: 'Арбитр площадки', desc: 'Оставьте 10 отзывов о сделках', reward: 2500 },
 ]
 
 export interface PlayerStats {
@@ -75,13 +77,14 @@ export interface PlayerStats {
   taxPaid: number
   haggles: number
   bargains: number
+  reviews: number
 }
 
 export function defaultStats(): PlayerStats {
   return {
     dealsBuy: 0, dealsSell: 0, dealsTotal: 0, profit: 0, chat: 0, freePicked: 0,
     repairs: 0, courierBuys: 0, auctionWins: 0, bids: 0, boosts: 0, spent: 0,
-    taxPaid: 0, haggles: 0, bargains: 0,
+    taxPaid: 0, haggles: 0, bargains: 0, reviews: 0,
   }
 }
 
@@ -116,5 +119,6 @@ export function achievedIds(stats: PlayerStats, level: number, balance: number, 
   add('collector_15', inventoryCount >= 15)
   add('taxpayer_5k', stats.taxPaid >= 5_000)
   add('chatter_100', stats.chat >= 100)
+  add('reviewer_10', stats.reviews >= 10)
   return out
 }

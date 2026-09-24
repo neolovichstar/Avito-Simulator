@@ -35,6 +35,7 @@ export interface FeedListing {
   category: string
   condition: string
   image: string
+  status?: string
   city: string
   createdAt: string
   views: number
@@ -48,6 +49,16 @@ export interface ListingDetailData extends FeedListing {
   itemKey: string
   marginHint: number // сколько можно заработать %, ориентировочно
   sellerJoined: string
+  purchasedByMe?: boolean // текущий пользователь покупал этот товар
+  reviewedByMe?: boolean // и уже оставил отзыв
+}
+
+export interface ReviewDTO {
+  id: string
+  from: string
+  rating: number
+  text: string
+  createdAt: string
 }
 
 export interface ChatListItem {
@@ -253,6 +264,16 @@ export interface ProfileData {
   soldCount: number
   inventoryValue: number
   dealsCount: number
+  purchases: PurchaseDTO[]
+}
+
+export interface PurchaseDTO {
+  listingId: string
+  title: string
+  image: string
+  price: number
+  createdAt: string
+  reviewed: boolean
 }
 
 export const TX_TYPE_LABEL: Record<string, string> = {

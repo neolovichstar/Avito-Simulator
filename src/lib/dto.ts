@@ -24,6 +24,7 @@ export function listingDTO(l: Listing & { seller: User }, viewerId: string | nul
     category: l.category,
     condition: l.condition,
     image: itemImage(l.itemKey, l.category),
+    status: l.status,
     city: l.city,
     createdAt: l.createdAt.toISOString(),
     views: l.views,

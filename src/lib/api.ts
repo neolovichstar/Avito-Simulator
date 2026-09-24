@@ -68,6 +68,10 @@ export const api = {
   removeListing: (id: string) => post<{ ok: boolean }>(`/api/listings/${id}/remove`),
   buyListing: (id: string, opts?: { courier?: boolean }) =>
     post<{ ok: boolean; balance: number; item?: InventoryItemDTO; deliveryId?: string }>(`/api/listings/${id}/buy`, { courier: opts?.courier ?? false }),
+  leaveReview: (id: string, rating: number, text: string) =>
+    post<{ ok: boolean; xp: number }>(`/api/listings/${id}/review`, { rating, text }),
+  userReviews: (userId: string) =>
+    req<{ rating: number; count: number; items: { id: string; from: string; rating: number; text: string; listing: string; createdAt: string }[] }>(`/api/users/${userId}/reviews`),
 
   // каталог и инвентарь
   catalog: () => req<{ items: CatalogItem[] }>('/api/catalog'),
