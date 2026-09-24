@@ -3,12 +3,12 @@
 // Профиль Avito: статистика, мои объявления, инвентарь, отзывы
 import { useCallback, useEffect, useState } from 'react'
 import {
-  Loader2, Star, Package, Tag, Zap, Trash2, ChevronLeft, MessageSquareText, Wallet, TrendingUp, ShoppingBag, PenLine, BadgeCheck,
+  Loader2, Star, Package, Tag, Zap, Trash2, ChevronLeft, MessageSquareText, Wallet, TrendingUp, ShoppingBag, PenLine, BadgeCheck, Pencil, Swords,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
 import { fmtNum, fmtMoney, timeAgo, initials, hueColor } from '@/lib/format'
-import type { ProfileData, FeedListing, InventoryItemDTO } from '@/lib/types'
+import type { ProfileData, FeedListing, InventoryItemDTO, RivalsData } from '@/lib/types'
 import { ListingCard } from './FeedScreen'
 import { ConditionBadge } from './AvitoApp'
 
@@ -23,7 +23,16 @@ export default function ProfileScreen({ onOpenListing, onGoSell }: {
   const [error, setError] = useState('')
   const [subTab, setSubTab] = useState<'listings' | 'inventory' | 'purchases'>('listings')
   const [busy, setBusy] = useState('')
+  // изменение цены
+  const [priceEdit, setPriceEdit] = useState<FeedListing | null>(null)
+  const [priceInput, setPriceInput] = useState('')
+  const [priceError, setPriceError] = useState('')
+  const [priceBusy, setPriceBusy] = useState(false)
+  // конкуренты по этому товару (видны прямо в шите цены)
+  const [rivals, setRivals] = useState<RivalsData | null>(null)
+  const [rivalsLoading, setRivalsLoading] = useState(false)
   const refreshSession = useOS((s) => s.refreshSession)
+  const pushToast = useOS((s) => s.pushToast)
 
   const load = useCallback(async () => {
     try {
@@ -57,6 +66,45 @@ export default function ProfileScreen({ onOpenListing, onGoSell }: {
       await api.removeListing(id)
       await load()
     } catch { /* ignore */ } finally { setBusy('') }
+  }
+
+  const openPriceEdit = (l: FeedListing) => {
+    setPriceEdit(l)
+    setPriceInput(l.price === 0 ? '' : String(l.price))
+    setPriceError('')
+    // подтягиваем рынок этого товара
+    setRivals(null)
+    setRivalsLoading(true)
+    api.listingRivals(l.id)
+      .then(setRivals)
+      .catch(() => setRivals(null))
+      .finally(() => setRivalsLoading(false))
+  }
+
+  const savePrice = async () => {
+    if (!priceEdit) return
+    const val = Math.floor(Number(priceInput.replace(/[^\d]/g, '')) || 0)
+    if (val === priceEdit.price) {
+      setPriceEdit(null)
+      return
+    }
+    setPriceBusy(true)
+    setPriceError('')
+    try {
+      const res = await api.updatePrice(priceEdit.id, val)
+      setPriceEdit(null)
+      pushToast(
+        'Avito',
+        res.warStarted
+          ? `Цена изменена: ${fmtNum(res.oldPrice ?? priceEdit.price)} → ${fmtNum(val)} ₽. Конкуренты уже отреагируют`
+          : 'Цена обновлена',
+      )
+      await load()
+    } catch (e) {
+      setPriceError(e instanceof ApiError ? e.message : 'Не удалось изменить цену')
+    } finally {
+      setPriceBusy(false)
+    }
   }
 
   if (loading && !data) {
@@ -166,6 +214,13 @@ export default function ProfileScreen({ onOpenListing, onGoSell }: {
                     </div>
                   </button>
                   <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={() => openPriceEdit(l)}
+                      disabled={busy === l.id}
+                      className="h-8 px-3 rounded-lg bg-[#00AAFF]/10 text-[#0095E0] text-[11px] font-semibold flex items-center gap-1 disabled:opacity-50"
+                    >
+                      <Pencil size={11} /> Цена
+                    </button>
                     <button
                       onClick={() => boost(l.id)}
                       disabled={busy === l.id || l.boosted}
@@ -282,6 +337,137 @@ export default function ProfileScreen({ onOpenListing, onGoSell }: {
           </div>
         )}
       </div>
+
+      {/* Изменение цены — bottom sheet */}
+      {priceEdit && (
+        <div
+          className="absolute inset-0 z-50 flex items-end bg-black/40"
+          onClick={() => !priceBusy && setPriceEdit(null)}
+          role="dialog"
+          aria-label="Изменение цены"
+        >
+          <div
+            className="w-full rounded-t-3xl bg-white p-5 pb-8 max-h-[88%] overflow-y-auto [scrollbar-width:thin] animate-[sheet-up_220ms_ease-out]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-neutral-200" />
+            <div className="flex items-center gap-3">
+              <img src={priceEdit.image} alt={priceEdit.title} className="w-12 h-12 rounded-xl object-cover bg-neutral-100" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-neutral-900 truncate">{priceEdit.title}</p>
+                <p className="text-xs text-neutral-400">Текущая цена: {priceEdit.price === 0 ? 'Даром' : `${fmtNum(priceEdit.price)} ₽`}</p>
+              </div>
+            </div>
+            <label className="mt-4 block text-xs font-semibold text-neutral-500">Новая цена, ₽</label>
+            <div className="relative mt-1.5">
+              <input
+                autoFocus
+                inputMode="numeric"
+                value={priceInput}
+                onChange={(e) => setPriceInput(e.target.value.replace(/[^\d]/g, ''))}
+                onKeyDown={(e) => { if (e.key === 'Enter') void savePrice() }}
+                placeholder="0 — отдать даром"
+                className="w-full h-12 rounded-xl border border-neutral-200 bg-neutral-50 px-4 text-base font-bold text-neutral-900 outline-none focus:border-[#00AAFF]"
+                aria-label="Новая цена"
+              />
+            </div>
+            {priceEdit.price >= 500 && priceEdit.price > 0 && (
+              <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-relaxed text-neutral-400">
+                <Swords size={12} className="mt-0.5 shrink-0 text-violet-400" />
+                Если снизите цену — конкуренты с таким же товаром заметят и ответят: кто-то подрежет цену, кто-то напишет вам не самое приятное сообщение.
+              </p>
+            )}
+
+            {/* Рынок этого товара: конкуренты и их цены */}
+            {rivalsLoading && (
+              <div className="mt-3 flex items-center justify-center gap-2 rounded-xl bg-neutral-50 py-3 text-[11px] text-neutral-400">
+                <Loader2 size={12} className="animate-spin" /> Смотрим, кто ещё продаёт такой товар…
+              </div>
+            )}
+            {rivals && rivals.rivals.length > 1 && (
+              <div className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3" aria-label="Рынок этого товара">
+                <div className="flex items-baseline justify-between">
+                  <p className="text-[11px] font-bold text-neutral-700">Рынок этого товара</p>
+                  <p className="text-[10px] text-neutral-400">
+                    {rivals.count} шт · средняя {fmtNum(rivals.avg)} ₽
+                  </p>
+                </div>
+                <div className="mt-2 space-y-1.5">
+                  {rivals.rivals.slice(0, 5).map((r) => {
+                    const max = Math.max(...rivals.rivals.map((x) => x.price), 1)
+                    const cheapest = r.price === Math.min(...rivals.rivals.map((x) => x.price))
+                    return (
+                      <div key={r.id} className="flex items-center gap-2">
+                        <span
+                          className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white shrink-0"
+                          style={{ background: r.isMine ? '#00AAFF' : hueColor(r.seller.length * 47 % 360) }}
+                          aria-hidden
+                        >
+                          {initials(r.seller)}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1">
+                            <p className={`text-[10px] truncate ${r.isMe ? 'font-bold text-[#0084c9]' : 'text-neutral-600'}`}>
+                              {r.isMe ? 'Вы' : r.seller}
+                            </p>
+                            {cheapest && !r.isMe && (
+                              <span className="shrink-0 rounded bg-emerald-100 px-1 text-[8px] font-bold text-emerald-600">мин</span>
+                            )}
+                          </div>
+                          <div className="mt-0.5 h-1 rounded-full bg-neutral-200 overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${r.isMe ? 'bg-[#00AAFF]' : cheapest ? 'bg-emerald-400' : 'bg-neutral-400'}`}
+                              style={{ width: `${Math.max(8, Math.round((r.price / max) * 100))}%` }}
+                            />
+                          </div>
+                        </div>
+                        <span className={`text-[11px] font-bold shrink-0 ${r.isMe ? 'text-[#0084c9]' : 'text-neutral-700'}`}>
+                          {fmtNum(r.price)} ₽
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+            {rivals && rivals.rivals.length <= 1 && (
+              <p className="mt-3 rounded-xl bg-neutral-50 px-3 py-2 text-[11px] text-neutral-400">
+                Вы единственный активный продавец такого товара — рынок пока ваш.
+              </p>
+            )}
+
+            {/* Позиция при новой цене */}
+            {rivals && rivals.rivals.length > 1 && priceInput && Number(priceInput) > 0 && (
+              <p className="mt-2 text-[11px] font-medium text-neutral-500" aria-live="polite">
+                С ценой {fmtNum(Number(priceInput))} ₽ вы{' '}
+                {(() => {
+                  const cheaper = rivals.rivals.filter((r) => !r.isMe && r.price < Number(priceInput)).length
+                  const place = cheaper + 1
+                  return place === 1
+                    ? <span className="text-emerald-600">самый дешёвый — покупатели придут к вам</span>
+                    : <span>будете №{place} из {rivals.rivals.length} по цене</span>
+                })()}
+              </p>
+            )}
+            {priceError && <p className="mt-2 text-[11px] text-red-500">{priceError}</p>}
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                onClick={() => !priceBusy && setPriceEdit(null)}
+                className="h-12 rounded-xl bg-neutral-100 text-sm font-semibold text-neutral-600 active:scale-[0.98] transition"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={() => void savePrice()}
+                disabled={priceBusy}
+                className="h-12 rounded-xl bg-[#00AAFF] text-sm font-bold text-white active:scale-[0.98] transition disabled:opacity-60 flex items-center justify-center"
+              >
+                {priceBusy ? <Loader2 size={16} className="animate-spin" /> : 'Сохранить'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

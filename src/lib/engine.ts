@@ -10,11 +10,25 @@ import { botOpener } from '@/lib/chat-engine'
 import { auctionStep } from '@/lib/economy'
 import { emitTo } from '@/lib/realtime-emit'
 import { onListingCreated, notifyPriceDrop } from '@/lib/market-hooks'
+import { botComebackOffers } from '@/lib/price-war'
 import { fmtMoney } from '@/lib/format'
 import { cache } from '@/lib/cache'
 
 const g = globalThis as unknown as {
   __avitoEngine?: { started: boolean; tick: number; lastSpecialDay?: string }
+  __avitoNotifyCd?: Map<string, number>
+}
+
+// Кулдаун уведомлений одного типа про одно объявление — без него игрок
+// получает серии одинаковых «Конкурент сбивает цену» на локскрин.
+function notifyCooldown(key: string, ms: number): boolean {
+  const m = (g.__avitoNotifyCd ??= new Map<string, number>())
+  const now = Date.now()
+  const last = m.get(key) ?? 0
+  if (now - last < ms) return false
+  if (m.size > 500) m.clear()
+  m.set(key, now)
+  return true
 }
 
 function rnd<T>(arr: T[]): T {
@@ -325,10 +339,13 @@ async function botsTick(tick: number) {
             await db.listing.update({ where: { id: rivalBot.id }, data: { price: rp } })
             await notifyPriceDrop({ id: rivalBot.id, sellerId: rivalBot.sellerId, title: rivalBot.title, price: rp }, rivalOld)
           }
-          await notifyUser(
-            overpriced.sellerId, 'market', 'Конкурент сбивает цену',
-            `Такой же «${overpriced.title}» уже продают за ${fmtMoney(Math.min(rp, cheapest.price))}. Покупатели уходят к нему — подумайте о цене.`,
-          )
+          // не чаще раза в 30 минут на одно объявление — иначе спам на локскрине
+          if (notifyCooldown(`compete:${overpriced.id}`, 30 * 60_000)) {
+            await notifyUser(
+              overpriced.sellerId, 'market', 'Конкурент сбивает цену',
+              `Такой же «${overpriced.title}» уже продают за ${fmtMoney(Math.min(rp, cheapest.price))}. Покупатели уходят к нему — подумайте о цене.`,
+            )
+          }
         }
       }
     }
@@ -421,6 +438,10 @@ async function botsTick(tick: number) {
       break
     }
   }
+  // 7. Боты возвращаются в чат со скидкой (после паузы в торге)
+  if (tick % 3 === 0) {
+    await botComebackOffers()
+  }
 }
 
 // ---------- АУКЦИОН ----------
@@ -447,7 +468,9 @@ async function auctionTick(tick: number) {
   // ставки ботов
   if (tick % 2 === 0) {
     for (const lot of activeLots) {
-      if (lot.endsAt.getTime() - Date.now() < 30_000) continue
+      const msLeft = lot.endsAt.getTime() - Date.now()
+      // обычные ставки — пока до конца > 30с; в финальном окне боты снайпят редко (драма финала)
+      if (msLeft < 30_000 && Math.random() > 0.25) continue
       if (Math.random() > 0.3) continue
       const step = auctionStep(lot.startPrice)
       const mult = await getCategoryMult(lot.category)
@@ -460,12 +483,18 @@ async function auctionTick(tick: number) {
       const bot = await randomBot()
       if (!bot) continue
       if (bot.id === prevBidderId) continue
+      // анти-снайпинг (как у игрока): ставка в последнюю минуту продлевает торги до 30с
+      const extended = msLeft < 60_000
       await db.auctionBid.create({
         data: { lotId: lot.id, userId: bot.id, userName: bot.displayName, amount: nextBid },
       })
       await db.auctionLot.update({
         where: { id: lot.id },
-        data: { currentBid: nextBid, currentBidderId: bot.id, currentBidderName: bot.displayName, bidCount: { increment: 1 } },
+        data: {
+          currentBid: nextBid, currentBidderId: bot.id, currentBidderName: bot.displayName,
+          bidCount: { increment: 1 },
+          ...(extended ? { endsAt: new Date(Date.now() + 30_000) } : {}),
+        },
       })
       // вернуть деньги игроку, которого перебили
       if (prevBidderId) {
@@ -475,7 +504,7 @@ async function auctionTick(tick: number) {
           await notifyUser(prev.id, 'market', 'Вас перебили на аукционе', `Лот «${lot.title}» уходит за ${fmtMoney(nextBid)}. Ставка возвращена на счёт.`)
         }
       }
-      await emitTo('global', 'auction:update', { lotId: lot.id })
+      await emitTo('global', 'auction:update', { lotId: lot.id, extended })
     }
   }
 

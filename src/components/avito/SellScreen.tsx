@@ -200,7 +200,7 @@ export default function SellScreen({ onDone }: { onDone: () => void }) {
               {busy ? 'Публикуем...' : 'Разместить объявление'}
             </button>
             <p className="text-[11px] text-neutral-400 text-center px-4">
-              После продажи получитe {fmtMoney(Math.round(Number(price || 0) * 0.96))} (минус 4% налог)
+              После продажи получите {fmtMoney(Math.round(Number(price || 0) * 0.96))} (минус 4% налог)
             </p>
           </div>
         )}

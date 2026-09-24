@@ -158,6 +158,17 @@ export async function botReply(chatId: string, playerMsg: { text?: string; invoi
   await saveAndEmit(chat.id, bot, reply.text, persona.typoRate, reply.price ? { offer: reply.price } : undefined)
 }
 
+// Публичный хелпер: бот пишет сообщение в чат (используется и движком рынка)
+export async function botSay(
+  chatId: string,
+  bot: User,
+  text: string,
+  typoRate: number,
+  extra?: { kind?: 'invoice'; amount?: number; invoiceId?: string; offer?: number },
+) {
+  return saveAndEmit(chatId, bot, text, typoRate, extra)
+}
+
 async function saveAndEmit(
   chatId: string,
   bot: User,

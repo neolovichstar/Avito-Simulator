@@ -1,9 +1,12 @@
 import { db } from '@/lib/db'
-import { getSessionUser } from '@/lib/session'
+import { getSessionUser, unauthorized } from '@/lib/session'
 import { listingDTO, isOnline, ratingOf } from '@/lib/dto'
 import { getCategoryMult } from '@/lib/engine'
 import { CONDITION_MULT } from '@/lib/catalog-types'
 import { specsFor } from '@/lib/specs'
+import { cache } from '@/lib/cache'
+import { recordPricePoint } from '@/lib/market-hooks'
+import { onPlayerPriceDrop } from '@/lib/price-war'
 
 export const dynamic = 'force-dynamic'
 
@@ -69,5 +72,63 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       sellerName: s.seller.displayName,
       mine: user ? s.sellerId === user.id : false,
     })),
+  })
+}
+
+// PATCH: игрок меняет цену своего активного объявления
+export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const user = await getSessionUser(req)
+  if (!user) return unauthorized()
+  const { id } = await ctx.params
+
+  const listing = await db.listing.findUnique({ where: { id }, include: { seller: true } })
+  if (!listing || listing.sellerId !== user.id) {
+    return Response.json({ error: 'Объявление не найдено' }, { status: 404 })
+  }
+  if (listing.status !== 'active') {
+    return Response.json({ error: 'Объявление не активно' }, { status: 400 })
+  }
+
+  const body = (await req.json().catch(() => ({}))) as { price?: number }
+  const price = Math.round(Number(body.price))
+  if (!Number.isFinite(price) || price < 0 || price > 10_000_000) {
+    return Response.json({ error: 'Некорректная цена' }, { status: 400 })
+  }
+  if (price === listing.price) {
+    return Response.json({ listing: listingDTO(listing, user.id), changed: false })
+  }
+  // «даром» разрешаем только мусору/бесплатным (и если уже было даром)
+  if (price === 0 && listing.price > 0 && listing.baseValue >= 500) {
+    return Response.json({ error: 'Отдать даром можно только мелочь — иначе рынок не переживёт' }, { status: 400 })
+  }
+  if (price > 0 && price < 50) {
+    return Response.json({ error: 'Минимальная цена — 50 ₽ (или 0, чтобы отдать даром)' }, { status: 400 })
+  }
+
+  const oldPrice = listing.price
+  const updated = await db.listing.update({
+    where: { id: listing.id },
+    data: { price },
+    include: { seller: true },
+  })
+  cache.invalidate('feed')
+  await recordPricePoint(updated.itemKey, price)
+
+  // снижение цены — включаем войну: конкуренты отреагируют через пару секунд
+  if (price < oldPrice) {
+    void onPlayerPriceDrop(
+      {
+        id: updated.id, sellerId: updated.sellerId, itemKey: updated.itemKey,
+        title: updated.title, price, baseValue: updated.baseValue,
+      },
+      oldPrice,
+    ).catch(() => {})
+  }
+
+  return Response.json({
+    listing: listingDTO(updated, user.id),
+    changed: true,
+    oldPrice,
+    warStarted: price < oldPrice,
   })
 }

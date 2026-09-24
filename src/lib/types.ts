@@ -80,6 +80,36 @@ export interface SavedSearchDTO {
   createdAt: string
 }
 
+// Пульс рынка: заметное движение цены на конкретный товар за последний час
+export interface PulseItemDTO {
+  itemKey: string
+  title: string
+  image: string
+  category: string
+  price: number // последняя цена
+  deltaPct: number // минус — подешевел, плюс — подорожал
+  moves: number // сколько смен цены за час
+}
+
+// Конкуренты по тому же товару (для шита изменения цены)
+export interface RivalRow {
+  id: string
+  price: number
+  seller: string
+  city: string
+  condition: string
+  image: string
+  isMine: boolean
+  isMe: boolean
+}
+
+export interface RivalsData {
+  itemKey: string
+  count: number
+  avg: number
+  rivals: RivalRow[]
+}
+
 export interface ReviewDTO {
   id: string
   from: string

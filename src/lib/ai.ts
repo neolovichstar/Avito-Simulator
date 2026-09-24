@@ -43,7 +43,7 @@ export interface AiReply {
 const MODEL = process.env.OPENROUTER_MODEL ?? 'deepseek/deepseek-chat'
 const MODEL_FALLBACK = process.env.OPENROUTER_MODEL_FALLBACK ?? 'mistralai/mistral-small-3.2-24b-instruct'
 
-function withTypos(text: string, rate: number): string {
+export function withTypos(text: string, rate: number): string {
   if (rate <= 0 || Math.random() > 0.7) return text
   const words = text.split(' ')
   const idx = Math.floor(Math.random() * words.length)

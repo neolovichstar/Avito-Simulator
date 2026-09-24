@@ -2,14 +2,15 @@
 
 // Лента объявлений: крупные фотокарточки 16:10, поиск, категории, сортировка, избранное
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Search, SlidersHorizontal, Heart, MapPin, Star, Zap, BellPlus, X, SearchX, History } from 'lucide-react'
+import { Search, SlidersHorizontal, Heart, MapPin, Star, Zap, BellPlus, X, SearchX, History, Activity } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { CATEGORIES, CATEGORY_LABEL, CONDITION_MULT } from '@/lib/catalog-types'
 import type { CategoryKey } from '@/lib/catalog-types'
 import { fmtNum, initials, hueColor } from '@/lib/format'
 import { useOS } from '@/lib/store'
 import { getViewed, clearViewed, type ViewedItem } from '@/lib/viewed'
-import type { FeedListing, SavedSearchDTO } from '@/lib/types'
+import { getSocket } from '@/lib/use-realtime'
+import type { FeedListing, SavedSearchDTO, PulseItemDTO } from '@/lib/types'
 
 const FAV_KEY = 'avito_sim_favs'
 
@@ -64,6 +65,8 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
   const [viewed, setViewed] = useState<ViewedItem[]>([])
   const [city, setCity] = useState<string>('all')
   const [cities, setCities] = useState<{ city: string; count: number }[]>([])
+  const [pulse, setPulse] = useState<PulseItemDTO[]>([])
+  const [pulseFlash, setPulseFlash] = useState(false)
   const pushToast = useOS((s) => s.pushToast)
   const scrollRef = useRef<HTMLDivElement>(null)
   const pageRef = useRef(1)
@@ -81,8 +84,42 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
   const loadSaved = useCallback(() => {
     api.savedSearches().then((r) => setSaved(r.searches)).catch(() => {})
     api.feedCities().then((r) => setCities(r.cities.filter((c) => c.count > 0).slice(0, 12))).catch(() => {})
+    api.marketPulse().then((r) => setPulse(Array.isArray(r) ? r : [])).catch(() => {})
   }, [])
   useEffect(() => { loadSaved() }, [loadSaved])
+
+  // живой пульс: рынок дёрнулся — обновляем полосу и подсвечиваем её
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    let retry: ReturnType<typeof setTimeout> | null = null
+    let tries = 0
+    let detach: (() => void) | null = null
+    const attach = () => {
+      const sock = getSocket()
+      if (!sock) {
+        if (tries++ < 20) retry = setTimeout(attach, 1000)
+        return
+      }
+      const onPulse = () => {
+        if (timer) clearTimeout(timer)
+        timer = setTimeout(() => {
+          api.marketPulse().then((r) => {
+            setPulse(Array.isArray(r) ? r : [])
+            setPulseFlash(true)
+            setTimeout(() => setPulseFlash(false), 1600)
+          }).catch(() => {})
+        }, 2500)
+      }
+      sock.on('market:pulse', onPulse)
+      detach = () => { sock.off('market:pulse', onPulse) }
+    }
+    attach()
+    return () => {
+      if (retry) clearTimeout(retry)
+      if (timer) clearTimeout(timer)
+      if (detach) detach()
+    }
+  }, [])
 
   const saveCurrent = async () => {
     if (!query && category === 'all') return
@@ -252,6 +289,14 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
             items={viewed}
             onOpen={(id) => onOpenListing(id)}
             onClear={() => { clearViewed(); setViewed([]) }}
+          />
+        )}
+        {/* Пульс рынка — живые движения цен за час */}
+        {!favoritesMode && !query && category === 'all' && pulse.length > 0 && !loading && (
+          <MarketPulseStrip
+            items={pulse}
+            flash={pulseFlash}
+            onPick={(t) => { setQ(t); setQuery(t) }}
           />
         )}
         {error && (
@@ -433,5 +478,72 @@ export function ListingCard({ listing: l, onOpen, onFav, fav }: {
         </div>
       </button>
     </div>
+  )
+}
+
+// ПУЛЬС РЫНКА: карточки товаров, чья цена заметно двигалась за последний час.
+// Тап — применяем поиск по товару. Вспышка при живом обновлении с рынка.
+// deltaPct < 0 — подешевел (зелёный), > 0 — подорожал (красный).
+function MarketPulseStrip({ items, flash, onPick }: {
+  items: PulseItemDTO[]
+  flash: boolean
+  onPick: (query: string) => void
+}) {
+  const queryOf = (title: string) => {
+    const words = title.split(' ')
+    return words.length <= 2 ? title : words.slice(0, 2).join(' ')
+  }
+  return (
+    <section
+      className={`shrink-0 rounded-2xl bg-white shadow-sm overflow-hidden transition-shadow ${flash ? 'ring-2 ring-[#00AAFF]/50 shadow-md' : ''}`}
+      aria-label="Пульс рынка"
+    >
+      <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-1">
+        <Activity size={13} className="text-[#00AAFF]" aria-hidden />
+        <h2 className="text-xs font-semibold text-neutral-800">Пульс рынка</h2>
+        <span className="text-[10px] text-neutral-400">за час</span>
+        {flash && (
+          <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-[#00AAFF]">
+            <span className="relative flex h-1.5 w-1.5" aria-hidden>
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#00AAFF] opacity-75" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#00AAFF]" />
+            </span>
+            живое
+          </span>
+        )}
+      </div>
+      <div className="flex gap-2 overflow-x-auto px-2.5 pb-2.5 [scrollbar-width:none]">
+        {items.map((p) => {
+          const down = p.deltaPct < 0
+          return (
+            <button
+              key={p.itemKey}
+              onClick={() => onPick(queryOf(p.title))}
+              className="shrink-0 w-[124px] text-left rounded-xl border border-black/5 overflow-hidden bg-neutral-50 active:scale-[0.97] transition-transform"
+              aria-label={`${p.title}, цена ${fmtNum(p.price)}, ${down ? 'подешевел' : 'подорожал'} на ${Math.abs(p.deltaPct)}%`}
+            >
+              <div className="relative aspect-[16/10] bg-neutral-200">
+                <img src={p.image} alt={p.title} className="h-full w-full object-cover" loading="lazy" />
+                <span
+                  className={`absolute top-1 left-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-white shadow-sm ${
+                    down ? 'bg-emerald-500' : 'bg-red-500'
+                  }`}
+                >
+                  {down ? '−' : '+'}
+                  {Math.abs(p.deltaPct)}%
+                </span>
+              </div>
+              <div className="p-1.5 space-y-0.5">
+                <p className="text-[10px] font-semibold text-neutral-800 truncate">{p.title}</p>
+                <div className="flex items-baseline justify-between gap-1">
+                  <span className="text-[11px] font-bold text-neutral-900">{fmtNum(p.price)} ₽</span>
+                  <span className="text-[9px] text-neutral-400">{p.moves} изм.</span>
+                </div>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </section>
   )
 }

@@ -2,10 +2,11 @@
 
 // Приложение «Аукцион» — роскошный тёмный аукционный дом: фон #0c0a09, золотой акцент #d4a017.
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
-import { Gavel, Info, Loader2, Trophy } from 'lucide-react'
+import { ChevronDown, ChevronUp, Gavel, History, Info, Loader2, Trophy } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
-import { fmtMoney } from '@/lib/format'
+import { fmtMoney, timeAgo } from '@/lib/format'
+import { getSocket } from '@/lib/use-realtime'
 import { CONDITION_LABEL } from '@/lib/catalog-types'
 import type { AuctionData, AuctionLotDTO } from '@/lib/types'
 import { Button } from '@/components/ui/button'
@@ -75,6 +76,14 @@ function ConditionBadge({ value }: { value: string }) {
   )
 }
 
+interface BidRow {
+  id: string
+  userName: string
+  amount: number
+  createdAt: string
+  isMe: boolean
+}
+
 export default function AuctionApp() {
   const session = useOS((s) => s.session)
   const [data, setData] = useState<AuctionData | null>(null)
@@ -84,6 +93,13 @@ export default function AuctionApp() {
   const [bidInput, setBidInput] = useState('')
   const [bidError, setBidError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // история ставок
+  const [openHist, setOpenHist] = useState<string | null>(null)
+  const [histBids, setHistBids] = useState<Record<string, BidRow[]>>({})
+  const [histLoading, setHistLoading] = useState(false)
+  // лот, у которого только что продлили таймер (антиснайпинг)
+  const [extendedLot, setExtendedLot] = useState<string | null>(null)
+  const [liveBids, setLiveBids] = useState(0)
 
   useTick(1000) // живые таймеры лотов
 
@@ -103,13 +119,53 @@ export default function AuctionApp() {
     void load()
   }, [load])
 
+  const refreshHist = useCallback(async (lotId: string) => {
+    try {
+      const res = await api.auctionBids(lotId)
+      setHistBids((prev) => ({ ...prev, [lotId]: res.bids }))
+    } catch {
+      /* не критично */
+    }
+  }, [])
+
   // Тихий refetch каждые 10 секунд — боты торгуются живьём
   useEffect(() => {
     const id = setInterval(() => {
       void load(true)
+      if (openHist) void refreshHist(openHist)
     }, 10000)
     return () => clearInterval(id)
-  }, [load])
+  }, [load, openHist, refreshHist])
+
+  // realtime: чужая ставка прилетает мгновенно, без ожидания поллинга
+  useEffect(() => {
+    let tries = 0
+    let retry: ReturnType<typeof setTimeout> | null = null
+    let detach: (() => void) | null = null
+    const attach = () => {
+      const sock = getSocket()
+      if (!sock) {
+        if (tries++ < 20) retry = setTimeout(attach, 1000)
+        return
+      }
+      const onUpdate = (p: { lotId?: string; extended?: boolean }) => {
+        void load(true)
+        if (p.lotId && openHist === p.lotId) void refreshHist(p.lotId)
+        setLiveBids((n) => n + 1)
+        if (p.extended && p.lotId) {
+          setExtendedLot(p.lotId)
+          setTimeout(() => setExtendedLot((cur) => (cur === p.lotId ? null : cur)), 9000)
+        }
+      }
+      sock.on('auction:update', onUpdate)
+      detach = () => { sock.off('auction:update', onUpdate) }
+    }
+    attach()
+    return () => {
+      if (retry) clearTimeout(retry)
+      if (detach) detach()
+    }
+  }, [load, openHist, refreshHist])
 
   const openPanel = (lot: AuctionLotDTO) => {
     setOpenBid(lot.id)
@@ -120,6 +176,25 @@ export default function AuctionApp() {
   const closePanel = () => {
     setOpenBid(null)
     setBidError(null)
+  }
+
+  const toggleHist = async (lotId: string) => {
+    if (openHist === lotId) {
+      setOpenHist(null)
+      return
+    }
+    setOpenHist(lotId)
+    if (!histBids[lotId]) {
+      setHistLoading(true)
+      try {
+        const res = await api.auctionBids(lotId)
+        setHistBids((prev) => ({ ...prev, [lotId]: res.bids }))
+      } catch {
+        setHistBids((prev) => ({ ...prev, [lotId]: [] }))
+      } finally {
+        setHistLoading(false)
+      }
+    }
   }
 
   const placeBid = async (lot: AuctionLotDTO) => {
@@ -214,8 +289,13 @@ export default function AuctionApp() {
             </div>
 
             <div className="flex items-center gap-1.5 text-[10px] text-stone-600">
-              <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" aria-hidden />
-              Список обновляется автоматически каждые 10 секунд
+              <span className="relative flex size-1.5" aria-hidden>
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+                <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+              </span>
+              {liveBids > 0
+                ? `Ставки приходят в реальном времени · только что +${liveBids}`
+                : 'Ставки ботов приходят в реальном времени'}
             </div>
 
             {/* Лоты */}
@@ -262,6 +342,16 @@ export default function AuctionApp() {
                               Ваша ставка лидирует
                             </span>
                           ) : null}
+                          {!ended && extendedLot === lot.id && (
+                            <span className="inline-flex animate-pulse items-center gap-1 rounded-full border border-red-500/40 bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-300">
+                              Финал: таймер продлён
+                            </span>
+                          )}
+                          {!ended && remainMs < 60000 && extendedLot !== lot.id && (
+                            <span className="inline-flex items-center rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-300">
+                              Последние торги
+                            </span>
+                          )}
                         </div>
                         <div className="mt-1 text-[11px] text-stone-500">
                           Рынок: {fmtMoney(lot.baseValue)} · Старт: {fmtMoney(lot.startPrice)}
@@ -303,11 +393,90 @@ export default function AuctionApp() {
                         >
                           {ended ? 'Завершён' : fmtTimer(remainMs)}
                         </div>
-                        <div className="text-[11px] text-stone-500">
+                        <div className="flex items-center justify-end gap-1 text-[11px] text-stone-500">
+                          {!ended && lot.bidCount > 0 && (
+                            <span className="relative flex size-1" aria-hidden>
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#d4a017] opacity-75" />
+                              <span className="relative inline-flex size-1 rounded-full bg-[#d4a017]" />
+                            </span>
+                          )}
                           {lot.bidCount} {plural(lot.bidCount, 'ставка', 'ставки', 'ставок')}
                         </div>
                       </div>
                     </div>
+
+                    {/* История ставок */}
+                    {lot.bidCount > 0 && (
+                      <div className="mt-3">
+                        <button
+                          onClick={() => void toggleHist(lot.id)}
+                          className="flex w-full items-center justify-between rounded-lg border border-[#d4a017]/15 bg-black/20 px-3 py-2 text-[11px] font-medium text-stone-300 transition hover:border-[#d4a017]/35 hover:text-amber-50"
+                          aria-expanded={openHist === lot.id}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <History className="size-3.5 text-[#d4a017]" aria-hidden />
+                            История ставок ({lot.bidCount})
+                          </span>
+                          {openHist === lot.id ? (
+                            <ChevronUp className="size-3.5 text-stone-500" aria-hidden />
+                          ) : (
+                            <ChevronDown className="size-3.5 text-stone-500" aria-hidden />
+                          )}
+                        </button>
+                        {openHist === lot.id && (
+                          <div className="mt-1.5 max-h-52 overflow-y-auto rounded-lg border border-[#d4a017]/10 bg-black/30 p-1 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#d4a017]/25">
+                            {histLoading && !histBids[lot.id] ? (
+                              <div className="flex items-center justify-center gap-2 py-3 text-[11px] text-stone-500">
+                                <Loader2 className="size-3.5 animate-spin" aria-hidden /> Загружаем торги…
+                              </div>
+                            ) : (histBids[lot.id]?.length ?? 0) === 0 ? (
+                              <div className="py-3 text-center text-[11px] text-stone-500">Ставок пока не было</div>
+                            ) : (
+                              <div className="divide-y divide-stone-800/60">
+                                {histBids[lot.id]!.map((b, i) => (
+                                  <div
+                                    key={b.id}
+                                    className={
+                                      'flex items-center gap-2 px-2.5 py-2 text-xs ' +
+                                      (i === 0 ? 'bg-[#d4a017]/[0.07]' : '')
+                                    }
+                                  >
+                                    <span
+                                      className={
+                                        'flex size-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold ' +
+                                        (i === 0
+                                          ? 'bg-[#d4a017] text-stone-950'
+                                          : 'bg-stone-800 text-stone-400')
+                                      }
+                                    >
+                                      {i + 1}
+                                    </span>
+                                    <span
+                                      className={
+                                        'min-w-0 flex-1 truncate ' +
+                                        (b.isMe ? 'font-semibold text-emerald-400' : 'text-stone-300')
+                                      }
+                                    >
+                                      {b.userName}
+                                      {b.isMe && <span className="ml-1 text-[10px] font-normal text-emerald-500/80">(вы)</span>}
+                                    </span>
+                                    <span className="shrink-0 text-[10px] text-stone-500">{timeAgo(b.createdAt)}</span>
+                                    <span
+                                      className={
+                                        'shrink-0 font-semibold tabular-nums ' +
+                                        (i === 0 ? 'text-[#d4a017]' : 'text-stone-400')
+                                      }
+                                    >
+                                      {fmtMoney(b.amount)}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {!ended &&
                       (openBid === lot.id ? (

@@ -5,7 +5,7 @@ import type {
   SessionUser, FeedListing, ListingDetailData, ChatListItem, ChatDetailData, ChatMessageDTO,
   BankData, TaxData, MarketStats, NotificationDTO, InventoryItemDTO, ProfileData,
   RepairOrderDTO, RepairQuoteDTO, DeliveryDTO, AuctionData, AuctionLotDTO, CareerData,
-  SavedSearchDTO, SellerProfile, BonusState,
+  SavedSearchDTO, SellerProfile, BonusState, PulseItemDTO, RivalsData,
 } from '@/lib/types'
 import type { CatalogItem, CategoryKey } from '@/lib/catalog-types'
 
@@ -51,6 +51,9 @@ const put = <T,>(path: string, body?: unknown) =>
 
 const del = <T,>(path: string) => req<T>(path, { method: 'DELETE' })
 
+const patch = <T,>(path: string, body?: unknown) =>
+  req<T>(path, { method: 'PATCH', body: body !== undefined ? JSON.stringify(body) : undefined })
+
 export const api = {
   // auth
   auth: (initData: string | null) =>
@@ -74,6 +77,8 @@ export const api = {
     post<{ listing: FeedListing }>('/api/listings', body),
   boostListing: (id: string) => post<{ ok: boolean; balance: number }>(`/api/listings/${id}/boost`),
   removeListing: (id: string) => post<{ ok: boolean }>(`/api/listings/${id}/remove`),
+  updatePrice: (id: string, price: number) =>
+    patch<{ ok: boolean; listing: FeedListing; changed: boolean; oldPrice?: number; warStarted?: boolean }>(`/api/listings/${id}`, { price }),
   buyListing: (id: string, opts?: { courier?: boolean }) =>
     post<{ ok: boolean; balance: number; item?: InventoryItemDTO; deliveryId?: string }>(`/api/listings/${id}/buy`, { courier: opts?.courier ?? false }),
   leaveReview: (id: string, rating: number, text: string) =>
@@ -135,6 +140,13 @@ export const api = {
   auction: () => req<AuctionData>('/api/auction'),
   auctionBid: (lotId: string, amount: number) =>
     post<{ ok: boolean; balance: number; lot: AuctionLotDTO }>('/api/auction', { lotId, amount }),
+  auctionBids: (lotId: string) =>
+    req<{ bids: { id: string; userName: string; amount: number; createdAt: string; isMe: boolean }[] }>(`/api/auction/${lotId}`),
+
+  // пульс рынка: движения цен за час
+  marketPulse: () => req<PulseItemDTO[]>('/api/market/pulse'),
+  // конкуренты по товару (для шита цены)
+  listingRivals: (listingId: string) => req<RivalsData>(`/api/listings/${listingId}/rivals`),
 
   // карьера: задания и достижения
   career: () => req<CareerData>('/api/career'),

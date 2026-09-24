@@ -5,6 +5,7 @@ import { notifyUser, bumpStats, checkAchievements } from '@/lib/deals'
 import { rateLimit } from '@/lib/ratelimit'
 import { CONDITION_LABEL } from '@/lib/catalog-types'
 import { fmtMoney } from '@/lib/format'
+import { emitTo } from '@/lib/realtime-emit'
 import type { AuctionLotDTO, AuctionData } from '@/lib/types'
 import { itemImage } from '@/lib/item-images'
 
@@ -89,6 +90,7 @@ export async function POST(req: Request) {
   })
   await bumpStats(user.id, { bids: 1 })
   await checkAchievements(user.id)
+  await emitTo('global', 'auction:update', { lotId: lot.id, extended: endsAt.getTime() !== lot.endsAt.getTime() })
 
   const fresh = await db.user.findUnique({ where: { id: user.id } })
   const dto: AuctionLotDTO = {
