@@ -7,6 +7,7 @@ import { CATEGORY_LABEL, CONDITION_LABEL, CONDITION_MULT } from '@/lib/catalog-t
 import { fmtMoney, stripEmoji } from '@/lib/format'
 import { completeSale } from '@/lib/deals'
 import { bumpStats, bumpQuests } from '@/lib/deals'
+import { isBlocked } from '@/lib/blocked'
 import type { Chat, Listing, User } from '@prisma/client'
 
 export interface ChatMeta {
@@ -262,4 +263,70 @@ export async function payInvoice(chatId: string, invoiceId: string, player: User
   }
   await bumpQuests(player.id, 'chat')
   return { ok: true as const }
+}
+
+// ---------- WIN-BACK ----------
+// Бот-продавец сам делает шаг навстречу, если игрок пропал после торга:
+// через 2-6 минут присылает «ладно, отдам за X, ну ты чё» — цену между
+// последним оффером и скрытым пределом. Один раз на чат (winBackDone в meta).
+const WINBACK_TEMPLATES = [
+  'ладно, уступлю в последний раз — {X} и забирай',
+  'слушай, ну ты чё пропал, отдам за {X} если сегодня заберёшь',
+  'окей, хочу просто закрыть вопрос, {X} и моя',
+  'ладно, вижу ты с деньгами туго, давай {X} и разойдёмся',
+  'старая цена не актуальна, {X} — последняя, дальше только дорожать будет',
+  'ну не молчи, могу подвинуться: {X} и по рукам',
+]
+
+export async function winBackSweep(): Promise<void> {
+  // свежие чаты: последнее сообщение 2..30 минут назад
+  const chats = await db.chat.findMany({
+    where: { lastMessageAt: { lt: new Date(Date.now() - 2 * 60_000), gt: new Date(Date.now() - 30 * 60_000) } },
+    orderBy: { lastMessageAt: 'desc' },
+    take: 25,
+  })
+  for (const chat of chats) {
+    try {
+      const meta = parseChatMeta(chat.meta)
+      if (meta.closed || (meta as ChatMeta & { winBackDone?: boolean }).winBackDone) continue
+      if (meta.botRole !== 'seller') continue
+      if (!meta.lastOffer || meta.lastOffer <= 0) continue
+
+      const buyer = await db.user.findUnique({ where: { id: chat.buyerId } })
+      const seller = await db.user.findUnique({ where: { id: chat.sellerId } })
+      if (!buyer || !seller || buyer.isBot || !seller.isBot) continue
+      if (await isBlocked(buyer.id, seller.id)) continue
+
+      const listing = await db.listing.findUnique({ where: { id: chat.listingId } })
+      if (!listing || listing.status !== 'active') continue
+
+      const lastMsg = await db.message.findFirst({
+        where: { chatId: chat.id },
+        orderBy: { createdAt: 'desc' },
+      })
+      // последнее слово за ботом, и это текст (не ждём оплату инвойса)
+      if (!lastMsg || lastMsg.senderId !== seller.id || lastMsg.kind !== 'text') continue
+
+      // уступка 3-8% от последнего оффера, но не ниже экономического пола
+      // (~70% оценки товара в его состоянии) и не сильно ниже скрытого предела
+      const mult = CONDITION_MULT[listing.condition] ?? 0.8
+      const econFloor = Math.round(listing.baseValue * mult * 0.7)
+      const softFloor = Math.round(meta.botLimit * 0.88)
+      const price = Math.max(econFloor, softFloor, Math.round((meta.lastOffer * (1 - (0.03 + Math.random() * 0.05))) / 10) * 10)
+      if (price >= meta.lastOffer) continue
+
+      const persona = personaOf(seller)
+      const tpl = WINBACK_TEMPLATES[Math.floor(Math.random() * WINBACK_TEMPLATES.length)]
+      await botSay(chat.id, seller, tpl.replace('{X}', fmtMoney(price)), persona.typoRate + 0.05, { offer: price })
+
+      // ботLimit опускаем до обещанной цены, чтобы последующее «согласен»
+      // выставило счёт ровно на неё (иначе ИИ продаст дороже обещанного)
+      await db.chat.update({
+        where: { id: chat.id },
+        data: { meta: JSON.stringify({ ...meta, lastOffer: price, botLimit: price, winBackDone: true }) },
+      })
+    } catch (e) {
+      console.error('[chat-engine] winback error:', e)
+    }
+  }
 }

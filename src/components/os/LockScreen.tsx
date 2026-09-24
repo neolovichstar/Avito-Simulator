@@ -1,8 +1,10 @@
 'use client'
 
-import { useRef, useState, useSyncExternalStore } from 'react'
-import { ChevronUp } from 'lucide-react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { ChevronUp, ShoppingBag } from 'lucide-react'
 import { useOS } from '@/lib/store'
+import { api } from '@/lib/api'
+import { fmtMoney } from '@/lib/format'
 import { wallpaperClass } from '@/lib/wallpapers'
 
 // Живые тики каждые 1000 мс без setState в эффекте (useSyncExternalStore).
@@ -21,12 +23,29 @@ function useClock(): Date | null {
 export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   const battery = useOS((s) => s.battery)
   const online = useOS((s) => s.online)
+  const dnd = useOS((s) => s.dnd)
   const notifications = useOS((s) => s.notifications)
   const wallpaper = useOS((s) => s.wallpaper)
+  const session = useOS((s) => s.session)
 
   const now = useClock()
   const [leaving, setLeaving] = useState(false)
   const touchStartY = useRef<number | null>(null)
+  const [day, setDay] = useState<{ deals: number; net: number } | null>(null)
+
+  // итоги дня — только для авторизованной сессии, один раз при монтировании
+  useEffect(() => {
+    if (!session) return
+    let alive = true
+    api.daySummary()
+      .then((d) => {
+        if (alive && d.deals > 0) setDay({ deals: d.deals, net: d.net })
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [session])
 
   const unlock = () => {
     if (leaving) return
@@ -80,9 +99,28 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
         </div>
       )}
 
+      {/* Итоги дня (если сегодня были сделки) */}
+      {day && (
+        <div className="mt-4 flex items-center gap-3 rounded-2xl bg-white/10 px-4 py-3 backdrop-blur-md">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-violet-500/80">
+            <ShoppingBag className="size-4.5 text-white" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-white">Сегодня на Сделке</p>
+            <p className="text-xs text-white/70">
+              {day.deals} {day.deals === 1 ? 'сделка' : day.deals < 5 ? 'сделки' : 'сделок'} ·{' '}
+              <span className={day.net >= 0 ? 'font-semibold text-emerald-300' : 'font-semibold text-red-300'}>
+                {day.net >= 0 ? '+' : ''}
+                {fmtMoney(day.net)}
+              </span>
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1" />
 
-      {/* Батарея и онлайн */}
+      {/* Батарея, DND и онлайн */}
       <div className="mb-6 flex items-center justify-center gap-4 text-xs text-white/70">
         <span className="flex items-center gap-1.5 tabular-nums">
           <span
@@ -94,6 +132,8 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
           Батарея: {battery}%
         </span>
         <span aria-hidden="true" className="h-1 w-1 rounded-full bg-white/40" />
+        {dnd && <span title="Не беспокоить">Не беспокоить</span>}
+        {dnd && <span aria-hidden="true" className="h-1 w-1 rounded-full bg-white/40" />}
         <span className="tabular-nums">Онлайн: {online}</span>
       </div>
 

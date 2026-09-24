@@ -10,6 +10,7 @@ import {
   BatteryWarning,
   Bell,
   Flashlight,
+  Moon,
   Signal,
   Wifi,
 } from 'lucide-react'
@@ -42,6 +43,7 @@ export default function StatusBar({ variant, onBell }: { variant: 'light' | 'dar
   const charging = useOS((s) => s.charging)
   const online = useOS((s) => s.online)
   const flashlight = useOS((s) => s.flashlight)
+  const dnd = useOS((s) => s.dnd)
   const unreadNotifs = useOS((s) => s.notifications.filter((n) => !n.readAt).length)
   const now = useClock()
 
@@ -72,6 +74,11 @@ export default function StatusBar({ variant, onBell }: { variant: 'light' | 'dar
         <Signal className="h-4 w-4" aria-hidden="true" />
         <Wifi className="h-4 w-4" aria-hidden="true" />
         {flashlight && <Flashlight className="h-4 w-4 text-amber-300" aria-hidden="true" />}
+        {dnd && (
+          <span className="flex items-center" title="Не беспокоить">
+            <Moon className="h-4 w-4 text-violet-300" aria-label="Включён режим «Не беспокоить»" role="img" />
+          </span>
+        )}
         <span className="flex items-center gap-1">
           {batteryEl}
           <span className="text-xs font-medium tabular-nums">{battery}%</span>

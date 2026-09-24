@@ -6,7 +6,7 @@ import { PERSONAS } from '@/lib/personas-data'
 import { CATEGORY_IMAGE, CONDITIONS, CONDITION_MULT, CATEGORY_LABEL } from '@/lib/catalog-types'
 import { estValueFor, completeSale, deliverDue, notifyUser } from '@/lib/deals'
 import { ensureDailyQuests } from '@/lib/quest-engine'
-import { botOpener } from '@/lib/chat-engine'
+import { botOpener, winBackSweep } from '@/lib/chat-engine'
 import { auctionStep } from '@/lib/economy'
 import { emitTo } from '@/lib/realtime-emit'
 import { onListingCreated, notifyPriceDrop } from '@/lib/market-hooks'
@@ -638,6 +638,7 @@ export async function tickAll() {
     await deliveryTick()
     await repairTick()
     if (tick % 4 === 0) await financeTick()
+    if (tick % 4 === 0) await winBackSweep()
     await presenceTick()
     if (tick % 8 === 0) await ensureDailyQuestsAll()
   } catch (e) {

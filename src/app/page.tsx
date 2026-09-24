@@ -28,6 +28,7 @@ const BATTERY_KEY = 'avito_sim_battery'
 const THEME_KEY = 'avito_sim_theme'
 const WALLPAPER_KEY = 'avito_sim_wallpaper'
 const WIDGETS_KEY = 'avito_sim_widgets'
+const DND_KEY = 'avito_sim_dnd'
 const DESKTOP_MIN_WIDTH = 1024
 
 export default function Home() {
@@ -124,6 +125,8 @@ export default function Home() {
     setBattery(Number.isFinite(saved) ? saved : 100)
     const savedTheme = localStorage.getItem(THEME_KEY)
     if (savedTheme === 'dark' || savedTheme === 'light') useOS.getState().setTheme(savedTheme)
+    const savedDnd = localStorage.getItem(DND_KEY)
+    if (savedDnd === '1') useOS.getState().setDnd(true)
     const savedWall = localStorage.getItem(WALLPAPER_KEY)
     if (savedWall) useOS.getState().setWallpaper(savedWall)
     try {
@@ -155,6 +158,14 @@ export default function Home() {
   useEffect(() => {
     localStorage.setItem(THEME_KEY, theme)
   }, [theme])
+
+  // persist «Не беспокоить»
+  useEffect(() => {
+    const unsub = useOS.subscribe((s) => {
+      localStorage.setItem(DND_KEY, s.dnd ? '1' : '0')
+    })
+    return unsub
+  }, [])
 
   // persist обоев и виджетов
   useEffect(() => {

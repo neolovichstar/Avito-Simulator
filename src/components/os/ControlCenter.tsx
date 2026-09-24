@@ -5,7 +5,7 @@
 // звук и зарядка — системные переключатели ОС.
 import { useSyncExternalStore } from 'react'
 import {
-  BatteryCharging, ChevronDown, Flashlight, Moon, Settings, Sun, SunDim, Volume2, VolumeX, Zap, Wifi,
+  BatteryCharging, ChevronDown, Flashlight, Moon, MoonStar, Settings, Sun, SunDim, Volume2, VolumeX, Zap, Wifi,
 } from 'lucide-react'
 import { useOS, type AppKey } from '@/lib/store'
 import { enableTorch, stopTorch } from '@/lib/torch'
@@ -73,6 +73,8 @@ export default function ControlCenter({
   const setFlashlight = useOS((s) => s.setFlashlight)
   const soundOn = useOS((s) => s.soundOn)
   const setSound = useOS((s) => s.setSound)
+  const dnd = useOS((s) => s.dnd)
+  const setDnd = useOS((s) => s.setDnd)
   const charging = useOS((s) => s.charging)
   const setCharging = useOS((s) => s.setCharging)
   const brightness = useOS((s) => s.brightness)
@@ -168,6 +170,17 @@ export default function ControlCenter({
               onClick={() => setSound(!soundOn)}
             />
             <Tile
+              active={dnd}
+              activeCls="bg-violet-400 text-neutral-900"
+              icon={<MoonStar className="size-4.5" aria-hidden="true" />}
+              label="Не беспокоить"
+              sub={dnd ? 'Тосты скрыты' : 'Уведомления всплывают'}
+              onClick={() => {
+                setDnd(!dnd)
+                pushToast('Не беспокоить', !useOS.getState().dnd ? 'Тосты снова всплывают' : 'Уведомления копятся в центре')
+              }}
+            />
+            <Tile
               active={charging}
               activeCls="bg-emerald-400 text-neutral-900"
               icon={<Zap className="size-4.5" aria-hidden="true" />}
@@ -187,10 +200,9 @@ export default function ControlCenter({
               }}
             />
             <Tile
-              className="col-span-2"
               icon={<Settings className="size-4.5" aria-hidden="true" />}
               label="Настройки"
-              sub="Устройство, тема, звук"
+              sub="Тема, звук, Telegram"
               onClick={() => {
                 onClose()
                 onOpenApp('settings')

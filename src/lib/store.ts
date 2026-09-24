@@ -30,6 +30,7 @@ interface OSState {
   unreadChats: number
   toastQueue: { id: number; title: string; body: string }[]
   soundOn: boolean
+  dnd: boolean // «Не беспокоить»: тосты не всплывают, уведомления копятся в центре
   flashlight: boolean
   brightness: number // 0.4..1
   theme: 'light' | 'dark'
@@ -53,6 +54,7 @@ interface OSState {
   pushToast: (title: string, body: string) => void
   dropToast: (id: number) => void
   setSound: (v: boolean) => void
+  setDnd: (v: boolean) => void
   setFlashlight: (v: boolean) => void
   setBrightness: (v: number) => void
   setTheme: (t: 'light' | 'dark') => void
@@ -78,6 +80,7 @@ export const useOS = create<OSState>((set, get) => ({
   unreadChats: 0,
   toastQueue: [],
   soundOn: true,
+  dnd: false,
   flashlight: false,
   brightness: 1,
   theme: 'light',
@@ -104,6 +107,8 @@ export const useOS = create<OSState>((set, get) => ({
     set((s) => ({ notifications: s.notifications.map((n) => ({ ...n, readAt: n.readAt ?? new Date().toISOString() })) })),
   setUnreadChats: (n) => set({ unreadChats: n }),
   pushToast: (title, body) => {
+    // «Не беспокоить»: уведомление всё равно попадает в центр, но не всплывает поверх экрана
+    if (get().dnd) return
     g.__osToastId = (g.__osToastId ?? 0) + 1
     const id = g.__osToastId
     set((s) => ({ toastQueue: [...s.toastQueue, { id, title, body }].slice(-3) }))
@@ -113,6 +118,7 @@ export const useOS = create<OSState>((set, get) => ({
   },
   dropToast: (id) => set((s) => ({ toastQueue: s.toastQueue.filter((t) => t.id !== id) })),
   setSound: (v) => set({ soundOn: v }),
+  setDnd: (v) => set({ dnd: v }),
   setFlashlight: (v) => set({ flashlight: v }),
   setBrightness: (v) => set({ brightness: Math.max(0.4, Math.min(1, v)) }),
   setTheme: (t) => set({ theme: t }),

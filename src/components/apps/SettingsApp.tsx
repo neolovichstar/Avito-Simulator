@@ -3,7 +3,7 @@
 // Приложение «Настройки» — стиль Android-настроек: белый фон, секции-карточки.
 import { useCallback, useEffect, useState } from 'react'
 import {
-  BatteryCharging, Ban, CheckCircle2, Handshake, Info, Loader2, MapPin, Moon, NotebookText, RefreshCw,
+  BatteryCharging, Ban, CheckCircle2, Handshake, Info, Loader2, MapPin, Moon, MoonStar, NotebookText, RefreshCw,
   Send, Shield, Star, Volume2, Wallet,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
@@ -47,6 +47,8 @@ export default function SettingsApp() {
   const charging = useOS((s) => s.charging)
   const setCharging = useOS((s) => s.setCharging)
   const soundOn = useOS((s) => s.soundOn)
+  const dnd = useOS((s) => s.dnd)
+  const setDnd = useOS((s) => s.setDnd)
   const setSound = useOS((s) => s.setSound)
   const theme = useOS((s) => s.theme)
   const setTheme = useOS((s) => s.setTheme)
@@ -257,6 +259,16 @@ export default function SettingsApp() {
                   onCheckedChange={(v) => setTheme(v ? 'dark' : 'light')}
                   aria-label="Тёмная тема"
                 />
+              </div>
+              <div className="flex items-center gap-3 border-t border-neutral-100 px-4 py-3">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
+                  <MoonStar className="size-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium text-neutral-800">Не беспокоить</div>
+                  <div className="text-xs text-neutral-500">{dnd ? 'Тосты скрыты — всё копится в шторке' : 'Уведомления всплывают поверх экрана'}</div>
+                </div>
+                <Switch checked={dnd} onCheckedChange={setDnd} aria-label="Не беспокоить" />
               </div>
             </SectionCard>
 

@@ -3,15 +3,16 @@
 // Приложение «Банк» — стиль Сбербанк-онлайн: белый фон, зелёный акцент #21A038.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  ArrowDownToLine, ArrowUpFromLine, Banknote, CreditCard, Gauge, HandCoins, Landmark,
+  ArrowDownToLine, ArrowUpFromLine, Banknote, CreditCard, FileDown, Gauge, HandCoins, Landmark,
   Loader2, PiggyBank, TrendingUp,
 } from 'lucide-react'
-import { api, ApiError } from '@/lib/api'
+import { api, ApiError, exportCsvUrl } from '@/lib/api'
 import { useOS } from '@/lib/store'
 import { fmtMoney, timeAgo } from '@/lib/format'
 import { TX_TYPE_LABEL } from '@/lib/types'
 import type { BankData, SessionUser } from '@/lib/types'
 import { creditLabel } from '@/lib/economy'
+import { useCountUp } from '@/lib/use-count-up'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
@@ -36,6 +37,8 @@ export default function BankApp() {
   const [repayAmount, setRepayAmount] = useState(0)
   const [depositInput, setDepositInput] = useState('1000')
   const tabsRef = useRef<HTMLDivElement | null>(null)
+  // плавный «счётчик денег» на карте
+  const animatedBalance = useCountUp(data?.balance ?? 0)
 
   const load = useCallback(async () => {
     try {
@@ -150,7 +153,7 @@ export default function BankApp() {
                   </div>
                   <div className="text-right">
                     <div className="text-[10px] uppercase tracking-widest text-white/60">Баланс</div>
-                    <div className="text-2xl font-bold">{fmtMoney(data.balance)}</div>
+                    <div className="text-2xl font-bold tabular-nums">{fmtMoney(animatedBalance)}</div>
                   </div>
                 </div>
               </div>
@@ -294,7 +297,20 @@ export default function BankApp() {
             {/* ИСТОРИЯ */}
             {tab === 'История' && (
               <div className="rounded-2xl border border-neutral-100 p-3.5">
-                <div className="text-sm font-semibold">История операций</div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-sm font-semibold">История операций</div>
+                  {data.transactions.length > 0 && (
+                    <a
+                      href={exportCsvUrl()}
+                      download
+                      aria-label="Скачать историю операций в CSV"
+                      className="flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-[#21A038]/10 px-3 text-[11px] font-semibold text-[#177A2B] outline-none transition-colors hover:bg-[#21A038]/20 focus-visible:ring-2 focus-visible:ring-[#21A038]/40"
+                    >
+                      <FileDown className="size-3.5" aria-hidden="true" />
+                      CSV
+                    </a>
+                  )}
+                </div>
                 {data.transactions.length === 0 ? (
                   <p className="mt-3 text-xs text-neutral-400">Здесь появятся все ваши покупки, продажи и операции с банком.</p>
                 ) : (

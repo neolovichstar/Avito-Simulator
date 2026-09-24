@@ -180,4 +180,10 @@ export const api = {
   notifications: () => req<{ items: NotificationDTO[] }>('/api/notifications'),
   readNotifications: () => post<{ ok: boolean }>('/api/notifications', { action: 'read' }),
   stats: () => req<{ online: number }>('/api/stats'),
+  daySummary: () => req<{ deals: number; buys: number; sales: number; net: number }>('/api/day-summary'),
+}
+
+// Ссылка на скачивание CSV-истории операций (токен в query — для прямой ссылки)
+export function exportCsvUrl(): string {
+  return `/api/export/csv?token=${encodeURIComponent(getToken())}`
 }
