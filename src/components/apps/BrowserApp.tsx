@@ -6,8 +6,8 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   BookOpen, ChevronLeft, ChevronRight, CreditCard, ExternalLink, Globe, History,
-  Lock, Plus, RotateCw, Search, ShoppingBag, Square, TrendingDown,
-  TrendingUp, Users, X,
+  Lock, Plus, RotateCw, Search, ShoppingBag, Square, Star, TrendingDown,
+  TrendingUp, Users, Trash2, X,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
@@ -16,6 +16,67 @@ import { CATEGORY_LABEL } from '@/lib/catalog-types'
 import { useDrag, useSwipe } from '@/lib/use-swipe'
 import type { MarketStats } from '@/lib/types'
 import { Button } from '@/components/ui/button'
+
+function BookmarksPanel({
+  pal,
+  bookmarks,
+  onPick,
+  onRemove,
+  onBack,
+}: {
+  pal: Pal
+  bookmarks: { key: string; entry: NavEntry }[]
+  onPick: (e: NavEntry) => void
+  onRemove: (key: string) => void
+  onBack: () => void
+}) {
+  return (
+    <div className={'flex h-full flex-col ' + pal.shell}>
+      <div className={'flex items-center gap-2 border-b px-3 py-3 ' + pal.toolbarBorder}>
+        <button type="button" onClick={onBack} className={'flex size-9 items-center justify-center rounded-full transition ' + pal.hover} aria-label="Назад в браузер">
+          <ChevronLeft className={'size-5 ' + pal.icon} />
+        </button>
+        <div className="flex-1 text-sm font-semibold">Закладки</div>
+        <Star className={'size-4.5 ' + pal.faint} />
+      </div>
+      <div className="flex-1 overflow-y-auto [scrollbar-width:thin]">
+        {bookmarks.length === 0 ? (
+          <div className="flex flex-col items-center px-6 pt-16 text-center">
+            <Star className={'size-10 ' + (pal === C.light ? 'text-neutral-300' : 'text-[#5f6368]')} />
+            <div className={'mt-3 text-sm font-medium ' + pal.sub}>Закладок нет</div>
+            <p className={'mt-1 text-xs ' + pal.faint}>Жмите звёздочку в адресной строке, чтобы сохранить страницу</p>
+          </div>
+        ) : (
+          <ul className={'divide-y ' + pal.divider}>
+            {bookmarks.map(({ key, entry }) => (
+              <li key={key} className="flex items-center">
+                <button
+                  type="button"
+                  onClick={() => onPick(entry)}
+                  className={'flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left transition ' + pal.hover}
+                >
+                  <Favicon seed={entrySub(entry)} size={28} />
+                  <span className="min-w-0 flex-1">
+                    <span className={'block truncate text-[13px] font-medium ' + pal.shell.split(' ')[1]}>{entryTitle(entry)}</span>
+                    <span className={'block truncate text-[11px] ' + pal.faint}>{entrySub(entry)}</span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Удалить из закладок: ${entryTitle(entry)}`}
+                  onClick={() => onRemove(key)}
+                  className={'mr-2 flex size-8 shrink-0 items-center justify-center rounded-full transition active:scale-90 ' + pal.hover}
+                >
+                  <Trash2 className={'size-4 ' + pal.faint} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  )
+}
 
 // ---------- палитра Chrome (светлая/тёмная) ----------
 const C = {
@@ -968,10 +1029,27 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp: (app: 'avito' | '
   const [reloadKey, setReloadKey] = useState(0)
   const [busy, setBusy] = useState(false)
   const [omniFocused, setOmniFocused] = useState(false)
-  const [view, setView] = useState<'page' | 'tabs' | 'history'>('page')
+  const [view, setView] = useState<'page' | 'tabs' | 'history' | 'bookmarks'>('page')
   const [menuOpen, setMenuOpen] = useState(false)
   // журнал посещений с реальными таймстампами
   const [historyLog, setHistoryLog] = useState<{ entry: NavEntry; at: number }[]>([])
+  // закладки — живут в localStorage, как в настоящем Chrome
+  const [bookmarks, setBookmarks] = useState<{ key: string; entry: NavEntry }[]>(() => {
+    if (typeof window === 'undefined') return []
+    try {
+      const raw = localStorage.getItem('chrome_bookmarks_v1')
+      return raw ? (JSON.parse(raw) as { key: string; entry: NavEntry }[]) : []
+    } catch {
+      return []
+    }
+  })
+  useEffect(() => {
+    try {
+      localStorage.setItem('chrome_bookmarks_v1', JSON.stringify(bookmarks))
+    } catch {
+      /* приватный режим */
+    }
+  }, [bookmarks])
 
   const active = tabs.find((t) => t.id === activeId) ?? tabs[0]
   const current = active.stack[active.idx] ?? { type: 'site', site: 'start' }
@@ -980,6 +1058,17 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp: (app: 'avito' | '
   const secure = current.type === 'web'
   const canBack = active.idx > 0
   const canForward = active.idx < active.stack.length - 1
+
+  // закладки: текущая страница + звёздочка в омнибоксе
+  const bookmarkKey = entryKey(current)
+  const isBookmarked = bookmarks.some((b) => b.key === bookmarkKey)
+  const toggleBookmark = () => {
+    setBookmarks((prev) =>
+      prev.some((b) => b.key === bookmarkKey)
+        ? prev.filter((b) => b.key !== bookmarkKey)
+        : [...prev, { key: bookmarkKey, entry: current }].slice(-30),
+    )
+  }
 
   // синхронизация строки адреса с навигацией: «adjust state when props change»
   const [lastKey, setLastKey] = useState(currentKey)
@@ -1148,6 +1237,18 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp: (app: 'avito' | '
                 if (e.key === 'Enter') submitUrl()
               }}
             />
+            {/* звезда закладки — как в Chrome */}
+            {!isNtp && (
+              <button
+                type="button"
+                aria-label={isBookmarked ? 'Убрать из закладок' : 'Добавить в закладки'}
+                aria-pressed={isBookmarked}
+                onClick={toggleBookmark}
+                className={'flex size-7 shrink-0 items-center justify-center rounded-full transition active:scale-90 ' + (isBookmarked ? 'text-[#f9ab00]' : pal.icon)}
+              >
+                <Star className={'size-4 ' + (isBookmarked ? 'fill-[#f9ab00]' : '')} />
+              </button>
+            )}
             <button
               type="button"
               aria-label="Перезагрузить страницу"
@@ -1194,6 +1295,7 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp: (app: 'avito' | '
                 <div className={'chrome-menu-in absolute right-0 top-10 z-40 w-60 overflow-hidden rounded-2xl py-1.5 shadow-2xl ring-1 ring-black/10 ' + pal.sheet + ' ' + pal.menuBorder}>
                   {[
                     { icon: Plus, label: 'Новая вкладка', fn: newTab },
+                    { icon: Star, label: 'Закладки', fn: () => { setView('bookmarks'); setMenuOpen(false) } },
                     { icon: History, label: 'История', fn: () => { setView('history'); setMenuOpen(false) } },
                     { icon: BookOpen, label: 'Открыть Сделку', fn: () => { onOpenApp('avito'); setMenuOpen(false) } },
                     { icon: CreditCard, label: 'Открыть Банк', fn: () => { onOpenApp('bank'); setMenuOpen(false) } },
@@ -1258,6 +1360,14 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp: (app: 'avito' | '
           />
         ) : view === 'history' ? (
           <HistoryPanel pal={pal} entries={historyEntries} onPick={(e) => { go(e); setMenuOpen(false) }} onBack={() => setView('page')} />
+        ) : view === 'bookmarks' ? (
+          <BookmarksPanel
+            pal={pal}
+            bookmarks={bookmarks}
+            onPick={(e) => { go(e); setView('page') }}
+            onRemove={(k) => setBookmarks((prev) => prev.filter((b) => b.key !== k))}
+            onBack={() => setView('page')}
+          />
         ) : (
           <div ref={scrollRef} className="h-full overflow-y-auto [scrollbar-width:thin]" onPointerDown={ptr.onPointerDown}>
             {isNtp && (

@@ -1,7 +1,7 @@
 import { db } from '@/lib/db'
 import { getSessionUser, unauthorized } from '@/lib/session'
 import { isOnline } from '@/lib/dto'
-import { botOpener } from '@/lib/chat-engine'
+import { botOpener, personaOf } from '@/lib/chat-engine'
 import { CONDITION_MULT } from '@/lib/catalog-types'
 import { getCategoryMult } from '@/lib/engine'
 import type { ChatListItem } from '@/lib/types'
@@ -77,18 +77,21 @@ export async function POST(req: Request) {
   if (!chat && listing.seller.isBot) {
     const mult = await getCategoryMult(listing.category)
     const est = listing.baseValue * (CONDITION_MULT[listing.condition] ?? 0.8) * mult
-    const personaTrust = 0.5
     // Сложность ботов растёт с уровнем игрока: опытному торговцу бот уступает меньше.
     // Ур. 1 — базовая жадность, ур. 15+ — +5 п.п. к скрытому минимуму (но не дороже 97% цены).
     const levelFactor = Math.min(0.05, Math.max(0, (user.level - 1) * 0.0035))
+    // Характер личности: жадные держат цену (+), доверчивые уступают раньше (−)
+    const persona = personaOf(listing.seller)
+    const greedShift = (persona.greed - 0.5) * 0.06
+    const trustShift = (0.5 - persona.trust) * 0.04
     const limit = Math.max(
       Math.round(est * 0.35),
-      Math.min(Math.round(listing.price * 0.97), Math.round(listing.price * (0.86 + Math.random() * 0.08 + levelFactor))),
+      Math.min(Math.round(listing.price * 0.97), Math.round(listing.price * (0.87 + Math.random() * 0.07 + levelFactor + greedShift + trustShift))),
     )
     chat = await db.chat.create({
       data: {
         listingId: listing.id, buyerId: user.id, sellerId: listing.sellerId,
-        meta: JSON.stringify({ botRole: 'seller', botLimit: limit, rounds: 0 }),
+        meta: JSON.stringify({ botRole: 'seller', botLimit: limit, rounds: 0, patience: persona.patience }),
       },
     })
     const opener = botOpener(chat, listing, listing.seller)

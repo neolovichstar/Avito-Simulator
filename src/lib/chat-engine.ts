@@ -16,6 +16,8 @@ export interface ChatMeta {
   rounds: number
   closed?: boolean
   lastOffer?: number
+  patience?: number // сколько раундов бот выдерживает до финальной уступки
+  finalDone?: boolean // финальная уступка уже была
 }
 
 export function parseChatMeta(raw: string | null | undefined): ChatMeta {
@@ -27,6 +29,8 @@ export function parseChatMeta(raw: string | null | undefined): ChatMeta {
       rounds: m.rounds ?? 0,
       closed: m.closed,
       lastOffer: m.lastOffer,
+      patience: m.patience,
+      finalDone: m.finalDone,
     }
   } catch {
     return { botRole: 'buyer', botLimit: 0, rounds: 0 }
@@ -58,6 +62,10 @@ export function botOpener(chat: Chat, listing: Listing, bot: User): { text: stri
 const AGREE_PHRASES = ['по рукам', 'окей', 'идёт', 'ладно', 'договорились']
 function pickAgree(): string {
   return AGREE_PHRASES[Math.floor(Math.random() * AGREE_PHRASES.length)]
+}
+
+function pick<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)]
 }
 
 async function historyOf(chatId: string, viewerBotId: string): Promise<AiHistoryItem[]> {
@@ -136,6 +144,36 @@ export async function botReply(chatId: string, playerMsg: { text?: string; invoi
     }
   }
   // ---------- /FAST-PATH ----------
+
+  // ---------- ХАРАКТЕР: терпение и финальная уступка ----------
+  // Бот выдерживает persona.patience раундов, потом делает последнюю щедрую
+  // цену (свой botLimit), а через два раунда после этого устал и закрывает торг.
+  const patience = meta.patience ?? persona.patience
+  if (!meta.closed && meta.rounds >= patience) {
+    if (meta.rounds >= patience + 2 || meta.finalDone) {
+      // устал: терпение кончилось — вежливо/грубо закрываем сделку
+      await db.chat.update({ where: { id: chat.id }, data: { meta: JSON.stringify({ ...meta, closed: true, patience }) } })
+      const bye = isBuyer
+        ? pick(['ну всё, больше не дам, удачи в поисках', 'всё, потолок, до связи', 'не могу больше, пас'])
+        : pick(['всё, больше не уступлю, думай', 'последняя цена была — дальше никак, до связи', 'всё, я своё сказал, пас'])
+      await saveAndEmit(chat.id, bot, bye, persona.typoRate)
+      return
+    }
+    if (!meta.finalDone) {
+      // финальная уступка: открывает свою нижнюю границу один раз
+      const finalPrice = isBuyer ? Math.max(meta.botLimit, Math.round(meta.botLimit * 1.02)) : meta.botLimit
+      const text = isBuyer
+        ? `${pick(['ну окей, всё что есть', 'ладно, ты победил'])}: ${fmtMoney(finalPrice)}, больше не дам`
+        : `${pick(['ладно, уговорил', 'всё, последняя цена'])}: ${fmtMoney(finalPrice)}. Устраивает — ставь счёт`
+      await saveAndEmit(chat.id, bot, text, persona.typoRate, finalPrice ? { offer: finalPrice } : undefined)
+      await db.chat.update({
+        where: { id: chat.id },
+        data: { meta: JSON.stringify({ ...meta, finalDone: true, lastOffer: finalPrice, patience }) },
+      })
+      return
+    }
+  }
+  // ---------- /ХАРАКТЕР ----------
 
   const reply = await aiNegotiate({
     persona,
