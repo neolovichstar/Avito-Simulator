@@ -134,7 +134,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
     setMsg('')
     try {
       const res = await api.payInvoice(id, invoiceId)
-      refreshSession({ balance: res.balance })
+      refreshSession({ balance: res.balance, xp: res.xp, level: res.level })
       pushToast('Сделка', 'Счёт оплачен. Товар ваш!')
       await load()
     } catch (e) {

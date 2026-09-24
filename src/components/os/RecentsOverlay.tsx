@@ -1,7 +1,11 @@
 'use client'
 
-import { CreditCard, Globe, Receipt, Settings, ShoppingBag, Wrench, Gavel, Trophy, Truck, Crown, type LucideIcon } from 'lucide-react'
+// Недавние приложения: тап возвращает в приложение, свайп карточки вверх —
+// закрывает его из списка недавних (как на настоящем телефоне).
+import { useRef, useState } from 'react'
+import { CreditCard, Globe, Receipt, Settings, ShoppingBag, Wrench, Gavel, Trophy, Truck, Crown, X, type LucideIcon } from 'lucide-react'
 import { useOS, type AppKey } from '@/lib/store'
+import { useDrag } from '@/lib/use-swipe'
 
 const APP_META: Record<AppKey, { name: string; icon: LucideIcon; from: string; to: string }> = {
   avito: { name: 'Сделка', icon: ShoppingBag, from: '#B37BF5', to: '#5B21B6' },
@@ -16,6 +20,8 @@ const APP_META: Record<AppKey, { name: string; icon: LucideIcon; from: string; t
   leaderboard: { name: 'Лидеры', icon: Crown, from: '#d4a017', to: '#78350f' },
 }
 
+const SWIPE_CLOSE = 64 // порог свайпа вверх, px
+
 export default function RecentsOverlay({
   open,
   onClose,
@@ -26,6 +32,37 @@ export default function RecentsOverlay({
   onResume: () => void
 }) {
   const openApps = useOS((s) => s.openApps)
+  const dismissApp = useOS((s) => s.dismissApp)
+  const [dragging, setDragging] = useState<{ key: AppKey; dy: number } | null>(null)
+  const dragRef = useRef<{ key: AppKey } | null>(null)
+  const suppressClick = useRef(false)
+
+  // Свайп вверх — карточка уезжает, приложение закрывается из недавних
+  const { onPointerDown: onCardPointerDown } = useDrag({
+    onStart: (e) => {
+      const key = ((e.currentTarget as HTMLElement).dataset.appkey ?? '') as AppKey
+      if (!key) return
+      dragRef.current = { key }
+      setDragging({ key, dy: 0 })
+    },
+    onMove: (_dx, dy) => {
+      if (!dragRef.current) return
+      setDragging({ key: dragRef.current.key, dy })
+    },
+    onEnd: (_dx, dy) => {
+      const cur = dragRef.current
+      dragRef.current = null
+      setDragging(null)
+      if (!cur) return
+      if (dy < -8) {
+        suppressClick.current = true
+        setTimeout(() => {
+          suppressClick.current = false
+        }, 90)
+      }
+      if (dy < -SWIPE_CLOSE) dismissApp(cur.key)
+    },
+  })
 
   if (!open) return null
 
@@ -45,17 +82,39 @@ export default function RecentsOverlay({
             {openApps.map((key) => {
               const meta = APP_META[key] ?? APP_META.settings
               const Icon = meta.icon
+              const isDrag = dragging?.key === key
+              const dy = isDrag ? Math.min(0, dragging.dy) : 0
+              const willClose = isDrag && dy < -SWIPE_CLOSE
               return (
                 <button
                   key={key}
                   type="button"
-                  aria-label={`Вернуться в приложение ${meta.name}`}
-                  onClick={onResume}
-                  className="pointer-events-auto flex h-[220px] w-[120px] shrink-0 flex-col rounded-2xl p-3 text-left shadow-2xl ring-1 ring-white/15 outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-white"
+                  aria-label={`Вернуться в приложение ${meta.name}. Смахните вверх, чтобы закрыть`}
+                  data-appkey={key}
+                  onPointerDown={onCardPointerDown}
+                  onClick={() => {
+                    if (suppressClick.current) return
+                    onResume()
+                  }}
                   style={{
                     backgroundImage: `linear-gradient(160deg, ${meta.from}, ${meta.to})`,
+                    transform: isDrag ? `translateY(${dy}px) scale(${willClose ? 0.92 : 1})` : undefined,
+                    opacity: isDrag ? Math.max(0, 1 - Math.abs(dy) / 130) : undefined,
+                    touchAction: 'pan-x',
                   }}
+                  className={`pointer-events-auto relative flex h-[220px] w-[120px] shrink-0 flex-col rounded-2xl p-3 text-left shadow-2xl ring-1 outline-none transition-[background-color,box-shadow] focus-visible:ring-2 focus-visible:ring-white ${
+                    willClose ? 'ring-red-400/70' : 'ring-white/15'
+                  }`}
                 >
+                  {/* бейдж «закрыть» проявляется при драге */}
+                  {isDrag && dy < -20 && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute -top-2 left-1/2 flex size-6 -translate-x-1/2 items-center justify-center rounded-full bg-red-500 text-white shadow-lg"
+                    >
+                      <X className="size-3.5" />
+                    </span>
+                  )}
                   <span className="flex flex-1 items-center justify-center">
                     <Icon className="h-12 w-12 text-white" aria-hidden="true" />
                   </span>
@@ -65,7 +124,11 @@ export default function RecentsOverlay({
             })}
           </div>
         )}
-        <p className="text-xs text-white/50">Нажмите на карточку, чтобы вернуться в приложение</p>
+        <p className="text-xs text-white/50">
+          {openApps.length > 0
+            ? 'Нажмите, чтобы вернуться · смахните вверх, чтобы закрыть'
+            : 'Откройте любое приложение — оно появится здесь'}
+        </p>
       </div>
     </div>
   )

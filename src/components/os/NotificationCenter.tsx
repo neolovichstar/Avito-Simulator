@@ -2,11 +2,16 @@
 
 // Уведомления как в настоящем телефоне: иконка приложения, имя приложения,
 // заголовок, текст. Тап разворачивает карточку — видно весь текст и кнопку «Открыть».
-import { useState } from 'react'
-import { Bell, ChevronDown, ChevronUp, Info, MessageSquare, Receipt, ShoppingBag, TrendingUp, type LucideIcon } from 'lucide-react'
+// Карточку можно смахнуть в сторону — она удалится (и на сервере тоже).
+import { useRef, useState } from 'react'
+import {
+  Bell, ChevronDown, ChevronUp, Crown, Gavel, Info, MessageSquare, Receipt,
+  ShoppingBag, Trash2, TrendingUp, Truck, Trophy, type LucideIcon,
+} from 'lucide-react'
 import { useOS, type AppKey } from '@/lib/store'
 import { api } from '@/lib/api'
 import { timeAgo } from '@/lib/format'
+import { useDrag } from '@/lib/use-swipe'
 
 interface NotifApp {
   app: string
@@ -20,8 +25,17 @@ const KIND_APP: Record<string, NotifApp> = {
   message: { app: 'Сделка', icon: MessageSquare, bg: 'linear-gradient(145deg,#B37BF5,#7C3AED)', openApp: 'avito' },
   tax: { app: 'Налоги', icon: Receipt, bg: 'linear-gradient(145deg,#4a5568,#2d3748)', openApp: 'taxes' },
   market: { app: 'Сделка', icon: TrendingUp, bg: 'linear-gradient(145deg,#B37BF5,#7C3AED)', openApp: 'avito' },
+  career: { app: 'Задания', icon: Trophy, bg: 'linear-gradient(145deg,#B37BF5,#5B21B6)', openApp: 'career' },
+  quest: { app: 'Задания', icon: Trophy, bg: 'linear-gradient(145deg,#B37BF5,#5B21B6)', openApp: 'career' },
+  achievement: { app: 'Задания', icon: Trophy, bg: 'linear-gradient(145deg,#B37BF5,#5B21B6)', openApp: 'career' },
+  auction: { app: 'Аукцион', icon: Gavel, bg: 'linear-gradient(145deg,#fbbf24,#b45309)', openApp: 'auction' },
+  delivery: { app: 'Доставки', icon: Truck, bg: 'linear-gradient(145deg,#34d399,#047857)', openApp: 'delivery' },
+  leader: { app: 'Лидеры', icon: Crown, bg: 'linear-gradient(145deg,#fcd34d,#92400e)', openApp: 'leaderboard' },
   system: { app: 'Система', icon: Info, bg: 'linear-gradient(145deg,#9ca3af,#4b5563)', openApp: 'settings' },
 }
+
+const clampX = (x: number) => Math.max(-150, Math.min(150, x))
+const SWIPE_DELETE = 88 // порог смахивания, px
 
 export default function NotificationCenter({
   open,
@@ -34,14 +48,61 @@ export default function NotificationCenter({
 }) {
   const notifications = useOS((s) => s.notifications)
   const markNotificationsRead = useOS((s) => s.markNotificationsRead)
+  const removeNotification = useOS((s) => s.removeNotification)
+  const clearNotifications = useOS((s) => s.clearNotifications)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [dragging, setDragging] = useState<{ id: string; dx: number } | null>(null)
+  const dragRef = useRef<{ id: string } | null>(null)
+  const suppressClick = useRef(false)
 
   const readAll = () => {
     markNotificationsRead()
     api.readNotifications().catch(() => {})
   }
 
-  const toggle = (id: string) => setExpandedId((cur) => (cur === id ? null : id))
+  const clearAll = () => {
+    clearNotifications()
+    setExpandedId(null)
+    api.clearNotifications().catch(() => {})
+  }
+
+  const dismiss = (id: string) => {
+    if (expandedId === id) setExpandedId(null)
+    removeNotification(id)
+    api.deleteNotification(id).catch(() => {})
+  }
+
+  const toggle = (id: string) => {
+    if (suppressClick.current) return
+    setExpandedId((cur) => (cur === id ? null : id))
+  }
+
+  // Свайп-удаление: карточка следует за пальцем, дальше порога — краснеет и удаляется
+  const { onPointerDown: onCardPointerDown } = useDrag({
+    onStart: (e) => {
+      const id = (e.currentTarget as HTMLElement).dataset.notifId ?? ''
+      if (!id) return
+      dragRef.current = { id }
+      setDragging({ id, dx: 0 })
+    },
+    onMove: (dx) => {
+      if (!dragRef.current) return
+      setDragging({ id: dragRef.current.id, dx })
+    },
+    onEnd: (dx) => {
+      const cur = dragRef.current
+      dragRef.current = null
+      setDragging(null)
+      if (!cur) return
+      if (Math.abs(dx) > 12) {
+        suppressClick.current = true
+        setTimeout(() => {
+          suppressClick.current = false
+        }, 90)
+      }
+      if (Math.abs(dx) > SWIPE_DELETE) dismiss(cur.id)
+    },
+  })
 
   return (
     <div className={`pointer-events-none absolute inset-0 z-45 ${open ? '' : 'invisible'}`}>
@@ -69,6 +130,16 @@ export default function NotificationCenter({
             Уведомления
           </h2>
           <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={clearAll}
+              tabIndex={open ? 0 : -1}
+              disabled={notifications.length === 0}
+              className="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs text-white/70 outline-none transition-colors enabled:active:bg-white/10 enabled:hover:text-white disabled:opacity-35 focus-visible:ring-2 focus-visible:ring-white/70"
+            >
+              <Trash2 className="size-3.5" aria-hidden="true" />
+              Очистить
+            </button>
             <button
               type="button"
               onClick={readAll}
@@ -104,13 +175,18 @@ export default function NotificationCenter({
               const AppIcon = meta.icon
               const unread = !n.readAt
               const expanded = expandedId === n.id
+              const isDrag = dragging?.id === n.id
+              const dx = isDrag ? clampX(dragging.dx) : 0
+              const willDelete = isDrag && Math.abs(dx) > SWIPE_DELETE
               return (
                 <li key={n.id}>
                   <div
                     role="button"
                     tabIndex={open ? 0 : -1}
                     aria-expanded={expanded}
-                    aria-label={`${meta.app}: ${n.title}. ${expanded ? 'Свернуть' : 'Развернуть'}`}
+                    aria-label={`${meta.app}: ${n.title}. ${expanded ? 'Свернуть' : 'Развернуть'}. Смахните в сторону, чтобы удалить.`}
+                    data-notif-id={n.id}
+                    onPointerDown={onCardPointerDown}
                     onClick={() => toggle(n.id)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -118,9 +194,14 @@ export default function NotificationCenter({
                         toggle(n.id)
                       }
                     }}
-                    className={`cursor-pointer rounded-2xl px-3.5 py-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/60 ${
-                      unread ? 'bg-white/10' : 'bg-white/[0.045]'
-                    } ${expanded ? 'bg-white/[0.13]' : 'active:bg-white/[0.09]'}`}
+                    style={{
+                      transform: isDrag ? `translateX(${dx}px)` : undefined,
+                      opacity: isDrag ? Math.max(0, 1 - Math.abs(dx) / 170) : undefined,
+                      touchAction: 'pan-y',
+                    }}
+                    className={`cursor-pointer touch-pan-y select-none rounded-2xl px-3.5 py-3 outline-none transition-[background-color,box-shadow] focus-visible:ring-2 focus-visible:ring-white/60 ${
+                      willDelete ? 'bg-red-500/30 ring-1 ring-red-400/50' : unread ? 'bg-white/10' : 'bg-white/[0.045]'
+                    } ${expanded && !isDrag ? 'bg-white/[0.13]' : !isDrag && !willDelete ? 'active:bg-white/[0.09]' : ''}`}
                   >
                     <div className="flex items-center gap-2.5">
                       {/* иконка приложения — квадрат с радиусом, как на рабочем столе */}
@@ -170,6 +251,9 @@ export default function NotificationCenter({
                 </li>
               )
             })}
+            <li aria-hidden="true" className="pt-1 text-center text-[11px] text-white/30">
+              Смахните карточку в сторону, чтобы удалить
+            </li>
           </ul>
         )}
       </section>

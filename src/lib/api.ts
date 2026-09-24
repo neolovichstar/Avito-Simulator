@@ -80,7 +80,7 @@ export const api = {
   updatePrice: (id: string, price: number) =>
     patch<{ ok: boolean; listing: FeedListing; changed: boolean; oldPrice?: number; warStarted?: boolean }>(`/api/listings/${id}`, { price }),
   buyListing: (id: string, opts?: { courier?: boolean }) =>
-    post<{ ok: boolean; balance: number; item?: InventoryItemDTO; deliveryId?: string }>(`/api/listings/${id}/buy`, { courier: opts?.courier ?? false }),
+    post<{ ok: boolean; balance: number; xp?: number; level?: number; item?: InventoryItemDTO; deliveryId?: string }>(`/api/listings/${id}/buy`, { courier: opts?.courier ?? false }),
   leaveReview: (id: string, rating: number, text: string) =>
     post<{ ok: boolean; xp: number }>(`/api/listings/${id}/review`, { rating, text }),
   userReviews: (userId: string) =>
@@ -114,7 +114,7 @@ export const api = {
   chat: (id: string) => req<ChatDetailData>(`/api/chats/${id}`),
   sendMessage: (id: string, text: string) => post<{ messages: ChatMessageDTO[] }>(`/api/chats/${id}/messages`, { text }),
   sendInvoice: (id: string, amount: number) => post<{ messages: ChatMessageDTO[] }>(`/api/chats/${id}/messages`, { invoice: amount }),
-  payInvoice: (id: string, invoiceId: string) => post<{ ok: boolean; balance: number; messages: ChatMessageDTO[] }>(`/api/chats/${id}/pay`, { invoiceId }),
+  payInvoice: (id: string, invoiceId: string) => post<{ ok: boolean; balance: number; xp?: number; level?: number; messages: ChatMessageDTO[] }>(`/api/chats/${id}/pay`, { invoiceId }),
 
   // банк
   bank: () => req<BankData>('/api/bank'),
@@ -180,6 +180,8 @@ export const api = {
   profile: () => req<ProfileData>('/api/profile'),
   notifications: () => req<{ items: NotificationDTO[] }>('/api/notifications'),
   readNotifications: () => post<{ ok: boolean }>('/api/notifications', { action: 'read' }),
+  deleteNotification: (id: string) => post<{ ok: boolean }>('/api/notifications', { action: 'delete', id }),
+  clearNotifications: () => post<{ ok: boolean }>('/api/notifications', { action: 'clear' }),
   stats: () => req<{ online: number }>('/api/stats'),
   daySummary: () => req<{ deals: number; buys: number; sales: number; net: number }>('/api/day-summary'),
   leaderboard: () =>

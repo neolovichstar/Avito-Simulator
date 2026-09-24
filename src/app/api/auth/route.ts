@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { signSession, validateInitData } from '@/lib/telegram'
 import { rateLimit } from '@/lib/ratelimit'
+import { levelFromXp } from '@/lib/economy'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,6 +51,12 @@ export async function POST(req: Request) {
   }
 
   if (!user) return Response.json({ error: 'Не удалось создать профиль' }, { status: 500 })
+
+  // лечение уровня: если в БД остался level от старой формулы — пересчитываем из xp
+  const healLevel = levelFromXp(user.xp)
+  if (user.level !== healLevel) {
+    user = await db.user.update({ where: { id: user.id }, data: { level: healLevel } })
+  }
 
   const token = signSession(user.id)
   const isNew = user.balance === 35000 && user.ratingCount === 0 && user.xp === 0

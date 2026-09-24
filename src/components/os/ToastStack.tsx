@@ -2,7 +2,7 @@
 
 // Всплывающие уведомления как в настоящем телефоне (heads-up):
 // иконка и имя приложения, заголовок, текст. Тап по заголовку открывает приложение.
-import { Bell, MessageSquare, Receipt, ShoppingBag, TrendingUp, X, type LucideIcon } from 'lucide-react'
+import { Bell, Gavel, MessageSquare, Receipt, ShoppingBag, Trophy, TrendingUp, Truck, Crown, X, type LucideIcon } from 'lucide-react'
 import { useOS, type AppKey } from '@/lib/store'
 import { openAppForToast } from '@/lib/toast-apps'
 
@@ -12,15 +12,27 @@ const APP_META: Record<string, { app: string; icon: LucideIcon; bg: string; open
   deal: { app: 'Сделка', icon: ShoppingBag, bg: 'linear-gradient(145deg,#B37BF5,#7C3AED)', openApp: 'avito' },
   tax: { app: 'Налоги', icon: Receipt, bg: 'linear-gradient(145deg,#4a5568,#2d3748)', openApp: 'taxes' },
   market: { app: 'Сделка', icon: TrendingUp, bg: 'linear-gradient(145deg,#B37BF5,#7C3AED)', openApp: 'avito' },
+  career: { app: 'Задания', icon: Trophy, bg: 'linear-gradient(145deg,#B37BF5,#5B21B6)', openApp: 'career' },
+  auction: { app: 'Аукцион', icon: Gavel, bg: 'linear-gradient(145deg,#fbbf24,#b45309)', openApp: 'auction' },
+  delivery: { app: 'Доставки', icon: Truck, bg: 'linear-gradient(145deg,#34d399,#047857)', openApp: 'delivery' },
+  leader: { app: 'Лидеры', icon: Crown, bg: 'linear-gradient(145deg,#fcd34d,#92400e)', openApp: 'leaderboard' },
   system: { app: 'Система', icon: Bell, bg: 'linear-gradient(145deg,#9ca3af,#4b5563)', openApp: 'settings' },
 }
 
 // Ключевые слова в теле/заголовке — чтобы тост попадал в своё приложение
 function metaFor(title: string, body: string) {
   const s = `${title} ${body}`.toLowerCase()
-  if (s.includes('счёт') || s.includes('сообщен') || s.includes('чат')) return APP_META.message
   if (s.includes('налог') || s.includes('фнс')) return APP_META.tax
-  if (s.includes('рынк') || s.includes('цена') || s.includes('событи') || s.includes('аукцион')) return APP_META.market
+  // карьера: уровни, задания, достижения, бонусы
+  if (s.includes('уровен') || s.includes('задан') || s.includes('достижен') || s.includes('квест') || s.includes('стрик') || s.includes('бонус') || s.includes('опыт')) return APP_META.career
+  // аукцион: лоты и ставки
+  if (s.includes('аукцион') || s.includes(' лот') || s.includes('ставк') || s.includes('перебит')) return APP_META.auction
+  // доставки
+  if (s.includes('достав') || s.includes('посылк') || s.includes('курьер')) return APP_META.delivery
+  // лидерборды
+  if (s.includes('лидер') || s.includes('топ-') || s.includes('рейтинг')) return APP_META.leader
+  if (s.includes('счёт') || s.includes('сообщен') || s.includes('чат')) return APP_META.message
+  if (s.includes('рынк') || s.includes('цена') || s.includes('событи')) return APP_META.market
   if (s.includes('покуп') || s.includes('продаж') || s.includes('сделк') || s.includes('avito')) return APP_META.deal
   return APP_META.system
 }

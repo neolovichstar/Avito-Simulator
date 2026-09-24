@@ -2,6 +2,7 @@
 
 import { create } from 'zustand'
 import type { SessionUser, NotificationDTO } from '@/lib/types'
+import { levelFromXp } from '@/lib/economy'
 
 export type AppKey = 'avito' | 'bank' | 'taxes' | 'browser' | 'settings' | 'repair' | 'auction' | 'career' | 'delivery' | 'leaderboard'
 
@@ -43,11 +44,14 @@ interface OSState {
   openApp: (app: AppKey) => void
   closeApp: () => void
   goHome: () => void
+  dismissApp: (app: AppKey) => void // убрать приложение из недавних (свайп в recents)
   setBattery: (v: number) => void
   setCharging: (v: boolean) => void
   setOnline: (n: number) => void
   setNotifications: (n: NotificationDTO[]) => void
   addNotification: (n: NotificationDTO) => void
+  removeNotification: (id: string) => void
+  clearNotifications: () => void
   markNotificationsRead: () => void
   setUnreadChats: (n: number) => void
   pushToast: (title: string, body: string) => void
@@ -96,11 +100,18 @@ export const useOS = create<OSState>((set, get) => ({
   },
   closeApp: () => set({ currentApp: null }),
   goHome: () => set({ currentApp: null }),
+  dismissApp: (app) =>
+    set((s) => ({
+      openApps: s.openApps.filter((a) => a !== app),
+      currentApp: s.currentApp === app ? null : s.currentApp,
+    })),
   setBattery: (v) => set({ battery: Math.max(0, Math.min(100, v)) }),
   setCharging: (v) => set({ charging: v }),
   setOnline: (n) => set({ online: n }),
   setNotifications: (n) => set({ notifications: n }),
   addNotification: (n) => set((s) => ({ notifications: [n, ...s.notifications].slice(0, 40) })),
+  removeNotification: (id) => set((s) => ({ notifications: s.notifications.filter((n) => n.id !== id) })),
+  clearNotifications: () => set({ notifications: [] }),
   markNotificationsRead: () =>
     set((s) => ({ notifications: s.notifications.map((n) => ({ ...n, readAt: n.readAt ?? new Date().toISOString() })) })),
   setUnreadChats: (n) => set({ unreadChats: n }),
@@ -122,5 +133,19 @@ export const useOS = create<OSState>((set, get) => ({
   toggleTheme: () => set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
   setWallpaper: (id) => set({ wallpaper: id }),
   setWidgets: (w) => set({ widgets: w.length ? w : ['clock', 'wallet', 'online'] }),
-  refreshSession: (u) => set((s) => (s.session ? { session: { ...s.session, ...u } } : {})),
+  refreshSession: (u) => {
+    const s = get()
+    if (!s.session) return
+    const prevLevel = s.session.level
+    set({ session: { ...s.session, ...u } })
+    // XP-нотификация: уровень вырос — heads-up как в настоящем телефоне.
+    // Если бэк не прислал level, но прислал xp — считаем по единой формуле.
+    const nextLevel = u.level ?? (u.xp != null ? levelFromXp(u.xp) : prevLevel)
+    if (nextLevel > prevLevel) {
+      s.pushToast(
+        `Новый уровень ${nextLevel}!`,
+        'Опыт вырос: лимит кредита повышен, а задания стали щедрее.',
+      )
+    }
+  },
 }))

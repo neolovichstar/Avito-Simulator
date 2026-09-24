@@ -21,6 +21,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   return Response.json({
     ok: true,
     balance: fresh?.balance ?? user.balance,
+    xp: fresh?.xp ?? user.xp,
+    level: fresh?.level ?? user.level,
     messages: messages.map((m) => ({
       id: m.id, senderType: m.senderType as 'user' | 'bot' | 'system', senderId: m.senderId,
       senderName: m.senderName, kind: m.kind as 'text' | 'invoice' | 'system', text: m.text,

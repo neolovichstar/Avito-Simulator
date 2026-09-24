@@ -2,7 +2,7 @@
 // Используется и API-роутами, и движком ботов.
 import { db } from '@/lib/db'
 import { emitTo } from '@/lib/realtime-emit'
-import { TAX_RATE, DELIVERY_FEE, courierDefectChance, deliveryEtaSeconds, nextCondition } from '@/lib/economy'
+import { TAX_RATE, DELIVERY_FEE, courierDefectChance, deliveryEtaSeconds, nextCondition, levelFromXp } from '@/lib/economy'
 import { achievedIds, ACHIEVEMENTS, parseStats, defaultStats, type PlayerStats, type QuestKind } from '@/lib/quests'
 import { PERSONAS } from '@/lib/personas-data'
 import { CONDITION_ORDER } from '@/lib/economy'
@@ -28,7 +28,9 @@ export async function addXp(userId: string, xp: number): Promise<number> {
   const user = await db.user.findUnique({ where: { id: userId } })
   if (!user) return 0
   const newXp = user.xp + xp
-  const level = Math.max(1, Math.floor(Math.sqrt(newXp / 60)) + 1)
+  // единая формула уровня (economy.levelFromXp) — та же, что в Карьере и Лидерах,
+  // иначе уровень в БД расходился с интерфейсом
+  const level = levelFromXp(newXp)
   await db.user.update({ where: { id: userId }, data: { xp: newXp, level } })
   if (level > user.level) {
     await notifyUser(userId, 'system', 'Новый уровень', `Вы достигли ${level} уровня. Лимит кредита повышен.`)

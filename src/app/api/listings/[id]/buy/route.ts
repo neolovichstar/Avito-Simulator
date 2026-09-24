@@ -56,5 +56,5 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   }
 
   const fresh = await db.user.findUnique({ where: { id: user.id } })
-  return Response.json({ ok: true, balance: fresh?.balance ?? user.balance, deliveryId: res.deliveryId, downgraded: res.downgraded })
+  return Response.json({ ok: true, balance: fresh?.balance ?? user.balance, xp: fresh?.xp ?? user.xp, level: fresh?.level ?? user.level, deliveryId: res.deliveryId, downgraded: res.downgraded })
 }

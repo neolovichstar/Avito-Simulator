@@ -78,7 +78,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
     setMsg('')
     try {
       const res = await api.buyListing(id, { courier })
-      refreshSession({ balance: res.balance })
+      refreshSession({ balance: res.balance, xp: res.xp, level: res.level })
       setBuyOpen(false)
       setOkMsg(courier ? 'Курьер уже забирает товар — следите в приложении Доставки' : 'Товар ваш! Проверьте инвентарь в профиле')
       await load()
