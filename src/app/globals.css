@@ -284,6 +284,98 @@
 .theme-dark .bg-neutral-100\/80, .theme-dark [class*="bg-neutral-100/"] { background-color: #121417; }
 
 /* ============================================================
+   ТЁМНАЯ ТЕМА v3 — СИСТЕМНЫЙ ФИКС «ПОЛ-БЕЛОГО-ПОЛ-ЧЁРНОГО»
+   1) shadcn-компоненты живут на --primary/--secondary/... —
+      раньше внутри .theme-dark они оставались светлыми.
+   2) Захардкоженные светлые hex-классы приложений.
+   ============================================================ */
+
+/* --- 1) Переменные shadcn/ui внутри телефона --- */
+.theme-dark {
+  --background: #191c21;
+  --foreground: #f2f3f5;
+  --card: #1c2025;
+  --card-foreground: #f2f3f5;
+  --popover: #22262d;
+  --popover-foreground: #f2f3f5;
+  --primary: #f2f3f5;
+  --primary-foreground: #12161b;
+  --secondary: #2a2f36;
+  --secondary-foreground: #f2f3f5;
+  --muted: #262b31;
+  --muted-foreground: #90969e;
+  --accent: #2a2f36;
+  --accent-foreground: #f2f3f5;
+  --destructive: #e5484d;
+  --border: #2a2f36;
+  --input: #2a2f36;
+  --ring: #575d65;
+}
+
+/* --- 2) Светлые поверхности-приложения --- */
+.theme-dark .bg-\[\#EAF8F1\], .theme-dark .bg-\[\#e4f6ec\] { background-color: rgba(33, 160, 56, 0.14); }
+.theme-dark .bg-\[\#FFF7E6\], .theme-dark .bg-\[\#fff3e2\] { background-color: rgba(245, 158, 11, 0.12); }
+.theme-dark .bg-\[\#fdecec\] { background-color: rgba(229, 72, 77, 0.13); }
+.theme-dark .bg-\[\#e7edfb\] { background-color: rgba(63, 116, 224, 0.15); }
+.theme-dark .bg-\[\#f6f8fc\] { background-color: #1e2228; }
+.theme-dark .bg-\[\#f1f3f8\] { background-color: #22262c; }
+.theme-dark .bg-\[\#f7f7f8\] { background-color: #1e2228; }
+.theme-dark .bg-\[\#faf9f7\] { background-color: #1e2228; }
+.theme-dark .bg-\[\#f6f7f5\] { background-color: #1e2228; }
+.theme-dark .bg-\[\#f1f3f4\] { background-color: #303134; }
+.theme-dark .bg-\[\#f5f6f8\] { background-color: #22262c; }
+.theme-dark .bg-\[\#f2f4f7\] { background-color: #121417; }
+.theme-dark .bg-\[\#E8EBEF\] { background-color: #262b31; }
+.theme-dark .bg-\[\#b9c3dc\] { background-color: #3a414b; }
+.theme-dark .bg-\[\#f5f7fb\] { background-color: #1e2228; }
+.theme-dark .bg-\[\#e3e7ef\] { background-color: #2a2f36; }
+.theme-dark .border-\[\#dfe6f5\] { border-color: #2a2f36; }
+
+/* светлые градиентные промо-карточки (налоги) */
+.theme-dark [class*="e9efff"] { background: linear-gradient(135deg, rgba(63, 116, 224, 0.18), rgba(63, 116, 224, 0.10)) !important; }
+.theme-dark [class*="f7f9ff"] { background: linear-gradient(135deg, #20262e 0%, #1c222a 100%) !important; }
+
+/* --- 2b) Тёмные тексты приложений -> светлые --- */
+.theme-dark .text-\[\#2C3644\], .theme-dark .text-\[\#1c2433\], .theme-dark .text-\[\#231d33\],
+.theme-dark .text-\[\#120e2e\], .theme-dark .text-\[\#202124\], .theme-dark .text-\[\#3c4043\] { color: #e8eaed; }
+.theme-dark .text-\[\#1b3b8c\] { color: #8ab4f8; }
+.theme-dark .text-\[\#c0392b\], .theme-dark .text-\[\#8f2b25\], .theme-dark .text-\[\#A32E2C\] { color: #fb7185; }
+.theme-dark .text-\[\#c96a12\] { color: #fbbf24; }
+.theme-dark .text-\[\#7a8394\] { color: #90969e; }
+.theme-dark .text-\[\#5c6474\] { color: #a8aeb7; }
+.theme-dark .text-\[\#9aa3b2\], .theme-dark .text-\[\#98a1b0\] { color: #7a828c; }
+.theme-dark .text-\[\#5f6368\] { color: #9aa0a6; }
+.theme-dark .text-\[\#1a73e8\], .theme-dark .text-\[\#1a0dab\] { color: #8ab4f8; }
+.theme-dark .text-\[\#12842F\], .theme-dark .text-\[\#21A038\], .theme-dark .text-\[\#188a52\],
+.theme-dark .text-\[\#1B9A3E\], .theme-dark .text-\[\#0E7A2B\] { color: #4ade80; }
+
+/* --- 2c) Светлые границы-приложения --- */
+.theme-dark .border-\[\#eef1f6\], .theme-dark .border-\[\#e8ebef\] { border-color: #2a2f36; }
+.theme-dark .border-\[\#f5d3d3\] { border-color: rgba(229, 72, 77, 0.3); }
+.theme-dark .border-\[\#21A038\] { border-color: rgba(74, 222, 128, 0.45); }
+
+/* --- 2d) Тексты-акценты Tailwind, не покрытые ранее --- */
+.theme-dark .text-amber-800 { color: #fcd34d; }
+.theme-dark .text-amber-900 { color: #fbbf24; }
+.theme-dark .text-red-800 { color: #fca5a5; }
+.theme-dark .text-blue-900 { color: #93c5fd; }
+.theme-dark .text-emerald-800, .theme-dark .text-emerald-900 { color: #6ee7b7; }
+.theme-dark .text-neutral-950 { color: #f2f3f5; }
+.theme-dark .text-gray-800 { color: #e8eaed; }
+.theme-dark .text-gray-700 { color: #d2d6db; }
+.theme-dark .text-gray-600, .theme-dark .text-gray-500 { color: #90969e; }
+.theme-dark .text-slate-900 { color: #f2f3f5; }
+.theme-dark .text-slate-700 { color: #d2d6db; }
+.theme-dark .text-slate-600, .theme-dark .text-slate-500 { color: #90969e; }
+.theme-dark .text-stone-900 { color: #f2f3f5; }
+.theme-dark .text-stone-800 { color: #e8eaed; }
+.theme-dark .text-stone-700 { color: #d2d6db; }
+.theme-dark .text-stone-600 { color: #90969e; }
+
+/* --- 2e) Тёмные тексты на ярких заливках остаются тёмными (контраст) --- */
+.theme-dark [style*="background-color: rgb(33, 160, 56)"] { color-scheme: dark; }
+
+/* ============================================================
    ОБОИ (класс-модификаторы вместо inline style — надёжно при гидрации)
    ============================================================ */
 .wp-wave {
@@ -408,3 +500,5 @@
 @media (prefers-reduced-motion: reduce) {
   .screen-enter, .value-pop, .badge-wobble, .dot-pulse, .skeleton-shimmer, .chrome-load, .tab-card-in, .chrome-menu-in { animation: none !important; }
 }
+
+/* theme v3.2 */
