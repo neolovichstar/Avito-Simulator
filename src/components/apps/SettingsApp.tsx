@@ -207,7 +207,7 @@ export default function SettingsApp() {
                   <div className="min-w-0">
                     <div className="truncate text-lg font-bold">{name}</div>
                     <div className="truncate text-xs text-white/50">@{session?.username ?? 'player'}</div>
-                    <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-[#a78bfa]/20 px-2.5 py-0.5 text-[11px] font-semibold text-[#c4b5fd]">
+                    <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-[#4ade80]/20 px-2.5 py-0.5 text-[11px] font-semibold text-[#86efac]">
                       <Zap className="size-3" aria-hidden />
                       Уровень {session?.level ?? 1}
                     </div>
@@ -223,7 +223,7 @@ export default function SettingsApp() {
                     </span>
                   </div>
                   <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/10">
-                    <div className="h-full rounded-full bg-gradient-to-r from-[#a78bfa] to-[#c4b5fd] transition-all" style={{ width: `${xpPct}%` }} />
+                    <div className="h-full rounded-full bg-gradient-to-r from-[#4ade80] to-[#86efac] transition-all" style={{ width: `${xpPct}%` }} />
                   </div>
                   <p className="mt-1 text-[10px] text-white/40">Прогресс хардкорный: на высоких уровнях XP нужен в разы больше</p>
                 </div>
@@ -322,7 +322,7 @@ export default function SettingsApp() {
                       aria-pressed={wallpaper === w.id}
                       onClick={() => setWallpaper(w.id)}
                       className={`group relative h-16 overflow-hidden rounded-xl border transition active:scale-95 ${
-                        wallpaper === w.id ? 'border-[#965EEB] ring-2 ring-[#965EEB]/40' : 'border-neutral-200 hover:border-neutral-300'
+                        wallpaper === w.id ? 'border-[#16A34A] ring-2 ring-[#16A34A]/40' : 'border-neutral-200 hover:border-neutral-300'
                       }`}
                       style={wallpaperPreviewStyle(w.id)}
                     >
@@ -531,7 +531,7 @@ export default function SettingsApp() {
                   </Button>
                 </div>
                 <div className="flex items-center gap-3 px-4 py-3">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-violet-50 text-violet-600">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
                     <Database className="size-4" aria-hidden />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -573,7 +573,7 @@ export default function SettingsApp() {
                   )}
                 </div>
                 <div className="flex items-center gap-3 px-4 py-3">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sky-50 text-sky-600">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
                     <Server className="size-4" aria-hidden />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -591,13 +591,13 @@ export default function SettingsApp() {
               <div className="px-4 py-3">
                 <div className="flex items-center gap-2">
                   <Info className="size-4 text-neutral-400" />
-                  <span className="text-sm font-medium text-neutral-800">Сделка</span>
+                  <span className="text-sm font-medium text-neutral-800">Resale</span>
                   <span className="ml-auto rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-500">
-                    версия 2.4.0
+                    версия 2.5.0
                   </span>
                 </div>
                 <p className="mt-2 text-xs leading-relaxed text-neutral-500">
-                  «Сделка» — игра-симулятор перепродажи. Экономика живая: цены двигают ИИ-боты и реальные
+                  «Resale» — игра-симулятор перепродажи. Экономика живая: цены двигают ИИ-боты и реальные
                   игроки. Налоги, банк, рынок — как в жизни.
                 </p>
               </div>

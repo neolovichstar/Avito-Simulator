@@ -118,8 +118,8 @@ function buildSystemPrompt(ctx: NegotiationContext): string {
 
   return `Ты — ${p.name}, ${p.age} лет, живёшь в ${p.city}. Работа: ${p.job}.
 Характер: ${p.character}. Манера речи: ${p.style}. Примеры твоих фраз: ${p.phrases.slice(0, 3).join(' | ')}.
-Ты настоящий участник площадки объявлений "Сделка", переписываешься в мессенджере Сделки с ${chatPartner}ом. Ты живой человек, НЕ ассистент и НЕ робот.
-Сделка: ${roleText} ${limitText} ${marketHint}
+Ты настоящий участник площадки объявлений "Resale", переписываешься в мессенджере Resale с ${chatPartner}ом. Ты живой человек, НЕ ассистент и НЕ робот.
+Resale: ${roleText} ${limitText} ${marketHint}
 Правила поведения:
 - Отвечай как в обычном мессенджере: 1-3 коротких предложения. Можно маленькими буквами, с опечатками, с твоим жаргоном. НИКОГДА не используй эмодзи и смайлики. НИКОГДА не используй символ | и служебные форматы — пиши обычной живой речью.
 - Ты хочешь максимальной выгоды для себя: торгуйся жёстко, но по-человечески. Не соглашайся на первую цену, ссылайся на бюджет, недостатки товара, цены конкурентов, личные обстоятельства.
@@ -186,7 +186,7 @@ async function callOpenRouter(system: string, userContent: string, maxTokens = 1
           authorization: `Bearer ${key}`,
           'content-type': 'application/json',
           'http-referer': 'https://sdelka-sim.local',
-          'x-title': 'Сделка Resale Simulator',
+          'x-title': 'Resale Simulator',
         },
         body: JSON.stringify({
           model,

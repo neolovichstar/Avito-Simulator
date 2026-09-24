@@ -1,6 +1,6 @@
 'use client'
 
-// Экран блокировки «Сделка OS» — как на обычном смартфоне:
+// Экран блокировки «Resale OS» — как на обычном смартфоне:
 // дата, крупные часы, превью уведомлений и подсказка «свайп вверх».
 // Никаких паролей и пин-кодов — это игра, телефон открывается одним касанием.
 
@@ -128,13 +128,13 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
       }}
     >
       {/* ─── Тёмная сцена с мягкими бликами, как на системном экране блокировки ─── */}
-      <div aria-hidden="true" className="absolute inset-0 bg-[#0b0812]" />
+      <div aria-hidden="true" className="absolute inset-0 bg-[#050d09]" />
       <div
         aria-hidden="true"
         className="absolute inset-0"
         style={{
           background:
-            'radial-gradient(120% 55% at 50% -8%, rgba(124,58,237,0.42) 0%, rgba(124,58,237,0.12) 42%, transparent 68%), radial-gradient(90% 40% at 88% 108%, rgba(236,72,153,0.16) 0%, transparent 60%), radial-gradient(80% 36% at 6% 96%, rgba(59,130,246,0.12) 0%, transparent 62%)',
+            'radial-gradient(120% 55% at 50% -8%, rgba(34,197,94,0.4) 0%, rgba(34,197,94,0.12) 42%, transparent 68%), radial-gradient(90% 40% at 88% 108%, rgba(16,185,129,0.16) 0%, transparent 60%), radial-gradient(80% 36% at 6% 96%, rgba(132,204,22,0.12) 0%, transparent 62%)',
         }}
       />
 
@@ -191,7 +191,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
           {/* Итоги дня (если сегодня были сделки) */}
           {day && dealsLabel && (
             <div className="flex items-center gap-2.5 rounded-2xl border border-white/10 bg-white/10 px-3.5 py-2.5 backdrop-blur-md">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-violet-500 shadow-md shadow-violet-900/40">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-emerald-500 shadow-md shadow-emerald-900/40">
                 <svg viewBox="0 0 48 48" className="size-5" aria-hidden="true">
                   <path
                     d="M14.5 26.5 l5.5 5.5 L30 21.5"
@@ -204,7 +204,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
                 </svg>
               </span>
               <div className="min-w-0">
-                <p className="text-[12px] font-semibold text-white">Сегодня на Сделке</p>
+                <p className="text-[12px] font-semibold text-white">Сегодня в Resale</p>
                 <p className="text-[11px] text-white/70">
                   {day.deals} {dealsLabel} ·{' '}
                   <span

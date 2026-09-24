@@ -86,7 +86,7 @@ export const useOS = create<OSState>((set, get) => ({
   flashlight: false,
   brightness: 1,
   theme: 'light',
-  wallpaper: 'wave',
+  wallpaper: 'resale',
   widgets: ['clock', 'wallet', 'online'],
 
   setBooted: (v) => set({ booted: v }),

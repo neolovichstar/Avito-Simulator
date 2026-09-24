@@ -8,7 +8,7 @@ import { useOS, type AppKey } from '@/lib/store'
 import { useDrag } from '@/lib/use-swipe'
 
 const APP_META: Record<AppKey, { name: string; icon: LucideIcon; from: string; to: string }> = {
-  avito: { name: 'Сделка', icon: ShoppingBag, from: '#B37BF5', to: '#5B21B6' },
+  avito: { name: 'Resale', icon: ShoppingBag, from: '#4ADE80', to: '#065F46' },
   bank: { name: 'Банк', icon: CreditCard, from: '#21A038', to: '#14532d' },
   taxes: { name: 'Налоги', icon: Receipt, from: '#4b5563', to: '#111827' },
   browser: { name: 'Браузер', icon: Globe, from: '#0ea5e9', to: '#0c4a6e' },

@@ -7,10 +7,10 @@ import type { AppKey } from '@/lib/store'
 // Кастомные SVG-логотипы приложений ОС (чистый SVG, без эмодзи, без lucide).
 // Каждый логотип — белый/двухтоновый силуэт, который кладётся на градиентную
 // плитку AppIcon (фон плитки передаётся через APP_TILE[app].background).
-// Бренд площадки — «Сделка»: бирка-ценник как центральный образ.
+// Бренд площадки — «Resale»: бирка-ценник как центральный образ.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Сделка: наклонная бирка-ценник с отверстием (фирменный образ площадки).
+// Resale: наклонная бирка-ценник с отверстием (фирменный образ площадки).
 export function DealLogo() {
   return (
     <svg
@@ -22,8 +22,8 @@ export function DealLogo() {
     >
       <defs>
         <linearGradient id="dealGrad" x1="10" y1="8" x2="38" y2="40" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#B37BF5" />
-          <stop offset="1" stopColor="#7C3AED" />
+          <stop offset="0" stopColor="#4ADE80" />
+          <stop offset="1" stopColor="#15803D" />
         </linearGradient>
       </defs>
       <path
@@ -195,8 +195,8 @@ export function DeliveryLogo() {
 // ─────────────────────────────────────────────────────────────────────────────
 export const APP_TILE: Record<AppKey, { label: string; background: string; icon: ReactNode }> = {
   avito: {
-    label: 'Сделка',
-    background: 'linear-gradient(160deg, #FFFFFF 0%, #F3EEFB 55%, #E4D8F7 100%)',
+    label: 'Resale',
+    background: 'linear-gradient(160deg, #FFFFFF 0%, #EDFAF3 55%, #D5F5E3 100%)',
     icon: <DealLogo />,
   },
   bank: {
@@ -231,7 +231,7 @@ export const APP_TILE: Record<AppKey, { label: string; background: string; icon:
   },
   career: {
     label: 'Задания',
-    background: 'linear-gradient(145deg, #7C3AED, #6D28D9)',
+    background: 'linear-gradient(145deg, #15803D, #14532D)',
     icon: <CareerLogo />,
   },
   delivery: {

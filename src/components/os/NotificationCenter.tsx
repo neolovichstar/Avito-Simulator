@@ -22,13 +22,13 @@ interface NotifApp {
 }
 
 const KIND_APP: Record<string, NotifApp> = {
-  deal: { app: 'Сделка', icon: ShoppingBag, bg: 'linear-gradient(145deg,#B37BF5,#7C3AED)', openApp: 'avito' },
-  message: { app: 'Сделка', icon: MessageSquare, bg: 'linear-gradient(145deg,#B37BF5,#7C3AED)', openApp: 'avito' },
+  deal: { app: 'Resale', icon: ShoppingBag, bg: 'linear-gradient(145deg,#4ADE80,#15803D)', openApp: 'avito' },
+  message: { app: 'Resale', icon: MessageSquare, bg: 'linear-gradient(145deg,#4ADE80,#15803D)', openApp: 'avito' },
   tax: { app: 'Налоги', icon: Receipt, bg: 'linear-gradient(145deg,#4a5568,#2d3748)', openApp: 'taxes' },
-  market: { app: 'Сделка', icon: TrendingUp, bg: 'linear-gradient(145deg,#B37BF5,#7C3AED)', openApp: 'avito' },
-  career: { app: 'Задания', icon: Trophy, bg: 'linear-gradient(145deg,#B37BF5,#5B21B6)', openApp: 'career' },
-  quest: { app: 'Задания', icon: Trophy, bg: 'linear-gradient(145deg,#B37BF5,#5B21B6)', openApp: 'career' },
-  achievement: { app: 'Задания', icon: Trophy, bg: 'linear-gradient(145deg,#B37BF5,#5B21B6)', openApp: 'career' },
+  market: { app: 'Resale', icon: TrendingUp, bg: 'linear-gradient(145deg,#4ADE80,#15803D)', openApp: 'avito' },
+  career: { app: 'Задания', icon: Trophy, bg: 'linear-gradient(145deg,#4ADE80,#065F46)', openApp: 'career' },
+  quest: { app: 'Задания', icon: Trophy, bg: 'linear-gradient(145deg,#4ADE80,#065F46)', openApp: 'career' },
+  achievement: { app: 'Задания', icon: Trophy, bg: 'linear-gradient(145deg,#4ADE80,#065F46)', openApp: 'career' },
   auction: { app: 'Аукцион', icon: Gavel, bg: 'linear-gradient(145deg,#fbbf24,#b45309)', openApp: 'auction' },
   delivery: { app: 'Доставки', icon: Truck, bg: 'linear-gradient(145deg,#34d399,#047857)', openApp: 'delivery' },
   leader: { app: 'Лидеры', icon: Crown, bg: 'linear-gradient(145deg,#fcd34d,#92400e)', openApp: 'leaderboard' },
@@ -147,7 +147,7 @@ export default function NotificationCenter({
               type="button"
               onClick={readAll}
               tabIndex={open ? 0 : -1}
-              className="rounded-full px-3 py-1.5 text-xs text-sky-400 outline-none transition-colors active:bg-white/10 focus-visible:ring-2 focus-visible:ring-sky-400"
+              className="rounded-full px-3 py-1.5 text-xs text-emerald-400 outline-none transition-colors active:bg-white/10 focus-visible:ring-2 focus-visible:ring-emerald-400"
             >
               Прочитать всё
             </button>
@@ -223,7 +223,7 @@ export default function NotificationCenter({
                         </div>
                         <div className="truncate text-[13px] font-bold leading-tight text-white">{n.title}</div>
                       </div>
-                      {unread && <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-sky-400" />}
+                      {unread && <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-emerald-400" />}
                     </div>
 
                     <p className={`mt-1.5 pl-[46px] text-[13px] leading-snug text-white/75 ${expanded ? '' : 'line-clamp-2'}`}>

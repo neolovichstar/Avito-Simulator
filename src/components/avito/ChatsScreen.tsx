@@ -129,7 +129,7 @@ export default function ChatsScreen({ onOpenChat }: { onOpenChat: (id: string) =
                   {isTyping && (
                     <span className="absolute -bottom-1 -right-1 flex h-4 items-center gap-[3px] rounded-full bg-white px-1 shadow-sm">
                       {[0, 1, 2].map((i) => (
-                        <span key={i} className="size-1 rounded-full bg-[#965EEB] animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
+                        <span key={i} className="size-1 rounded-full bg-[#16A34A] animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
                       ))}
                     </span>
                   )}
@@ -146,9 +146,9 @@ export default function ChatsScreen({ onOpenChat }: { onOpenChat: (id: string) =
                     </span>
                   </div>
                   {isTyping ? (
-                    <p className="text-xs font-medium text-[#965EEB] truncate mt-0.5">печатает…</p>
+                    <p className="text-xs font-medium text-[#16A34A] truncate mt-0.5">печатает…</p>
                   ) : draft ? (
-                    <p className="text-xs truncate mt-0.5 text-[#7d47c6]">
+                    <p className="text-xs truncate mt-0.5 text-[#15803D]">
                       <span className="font-semibold">Черновик:</span> {draft.slice(0, 60)}
                     </p>
                   ) : (
@@ -161,7 +161,7 @@ export default function ChatsScreen({ onOpenChat }: { onOpenChat: (id: string) =
                   <p className="text-[10px] text-neutral-400 truncate mt-0.5">{c.listingTitle}</p>
                 </div>
                 {c.unread > 0 && (
-                  <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#965EEB] text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                  <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#16A34A] text-white text-[11px] font-bold flex items-center justify-center shrink-0">
                     {c.unread}
                   </span>
                 )}

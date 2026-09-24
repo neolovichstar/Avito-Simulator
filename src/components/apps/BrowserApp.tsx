@@ -161,7 +161,7 @@ function hostOf(url: string): string {
 
 const SITE_META: Record<string, { title: string }> = {
   start: { title: 'Новая вкладка' },
-  'sdelka.ru': { title: 'Сделка — объявления' },
+  'sdelka.ru': { title: 'Resale — объявления' },
   'news.market': { title: 'Market News' },
   'forum.market': { title: 'Market Forum' },
   'banki.ru': { title: 'Банки.ру — ставки' },
@@ -212,7 +212,7 @@ const KIND_BADGE: Record<string, { label: string; cls: string }> = {
 }
 
 const SITES = [
-  { site: 'sdelka.ru', title: 'Сделка', desc: 'Объявления и сделки', icon: ShoppingBag, hue: 262 },
+  { site: 'sdelka.ru', title: 'Resale', desc: 'Объявления и сделки', icon: ShoppingBag, hue: 262 },
   { site: 'news.market', title: 'Market News', desc: 'Новости рынка', icon: TrendingUp, hue: 160 },
   { site: 'forum.market', title: 'Market Forum', desc: 'Сообщество ресейлеров', icon: Users, hue: 210 },
   { site: 'banki.ru', title: 'Банки.ру', desc: 'Ставки и вклады', icon: CreditCard, hue: 42 },
@@ -635,7 +635,7 @@ function SdelkaSite({ onOpenApp }: { onOpenApp: (a: 'avito' | 'bank') => void })
               style={{ backgroundColor: '#00A0E3' }}
               onClick={() => onOpenApp('avito')}
             >
-              Открыть приложение Сделка
+              Открыть приложение Resale
             </button>
             <p className="mt-2 text-center text-[10px] text-neutral-400">Откроется внутри системы</p>
           </div>
@@ -837,7 +837,7 @@ function NewTabPage({
           </div>
         </div>
 
-        <div className={'mt-8 pb-6 text-[10px] ' + pal.faint}>Сделка Браузер · безопасный просмотр включён</div>
+        <div className={'mt-8 pb-6 text-[10px] ' + pal.faint}>Resale Браузер · безопасный просмотр включён</div>
       </div>
     </div>
   )
@@ -954,7 +954,7 @@ function TabSwitcher({
           <Plus className="size-5" />
         </button>
         <div className={'rounded-full px-3 py-1 text-[11px] font-semibold ' + pal.chip}>
-          Сделка Браузер
+          Resale Браузер
         </div>
         <div className="size-10" />
       </div>
@@ -1297,7 +1297,7 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp: (app: 'avito' | '
                     { icon: Plus, label: 'Новая вкладка', fn: newTab },
                     { icon: Star, label: 'Закладки', fn: () => { setView('bookmarks'); setMenuOpen(false) } },
                     { icon: History, label: 'История', fn: () => { setView('history'); setMenuOpen(false) } },
-                    { icon: BookOpen, label: 'Открыть Сделку', fn: () => { onOpenApp('avito'); setMenuOpen(false) } },
+                    { icon: BookOpen, label: 'Открыть Resale', fn: () => { onOpenApp('avito'); setMenuOpen(false) } },
                     { icon: CreditCard, label: 'Открыть Банк', fn: () => { onOpenApp('bank'); setMenuOpen(false) } },
                     { icon: X, label: 'Закрыть все вкладки', fn: closeAllTabs },
                   ].map((item) => (
@@ -1312,7 +1312,7 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp: (app: 'avito' | '
                     </button>
                   ))}
                   <div className={'mt-1 border-t px-4 pb-1.5 pt-2 text-[10px] ' + pal.faint + ' ' + pal.toolbarBorder}>
-                    Сделка Браузер 130.0.6723
+                    Resale Браузер 130.0.6723
                   </div>
                 </div>
               </>
@@ -1393,7 +1393,7 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp: (app: 'avito' | '
               <div className="min-h-full bg-[#f5f6f8]">
                 <div className="bg-white px-4 pb-3 pt-4 shadow-sm">
                   <div className="flex items-center gap-2">
-                    <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-700">
+                    <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-green-700">
                       <Users className="size-4 text-white" />
                     </div>
                     <div className="text-base font-bold text-neutral-900">Market Forum</div>

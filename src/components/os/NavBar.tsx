@@ -50,13 +50,13 @@ export default function NavBar({
         aria-pressed={recentsActive}
         onClick={onRecents}
         className={`flex h-10 w-10 items-center justify-center rounded-full outline-none transition-colors active:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70 ${
-          recentsActive ? 'bg-blue-500/25' : ''
+          recentsActive ? 'bg-emerald-500/25' : ''
         }`}
       >
         <span
           aria-hidden="true"
           className={`block h-3.5 w-3.5 rounded-[4px] border-2 ${
-            recentsActive ? 'border-blue-400 bg-blue-400/40' : 'border-white/85'
+            recentsActive ? 'border-emerald-400 bg-emerald-400/40' : 'border-white/85'
           }`}
         />
       </button>

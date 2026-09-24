@@ -7,12 +7,12 @@ import { useOS, type AppKey } from '@/lib/store'
 import { openAppForToast } from '@/lib/toast-apps'
 
 const APP_META: Record<string, { app: string; icon: LucideIcon; bg: string; openApp: AppKey }> = {
-  avito: { app: 'Сделка', icon: ShoppingBag, bg: 'linear-gradient(145deg,#B37BF5,#7C3AED)', openApp: 'avito' },
-  message: { app: 'Сделка', icon: MessageSquare, bg: 'linear-gradient(145deg,#B37BF5,#7C3AED)', openApp: 'avito' },
-  deal: { app: 'Сделка', icon: ShoppingBag, bg: 'linear-gradient(145deg,#B37BF5,#7C3AED)', openApp: 'avito' },
+  avito: { app: 'Resale', icon: ShoppingBag, bg: 'linear-gradient(145deg,#4ADE80,#15803D)', openApp: 'avito' },
+  message: { app: 'Resale', icon: MessageSquare, bg: 'linear-gradient(145deg,#4ADE80,#15803D)', openApp: 'avito' },
+  deal: { app: 'Resale', icon: ShoppingBag, bg: 'linear-gradient(145deg,#4ADE80,#15803D)', openApp: 'avito' },
   tax: { app: 'Налоги', icon: Receipt, bg: 'linear-gradient(145deg,#4a5568,#2d3748)', openApp: 'taxes' },
-  market: { app: 'Сделка', icon: TrendingUp, bg: 'linear-gradient(145deg,#B37BF5,#7C3AED)', openApp: 'avito' },
-  career: { app: 'Задания', icon: Trophy, bg: 'linear-gradient(145deg,#B37BF5,#5B21B6)', openApp: 'career' },
+  market: { app: 'Resale', icon: TrendingUp, bg: 'linear-gradient(145deg,#4ADE80,#15803D)', openApp: 'avito' },
+  career: { app: 'Задания', icon: Trophy, bg: 'linear-gradient(145deg,#4ADE80,#065F46)', openApp: 'career' },
   auction: { app: 'Аукцион', icon: Gavel, bg: 'linear-gradient(145deg,#fbbf24,#b45309)', openApp: 'auction' },
   delivery: { app: 'Доставки', icon: Truck, bg: 'linear-gradient(145deg,#34d399,#047857)', openApp: 'delivery' },
   leader: { app: 'Лидеры', icon: Crown, bg: 'linear-gradient(145deg,#fcd34d,#92400e)', openApp: 'leaderboard' },
@@ -79,7 +79,7 @@ export default function ToastStack({ variant = 'phone' }: { variant?: 'phone' | 
                   dropToast(t.id)
                   openApp(openAppForToast(meta.openApp))
                 }}
-                className="mt-1.5 h-7 rounded-full bg-white/10 px-3 text-[11px] font-semibold text-sky-300 outline-none transition-colors active:bg-white/20 focus-visible:ring-2 focus-visible:ring-sky-400"
+                className="mt-1.5 h-7 rounded-full bg-white/10 px-3 text-[11px] font-semibold text-emerald-300 outline-none transition-colors active:bg-white/20 focus-visible:ring-2 focus-visible:ring-emerald-400"
               >
                 Открыть {meta.app}
               </button>

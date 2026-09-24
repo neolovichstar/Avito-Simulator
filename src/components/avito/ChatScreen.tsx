@@ -168,7 +168,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
       const res = await api.payInvoice(id, invoiceId)
       refreshSession({ balance: res.balance, xp: res.xp, level: res.level })
       sound.success()
-      pushToast('Сделка', 'Счёт оплачен. Товар ваш!')
+      pushToast('Resale', 'Счёт оплачен. Товар ваш!')
       await load()
     } catch (e) {
       setMsg(e instanceof ApiError ? e.message : 'Не удалось оплатить')
@@ -188,7 +188,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
     return (
       <div className="h-full bg-white flex flex-col items-center justify-center gap-3 p-6 text-center">
         <p className="text-sm text-red-500">{error}</p>
-        <button onClick={onBack} className="text-sm font-medium text-[#965EEB]">Назад</button>
+        <button onClick={onBack} className="text-sm font-medium text-[#16A34A]">Назад</button>
       </div>
     )
   }
@@ -275,7 +275,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
           return (
             <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 ${
-                mine ? 'bg-[#965EEB] text-white rounded-br-md' : 'bg-white text-neutral-900 rounded-bl-md shadow-sm'
+                mine ? 'bg-[#16A34A] text-white rounded-br-md' : 'bg-white text-neutral-900 rounded-bl-md shadow-sm'
               }`}>
                 {m.kind === 'invoice' ? (
                   <div className="min-w-[180px]">
@@ -331,7 +331,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
             <button
               key={q.label}
               onClick={() => { setDraft(q.text); sound.tap() }}
-              className="shrink-0 whitespace-nowrap rounded-full border border-[#965EEB]/25 bg-[#965EEB]/[0.07] px-3 py-1.5 text-xs font-medium text-[#7d47c6] active:scale-95 transition-transform"
+              className="shrink-0 whitespace-nowrap rounded-full border border-[#16A34A]/25 bg-[#16A34A]/[0.07] px-3 py-1.5 text-xs font-medium text-[#15803D] active:scale-95 transition-transform"
             >
               {q.label}
             </button>
@@ -360,7 +360,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
           onClick={send}
           disabled={sending || !text.trim()}
           aria-label="Отправить"
-          className="w-11 h-11 rounded-full bg-[#965EEB] text-white flex items-center justify-center shrink-0 active:scale-95 transition-transform disabled:opacity-40"
+          className="w-11 h-11 rounded-full bg-[#16A34A] text-white flex items-center justify-center shrink-0 active:scale-95 transition-transform disabled:opacity-40"
         >
           {sending ? <Loader2 size={18} className="animate-spin" /> : <SendHorizontal size={18} />}
         </button>
@@ -391,7 +391,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
             />
             <button
               onClick={sendInvoice}
-              className="w-full h-12 rounded-xl bg-[#965EEB] text-white font-bold text-sm active:scale-[0.98] transition-transform"
+              className="w-full h-12 rounded-xl bg-[#16A34A] text-white font-bold text-sm active:scale-[0.98] transition-transform"
             >
               Отправить счёт
             </button>

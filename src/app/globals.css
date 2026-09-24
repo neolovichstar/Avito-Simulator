@@ -209,7 +209,7 @@
 .theme-dark .text-rose-500, .theme-dark .text-rose-600, .theme-dark .text-rose-700 { color: #fb7185; }
 .theme-dark .text-red-500, .theme-dark .text-red-600, .theme-dark .text-red-700 { color: #f87171; }
 .theme-dark .text-blue-600, .theme-dark .text-blue-700 { color: #60a5fa; }
-.theme-dark .text-violet-600, .theme-dark .text-violet-700 { color: #a78bfa; }
+.theme-dark .text-violet-600, .theme-dark .text-violet-700 { color: #4ade80; }
 .theme-dark .text-purple-600, .theme-dark .text-purple-700 { color: #c084fc; }
 .theme-dark .text-sky-600, .theme-dark .text-sky-700 { color: #38bdf8; }
 .theme-dark .text-orange-600, .theme-dark .text-orange-700 { color: #fb923c; }
@@ -268,9 +268,10 @@
 .theme-dark .divide-neutral-100 > :not([hidden]) ~ :not([hidden]) { border-color: #262b31; }
 .theme-dark .divide-neutral-200 > :not([hidden]) ~ :not([hidden]) { border-color: #2a2f36; }
 
-/* фиолетовый бренд «Сделки» — светлее в темноте */
-.theme-dark .text-\[\#965EEB\] { color: #bda0f5; }
-.theme-dark .text-\[\#7C3AED\] { color: #b39af3; }
+/* зелёный бренд «Resale» — светлее в темноте */
+.theme-dark .text-\[\#16A34A\] { color: #4ade80; }
+.theme-dark .text-\[\#15803D\] { color: #86efac; }
+.theme-dark .text-\[\#2fbf71\] { color: #6ee7b7; }
 
 /* инпуты и текстовые поля */
 .theme-dark input, .theme-dark textarea { color-scheme: dark; }
@@ -337,7 +338,7 @@
 
 /* --- 2b) Тёмные тексты приложений -> светлые --- */
 .theme-dark .text-\[\#2C3644\], .theme-dark .text-\[\#1c2433\], .theme-dark .text-\[\#231d33\],
-.theme-dark .text-\[\#120e2e\], .theme-dark .text-\[\#202124\], .theme-dark .text-\[\#3c4043\] { color: #e8eaed; }
+.theme-dark .text-\[\#071b10\], .theme-dark .text-\[\#202124\], .theme-dark .text-\[\#3c4043\] { color: #e8eaed; }
 .theme-dark .text-\[\#1b3b8c\] { color: #8ab4f8; }
 .theme-dark .text-\[\#c0392b\], .theme-dark .text-\[\#8f2b25\], .theme-dark .text-\[\#A32E2C\] { color: #fb7185; }
 .theme-dark .text-\[\#c96a12\] { color: #fbbf24; }
@@ -382,7 +383,7 @@
 
 /* корни приложений */
 .theme-dark .bg-\[\#f6f4f1\] { background-color: #121110; }
-.theme-dark .bg-\[\#f4f3fb\] { background-color: #14102b; }
+.theme-dark .bg-\[\#f2fbf6\] { background-color: #0a1712; }
 
 /* золото аукциона: тёмное на белом -> светлое на тёмном */
 .theme-dark .text-\[\#a87f0e\], .theme-dark .text-\[\#8a6a0c\] { color: #e9c05e; }
@@ -409,6 +410,13 @@
 /* ============================================================
    ОБОИ (класс-модификаторы вместо inline style — надёжно при гидрации)
    ============================================================ */
+.wp-resale {
+  background-image:
+    radial-gradient(circle at 22% 12%, rgba(34,197,94,0.38), transparent 52%),
+    radial-gradient(circle at 82% 88%, rgba(16,185,129,0.25), transparent 50%),
+    radial-gradient(circle at 62% 34%, rgba(74,222,128,0.12), transparent 45%),
+    linear-gradient(180deg, #07130d 0%, #050d09 55%, #030705 100%);
+}
 .wp-wave {
   background-image: url(/img/wall/wave.png),
     radial-gradient(circle at 20% 15%, rgba(124,58,237,0.45), transparent 55%),
@@ -524,8 +532,8 @@
 .chrome-menu-in { animation: chrome-menu-in 0.16s cubic-bezier(0.2, 0, 0, 1) both; }
 
 /* Кнопка-CTA с мягкой тенью-свечением */
-.cta-glow { box-shadow: 0 6px 20px -6px rgba(150, 94, 235, 0.55); }
-.cta-glow:active { box-shadow: 0 3px 10px -4px rgba(150, 94, 235, 0.5); }
+.cta-glow { box-shadow: 0 6px 20px -6px rgba(34, 197, 94, 0.55); }
+.cta-glow:active { box-shadow: 0 3px 10px -4px rgba(34, 197, 94, 0.5); }
 
 /* Уважение к reduced-motion */
 @media (prefers-reduced-motion: reduce) {

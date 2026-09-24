@@ -17,7 +17,7 @@ export interface QuestDef {
 }
 
 export const QUEST_POOL: QuestDef[] = [
-  { id: 'q_sell_2', title: 'План продаж', desc: (t) => `Продайте ${t} товара на Сделке`, kind: 'sell', target: 2, reward: 2000, xpReward: 80, weight: 3 },
+  { id: 'q_sell_2', title: 'План продаж', desc: (t) => `Продайте ${t} товара в Resale`, kind: 'sell', target: 2, reward: 2000, xpReward: 80, weight: 3 },
   { id: 'q_sell_4', title: 'Торговый зал', desc: (t) => `Продайте ${t} товара за день`, kind: 'sell', target: 4, reward: 4500, xpReward: 150, weight: 1 },
   { id: 'q_buy_2', title: 'Закупка', desc: (t) => `Купите ${t} товара для перепродажи`, kind: 'buy', target: 2, reward: 1800, xpReward: 70, weight: 3 },
   { id: 'q_buy_3', title: 'Оптовик', desc: (t) => `Купите ${t} товара за день`, kind: 'buy', target: 3, reward: 3000, xpReward: 110, weight: 2 },
@@ -97,11 +97,11 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'taxpayer_5k', title: 'Законопослушный', desc: 'Заплатите 5 000 ₽ налогов', reward: 2000 },
   { id: 'taxpayer_50k', title: 'Плательщик года', desc: 'Заплатите 50 000 ₽ налогов', reward: 15000 },
   { id: 'chatter_100', title: 'Душа площадки', desc: 'Отправьте 100 сообщений в чатах', reward: 3000 },
-  { id: 'chatter_500', title: 'Мегафон Сделки', desc: 'Отправьте 500 сообщений в чатах', reward: 14000 },
+  { id: 'chatter_500', title: 'Мегафон Resale', desc: 'Отправьте 500 сообщений в чатах', reward: 14000 },
   { id: 'reviewer_10', title: 'Арбитр площадки', desc: 'Оставьте 10 отзывов о сделках', reward: 2500 },
   { id: 'banker_3', title: 'Финансист', desc: 'Откройте 3 вклада в банке', reward: 3000 },
   { id: 'loaner_3', title: 'Кредитный дофин', desc: 'Возьмите 3 кредита', reward: 2500 },
-  { id: 'dealer_25', title: 'Сделки — моё всё', desc: 'Совершите 25 сделок', reward: 9000 },
+  { id: 'dealer_25', title: 'Resale — моё всё', desc: 'Совершите 25 сделок', reward: 9000 },
   { id: 'haggler_60', title: 'Гроза продавцов', desc: 'Выторгуйте скидку 5%+ в 60 сделках', reward: 25000 },
   { id: 'bargain_15', title: 'Ценовой ниндзя', desc: 'Купите 15 вещей на 30%+ дешевле рынка', reward: 9000 },
   { id: 'free_15', title: 'Спаситель вещей', desc: 'Заберите 15 вещей «Отдам даром»', reward: 6000 },

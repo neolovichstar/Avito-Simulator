@@ -1,6 +1,6 @@
 'use client'
 
-// Домашний экран «Сделка OS»: две страницы, как на настоящем смартфоне.
+// Домашний экран «Resale OS»: две страницы, как на настоящем смартфоне.
 // Страница 1 — виджеты + основные приложения, страница 2 — «умные» карточки
 // (задания, посылка, топ площадки) и остальные приложения.
 // Перелистывание — свайпом: палец на телефоне, зажатая мышь на ПК (Pointer Events).
@@ -250,7 +250,7 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
               onClick={() => onOpenApp('career')}
               className="press mb-2.5 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 p-3.5 text-left backdrop-blur-md active:scale-[0.985]"
             >
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/40" aria-hidden>
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-emerald-500/40" aria-hidden>
                 <svg viewBox="0 0 48 48" className="size-6">
                   <path d="M14.5 26.5 l5.5 5.5 L30 21.5" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
                 </svg>
@@ -263,7 +263,7 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
                     <span className="mt-1.5 flex items-center gap-2">
                       <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/20">
                         <span
-                          className="block h-full rounded-full bg-gradient-to-r from-violet-400 to-fuchsia-400 transition-[width] duration-500"
+                          className="block h-full rounded-full bg-gradient-to-r from-emerald-400 to-green-500 transition-[width] duration-500"
                           style={{ width: `${Math.min(100, Math.round((data.quest.progress / Math.max(1, data.quest.target)) * 100))}%` }}
                         />
                       </span>
@@ -325,7 +325,7 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
                       >
                         {i + 1}
                       </span>
-                      <span className={`min-w-0 flex-1 truncate text-xs font-medium ${r.isMe ? 'font-bold text-fuchsia-300' : 'text-white/85'}`}>{r.name}</span>
+                      <span className={`min-w-0 flex-1 truncate text-xs font-medium ${r.isMe ? 'font-bold text-emerald-300' : 'text-white/85'}`}>{r.name}</span>
                       <span className="shrink-0 text-[11px] font-bold tabular-nums text-white">{fmtMoney(r.value)}</span>
                     </span>
                   ))}

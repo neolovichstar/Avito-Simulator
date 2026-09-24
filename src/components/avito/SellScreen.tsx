@@ -55,7 +55,7 @@ export default function SellScreen({ onDone }: { onDone: () => void }) {
       setPrice('')
       setDesc('')
       await load()
-      useOS.getState().pushToast('Сделка', `Объявление «${selected.title}» опубликовано`)
+      useOS.getState().pushToast('Resale', `Объявление «${selected.title}» опубликовано`)
       onDone()
     } catch (e) {
       setMsg(e instanceof ApiError ? e.message : 'Не удалось опубликовать')
@@ -94,13 +94,13 @@ export default function SellScreen({ onDone }: { onDone: () => void }) {
               <PackageOpen size={32} className="mx-auto text-neutral-300" />
               <p className="text-sm text-neutral-500 font-medium">Инвентарь пуст</p>
               <p className="text-xs text-neutral-400">
-                Купите что-то на Сделке (можно даже «Отдам даром»), отремонтируйте в сервисе — и выставляйте на продажу
+                Купите что-то в Resale (можно даже «Отдам даром»), отремонтируйте в сервисе — и выставляйте на продажу
               </p>
             </div>
           ) : (
             <div className="space-y-2.5">
               <div className="bg-white rounded-2xl p-3 flex items-start gap-2 text-xs text-neutral-500">
-                <Info size={14} className="text-[#965EEB] shrink-0 mt-0.5" />
+                <Info size={14} className="text-[#16A34A] shrink-0 mt-0.5" />
                 Совет: смотрите цену рынка у похожих объявлений и ставьте чуть ниже — так быстрее уйдёт. За каждую продажу налоговая возьмёт 4%.
               </div>
               {items.map((i) => {
@@ -195,7 +195,7 @@ export default function SellScreen({ onDone }: { onDone: () => void }) {
             <button
               onClick={publish}
               disabled={busy}
-              className="w-full h-12 rounded-xl bg-[#965EEB] text-white font-bold text-sm active:scale-[0.98] transition-transform disabled:opacity-50"
+              className="w-full h-12 rounded-xl bg-[#16A34A] text-white font-bold text-sm active:scale-[0.98] transition-transform disabled:opacity-50"
             >
               {busy ? 'Публикуем...' : 'Разместить объявление'}
             </button>

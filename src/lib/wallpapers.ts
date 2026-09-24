@@ -10,6 +10,15 @@ export interface WallpaperDef {
 }
 
 export const WALLPAPERS: WallpaperDef[] = [
+  {
+    id: 'resale',
+    name: 'Resale',
+    image: null,
+    css:
+      'radial-gradient(circle at 22% 12%, rgba(34,197,94,0.38), transparent 52%),' +
+      'radial-gradient(circle at 82% 88%, rgba(16,185,129,0.25), transparent 50%),' +
+      'linear-gradient(180deg, #07130d 0%, #050d09 55%, #030705 100%)',
+  },
   { id: 'wave', name: 'Волны', image: '/img/wall/wave.png', css: 'linear-gradient(180deg, #14102b, #090614)' },
   { id: 'peak', name: 'Вершина', image: '/img/wall/peak.png', css: 'linear-gradient(180deg, #2b1d4d 0%, #6d3a6e 55%, #c96f7c 100%)' },
   { id: 'city', name: 'Огни города', image: '/img/wall/city.png', css: 'linear-gradient(180deg, #101423 0%, #1c2237 60%, #3c2f45 100%)' },

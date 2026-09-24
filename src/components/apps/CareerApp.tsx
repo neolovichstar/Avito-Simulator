@@ -15,7 +15,7 @@ import { fmtMoney } from '@/lib/format'
 import type { AchievementDTO, CareerData, QuestDTO, BonusState } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 
-const VIOLET = '#7c5cff'
+const VIOLET = '#2fbf71'
 
 function LevelRing({ level, progress }: { level: number; progress: number }) {
   const r = 30
@@ -39,14 +39,14 @@ function LevelRing({ level, progress }: { level: number; progress: number }) {
         />
         <defs>
           <linearGradient id="ringGrad" x1="0" y1="0" x2="76" y2="76">
-            <stop offset="0%" stopColor="#a78bfa" />
-            <stop offset="100%" stopColor="#c4b5fd" />
+            <stop offset="0%" stopColor="#4ade80" />
+            <stop offset="100%" stopColor="#86efac" />
           </linearGradient>
         </defs>
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-xl font-extrabold leading-none text-white tabular-nums">{level}</span>
-        <span className="text-[8px] uppercase tracking-widest text-violet-200/70">ур.</span>
+        <span className="text-[8px] uppercase tracking-widest text-emerald-200/70">ур.</span>
       </div>
     </div>
   )
@@ -70,11 +70,11 @@ function AchievementCard({ a }: { a: AchievementDTO }) {
       }
     >
       {/* декоративная полоса для открытых */}
-      {a.unlocked && <span className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-[#a78bfa] to-transparent" aria-hidden />}
+      {a.unlocked && <span className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-[#4ade80] to-transparent" aria-hidden />}
       <div className="flex items-start justify-between">
         <div className={'relative flex size-11 items-center justify-center rounded-2xl ' + (a.unlocked ? tier.ring : 'bg-neutral-100')}>
           {hidden ? (
-            <Sparkles className="size-5 text-violet-400" aria-hidden />
+            <Sparkles className="size-5 text-emerald-400" aria-hidden />
           ) : (
             <Medal className={'size-5.5 ' + (a.unlocked ? tier.icon : 'text-neutral-400')} aria-hidden />
           )}
@@ -84,7 +84,7 @@ function AchievementCard({ a }: { a: AchievementDTO }) {
             </span>
           )}
         </div>
-        <span className={'rounded-full border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider ' + (hidden ? 'border-violet-200 bg-violet-50 text-violet-500' : a.unlocked ? tier.chip : 'border-neutral-200 bg-neutral-100 text-neutral-400')}>
+        <span className={'rounded-full border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider ' + (hidden ? 'border-emerald-200 bg-emerald-50 text-emerald-500' : a.unlocked ? tier.chip : 'border-neutral-200 bg-neutral-100 text-neutral-400')}>
           {hidden ? 'Секрет' : tier.label}
         </span>
       </div>
@@ -175,29 +175,29 @@ export default function CareerApp() {
   const total = data?.totalCount ?? 0
 
   return (
-    <div className="flex h-full flex-col bg-[#f4f3fb] text-neutral-900">
+    <div className="flex h-full flex-col bg-[#f2fbf6] text-neutral-900">
       {/* ---------- герой: кольцо уровня + профиль (фирменный фиолетовый блок) ---------- */}
       <div className="relative shrink-0 overflow-hidden px-4 pb-5 pt-4 text-white">
         <div
           className="absolute inset-0"
-          style={{ background: 'radial-gradient(120% 100% at 20% 0%, #2b1d6e 0%, #120e2e 62%), linear-gradient(180deg, #17114a 0%, #120e2e 100%)' }}
+          style={{ background: 'radial-gradient(120% 100% at 20% 0%, #0b3d24 0%, #071b10 62%), linear-gradient(180deg, #0a2e1b 0%, #071b10 100%)' }}
           aria-hidden
         />
         <div className="relative flex items-center gap-4">
           {data ? <LevelRing level={data.level} progress={data.levelProgress} /> : <div className="size-[76px] animate-pulse rounded-full bg-white/15" />}
           <div className="min-w-0 flex-1">
             <div className="text-base font-bold">Карьера</div>
-            <div className="mt-0.5 text-[11px] leading-relaxed text-violet-200/60">
+            <div className="mt-0.5 text-[11px] leading-relaxed text-emerald-200/60">
               Прогресс хардкорный: опыт растёт только за сделки
             </div>
             {/* XP-полоса */}
             <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-white/10">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-[#a78bfa] to-[#c4b5fd] transition-[width]"
+                className="h-full rounded-full bg-gradient-to-r from-[#4ade80] to-[#86efac] transition-[width]"
                 style={{ width: `${Math.min(100, Math.max(0, data?.levelProgress ?? 0))}%` }}
               />
             </div>
-            <div className="mt-1 flex items-center justify-between text-[10px] text-violet-200/60">
+            <div className="mt-1 flex items-center justify-between text-[10px] text-emerald-200/60">
               <span>Прогресс уровня</span>
               <span className="tabular-nums">{data?.levelProgress ?? 0}%</span>
             </div>
@@ -211,7 +211,7 @@ export default function CareerApp() {
               <Medal className="size-4 text-white" aria-hidden />
             </div>
             <div className="min-w-0">
-              <div className="text-[10px] text-violet-200/60">Достижения</div>
+              <div className="text-[10px] text-emerald-200/60">Достижения</div>
               <div className="text-sm font-bold tabular-nums">{unlocked}/{total}</div>
             </div>
           </div>
@@ -220,7 +220,7 @@ export default function CareerApp() {
               <Trophy className="size-4 text-white" aria-hidden />
             </div>
             <div className="min-w-0">
-              <div className="text-[10px] text-violet-200/60">Заданий сегодня</div>
+              <div className="text-[10px] text-emerald-200/60">Заданий сегодня</div>
               <div className="text-sm font-bold tabular-nums">{data?.quests.length ?? 0}</div>
             </div>
           </div>
@@ -341,7 +341,7 @@ export default function CareerApp() {
                         className={
                           'relative overflow-hidden rounded-2xl border p-4 ' +
                           (done && !q.claimed
-                            ? 'border-violet-300 bg-violet-50 shadow-[0_0_24px_-10px_rgba(124,92,255,0.55)]'
+                            ? 'border-emerald-300 bg-emerald-50 shadow-[0_0_24px_-10px_rgba(34,197,94,0.55)]'
                             : isMega
                               ? 'border-amber-300 bg-white shadow-[0_0_24px_-12px_rgba(212,160,23,0.65)]'
                               : 'border-neutral-200 bg-white shadow-sm')
@@ -375,7 +375,7 @@ export default function CareerApp() {
                         <div className="mt-3 flex items-center gap-2">
                           <div className="h-2 flex-1 overflow-hidden rounded-full bg-neutral-200">
                             <div
-                              className="h-full rounded-full bg-gradient-to-r from-[#a78bfa] to-[#c4b5fd] transition-[width]"
+                              className="h-full rounded-full bg-gradient-to-r from-[#4ade80] to-[#86efac] transition-[width]"
                               style={{ width: `${pct}%` }}
                             />
                           </div>
@@ -389,7 +389,7 @@ export default function CareerApp() {
                             <span className={'inline-flex items-center gap-1 rounded-full px-2 py-1 ' + (isMega ? 'bg-amber-100 font-semibold text-amber-700' : 'bg-emerald-50 text-emerald-700')}>
                               <Coins className="size-3" aria-hidden />+{fmtMoney(q.reward)}
                             </span>
-                            <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-1 text-violet-700">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">
                               <Zap className="size-3" aria-hidden />+{q.xpReward} XP
                             </span>
                           </span>
@@ -398,7 +398,7 @@ export default function CareerApp() {
                               type="button"
                               onClick={() => void reroll(q)}
                               disabled={rerollBusy === q.id}
-                              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1.5 text-[10px] font-medium text-neutral-500 transition hover:border-violet-300 hover:text-violet-600 active:scale-95 disabled:opacity-50"
+                              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1.5 text-[10px] font-medium text-neutral-500 transition hover:border-emerald-300 hover:text-emerald-600 active:scale-95 disabled:opacity-50"
                               aria-label={`Заменить задание: ${q.title}`}
                             >
                               {rerollBusy === q.id ? <Loader2 className="size-3 animate-spin" aria-hidden /> : <RefreshCw className="size-3" aria-hidden />}

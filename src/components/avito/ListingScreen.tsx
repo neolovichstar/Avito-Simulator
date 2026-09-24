@@ -143,10 +143,10 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
     try {
       await api.addComplaint(id, complaintReason)
       setComplaintSent(true)
-      pushToast('Сделка', 'Жалоба отправлена модератору')
+      pushToast('Resale', 'Жалоба отправлена модератору')
       setTimeout(() => setComplaintOpen(false), 900)
     } catch (e) {
-      pushToast('Сделка', e instanceof ApiError ? e.message : 'Не удалось отправить жалобу')
+      pushToast('Resale', e instanceof ApiError ? e.message : 'Не удалось отправить жалобу')
     } finally {
       setComplaintBusy(false)
     }
@@ -159,13 +159,13 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
       const res = await api.toggleBlock(data.seller.id)
       setSellerBlocked(res.blocked)
       pushToast(
-        'Сделка',
+        'Resale',
         res.blocked
           ? `«${res.name ?? data.seller.displayName}» заблокирован — объявления скрыты из ленты`
           : 'Продавец разблокирован',
       )
     } catch (e) {
-      pushToast('Сделка', e instanceof ApiError ? e.message : 'Не удалось изменить список')
+      pushToast('Resale', e instanceof ApiError ? e.message : 'Не удалось изменить список')
     } finally {
       setBlockBusy(false)
     }
@@ -191,7 +191,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
     return (
       <div className="h-full bg-white flex flex-col items-center justify-center gap-3 p-6 text-center">
         <p className="text-sm text-red-500">{error}</p>
-        <button onClick={onBack} className="h-11 px-4 text-sm font-semibold text-[#965EEB]">Вернуться в ленту</button>
+        <button onClick={onBack} className="h-11 px-4 text-sm font-semibold text-[#16A34A]">Вернуться в ленту</button>
       </div>
     )
   }
@@ -222,7 +222,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
               <span className="absolute top-3 left-3 bg-[#04E061] text-white text-xs font-bold px-2 py-1 rounded-lg">Отдам даром</span>
             )}
             {data.boosted && (
-              <span className="absolute top-3 right-3 bg-[#965EEB] text-white text-xs font-bold px-2 py-1 rounded-lg flex items-center gap-1">
+              <span className="absolute top-3 right-3 bg-[#16A34A] text-white text-xs font-bold px-2 py-1 rounded-lg flex items-center gap-1">
                 <Zap size={12} aria-hidden /> ТОП
               </span>
             )}
@@ -245,7 +245,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
                 </span>
               )}
               {!isMine && data.negotiable && (
-                <span className="flex items-center gap-1 text-xs font-semibold text-[#965EEB] bg-[#965EEB]/10 px-2 py-1 rounded-lg">
+                <span className="flex items-center gap-1 text-xs font-semibold text-[#16A34A] bg-[#16A34A]/10 px-2 py-1 rounded-lg">
                   <Handshake size={12} aria-hidden /> Торг уместен
                 </span>
               )}
@@ -294,21 +294,21 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
               <button
                 onClick={chat}
                 disabled={busy}
-                className="h-11 px-4 rounded-2xl bg-[#965EEB]/10 text-[#965EEB] font-semibold text-sm flex items-center gap-1.5 shrink-0 active:scale-[0.98] transition-transform disabled:opacity-50"
+                className="h-11 px-4 rounded-2xl bg-[#16A34A]/10 text-[#16A34A] font-semibold text-sm flex items-center gap-1.5 shrink-0 active:scale-[0.98] transition-transform disabled:opacity-50"
               >
                 <MessageSquare size={16} aria-hidden /> Написать
               </button>
             </div>
             {joined && (
               <div className="flex items-center gap-1 text-[11px] text-neutral-400 pt-2 border-t border-black/5">
-                <BadgeCheck size={12} className="text-[#965EEB]" aria-hidden />
-                На Сделке с {joined}
+                <BadgeCheck size={12} className="text-[#16A34A]" aria-hidden />
+                В Resale с {joined}
               </div>
             )}
             {onOpenSeller && (
               <button
                 onClick={() => onOpenSeller(data.seller.id)}
-                className="w-full flex items-center justify-between text-[11px] font-medium text-[#965EEB] active:opacity-70"
+                className="w-full flex items-center justify-between text-[11px] font-medium text-[#16A34A] active:opacity-70"
               >
                 <span>Все объявления продавца</span>
                 <ChevronRight size={12} aria-hidden />
@@ -373,7 +373,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
               <button
                 onClick={() => setShowDesc((s) => !s)}
                 aria-expanded={showDesc}
-                className="text-sm font-semibold text-[#965EEB] mt-1.5"
+                className="text-sm font-semibold text-[#16A34A] mt-1.5"
               >
                 {showDesc ? 'Свернуть' : 'Показать полностью'}
               </button>
@@ -467,14 +467,14 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
           {isMine && (
             <div className="bg-[#f0f7ff] rounded-2xl p-3 space-y-2.5">
               <div className="text-xs text-neutral-600 flex items-center gap-1.5">
-                <PackageCheck size={14} className="text-[#965EEB]" aria-hidden />
+                <PackageCheck size={14} className="text-[#16A34A]" aria-hidden />
                 Это ваше объявление
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={boost}
                   disabled={busy || data.boosted}
-                  className="flex-1 h-11 rounded-2xl bg-[#965EEB] text-white text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  className="flex-1 h-11 rounded-2xl bg-[#16A34A] text-white text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50"
                 >
                   <Zap size={14} aria-hidden /> {data.boosted ? 'Уже продвинуто' : `Продвинуть · ${fmtMoney(149)}`}
                 </button>
@@ -486,7 +486,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
                   Снять
                 </button>
               </div>
-              <button onClick={onGoSell} className="text-xs text-[#965EEB] font-semibold h-11 flex items-center">
+              <button onClick={onGoSell} className="text-xs text-[#16A34A] font-semibold h-11 flex items-center">
                 Продать что-то ещё
               </button>
             </div>
@@ -505,7 +505,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
             <button
               onClick={() => { setMode('pickup'); setBuyOpen(true); setMsg('') }}
               disabled={busy || balance < data.price}
-              className="cta-glow w-full h-11 rounded-2xl bg-[#965EEB] text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-40"
+              className="cta-glow w-full h-11 rounded-2xl bg-[#16A34A] text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-40"
             >
               <ShoppingBag size={17} aria-hidden />
               {data.price === 0 ? 'Забрать даром' : `Купить за ${fmtNum(data.price)} ₽`}
@@ -535,13 +535,13 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
                 onClick={() => setMode('pickup')}
                 disabled={busy}
                 className={`w-full text-left rounded-2xl border-2 p-3 flex items-start gap-3 transition-colors disabled:opacity-50 ${
-                  mode === 'pickup' ? 'border-[#965EEB] bg-[#965EEB]/5' : 'border-neutral-200'
+                  mode === 'pickup' ? 'border-[#16A34A] bg-[#16A34A]/5' : 'border-neutral-200'
                 }`}
               >
-                <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${mode === 'pickup' ? 'border-[#965EEB]' : 'border-neutral-300'}`} aria-hidden>
-                  {mode === 'pickup' && <span className="w-2.5 h-2.5 rounded-full bg-[#965EEB]" />}
+                <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${mode === 'pickup' ? 'border-[#16A34A]' : 'border-neutral-300'}`} aria-hidden>
+                  {mode === 'pickup' && <span className="w-2.5 h-2.5 rounded-full bg-[#16A34A]" />}
                 </span>
-                <HandCoins size={20} className="text-[#965EEB] shrink-0 mt-0.5" aria-hidden />
+                <HandCoins size={20} className="text-[#16A34A] shrink-0 mt-0.5" aria-hidden />
                 <span className="flex-1 min-w-0">
                   <span className="flex items-center justify-between gap-2">
                     <span className="text-sm font-semibold text-neutral-900">Самовывоз</span>
@@ -556,11 +556,11 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
                 onClick={() => setMode('courier')}
                 disabled={busy || data.price === 0}
                 className={`w-full text-left rounded-2xl border-2 p-3 flex items-start gap-3 transition-colors disabled:opacity-50 ${
-                  mode === 'courier' ? 'border-[#965EEB] bg-[#965EEB]/5' : 'border-neutral-200'
+                  mode === 'courier' ? 'border-[#16A34A] bg-[#16A34A]/5' : 'border-neutral-200'
                 }`}
               >
-                <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${mode === 'courier' ? 'border-[#965EEB]' : 'border-neutral-300'}`} aria-hidden>
-                  {mode === 'courier' && <span className="w-2.5 h-2.5 rounded-full bg-[#965EEB]" />}
+                <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${mode === 'courier' ? 'border-[#16A34A]' : 'border-neutral-300'}`} aria-hidden>
+                  {mode === 'courier' && <span className="w-2.5 h-2.5 rounded-full bg-[#16A34A]" />}
                 </span>
                 <Truck size={20} className="text-amber-500 shrink-0 mt-0.5" aria-hidden />
                 <span className="flex-1 min-w-0">
@@ -581,7 +581,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
               <button
                 onClick={() => buy(mode === 'courier')}
                 disabled={busy || balance < total}
-                className="cta-glow w-full h-11 rounded-2xl bg-[#965EEB] text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-40"
+                className="cta-glow w-full h-11 rounded-2xl bg-[#16A34A] text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-40"
               >
                 <ShoppingBag size={17} aria-hidden />
                 {data.price === 0 ? 'Забрать даром' : `Купить за ${fmtNum(total)} ₽`}
@@ -615,11 +615,11 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
                   onClick={() => setComplaintReason(key)}
                   disabled={complaintBusy}
                   className={`w-full text-left rounded-2xl border-2 p-3 flex items-center gap-3 transition-colors disabled:opacity-50 ${
-                    complaintReason === key ? 'border-[#965EEB] bg-[#965EEB]/5' : 'border-neutral-200'
+                    complaintReason === key ? 'border-[#16A34A] bg-[#16A34A]/5' : 'border-neutral-200'
                   }`}
                 >
-                  <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${complaintReason === key ? 'border-[#965EEB]' : 'border-neutral-300'}`} aria-hidden>
-                    {complaintReason === key && <span className="w-2.5 h-2.5 rounded-full bg-[#965EEB]" />}
+                  <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${complaintReason === key ? 'border-[#16A34A]' : 'border-neutral-300'}`} aria-hidden>
+                    {complaintReason === key && <span className="w-2.5 h-2.5 rounded-full bg-[#16A34A]" />}
                   </span>
                   <span className="text-sm font-medium text-neutral-800">{label}</span>
                 </button>
@@ -634,7 +634,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
                 <button
                   onClick={sendComplaint}
                   disabled={complaintBusy}
-                  className="w-full h-11 rounded-2xl bg-[#965EEB] text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-40"
+                  className="w-full h-11 rounded-2xl bg-[#16A34A] text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-40"
                 >
                   {complaintBusy ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Flag size={16} aria-hidden />}
                   Отправить жалобу
@@ -704,7 +704,7 @@ function PriceHistoryCard({ points }: { points: PricePointDTO[] }) {
   return (
     <div className="rounded-2xl border border-neutral-100 p-3">
       <div className="flex items-center gap-1.5 mb-1">
-        <LineChart size={14} className="text-[#965EEB]" aria-hidden />
+        <LineChart size={14} className="text-[#16A34A]" aria-hidden />
         <h2 className="text-sm font-semibold text-neutral-900">Динамика цен</h2>
         <span
           className={`ml-auto text-[11px] font-bold px-2 py-0.5 rounded-lg ${
@@ -721,15 +721,15 @@ function PriceHistoryCard({ points }: { points: PricePointDTO[] }) {
       <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-[72px]" role="img" aria-label={`График цен от ${fmtNum(min)} до ${fmtNum(max)} рублей`}>
         <defs>
           <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#965EEB" stopOpacity="0.25" />
-            <stop offset="100%" stopColor="#965EEB" stopOpacity="0" />
+            <stop offset="0%" stopColor="#16A34A" stopOpacity="0.25" />
+            <stop offset="100%" stopColor="#16A34A" stopOpacity="0" />
           </linearGradient>
         </defs>
         <line x1={padX} y1={padY} x2={w - padX} y2={padY} stroke="#f0f1f3" strokeWidth="1" strokeDasharray="3 4" />
         <line x1={padX} y1={h - padY} x2={w - padX} y2={h - padY} stroke="#f0f1f3" strokeWidth="1" strokeDasharray="3 4" />
         <path d={area} fill={`url(#${gid})`} />
-        <path d={line} fill="none" stroke="#965EEB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx={x(ps.length - 1)} cy={y(last)} r="3.5" fill="#965EEB" stroke="white" strokeWidth="1.5" />
+        <path d={line} fill="none" stroke="#16A34A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx={x(ps.length - 1)} cy={y(last)} r="3.5" fill="#16A34A" stroke="white" strokeWidth="1.5" />
       </svg>
     </div>
   )
@@ -761,7 +761,7 @@ function SimilarStrip({ items, currentPrice, onOpen }: {
               <div className="relative aspect-[4/3] bg-neutral-100">
                   <img src={s.image} alt="" className="w-full h-full object-cover" loading="lazy" />
                 {s.boosted && (
-                  <span className="absolute top-1.5 left-1.5 bg-[#965EEB] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+                  <span className="absolute top-1.5 left-1.5 bg-[#16A34A] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
                     <Zap size={9} aria-hidden /> ТОП
                   </span>
                 )}

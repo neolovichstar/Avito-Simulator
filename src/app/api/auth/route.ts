@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(req: Request) {
   const ip = req.headers.get('x-forwarded-for') ?? 'local'
-  if (!rateLimit(`auth:${ip}`, 30, 60_000)) {
+  if (!rateLimit(`auth:${ip}`, 60, 60_000)) {
     return Response.json({ error: 'Слишком часто. Подождите минуту' }, { status: 429 })
   }
   const body = (await req.json().catch(() => ({}))) as { initData?: string | null; devName?: string }
@@ -29,7 +29,7 @@ export async function POST(req: Request) {
           displayName,
           photoUrl: tg.photo_url ?? null,
           city: 'Москва',
-          bio: 'Новичок на Сделке',
+          bio: 'Новичок в Resale',
         },
       })
     }
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
     user = existing
       ? await db.user.update({ where: { id: existing.id }, data: { lastSeenAt: new Date() } })
       : await db.user.create({
-          data: { username, displayName: devName, city: 'Москва', bio: 'Новичок на Сделке' },
+          data: { username, displayName: devName, city: 'Москва', bio: 'Новичок в Resale' },
         })
   }
 

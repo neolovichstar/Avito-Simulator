@@ -3,10 +3,10 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: "Сделка — Симулятор перепродажи",
+  title: "Resale — Симулятор ресейла",
   description:
-    "Игра-симулятор перепродажи: живой рынок с ИИ-продавцами, торг в чатах, банк, налоги, аукцион и ремонт — всё как в жизни.",
-  keywords: ["сделка", "симулятор", "перепродажа", "ресейл", "игра", "экономика", "телеграм миниапп"],
+    "Симулятор ресейла: живой рынок с ИИ-продавцами, торг в чатах, банк, налоги, аукцион и ремонт — всё как в жизни. Скупай дёшево, продавай дорого!",
+  keywords: ["resale", "ресейл", "симулятор", "перепродажа", "игра", "экономика", "телеграм миниапп"],
   other: {
     "format-detection": "telephone=no",
   },
@@ -17,7 +17,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#030307",
+  viewportFit: "cover",
+  themeColor: "#050d09",
 };
 
 export default function RootLayout({

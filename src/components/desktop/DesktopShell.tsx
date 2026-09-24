@@ -272,7 +272,7 @@ export default function DesktopShell({ locked, onUnlock, renderApp, theme }: Pro
                 {session.photoUrl ? (
                   <img src={session.photoUrl} alt="" className="size-8 rounded-full object-cover" />
                 ) : (
-                  <span className="flex size-8 items-center justify-center rounded-full bg-[#965EEB] text-xs font-bold text-white">
+                  <span className="flex size-8 items-center justify-center rounded-full bg-[#16A34A] text-xs font-bold text-white">
                     {(session.displayName ?? 'И')[0]}
                   </span>
                 )}
@@ -315,11 +315,11 @@ export default function DesktopShell({ locked, onUnlock, renderApp, theme }: Pro
                 notifications.slice(0, 30).map((n: NotificationDTO) => (
                   <div
                     key={n.id}
-                    className={`mb-2 rounded-lg border p-3 ${n.readAt ? 'border-white/5 bg-white/[0.03]' : 'border-[#965EEB]/30 bg-[#965EEB]/10'}`}
+                    className={`mb-2 rounded-lg border p-3 ${n.readAt ? 'border-white/5 bg-white/[0.03]' : 'border-[#16A34A]/30 bg-[#16A34A]/10'}`}
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-semibold text-white">{n.title}</span>
-                      {!n.readAt && <span className="size-1.5 rounded-full bg-[#965EEB]" aria-label="Непрочитано" />}
+                      {!n.readAt && <span className="size-1.5 rounded-full bg-[#16A34A]" aria-label="Непрочитано" />}
                       <span className="ml-auto text-[10px] text-white/40" suppressHydrationWarning>
                         {new Date(n.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
                       </span>
@@ -350,7 +350,7 @@ export default function DesktopShell({ locked, onUnlock, renderApp, theme }: Pro
             {/* логотип Пуск: 4 квадратика */}
             <span className="grid grid-cols-2 gap-[3px]" aria-hidden>
               {[0, 1, 2, 3].map((i) => (
-                <span key={i} className="size-[7px] rounded-[2px] bg-[#965EEB] transition group-hover:bg-[#B37BF5]" />
+                <span key={i} className="size-[7px] rounded-[2px] bg-[#16A34A] transition group-hover:bg-[#4ADE80]" />
               ))}
             </span>
           </button>
@@ -377,7 +377,7 @@ export default function DesktopShell({ locked, onUnlock, renderApp, theme }: Pro
                 </span>
                 {win && (
                   <span
-                    className={`absolute bottom-0.5 h-[3px] rounded-full transition-all ${active ? 'w-4 bg-[#965EEB]' : 'w-1.5 bg-white/40'}`}
+                    className={`absolute bottom-0.5 h-[3px] rounded-full transition-all ${active ? 'w-4 bg-[#16A34A]' : 'w-1.5 bg-white/40'}`}
                     aria-hidden
                   />
                 )}
@@ -402,7 +402,7 @@ export default function DesktopShell({ locked, onUnlock, renderApp, theme }: Pro
             <span className="relative">
               <ChevronUp className="size-3.5" aria-hidden />
               {unreadNotifications > 0 && (
-                <span className="absolute -right-1.5 -top-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[#965EEB] px-0.5 text-[8px] font-bold text-white">
+                <span className="absolute -right-1.5 -top-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[#16A34A] px-0.5 text-[8px] font-bold text-white">
                   {unreadNotifications > 9 ? '9+' : unreadNotifications}
                 </span>
               )}
@@ -421,7 +421,7 @@ export default function DesktopShell({ locked, onUnlock, renderApp, theme }: Pro
                 {now ? now.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '\u00A0'}
               </span>
             </span>
-            {unreadNotifications > 0 && <Bell className="size-4 text-[#B37BF5]" aria-hidden />}
+            {unreadNotifications > 0 && <Bell className="size-4 text-[#4ADE80]" aria-hidden />}
           </button>
         </div>
       </div>

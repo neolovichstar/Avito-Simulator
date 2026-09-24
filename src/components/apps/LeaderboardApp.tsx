@@ -66,13 +66,13 @@ function Avatar({ row, size = 'md' }: { row: Board; size?: 'md' | 'lg' }) {
       <img
         src={row.photoUrl}
         alt=""
-        className={`${cls} shrink-0 rounded-full object-cover ring-1 ring-black/5 ${row.isMe ? 'ring-2 ring-violet-400' : ''}`}
+        className={`${cls} shrink-0 rounded-full object-cover ring-1 ring-black/5 ${row.isMe ? 'ring-2 ring-emerald-400' : ''}`}
       />
     )
   }
   return (
     <span
-      className={`${cls} flex shrink-0 items-center justify-center rounded-full font-semibold text-white ${row.isMe ? 'ring-2 ring-violet-400' : ''}`}
+      className={`${cls} flex shrink-0 items-center justify-center rounded-full font-semibold text-white ${row.isMe ? 'ring-2 ring-emerald-400' : ''}`}
       style={{ backgroundColor: hueColor(row.userId.length * 47 % 360) }}
       aria-hidden
     >
@@ -197,7 +197,7 @@ export default function LeaderboardApp() {
               {rest.map((r, i) => (
                 <div
                   key={r.userId}
-                  className={`flex items-center gap-3 px-4 py-2.5 ${i > 0 ? 'border-t border-neutral-100' : ''} ${r.isMe ? 'bg-violet-50/70' : ''}`}
+                  className={`flex items-center gap-3 px-4 py-2.5 ${i > 0 ? 'border-t border-neutral-100' : ''} ${r.isMe ? 'bg-emerald-50/70' : ''}`}
                 >
                   <span className="w-6 shrink-0 text-center text-xs font-bold text-neutral-400">{r.rank}</span>
                   <div className="relative">
@@ -213,7 +213,7 @@ export default function LeaderboardApp() {
                     </div>
                     <div className="text-[11px] text-neutral-400">ур. {r.level}</div>
                   </div>
-                  <span className={`shrink-0 text-sm font-bold ${r.isMe ? 'text-violet-600' : 'text-neutral-700'}`}>
+                  <span className={`shrink-0 text-sm font-bold ${r.isMe ? 'text-emerald-600' : 'text-neutral-700'}`}>
                     {unit(r.value)}
                   </span>
                 </div>

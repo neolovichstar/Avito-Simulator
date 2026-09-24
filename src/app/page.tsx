@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { RefreshCw, WifiOff } from 'lucide-react'
 import { useOS, type AppKey } from '@/lib/store'
 import { api, setToken } from '@/lib/api'
 import { useRealtime } from '@/lib/use-realtime'
@@ -28,16 +29,45 @@ import LeaderboardApp from '@/components/apps/LeaderboardApp'
 
 const BATTERY_KEY = 'avito_sim_battery'
 const THEME_KEY = 'avito_sim_theme'
-const WALLPAPER_KEY = 'avito_sim_wallpaper'
+const WALLPAPER_KEY = 'avito_sim_wallpaper_v2' // v2: дефолт — зелёные обои Resale
 const WIDGETS_KEY = 'avito_sim_widgets'
 const DND_KEY = 'avito_sim_dnd'
 const DESKTOP_MIN_WIDTH = 1024
+
+// Экран «нет связи с сервером» — показывается после 3 неудачных попыток авторизации.
+function OfflineScreen({ onRetry, compact = false }: { onRetry: () => void; compact?: boolean }) {
+  return (
+    <div
+      role="alert"
+      className={`${compact ? 'h-full' : 'fixed inset-0'} flex flex-col items-center justify-center gap-4 px-8 text-center`}
+      style={{ backgroundImage: 'linear-gradient(180deg,#08120d,#030705)' }}
+    >
+      <div className="flex size-14 items-center justify-center rounded-full bg-emerald-500/15 ring-1 ring-emerald-400/30">
+        <WifiOff className="size-6 text-emerald-300" aria-hidden />
+      </div>
+      <div>
+        <p className="text-sm font-semibold text-white">Нет связи с сервером</p>
+        <p className="mt-1 text-xs leading-relaxed text-white/50">
+          Прогресс сохранён, а товары ждут. Проверьте интернет и попробуйте ещё раз
+        </p>
+      </div>
+      <button
+        onClick={onRetry}
+        className="press inline-flex min-h-[44px] items-center gap-2 rounded-2xl bg-emerald-500 px-6 text-xs font-bold text-neutral-950 shadow-lg shadow-emerald-500/25 active:scale-[0.98]"
+      >
+        <RefreshCw className="size-4" aria-hidden />
+        Повторить подключение
+      </button>
+    </div>
+  )
+}
 
 export default function Home() {
   const [recentsOpen, setRecentsOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [controlOpen, setControlOpen] = useState(false)
   const [isDesktop, setIsDesktop] = useState(false)
+  const [authError, setAuthError] = useState(false)
   const booted = useOS((s) => s.booted)
   const locked = useOS((s) => s.locked)
   const session = useOS((s) => s.session)
@@ -68,29 +98,52 @@ export default function Home() {
     return () => window.removeEventListener('resize', check)
   }, [])
 
-  // ---------- AUTH ----------
-  const doAuth = useCallback(async () => {
+  // ---------- TELEGRAM: слить рамки Mini App с фоном телефона ----------
+  const applyTelegramChrome = useCallback(() => {
+    const tg = (window as unknown as { Telegram?: { WebApp?: Record<string, ((v: string) => void) | undefined> } }).Telegram?.WebApp
+    if (!tg) return
+    const BG = '#050d09' // зелёно-чёрный Resale — совпадает с фоном/обоями
     try {
-      const tg = (window as unknown as { Telegram?: { WebApp?: { initData?: string; ready?: () => void; expand?: () => void } } }).Telegram?.WebApp
-      tg?.ready?.()
-      tg?.expand?.()
-      const initData = tg?.initData ?? null
-      const res = await api.auth(initData)
-      setToken(res.token)
-      setSession(res.user)
-      const [stats, notif] = await Promise.all([
-        api.stats().catch(() => ({ online: 0 })),
-        api.notifications().catch(() => ({ items: [] })),
-      ])
-      setOnline(stats.online)
-      setNotifications(notif.items)
-      if (res.user.isNew) {
-        pushToast('Добро пожаловать', 'Вам начислено 35 000 ₽ стартового капитала. Удачных сделок!')
-      }
+      tg.setHeaderColor?.(BG) // верхняя панель Telegram
+      tg.setBackgroundColor?.(BG) // фон окна
+      tg.setBottomBarColor?.(BG) // нижняя панель (Bot API 9+)
     } catch {
-      pushToast('Ошибка сети', 'Не удалось подключиться к серверу. Проверьте соединение')
+      /* старый клиент без поддержки — просто игнорируем */
     }
-  }, [setSession, setNotifications, setOnline, pushToast])
+  }, [])
+
+  // ---------- AUTH (3 ретрая, затем экран повтора) ----------
+  const doAuth = useCallback(async () => {
+    setAuthError(false)
+    const tg = (window as unknown as { Telegram?: { WebApp?: { initData?: string; ready?: () => void; expand?: () => void } } }).Telegram?.WebApp
+    tg?.ready?.()
+    tg?.expand?.()
+    applyTelegramChrome()
+    let lastErr: unknown = null
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, 700 * attempt))
+      try {
+        const initData = tg?.initData ?? null
+        const res = await api.auth(initData)
+        setToken(res.token)
+        setSession(res.user)
+        const [stats, notif] = await Promise.all([
+          api.stats().catch(() => ({ online: 0 })),
+          api.notifications().catch(() => ({ items: [] })),
+        ])
+        setOnline(stats.online)
+        setNotifications(notif.items)
+        if (res.user.isNew) {
+          pushToast('Добро пожаловать', 'Вам начислено 35 000 ₽ стартового капитала. Удачных сделок!')
+        }
+        return
+      } catch (e) {
+        lastErr = e
+      }
+    }
+    console.error('[auth] сервер недоступен после 3 попыток', lastErr)
+    setAuthError(true)
+  }, [setSession, setNotifications, setOnline, pushToast, applyTelegramChrome])
 
   useEffect(() => {
     if (authTried.current) return
@@ -226,10 +279,14 @@ export default function Home() {
     return (
       <main className="min-h-[100dvh] bg-neutral-950">
         {!session ? (
-          <div className="fixed inset-0 flex flex-col items-center justify-center gap-3" style={{ backgroundImage: 'linear-gradient(180deg,#0b0b16,#030307)' }}>
-            <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
-            <p className="text-xs text-white/50">Загрузка системы...</p>
-          </div>
+          authError ? (
+            <OfflineScreen onRetry={doAuth} />
+          ) : (
+            <div className="fixed inset-0 flex flex-col items-center justify-center gap-3" style={{ backgroundImage: 'linear-gradient(180deg,#08120d,#030705)' }}>
+              <div className="h-10 w-10 animate-spin rounded-full border-2 border-emerald-400/20 border-t-emerald-300/80" />
+              <p className="text-xs text-white/50">Загрузка системы...</p>
+            </div>
+          )
         ) : (
           <DesktopShell
             locked={locked}
@@ -259,10 +316,14 @@ export default function Home() {
         {/* контент */}
         <div className={`absolute inset-0 top-10 bottom-12 overflow-hidden bg-black ${theme === 'dark' ? 'theme-dark' : ''}`}>
           {!session ? (
-            <div className="h-full flex flex-col items-center justify-center gap-3" style={{ backgroundImage: 'linear-gradient(180deg,#0b0b16,#030307)' }}>
-              <div className="w-10 h-10 rounded-full border-2 border-white/20 border-t-white/80 animate-spin" />
-              <p className="text-xs text-white/50">Загрузка системы...</p>
-            </div>
+            authError ? (
+              <OfflineScreen compact onRetry={doAuth} />
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center gap-3" style={{ backgroundImage: 'linear-gradient(180deg,#08120d,#030705)' }}>
+                <div className="w-10 h-10 rounded-full border-2 border-emerald-400/20 border-t-emerald-300/80 animate-spin" />
+                <p className="text-xs text-white/50">Загрузка системы...</p>
+              </div>
+            )
           ) : currentApp ? (
             <div key={currentApp} className="screen-enter h-full">
               {renderApp()}

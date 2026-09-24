@@ -215,7 +215,7 @@ export default function DeliveryApp() {
                 </div>
                 <div className="mt-3 text-sm font-semibold text-neutral-800">Доставок пока нет</div>
                 <div className="mt-1 max-w-64 text-xs leading-relaxed text-neutral-400">
-                  Курьером можно получить товар при покупке в Сделке — выберите доставку при оплате.
+                  Курьером можно получить товар при покупке в Resale — выберите доставку при оплате.
                 </div>
               </div>
             ) : (
@@ -285,7 +285,7 @@ export default function DeliveryApp() {
                       </span>
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-xs font-semibold text-neutral-800">{d.courier}</div>
-                        <div className="text-[10px] text-neutral-400">Курьер Сделки</div>
+                        <div className="text-[10px] text-neutral-400">Курьер Resale</div>
                       </div>
                       <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700" aria-hidden>
                         <Truck className="size-4" />
@@ -352,7 +352,7 @@ export default function DeliveryApp() {
             )}
 
             <div className="pb-2 text-center text-[10px] text-neutral-400">
-              Сделка Доставка · осмотр при получении, это игра
+              Resale Доставка · осмотр при получении, это игра
             </div>
           </>
         )}

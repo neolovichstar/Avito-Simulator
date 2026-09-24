@@ -73,7 +73,7 @@ export default function SellerScreen({ sellerId, onBack, onOpenListing }: {
         <Header onBack={onBack} title="Продавец" />
         <div className="p-4 pt-8 text-center space-y-3">
           <p className="text-sm text-neutral-500">{error}</p>
-          <button onClick={onBack} className="h-11 px-6 rounded-2xl bg-[#965EEB] text-white font-semibold text-sm">
+          <button onClick={onBack} className="h-11 px-6 rounded-2xl bg-[#16A34A] text-white font-semibold text-sm">
             Вернуться
           </button>
         </div>
@@ -134,8 +134,8 @@ export default function SellerScreen({ sellerId, onBack, onOpenListing }: {
                   <MapPin size={11} aria-hidden /> {seller.city}
                 </div>
                 <div className="flex items-center gap-1 text-xs text-neutral-400">
-                  <BadgeCheck size={11} className="text-[#965EEB] shrink-0" aria-hidden />
-                  На Сделке с {joined}
+                  <BadgeCheck size={11} className="text-[#16A34A] shrink-0" aria-hidden />
+                  В Resale с {joined}
                 </div>
               </div>
             </div>
@@ -190,7 +190,7 @@ export default function SellerScreen({ sellerId, onBack, onOpenListing }: {
                     <div className="flex items-center gap-1.5">
                       <span className="text-base font-bold text-neutral-900">{l.price > 0 ? fmtMoney(l.price) : 'Даром'}</span>
                       {l.boosted && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#965EEB]/10 text-[#965EEB] font-semibold shrink-0">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#16A34A]/10 text-[#16A34A] font-semibold shrink-0">
                           ПРОДВИНУТО
                         </span>
                       )}

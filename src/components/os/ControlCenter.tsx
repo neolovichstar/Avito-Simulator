@@ -173,7 +173,7 @@ export default function ControlCenter({
             />
             <Tile
               active={dnd}
-              activeCls="bg-violet-400 text-neutral-900"
+              activeCls="bg-emerald-400 text-neutral-900"
               icon={<MoonStar className="size-4.5" aria-hidden="true" />}
               label="Не беспокоить"
               sub={dnd ? 'Тосты скрыты' : 'Уведомления всплывают'}
@@ -192,7 +192,7 @@ export default function ControlCenter({
             />
             <Tile
               active={theme === 'dark'}
-              activeCls="bg-violet-300 text-neutral-900"
+              activeCls="bg-emerald-300 text-neutral-900"
               icon={theme === 'dark' ? <Moon className="size-4.5" aria-hidden="true" /> : <Sun className="size-4.5" aria-hidden="true" />}
               label="Тема"
               sub={theme === 'dark' ? 'Тёмная' : 'Светлая'}

@@ -1,6 +1,6 @@
 'use client'
 
-// «Сделка» — главное приложение. Шапка: город + баланс + уведомления + профиль.
+// «Resale» — главное приложение. Шапка: город + баланс + уведомления + профиль.
 // Нижняя навигация как в Авито: Главная, Сообщения, круглая «+» (Продать), Избранное, Профиль
 import { useCallback, useEffect, useState } from 'react'
 import { Home, Heart, Plus, MessageCircle, User, Bell, ChevronDown } from 'lucide-react'
@@ -86,7 +86,7 @@ export default function AvitoApp() {
         <div className="ml-auto flex items-center gap-1">
           <span
             key={session?.balance ?? 0}
-            className="value-pop flex items-center h-7 px-2.5 rounded-full bg-[#7C3AED]/10 text-xs font-bold text-[#7C3AED] tabular-nums"
+            className="value-pop flex items-center h-7 px-2.5 rounded-full bg-[#15803D]/10 text-xs font-bold text-[#15803D] tabular-nums"
           >
             {session ? fmtBalance(session.balance) : '—'}
           </span>
@@ -106,7 +106,7 @@ export default function AvitoApp() {
             {session?.photoUrl ? (
               <img src={session.photoUrl} alt="" className="w-7 h-7 rounded-full object-cover" />
             ) : (
-              <span className="w-7 h-7 rounded-full bg-[#7C3AED]/10 text-[#7C3AED] flex items-center justify-center" aria-hidden>
+              <span className="w-7 h-7 rounded-full bg-[#15803D]/10 text-[#15803D] flex items-center justify-center" aria-hidden>
                 <User size={16} />
               </span>
             )}
@@ -164,13 +164,13 @@ export default function AvitoApp() {
               aria-label={label}
               aria-current={active ? 'page' : undefined}
               className={`relative flex-1 min-h-[58px] transition-colors ${
-                active ? 'text-[#7C3AED]' : 'text-neutral-500'
+                active ? 'text-[#15803D]' : 'text-neutral-500'
               }`}
             >
               {isSell ? (
                 <>
                   <span
-                    className="absolute left-1/2 -translate-x-1/2 -top-6 w-14 h-14 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shadow-lg shadow-[#7C3AED]/40 active:scale-95 transition-transform"
+                    className="absolute left-1/2 -translate-x-1/2 -top-6 w-14 h-14 rounded-full bg-[#15803D] text-white flex items-center justify-center shadow-lg shadow-[#15803D]/40 active:scale-95 transition-transform"
                     aria-hidden
                   >
                     <Plus size={26} strokeWidth={2.4} />
@@ -217,8 +217,8 @@ export function DealWordmark() {
       <svg width="24" height="24" viewBox="0 0 48 48" aria-hidden>
         <defs>
           <linearGradient id="dealWmGrad" x1="10" y1="8" x2="38" y2="40" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stopColor="#B37BF5" />
-            <stop offset="1" stopColor="#7C3AED" />
+            <stop offset="0" stopColor="#4ADE80" />
+            <stop offset="1" stopColor="#15803D" />
           </linearGradient>
         </defs>
         <path
@@ -228,7 +228,7 @@ export function DealWordmark() {
         <circle cx="33" cy="15" r="3.2" fill="#ffffff" />
         <path d="M14.5 26.5 l5.5 5.5 L30 21.5" stroke="#ffffff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" opacity="0.92" fill="none" />
       </svg>
-      <span className="text-lg font-extrabold tracking-tight text-neutral-900">Сделка</span>
+      <span className="text-lg font-extrabold tracking-tight text-neutral-900">Resale</span>
     </div>
   )
 }
