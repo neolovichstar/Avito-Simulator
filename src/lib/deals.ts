@@ -17,6 +17,10 @@ export async function notifyUser(userId: string, kind: string, title: string, bo
   await emitTo(`user:${userId}`, 'notify', {
     id: n.id, kind: n.kind, title: n.title, body: n.body, readAt: null, createdAt: n.createdAt.toISOString(),
   })
+  // дубль в Telegram-бот (fire-and-forget, не блокирует игру)
+  void import('@/lib/telegram-notify').then((m) =>
+    m.telegramNotify(userId, `${n.title}\n${n.body}`).catch(() => {}),
+  )
   return n
 }
 

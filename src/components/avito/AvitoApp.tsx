@@ -71,7 +71,7 @@ export default function AvitoApp() {
         <DealWordmark />
         <div className="ml-auto text-right">
           <div className="text-[11px] text-neutral-400 leading-none">{session?.city ?? 'Москва'}</div>
-          <div className="text-xs font-semibold text-neutral-800 mt-1">
+          <div key={session?.balance ?? 0} className="value-pop text-xs font-semibold text-neutral-800 mt-1">
             {session ? fmtBalance(session.balance) : '—'}
           </div>
         </div>

@@ -503,7 +503,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
             <button
               onClick={() => { setMode('pickup'); setBuyOpen(true); setMsg('') }}
               disabled={busy || balance < data.price}
-              className="w-full h-11 rounded-2xl bg-[#965EEB] text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-40"
+              className="cta-glow w-full h-11 rounded-2xl bg-[#965EEB] text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-40"
             >
               <ShoppingBag size={17} aria-hidden />
               {data.price === 0 ? 'Забрать даром' : `Купить за ${fmtNum(data.price)} ₽`}
@@ -579,7 +579,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
               <button
                 onClick={() => buy(mode === 'courier')}
                 disabled={busy || balance < total}
-                className="w-full h-11 rounded-2xl bg-[#965EEB] text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-40"
+                className="cta-glow w-full h-11 rounded-2xl bg-[#965EEB] text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-40"
               >
                 <ShoppingBag size={17} aria-hidden />
                 {data.price === 0 ? 'Забрать даром' : `Купить за ${fmtNum(total)} ₽`}

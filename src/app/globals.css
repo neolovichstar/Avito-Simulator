@@ -324,3 +324,66 @@
     radial-gradient(circle at 12% 82%, rgba(190,18,60,0.35), transparent 55%),
     linear-gradient(180deg, #1c0f18 0%, #2b1220 55%, #0d0509 100%);
 }
+
+/* ============================================================
+   ПОЛИРОВКА v2.1: микро-анимации и тактильные детали
+   ============================================================ */
+
+/* Экран приложения появляется с лёгким подъёмом */
+@keyframes screen-enter {
+  from { opacity: 0; transform: translateY(10px) scale(0.995); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.screen-enter { animation: screen-enter 0.28s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.theme-dark .screen-enter { animation-name: screen-enter; }
+
+/* Тактильный отклик: нажатая карточка/кнопка чуть сжимается */
+.press { transition: transform 0.12s ease, box-shadow 0.12s ease; }
+.press:active { transform: scale(0.975); }
+
+/* Плавное «свечение» цифр баланса при обновлении */
+@keyframes value-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+.value-pop { animation: value-pop 0.35s ease; }
+
+/* Дрожащий бейдж непрочитанного */
+@keyframes badge-wobble {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(-8deg) scale(1.08); }
+  75% { transform: rotate(8deg) scale(1.08); }
+}
+.badge-wobble { animation: badge-wobble 0.5s ease-in-out; }
+
+/* Пульс индикатора «печатает…» / «онлайн» */
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.8); }
+}
+.dot-pulse { animation: dot-pulse 1.6s ease-in-out infinite; }
+
+/* Скелетоны с бликом-шimmer вместо тупого пульса */
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+.skeleton-shimmer {
+  background: linear-gradient(100deg, #e5e5e5 40%, #f5f5f5 50%, #e5e5e5 60%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+.theme-dark .skeleton-shimmer {
+  background: linear-gradient(100deg, #2b3038 40%, #383f49 50%, #2b3038 60%);
+  background-size: 200% 100%;
+}
+
+/* Кнопка-CTA с мягкой тенью-свечением */
+.cta-glow { box-shadow: 0 6px 20px -6px rgba(150, 94, 235, 0.55); }
+.cta-glow:active { box-shadow: 0 3px 10px -4px rgba(150, 94, 235, 0.5); }
+
+/* Уважение к reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  .screen-enter, .value-pop, .badge-wobble, .dot-pulse, .skeleton-shimmer { animation: none !important; }
+}

@@ -54,6 +54,8 @@ model User {
   favorites     Favorite[]
   blocked       BlockedSeller[] @relation("blocker")
   blockedMe     BlockedSeller[] @relation("blockedOne")
+  telegramLink  TelegramLink?
+  telegramCodes TelegramCode[]
 }
 
 model Listing {
@@ -357,4 +359,24 @@ model BlockedSeller {
 
   @@unique([userId, sellerId])
   @@index([userId])
+}
+
+// Привязка игрового аккаунта к Telegram-боту @resalesimbot: уведомления и команды
+model TelegramLink {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  chatId    String   @unique
+  tgUsername String?
+  createdAt DateTime @default(now())
+}
+
+// Одноразовые коды привязки (жизнь 15 минут)
+model TelegramCode {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 }

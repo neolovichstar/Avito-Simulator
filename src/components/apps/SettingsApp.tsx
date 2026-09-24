@@ -3,8 +3,8 @@
 // Приложение «Настройки» — стиль Android-настроек: белый фон, секции-карточки.
 import { useCallback, useEffect, useState } from 'react'
 import {
-  BatteryCharging, Ban, Handshake, Info, Loader2, MapPin, Moon, NotebookText, RefreshCw,
-  Shield, Star, Volume2, Wallet,
+  BatteryCharging, Ban, CheckCircle2, Handshake, Info, Loader2, MapPin, Moon, NotebookText, RefreshCw,
+  Send, Shield, Star, Volume2, Wallet,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS, ALL_WIDGETS, WIDGET_LABEL, type WidgetKey } from '@/lib/store'
@@ -62,6 +62,10 @@ export default function SettingsApp() {
   // чёрный список продавцов
   const [blocked, setBlocked] = useState<BlockedSellerDTO[] | null>(null)
   const [unblocking, setUnblocking] = useState<string | null>(null)
+  // telegram-бот
+  const [tg, setTg] = useState<{ linked: boolean; tgUsername: string | null; botUsername: string } | null>(null)
+  const [tgCode, setTgCode] = useState<string | null>(null)
+  const [tgBusy, setTgBusy] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -80,7 +84,34 @@ export default function SettingsApp() {
     api.blockedList()
       .then((r) => setBlocked(r.items))
       .catch(() => setBlocked([]))
+    api.telegramStatus().then(setTg).catch(() => setTg({ linked: false, tgUsername: null, botUsername: 'resalesimbot' }))
   }, [load])
+
+  const getTgCode = async () => {
+    setTgBusy(true)
+    try {
+      const r = await api.telegramCode()
+      setTgCode(r.code)
+    } catch (e) {
+      useOS.getState().pushToast('Telegram', e instanceof ApiError ? e.message : 'Не удалось получить код')
+    } finally {
+      setTgBusy(false)
+    }
+  }
+
+  const unlinkTg = async () => {
+    setTgBusy(true)
+    try {
+      await api.telegramUnlink()
+      setTg({ linked: false, tgUsername: null, botUsername: tg?.botUsername ?? 'resalesimbot' })
+      setTgCode(null)
+      useOS.getState().pushToast('Telegram', 'Аккаунт отвязан')
+    } catch {
+      useOS.getState().pushToast('Telegram', 'Не удалось отвязать')
+    } finally {
+      setTgBusy(false)
+    }
+  }
 
   const unblock = async (b: BlockedSellerDTO) => {
     setUnblocking(b.sellerId)
@@ -285,6 +316,71 @@ export default function SettingsApp() {
               </div>
             </SectionCard>
 
+            {/* Telegram-бот: уведомления и команды */}
+            <SectionCard title="Telegram">
+              <div className="flex items-center gap-3 px-4 py-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#2AABEE]/10 text-[#2AABEE]">
+                  <Send className="size-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium text-neutral-800">Уведомления в Telegram</div>
+                  {tg === null ? (
+                    <div className="text-xs text-neutral-400">Проверяем привязку…</div>
+                  ) : tg.linked ? (
+                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-emerald-600">
+                      <CheckCircle2 className="size-3.5" />
+                      Привязано{tg.tgUsername ? `: @${tg.tgUsername}` : ''} — бот присылает сделки, ставки и налоги
+                    </div>
+                  ) : (
+                    <div className="mt-0.5 text-xs text-neutral-500">
+                      Привяжите аккаунт — бот @{tg.botUsername} сообщит о сделке, перебитой ставке, доставке и налогах
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {tg !== null && !tg.linked && (
+                <div className="border-t border-neutral-100 px-4 py-3">
+                  {tgCode ? (
+                    <div className="rounded-xl border border-[#2AABEE]/30 bg-[#2AABEE]/5 p-3.5">
+                      <div className="text-[11px] font-medium text-neutral-600">Ваш код привязки (живёт 15 минут):</div>
+                      <div className="mt-1.5 select-all text-center font-mono text-2xl font-bold tracking-[0.3em] text-[#2AABEE]">
+                        {tgCode}
+                      </div>
+                      <ol className="mt-2.5 space-y-1 text-[11px] leading-relaxed text-neutral-600">
+                        <li>1. Откройте в Telegram бота <span className="font-semibold">@{tg.botUsername}</span></li>
+                        <li>2. Нажмите «Старт» и отправьте команду</li>
+                        <li>3. Затем напишите боту: <span className="font-mono font-semibold">/start {tgCode}</span></li>
+                      </ol>
+                      <div className="mt-2 text-[10px] text-neutral-400">После привязки этот код погасится автоматически.</div>
+                    </div>
+                  ) : (
+                    <Button
+                      className="h-10 w-full rounded-xl bg-[#2AABEE] text-[13px] font-semibold text-white hover:bg-[#2AABEE]/90"
+                      disabled={tgBusy}
+                      onClick={() => void getTgCode()}
+                    >
+                      {tgBusy ? <Loader2 className="size-4 animate-spin" /> : 'Получить код привязки'}
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {tg?.linked && (
+                <div className="border-t border-neutral-100 px-4 py-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 w-full rounded-lg border-red-200 text-[11px] font-semibold text-red-600 hover:bg-red-50 hover:text-red-700"
+                    disabled={tgBusy}
+                    onClick={() => void unlinkTg()}
+                  >
+                    {tgBusy ? <Loader2 className="size-3.5 animate-spin" /> : 'Отвязать Telegram'}
+                  </Button>
+                </div>
+              )}
+            </SectionCard>
+
             {/* Безопасность: чёрный список продавцов */}
             <SectionCard title={`Безопасность · чёрный список${blocked?.length ? ` (${blocked.length})` : ''}`}>
               {blocked === null ? (
@@ -351,7 +447,7 @@ export default function SettingsApp() {
                   <Info className="size-4 text-neutral-400" />
                   <span className="text-sm font-medium text-neutral-800">Сделка</span>
                   <span className="ml-auto rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-500">
-                    версия 2.0.0
+                    версия 2.1.0
                   </span>
                 </div>
                 <p className="mt-2 text-xs leading-relaxed text-neutral-500">

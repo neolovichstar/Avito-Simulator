@@ -158,6 +158,12 @@ export const api = {
   toggleBlock: (sellerId: string) =>
     post<{ ok: boolean; blocked: boolean; name?: string }>('/api/blocked', { sellerId }),
 
+  // telegram-бот: привязка аккаунта для уведомлений
+  telegramStatus: () =>
+    req<{ linked: boolean; tgUsername: string | null; botUsername: string; createdAt: string | null }>('/api/telegram/link'),
+  telegramCode: () => post<{ code: string; ttlMinutes: number; botUsername: string }>('/api/telegram/link', {}),
+  telegramUnlink: () => req<{ ok: boolean }>('/api/telegram/link', { method: 'DELETE' }),
+
   // карьера: задания и достижения
   career: () => req<CareerData>('/api/career'),
   claimQuest: (questId: string) => post<{ ok: boolean; balance: number; xp: number }>('/api/career', { questId }),

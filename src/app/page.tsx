@@ -256,7 +256,9 @@ export default function Home() {
               <p className="text-xs text-white/50">Загрузка системы...</p>
             </div>
           ) : currentApp ? (
-            renderApp()
+            <div key={currentApp} className="screen-enter h-full">
+              {renderApp()}
+            </div>
           ) : (
             <HomeScreen onOpenApp={openApp} />
           )}

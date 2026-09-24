@@ -439,11 +439,11 @@ function CatChip({ active, onClick, label }: { active: boolean; onClick: () => v
 
 function CardSkeleton() {
   return (
-    <div className="shrink-0 bg-white rounded-2xl overflow-hidden shadow-sm animate-pulse">
-      <div className="aspect-[16/10] bg-neutral-100" />
+    <div className="shrink-0 bg-white rounded-2xl overflow-hidden shadow-sm">
+      <div className="aspect-[16/10] skeleton-shimmer bg-neutral-100" />
       <div className="p-3 space-y-2">
-        <div className="h-3.5 bg-neutral-100 rounded w-3/4" />
-        <div className="h-3 bg-neutral-100 rounded w-1/2" />
+        <div className="h-3.5 skeleton-shimmer bg-neutral-100 rounded w-3/4" />
+        <div className="h-3 skeleton-shimmer bg-neutral-100 rounded w-1/2" />
       </div>
     </div>
   )
@@ -553,7 +553,7 @@ export function ListingCard({ listing: l, onOpen, onFav, fav, comparing, onCompa
 }) {
   const cheap = cheaperPercent(l)
   return (
-    <div className={`shrink-0 bg-white rounded-2xl overflow-hidden shadow-sm active:scale-[0.99] transition-all ${comparing ? 'ring-2 ring-[#965EEB] ring-offset-1 ring-offset-[#f4f5f7]' : ''}`}>
+    <div className={`press shrink-0 bg-white rounded-2xl overflow-hidden shadow-sm ${comparing ? 'ring-2 ring-[#965EEB] ring-offset-1 ring-offset-[#f4f5f7]' : ''}`}>
       <div className="relative aspect-[16/10] bg-neutral-100">
         <button onClick={onOpen} aria-label={l.title} className="absolute inset-0 w-full text-left">
           <img src={l.image} alt="" className="w-full h-full object-cover" loading="lazy" />
@@ -611,7 +611,7 @@ export function ListingCard({ listing: l, onOpen, onFav, fav, comparing, onCompa
             {initials(l.seller.displayName)}
           </span>
           <span className="text-xs text-neutral-500 truncate">{l.seller.displayName}</span>
-          {l.seller.online && <span className="w-1.5 h-1.5 rounded-full bg-[#04E061] shrink-0" aria-label="Продавец онлайн" />}
+          {l.seller.online && <span className="dot-pulse w-1.5 h-1.5 rounded-full bg-[#04E061] shrink-0" aria-label="Продавец онлайн" />}
           <span className="ml-auto flex items-center gap-0.5 text-[11px] text-neutral-500 shrink-0">
             <Star size={10} className="text-amber-400 fill-amber-400" aria-hidden />
             {l.seller.rating > 0 ? Math.min(5, l.seller.rating).toFixed(1) : 'новый'}

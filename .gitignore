@@ -58,3 +58,9 @@ server.log
 db/
 mini-services/realtime/node_modules
 *.db
+
+# secrets & local artifacts
+.env
+tool-results/
+tg-bot.log
+dev.log
