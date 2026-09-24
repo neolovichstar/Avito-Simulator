@@ -5,7 +5,7 @@ import { useCallback, useEffect, useId, useState } from 'react'
 import {
   ChevronLeft, MapPin, Eye, Star, Truck, HandCoins, MessageSquare, ShoppingBag,
   TrendingDown, Zap, Loader2, PackageCheck, AlertTriangle, Clock, BadgeCheck, PenLine,
-  Flag, LineChart, ShieldCheck,
+  Flag, LineChart, ShieldCheck, ChevronRight,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
@@ -16,10 +16,11 @@ import type { ListingDetailData, PricePointDTO } from '@/lib/types'
 import type { SpecItem } from '@/lib/specs'
 import { ConditionBadge } from './AvitoApp'
 
-export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
+export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, onGoSell }: {
   id: string
   onBack: () => void
   onOpenChat: (chatId: string) => void
+  onOpenSeller?: (sellerId: string) => void
   onGoSell: () => void
 }) {
   const [data, setData] = useState<(ListingDetailData & { sellerOnline: boolean; sellerRating: number; specs?: SpecItem[] }) | null>(null)
@@ -226,27 +227,34 @@ export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
             </div>
           </div>
 
-          {/* продавец */}
+          {/* продавец — тап открывает страницу продавца */}
           <div className="bg-neutral-50 rounded-2xl p-3 space-y-2">
             <div className="flex items-center gap-3">
-              <div
-                className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
-                style={{ background: hueColor(data.seller.id.length * 47 % 360) }}
-                aria-hidden
+              <button
+                onClick={() => onOpenSeller?.(data.seller.id)}
+                disabled={!onOpenSeller}
+                className="flex-1 min-w-0 flex items-center gap-3 text-left rounded-xl active:opacity-80 transition-opacity disabled:cursor-default"
+                aria-label={`Все объявления продавца ${data.seller.displayName}`}
               >
-                {initials(data.seller.displayName)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-semibold text-neutral-900 truncate">{data.seller.displayName}</span>
-                  {data.sellerOnline && <span className="w-2 h-2 rounded-full bg-[#04E061] shrink-0" aria-label="Продавец онлайн" />}
+                <div
+                  className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
+                  style={{ background: hueColor(data.seller.id.length * 47 % 360) }}
+                  aria-hidden
+                >
+                  {initials(data.seller.displayName)}
                 </div>
-                <div className="text-xs text-neutral-400 flex items-center gap-1 mt-0.5">
-                  <Star size={11} className="text-amber-400 fill-amber-400" aria-hidden />
-                  {data.sellerRating > 0 ? Math.min(5, data.sellerRating).toFixed(1) : 'новый'}
-                  <span>({data.seller.ratingCount})</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-semibold text-neutral-900 truncate">{data.seller.displayName}</span>
+                    {data.sellerOnline && <span className="w-2 h-2 rounded-full bg-[#04E061] shrink-0" aria-label="Продавец онлайн" />}
+                  </div>
+                  <div className="text-xs text-neutral-400 flex items-center gap-1 mt-0.5">
+                    <Star size={11} className="text-amber-400 fill-amber-400" aria-hidden />
+                    {data.sellerRating > 0 ? Math.min(5, data.sellerRating).toFixed(1) : 'новый'}
+                    <span>({data.seller.ratingCount})</span>
+                  </div>
                 </div>
-              </div>
+              </button>
               <button
                 onClick={chat}
                 disabled={busy}
@@ -260,6 +268,15 @@ export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
                 <BadgeCheck size={12} className="text-[#00AAFF]" aria-hidden />
                 На Авито с {joined}
               </div>
+            )}
+            {onOpenSeller && (
+              <button
+                onClick={() => onOpenSeller(data.seller.id)}
+                className="w-full flex items-center justify-between text-[11px] font-medium text-[#00AAFF] active:opacity-70"
+              >
+                <span>Все объявления продавца</span>
+                <ChevronRight size={12} aria-hidden />
+              </button>
             )}
           </div>
 

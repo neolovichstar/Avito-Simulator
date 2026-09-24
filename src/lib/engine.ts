@@ -9,7 +9,7 @@ import { ensureDailyQuests } from '@/lib/quest-engine'
 import { botOpener } from '@/lib/chat-engine'
 import { auctionStep } from '@/lib/economy'
 import { emitTo } from '@/lib/realtime-emit'
-import { onListingCreated } from '@/lib/market-hooks'
+import { onListingCreated, notifyPriceDrop } from '@/lib/market-hooks'
 import { fmtMoney } from '@/lib/format'
 import { cache } from '@/lib/cache'
 
@@ -312,14 +312,18 @@ async function botsTick(tick: number) {
       const newPrice = Math.round(overpriced.price * (1 - 0.04 - Math.random() * 0.05))
       if (newPrice <= cheapest.price || newPrice < 50) continue
       if (overpriced.seller.isBot) {
+        const oldPrice = overpriced.price
         await db.listing.update({ where: { id: overpriced.id }, data: { price: newPrice } })
+        await notifyPriceDrop({ id: overpriced.id, sellerId: overpriced.sellerId, title: overpriced.title, price: newPrice }, oldPrice)
       } else {
         // игроку — только уведомление, что конкурент давит
         const rivalBot = sorted.find((l) => l.seller.isBot && l.sellerId !== overpriced.sellerId)
         if (rivalBot && Math.random() < 0.6) {
           const rp = Math.round(rivalBot.price * (1 - 0.04 - Math.random() * 0.05))
           if (rp > cheapest.price && rp >= 50) {
+            const rivalOld = rivalBot.price
             await db.listing.update({ where: { id: rivalBot.id }, data: { price: rp } })
+            await notifyPriceDrop({ id: rivalBot.id, sellerId: rivalBot.sellerId, title: rivalBot.title, price: rp }, rivalOld)
           }
           await notifyUser(
             overpriced.sellerId, 'market', 'Конкурент сбивает цену',
@@ -344,7 +348,9 @@ async function botsTick(tick: number) {
       const newPrice = Math.round(l.price * 0.95)
       const floor = Math.round(l.baseValue * 0.35)
       if (newPrice < floor) continue
+      const oldPrice = l.price
       await db.listing.update({ where: { id: l.id }, data: { price: newPrice } })
+      await notifyPriceDrop({ id: l.id, sellerId: l.sellerId, title: l.title, price: newPrice }, oldPrice)
     }
   }
 

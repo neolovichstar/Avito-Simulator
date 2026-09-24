@@ -11,7 +11,7 @@ const APP_META: Record<string, { app: string; icon: LucideIcon; bg: string; open
   message: { app: 'Avito', icon: MessageSquare, bg: 'linear-gradient(145deg,#35c3ff,#0091d5)', openApp: 'avito' },
   deal: { app: 'Avito', icon: ShoppingBag, bg: 'linear-gradient(145deg,#35c3ff,#0091d5)', openApp: 'avito' },
   tax: { app: 'Налоги', icon: Receipt, bg: 'linear-gradient(145deg,#4a5568,#2d3748)', openApp: 'taxes' },
-  market: { app: 'Браузер', icon: TrendingUp, bg: 'linear-gradient(145deg,#38bdf8,#0284c7)', openApp: 'browser' },
+  market: { app: 'Avito', icon: TrendingUp, bg: 'linear-gradient(145deg,#35c3ff,#0091d5)', openApp: 'avito' },
   system: { app: 'Система', icon: Bell, bg: 'linear-gradient(145deg,#9ca3af,#4b5563)', openApp: 'settings' },
 }
 
@@ -20,7 +20,7 @@ function metaFor(title: string, body: string) {
   const s = `${title} ${body}`.toLowerCase()
   if (s.includes('счёт') || s.includes('сообщен') || s.includes('чат')) return APP_META.message
   if (s.includes('налог') || s.includes('фнс')) return APP_META.tax
-  if (s.includes('рынк') || s.includes('цена') || s.includes('событи')) return APP_META.market
+  if (s.includes('рынк') || s.includes('цена') || s.includes('событи') || s.includes('аукцион')) return APP_META.market
   if (s.includes('покуп') || s.includes('продаж') || s.includes('сделк') || s.includes('avito')) return APP_META.deal
   return APP_META.system
 }

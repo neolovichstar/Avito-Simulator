@@ -124,9 +124,24 @@ export default function Home() {
     localStorage.setItem(BATTERY_KEY, String(Math.round(battery)))
   }, [battery, booted])
 
+  const claimDailyBonus = useCallback(async () => {
+    try {
+      const st = await api.bonusState()
+      if (st.claimedToday) return
+      const res = await api.bonusClaim()
+      pushToast(
+        'Бонус за вход',
+        `+${res.reward.toLocaleString('ru-RU')} ₽ за ${res.streak} ${res.streak === 1 ? 'день' : res.streak < 5 ? 'дня' : 'дней'} подряд. Завтра будет больше`,
+      )
+      api.profile().then((p) => useOS.getState().refreshSession({ balance: p.user.balance })).catch(() => {})
+    } catch { /* бонус не критичен */ }
+  }, [pushToast])
+
   const unlock = () => {
     setLocked(false)
     setCharging(charging)
+    // ежедневный бонус за вход: начисляем сразу при разблокировке нового дня
+    claimDailyBonus()
   }
 
   // ---------- ЖЕСТ: СВАЙП СВЕРХУ ВНИЗ — ЦЕНТР УПРАВЛЕНИЯ ----------

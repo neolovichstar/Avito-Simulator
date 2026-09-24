@@ -31,6 +31,8 @@ model User {
   achievements String  @default("[]")
   stats       String   @default("{}")
   questDay    String?
+  bonusStreak Int      @default(0)
+  lastBonusAt DateTime?
   lastSeenAt  DateTime @default(now())
   createdAt   DateTime @default(now())
 
@@ -48,6 +50,7 @@ model User {
   auctionBids  AuctionBid[]
   savedSearches SavedSearch[]
   complaints    Complaint[] @relation("complaintFrom")
+  favorites     Favorite[]
 }
 
 model Listing {
@@ -74,6 +77,7 @@ model Listing {
   chats     Chat[]
   reviews   Review[]
   complaints Complaint[]
+  favorites Favorite[]
 }
 
 model Item {
@@ -310,4 +314,15 @@ model Quest {
   claimed   Boolean  @default(false)
   createdAt DateTime @default(now())
   day       String
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, listingId])
 }

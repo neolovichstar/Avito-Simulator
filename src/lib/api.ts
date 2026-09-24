@@ -5,7 +5,7 @@ import type {
   SessionUser, FeedListing, ListingDetailData, ChatListItem, ChatDetailData, ChatMessageDTO,
   BankData, TaxData, MarketStats, NotificationDTO, InventoryItemDTO, ProfileData,
   RepairOrderDTO, RepairQuoteDTO, DeliveryDTO, AuctionData, AuctionLotDTO, CareerData,
-  SavedSearchDTO,
+  SavedSearchDTO, SellerProfile, BonusState,
 } from '@/lib/types'
 import type { CatalogItem, CategoryKey } from '@/lib/catalog-types'
 
@@ -46,6 +46,9 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 const post = <T,>(path: string, body?: unknown) =>
   req<T>(path, { method: 'POST', body: body !== undefined ? JSON.stringify(body) : undefined })
 
+const put = <T,>(path: string, body?: unknown) =>
+  req<T>(path, { method: 'PUT', body: body !== undefined ? JSON.stringify(body) : undefined })
+
 const del = <T,>(path: string) => req<T>(path, { method: 'DELETE' })
 
 export const api = {
@@ -79,6 +82,16 @@ export const api = {
     post<{ ok: boolean; complaints: number }>(`/api/listings/${id}/complaint`, { reason }),
   complaintState: (id: string) =>
     req<{ complainedByMe: boolean; reason: string | null; complaints: number }>(`/api/listings/${id}/complaint`),
+  // избранное: серверный синк для оповещений о снижении цены
+  favSyncAll: (ids: string[]) => put<{ ok: boolean; added: number; removed: number }>('/api/favorites', { ids }),
+  favToggle: (listingId: string, on: boolean) => post<{ ok: boolean; on: boolean }>('/api/favorites', { listingId, on }),
+  // страница продавца
+  seller: (id: string) => req<SellerProfile>(`/api/users/${id}`),
+  sellerListings: (id: string, offset = 0) =>
+    req<{ items: FeedListing[]; total: number; offset: number }>(`/api/users/${id}/listings?offset=${offset}`),
+  // ежедневный бонус за вход
+  bonusState: () => req<BonusState>('/api/bonus'),
+  bonusClaim: () => post<{ ok: boolean; reward: number; streak: number }>('/api/bonus'),
   savedSearches: () => req<{ searches: SavedSearchDTO[] }>('/api/searches'),
   createSavedSearch: (query: string, category: string | null) =>
     post<{ search: SavedSearchDTO }>('/api/searches', { query, category }),

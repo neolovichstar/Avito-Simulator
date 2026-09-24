@@ -16,12 +16,13 @@ export function getFavs(): string[] {
   if (typeof window === 'undefined') return []
   try { return JSON.parse(localStorage.getItem(FAV_KEY) ?? '[]') as string[] } catch { return [] }
 }
-function toggleFav(id: string): string[] {
+export function toggleFavLocal(id: string): string[] {
   const cur = getFavs()
   const next = cur.includes(id) ? cur.filter((x) => x !== id) : [id, ...cur]
   localStorage.setItem(FAV_KEY, JSON.stringify(next))
   return next
 }
+const toggleFav = toggleFavLocal
 
 // Короткий формат «2 ч» для строки «Москва · 2 ч»
 function shortAgo(dateStr: string): string {
@@ -63,7 +64,14 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
   const scrollRef = useRef<HTMLDivElement>(null)
   const pageRef = useRef(1)
 
-  useEffect(() => { setFavs(getFavs()) }, [])
+  useEffect(() => {
+    setFavs(getFavs())
+    // разовая синхронизация избранного с сервером (для оповещений о снижении цены)
+    const t = setTimeout(() => {
+      api.favSyncAll(getFavs()).catch(() => {})
+    }, 4000)
+    return () => clearTimeout(t)
+  }, [])
 
   const loadSaved = useCallback(() => {
     api.savedSearches().then((r) => setSaved(r.searches)).catch(() => {})
@@ -118,7 +126,12 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
 
   useEffect(() => { load(1) }, [load])
 
-  const onFav = (id: string) => setFavs(toggleFav(id))
+  const onFav = (id: string) => {
+    const next = toggleFav(id)
+    setFavs(next)
+    // синк на сервер (не блокирует UI): оповещения «цена снизилась» приходят только по синхронизированным
+    api.favToggle(id, next.includes(id)).catch(() => {})
+  }
 
   return (
     <div className="h-full flex flex-col">

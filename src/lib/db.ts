@@ -5,10 +5,15 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 // Если схема обновилась (bun run db:push) при живом dev-сервере, глобальный
-// синглтон останется со старым клиентом без новых моделей — пересоздаём его.
+// синглтон останется со старым клиентом без новых моделей/полей — пересоздаём его.
 function clientIsStale(client: PrismaClient): boolean {
   try {
-    return !('savedSearch' in client) || !('pricePoint' in client) || !('complaint' in client)
+    return (
+      !('savedSearch' in client) ||
+      !('pricePoint' in client) ||
+      !('complaint' in client) ||
+      !('favorite' in client)
+    )
   } catch {
     return false
   }

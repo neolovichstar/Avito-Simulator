@@ -27,7 +27,7 @@ export function useRealtime(userId: string | null | undefined, handlers: Realtim
   useEffect(() => {
     if (!userId || socket) return
     const s = io('/?XTransformPort=3003', {
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'],
       forceNew: true,
       reconnection: true,
       reconnectionAttempts: 10,
@@ -36,6 +36,10 @@ export function useRealtime(userId: string | null | undefined, handlers: Realtim
       query: { uid: userId },
     })
     socket = s
+    // отладочный доступ (QA): window.__avitoSocket
+    if (typeof window !== 'undefined') {
+      (window as unknown as Record<string, unknown>).__avitoSocket = s
+    }
 
     const os = useOS.getState
 

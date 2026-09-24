@@ -3,12 +3,12 @@
 // Приложение «Карьера» — игровой профиль: градиент #1e1b4b → #312e81, акцент #a78bfa.
 import { useCallback, useEffect, useState } from 'react'
 import {
-  CalendarClock, CheckCircle2, Coins, Loader2, Lock, Medal, Trophy, Zap,
+  CalendarClock, CheckCircle2, Coins, Flame, Loader2, Lock, Medal, Trophy, Zap,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
 import { fmtMoney } from '@/lib/format'
-import type { CareerData, QuestDTO } from '@/lib/types'
+import type { CareerData, QuestDTO, BonusState } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 
 const VIOLET = '#a78bfa'
@@ -22,6 +22,7 @@ export default function CareerApp() {
   const [tab, setTab] = useState<Tab>('quests')
   const [claimBusy, setClaimBusy] = useState<string | null>(null)
   const [claimError, setClaimError] = useState<string | null>(null)
+  const [bonus, setBonus] = useState<BonusState | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -37,6 +38,7 @@ export default function CareerApp() {
 
   useEffect(() => {
     void load()
+    api.bonusState().then(setBonus).catch(() => {})
   }, [load])
 
   const claim = async (quest: QuestDTO) => {
@@ -126,6 +128,33 @@ export default function CareerApp() {
                 <span className="tabular-nums">{data.levelProgress}%</span>
               </div>
             </div>
+
+            {/* Ежедневный бонус за вход */}
+            {bonus && (
+              <div className="flex items-center gap-3 rounded-2xl border border-[#a78bfa]/25 bg-[#a78bfa]/10 p-3.5">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#a78bfa]/20">
+                  <Flame className="size-5 text-[#fbbf24]" aria-hidden />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold text-white">Бонус за вход</div>
+                  <div className="text-[11px] text-indigo-200/60">
+                    {bonus.claimedToday
+                      ? `Серия ${bonus.streak} дн. · получено сегодня`
+                      : `Серия ${bonus.streak} дн. · заходите завтра: ${fmtMoney(bonus.nextReward)}`}
+                  </div>
+                </div>
+                <div
+                  className={
+                    'shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold ' +
+                    (bonus.claimedToday
+                      ? 'bg-white/10 text-indigo-200/70'
+                      : 'bg-[#fbbf24] text-[#1e1b4b]')
+                  }
+                >
+                  {bonus.claimedToday ? 'Завтра' : fmtMoney(bonus.nextReward)}
+                </div>
+              </div>
+            )}
 
             {/* Табы */}
             <div className="grid grid-cols-2 rounded-2xl bg-black/25 p-1">

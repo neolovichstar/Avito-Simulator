@@ -301,3 +301,35 @@ export const TX_TYPE_LABEL: Record<string, string> = {
   interest: 'Проценты по вкладу',
   boost: 'Продвижение объявления',
 }
+
+// Страница продавца
+export interface SellerInfo {
+  id: string
+  displayName: string
+  isBot: boolean
+  bio: string | null
+  city: string
+  joinedAt: string
+  online: boolean
+  rating: number
+  ratingCount: number
+  hue: string
+}
+
+export interface SellerProfile {
+  seller: SellerInfo
+  stats: {
+    activeCount: number
+    salesCount: number
+    dealsCount: number
+  }
+  reviews: { id: string; from: string; rating: number; text: string; listing: string; createdAt: string }[]
+}
+
+// Ежедневный бонус за вход
+export interface BonusState {
+  claimedToday: boolean
+  streak: number
+  nextReward: number
+  nextStreak: number
+}

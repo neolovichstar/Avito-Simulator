@@ -13,8 +13,12 @@ import SellScreen from './SellScreen'
 import ChatsScreen from './ChatsScreen'
 import ChatScreen from './ChatScreen'
 import ProfileScreen from './ProfileScreen'
+import SellerScreen from './SellerScreen'
 
 type Tab = 'feed' | 'fav' | 'sell' | 'chats' | 'profile'
+
+// Внутренняя навигация Avito: стек экранов (объявление → продавец → объявление …)
+type View = { type: 'listing' | 'seller' | 'chat'; id: string }
 
 const TABS: { key: Tab; label: string; icon: typeof Home }[] = [
   { key: 'feed', label: 'Главная', icon: Home },
@@ -26,10 +30,10 @@ const TABS: { key: Tab; label: string; icon: typeof Home }[] = [
 
 export default function AvitoApp() {
   const [tab, setTab] = useState<Tab>('feed')
-  const [viewListingId, setViewListingId] = useState<string | null>(null)
-  const [viewChatId, setViewChatId] = useState<string | null>(null)
+  const [stack, setStack] = useState<View[]>([])
   const [unread, setUnread] = useState(0)
   const session = useOS((s) => s.session)
+  const top = stack[stack.length - 1] ?? null
 
   const refreshUnread = useCallback(async () => {
     try {
@@ -47,8 +51,18 @@ export default function AvitoApp() {
     }
   }, [refreshUnread])
 
-  const openListing = (id: string) => { setViewChatId(null); setViewListingId(id) }
-  const openChat = (id: string) => { setViewListingId(null); setViewChatId(id); setUnread(0) }
+  const push = (v: View) => setStack((s) => [...s, v])
+  const pop = () => {
+    setStack((s) => {
+      const wasChat = s[s.length - 1]?.type === 'chat'
+      if (wasChat) setTimeout(refreshUnread, 0)
+      return s.slice(0, -1)
+    })
+  }
+  const reset = () => setStack([])
+  const openListing = (id: string) => push({ type: 'listing', id })
+  const openChat = (id: string) => { setUnread(0); push({ type: 'chat', id }) }
+  const openSeller = (id: string) => push({ type: 'seller', id })
 
   return (
     <div className="h-full flex flex-col bg-[#f4f5f7]">
@@ -65,16 +79,28 @@ export default function AvitoApp() {
 
       {/* контент */}
       <div className="flex-1 overflow-hidden relative">
-        {viewListingId ? (
+        {top?.type === 'listing' && (
           <ListingScreen
-            id={viewListingId}
-            onBack={() => setViewListingId(null)}
+            key={top.id}
+            id={top.id}
+            onBack={pop}
             onOpenChat={openChat}
-            onGoSell={() => { setViewListingId(null); setTab('sell') }}
+            onOpenSeller={openSeller}
+            onGoSell={() => { reset(); setTab('sell') }}
           />
-        ) : viewChatId ? (
-          <ChatScreen id={viewChatId} onBack={() => { setViewChatId(null); refreshUnread() }} />
-        ) : (
+        )}
+        {top?.type === 'seller' && (
+          <SellerScreen
+            key={top.id}
+            sellerId={top.id}
+            onBack={pop}
+            onOpenListing={openListing}
+          />
+        )}
+        {top?.type === 'chat' && (
+          <ChatScreen key={top.id} id={top.id} onBack={pop} />
+        )}
+        {!top && (
           <>
             {tab === 'feed' && <FeedScreen onOpenListing={openListing} favoritesMode={false} />}
             {tab === 'fav' && <FeedScreen onOpenListing={openListing} favoritesMode />}
@@ -90,12 +116,12 @@ export default function AvitoApp() {
       {/* нижняя навигация как в Avito */}
       <nav className="shrink-0 bg-white border-t border-black/5 flex" aria-label="Разделы Avito">
         {TABS.map(({ key, label, icon: Icon }) => {
-          const active = tab === key && !viewListingId && !viewChatId
+          const active = tab === key && !top
           const isSell = key === 'sell'
           return (
             <button
               key={key}
-              onClick={() => { setViewListingId(null); setViewChatId(null); setTab(key) }}
+              onClick={() => { reset(); setTab(key) }}
               aria-label={label}
               className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] transition-colors ${
                 active ? 'text-[#00AAFF]' : 'text-neutral-400'

@@ -1,0 +1,632 @@
+     1→// Живой рынок: боты торгуют, конкурируют, покупают, аукцион, события дня.
+     2→// Запускается из instrumentation.ts в фоне (Node.js runtime).
+     3→import { db } from '@/lib/db'
+     4→import { CATALOG } from '@/lib/catalog-data'
+     5→import { PERSONAS } from '@/lib/personas-data'
+     6→import { CATEGORY_IMAGE, CONDITIONS, CONDITION_MULT, CATEGORY_LABEL } from '@/lib/catalog-types'
+     7→import { estValueFor, completeSale, deliverDue, notifyUser } from '@/lib/deals'
+     8→import { ensureDailyQuests } from '@/lib/quest-engine'
+     9→import { botOpener } from '@/lib/chat-engine'
+    10→import { auctionStep } from '@/lib/economy'
+    11→import { emitTo } from '@/lib/realtime-emit'
+    12→import { onListingCreated } from '@/lib/market-hooks'
+    13→import { fmtMoney } from '@/lib/format'
+    14→import { cache } from '@/lib/cache'
+    15→
+    16→const g = globalThis as unknown as {
+    17→  __avitoEngine?: { started: boolean; tick: number; lastSpecialDay?: string }
+    18→}
+    19→
+    20→function rnd<T>(arr: T[]): T {
+    21→  return arr[Math.floor(Math.random() * arr.length)]
+    22→}
+    23→function randInt(min: number, max: number): number {
+    24→  return min + Math.floor(Math.random() * (max - min + 1))
+    25→}
+    26→function weightedCatalogItem() {
+    27→  const total = CATALOG.reduce((s, i) => s + (i.weight ?? 1), 0)
+    28→  let r = Math.random() * total
+    29→  for (const item of CATALOG) {
+    30→    r -= item.weight ?? 1
+    31→    if (r <= 0) return item
+    32→  }
+    33→  return CATALOG[0]
+    34→}
+    35→
+    36→export async function getCategoryMult(category: string): Promise<number> {
+    37→  const idx = await db.marketIndex.findUnique({ where: { category } })
+    38→  const events = await db.marketEvent.findMany({
+    39→    where: { category, expiresAt: { gt: new Date() } },
+    40→  })
+    41→  const eventMult = events.reduce((m, e) => m * (1 + e.magnitude), 1)
+    42→  return (idx?.multiplier ?? 1) * eventMult
+    43→}
+    44→
+    45→function conditionWeighted(): string {
+    46→  const r = Math.random()
+    47→  if (r < 0.08) return 'new'
+    48→  if (r < 0.35) return 'excellent'
+    49→  if (r < 0.7) return 'good'
+    50→  if (r < 0.93) return 'used'
+    51→  return 'parts'
+    52→}
+    53→
+    54→async function randomBot() {
+    55→  const bots = await db.user.findMany({ where: { isBot: true }, take: 100 })
+    56→  return bots.length ? rnd(bots) : null
+    57→}
+    58→
+    59→function catLabel(key: string): string {
+    60→  return CATEGORY_LABEL[key] ?? key
+    61→}
+    62→
+    63→function personaOfId(personaId: string | null | undefined) {
+    64→  return PERSONAS.find((p) => p.id === personaId) ?? PERSONAS[0]
+    65→}
+    66→
+    67→// ---------- РЫНОК ----------
+    68→async function marketTick(tick: number) {
+    69→  const cats = await db.marketIndex.findMany()
+    70→  if (!cats.length) return
+    71→  // случайное блуждание 2 категорий
+    72→  for (let i = 0; i < 2; i++) {
+    73→    const c = rnd(cats)
+    74→    const delta = (Math.random() - 0.5) * 0.04
+    75→    const mult = Math.min(1.75, Math.max(0.55, c.multiplier + delta))
+    76→    await db.marketIndex.update({ where: { category: c.category }, data: { multiplier: mult } })
+    77→  }
+    78→  // небольшие события каждые ~3 минуты
+    79→  if (tick % 12 === 0 && Math.random() < 0.35) {
+    80→    const c = rnd(cats)
+    81→    const up = Math.random() < 0.5
+    82→    const magnitude = 0.05 + Math.random() * 0.12
+    83→    const templates = up
+    84→      ? [
+    85→          `Спрос на «${catLabel(c.category)}» вырос: покупатели смели лучшие предложения`,
+    86→          `Аналитики: категория «${catLabel(c.category)}» недооценена, толпа ринулась скупать`,
+    87→        ]
+    88→      : [
+    89→          `На рынок выбросили партию товаров категории «${catLabel(c.category)}» — цены поехали вниз`,
+    90→          `Сезонный спад: «${catLabel(c.category)}» теряет в цене`,
+    91→        ]
+    92→    await db.marketEvent.create({
+    93→      data: {
+    94→        category: c.category, kind: up ? 'demand_up' : 'demand_down', magnitude: up ? magnitude : -magnitude,
+    95→        headline: rnd(templates), body: up ? 'Продавцы поднимают цены, покупатели торопятся.' : 'Выгодные покупки — у тех, кто умеет ждать.',
+    96→        expiresAt: new Date(Date.now() + randInt(2, 6) * 3_600_000),
+    97→      },
+    98→    })
+    99→  }
+   100→  // гаражные распродажи — отдельный цикл, примерно раз в 2 часа
+   101→  if (tick % 8 === 0 && Math.random() < 0.12) {
+   102→    await spawnGarageSale().catch((e) => console.error('[engine] garage:', e))
+   103→  }
+   104→  // ежедневное крупное событие
+   105→  await dailySpecial()
+   106→}
+   107→
+   108→async function dailySpecial() {
+   109→  const today = new Date().toISOString().slice(0, 10)
+   110→  if (g.__avitoEngine?.lastSpecialDay === today) return
+   111→  const startOfDay = new Date(today + 'T00:00:00')
+   112→  const bigToday = await db.marketEvent.count({
+   113→    where: { createdAt: { gte: startOfDay }, magnitude: { gte: 0.2 } },
+   114→  })
+   115→  if (bigToday > 0) {
+   116→    if (g.__avitoEngine) g.__avitoEngine.lastSpecialDay = today
+   117→    return
+   118→  }
+   119→  const roll = Math.random()
+   120→  const cats = await db.marketIndex.findMany()
+   121→  if (!cats.length) return
+   122→
+   123→  if (roll < 0.25) {
+   124→    // ОПУ-ШТОРМ
+   125→    const cat = rnd(['laptops', 'electronics'])
+   126→    const magnitude = 0.3 + Math.random() * 0.25
+   127→    await db.marketEvent.create({
+   128→      data: {
+   129→        category: cat, kind: 'opu', magnitude,
+   130→        headline: 'Нейросети скупили всю оперативную память — цены взлетели',
+   131→        body: 'Датацентры выкупают комплектующие под новые модели. Категория в дефиците, продавцы задирают ценники.',
+   132→        expiresAt: new Date(Date.now() + 12 * 3_600_000),
+   133→      },
+   134→    })
+   135→  } else if (roll < 0.45) {
+   136→    // НАЛОГОВАЯ ПРОВЕРКА
+   137→    const players = await db.user.findMany({ where: { isBot: false } })
+   138→    for (const p of players) {
+   139→      if (p.taxDebt > 0) {
+   140→        const penalty = Math.round(p.taxDebt * 0.2)
+   141→        await db.user.update({ where: { id: p.id }, data: { taxDebt: { increment: penalty } } })
+   142→        await db.taxBill.create({
+   143→          data: { userId: p.id, amount: penalty, reason: 'Пеня по итогам налоговой проверки', dueAt: new Date(Date.now() + 2 * 86_400_000) },
+   144→        })
+   145→        await notifyUser(p.id, 'tax', 'Налоговая проверка', `Обнаружена задолженность. Начислена пеня ${fmtMoney(penalty)}. Оплатите в приложении Налоги.`)
+   146→      } else {
+   147→        await db.user.update({ where: { id: p.id }, data: { balance: { increment: 1000 } } })
+   148→        await db.transaction.create({ data: { userId: p.id, type: 'sale', amount: 1000, note: 'Премия за честность (налоговая проверка)' } })
+   149→        await notifyUser(p.id, 'tax', 'Налоговая проверка', 'Проверка пройдена. Премия 1 000 ₽ за чистую декларацию.')
+   150→      }
+   151→    }
+   152→    await db.marketEvent.create({
+   153→      data: {
+   154→        category: 'all', kind: 'tax_raid', magnitude: 0,
+   155→        headline: 'ФНС проводит массовую проверку продавцов', body: 'У кого долги по налогу — пеня. У кого порядок — премия.',
+   156→        expiresAt: new Date(Date.now() + 6 * 3_600_000),
+   157→      },
+   158→    })
+   159→  } else if (roll < 0.6) {
+   160→    // КРИЗИС
+   161→    for (const c of cats) {
+   162→      await db.marketEvent.create({
+   163→        data: {
+   164→          category: c.category, kind: 'crisis', magnitude: -(0.08 + Math.random() * 0.07),
+   165→          headline: 'Кризис перекупа: рынок остывает', body: 'Покупатели затаились, цены ползут вниз по всем категориям.',
+   166→          expiresAt: new Date(Date.now() + 6 * 3_600_000),
+   167→        },
+   168→      })
+   169→    }
+   170→  } else if (roll < 0.8) {
+   171→    // ТРЕНД
+   172→    const c = rnd(cats)
+   173→    await db.marketEvent.create({
+   174→      data: {
+   175→        category: c.category, kind: 'fashion', magnitude: 0.15 + Math.random() * 0.15,
+   176→        headline: `Блогеры подняли хайп: категория «${catLabel(c.category)}» на пике`, body: 'Мода непредсказуема, но кошелёк — предсказуемо тяжелее.',
+   177→        expiresAt: new Date(Date.now() + 10 * 3_600_000),
+   178→      },
+   179→    })
+   180→  } else if (roll < 0.9) {
+   181→    // ГАРАЖНАЯ РАСПРОДАЖА — гарантированная в ежедневном ролле
+   182→    await spawnGarageSale()
+   183→  } else {
+   184→    // ПОСТАВКИ
+   185→    const c = rnd(cats)
+   186→    await db.marketEvent.create({
+   187→      data: {
+   188→        category: c.category, kind: 'supply', magnitude: -(0.1 + Math.random() * 0.15),
+   189→        headline: `Фура с товаром пришла в срок: «${catLabel(c.category)}» дешевеет`, body: 'Поставки восстановлены, продавцы демпингуют.',
+   190→        expiresAt: new Date(Date.now() + 8 * 3_600_000),
+   191→      },
+   192→    })
+   193→  }
+   194→  if (g.__avitoEngine) g.__avitoEngine.lastSpecialDay = today
+   195→}
+   196→
+   197→// Гаражная распродажа: пачка discounted-объявлений в двух категориях + новость
+   198→export async function spawnGarageSale() {
+   199→  const active = await db.marketEvent.findFirst({
+   200→    where: { kind: 'garage', expiresAt: { gt: new Date() } },
+   201→  })
+   202→  if (active) return // одна распродажа за раз
+   203→  const cats = await db.marketIndex.findMany()
+   204→  if (!cats.length) return
+   205→  const cityNames = ['Черёмушках', 'Ярославском шоссе', 'Гавриловой-Яме', 'Лиговке', 'Бутове', 'Уралмаше']
+   206→  const catA = rnd(cats)
+   207→  let catB = rnd(cats)
+   208→  if (catB.category === catA.category) catB = rnd(cats)
+   209→  const botsAll = await db.user.findMany({ where: { isBot: true }, take: 100 })
+   210→  if (!botsAll.length) return
+   211→  let spawned = 0
+   212→  for (const cat of [catA, catB]) {
+   213→    const mult = cat.multiplier
+   214→    const pool = CATALOG.filter((i) => i.category === cat.category && !i.key.startsWith('trash-'))
+   215→    const n = Math.min(pool.length, randInt(4, 6))
+   216→    for (let i = 0; i < n; i++) {
+   217→      const item = rnd(pool)
+   218→      const cond = conditionWeighted()
+   219→      const full = item.basePrice * (CONDITION_MULT[cond] ?? 0.8) * mult
+   220→      const price = Math.max(50, Math.round(full * (0.5 + Math.random() * 0.22)))
+   221→      const bot = rnd(botsAll)
+   222→      const created = await db.listing.create({
+   223→        data: {
+   224→          sellerId: bot.id, itemKey: item.key, title: item.title,
+   225→          description: `Гаражная распродажа, всё за полцены. ${rnd(item.desc)}`,
+   226→          category: item.category, condition: cond, price, baseValue: item.basePrice,
+   227→          image: CATEGORY_IMAGE[item.category] ?? '/img/cat-electronics.jpg',
+   228→          city: bot.city, createdAt: new Date(),
+   229→        },
+   230→      })
+   231→      await onListingCreated(created)
+   232→      spawned++
+   233→    }
+   234→  }
+   235→  await db.marketEvent.create({
+   236→    data: {
+   237→      category: catA.category, kind: 'garage', magnitude: 0,
+   238→      headline: `Гаражная распродажа в ${rnd(cityNames)}: ${spawned} лотов за полцены`,
+   239→      body: `Соседи выносят всё: «${catLabel(catA.category)}» и «${catLabel(catB.category)}» почти даром. Успей, пока не разобрали.`,
+   240→      expiresAt: new Date(Date.now() + 4 * 3_600_000),
+   241→    },
+   242→  })
+   243→  cache.invalidate('feed')
+   244→  // пуш всем живым игрокам
+   245→  const players = await db.user.findMany({ where: { isBot: false }, take: 100 })
+   246→  for (const p of players) {
+   247→    await notifyUser(
+   248→      p.id, 'market', 'Гаражная распродажа',
+   249→      `${spawned} товаров за полцены в категориях «${catLabel(catA.category)}» и «${catLabel(catB.category)}». Рынок не будет ждать.`,
+   250→    )
+   251→  }
+   252→}
+   253→
+   254→// ---------- БОТЫ ----------
+   255→async function botsTick(tick: number) {
+   256→  const botCount = await db.user.count({ where: { isBot: true } })
+   257→  if (botCount === 0) return
+   258→
+   259→  // 1. Выставляют новые объявления
+   260→  const active = await db.listing.count({ where: { status: 'active', seller: { isBot: true } } })
+   261→  const freeActive = await db.listing.count({ where: { status: 'active', price: 0 } })
+   262→  const want = Math.min(3, Math.max(0, 50 - active))
+   263→  for (let i = 0; i < want; i++) {
+   264→    const bot = await randomBot()
+   265→    if (!bot) break
+   266→    const item = weightedCatalogItem()
+   267→    const cond = conditionWeighted()
+   268→    const mult = await getCategoryMult(item.category)
+   269→    const persona = personaOfId(bot.personaId)
+   270→    const base = item.basePrice * (1 + (Math.random() - 0.5) * 2 * item.jitter)
+   271→    let price = Math.round(base * (CONDITION_MULT[cond] ?? 0.8) * mult * (0.86 + persona.greed * 0.3 + Math.random() * 0.15))
+   272→    const isJunk = item.key.startsWith('trash-') || item.basePrice < 500
+   273→    if (isJunk && freeActive < 3 && Math.random() < 0.4) {
+   274→      price = 0
+   275→    }
+   276→    if (!isJunk && price < 100) price = 100
+   277→    const created = await db.listing.create({
+   278→      data: {
+   279→        sellerId: bot.id, itemKey: item.key, title: item.title,
+   280→        description: rnd(item.desc), category: item.category, condition: cond,
+   281→        price, baseValue: item.basePrice, image: CATEGORY_IMAGE[item.category] ?? '/img/cat-electronics.jpg',
+   282→        city: bot.city,
+   283→        createdAt: new Date(Date.now() - randInt(0, 90) * 60_000),
+   284→      },
+   285→    })
+   286→    await onListingCreated(created)
+   287→  }
+   288→
+   289→  // 2. Конкуренция: продавцы одного товара сбивают цену друг другу
+   290→  if (tick % 4 === 0) {
+   291→    const actives = await db.listing.findMany({
+   292→      where: { status: 'active' },
+   293→      include: { seller: true },
+   294→      orderBy: { createdAt: 'desc' },
+   295→      take: 300,
+   296→    })
+   297→    const groups = new Map<string, typeof actives>()
+   298→    for (const l of actives) {
+   299→      const arr = groups.get(l.itemKey) ?? []
+   300→      arr.push(l)
+   301→      groups.set(l.itemKey, arr)
+   302→    }
+   303→    for (const [, list] of groups) {
+   304→      if (list.length < 2) continue
+   305→      const sorted = [...list].sort((a, b) => a.price - b.price)
+   306→      const cheapest = sorted[0]
+   307→      const overpriced = sorted[sorted.length - 1]
+   308→      if (overpriced.price <= cheapest.price) continue
+   309→      if (overpriced.sellerId === cheapest.sellerId) continue
+   310→      if (Date.now() - overpriced.createdAt.getTime() < 10 * 60_000) continue
+   311→      if (Math.random() > 0.5) continue
+   312→      const newPrice = Math.round(overpriced.price * (1 - 0.04 - Math.random() * 0.05))
+   313→      if (newPrice <= cheapest.price || newPrice < 50) continue
+   314→      if (overpriced.seller.isBot) {
+   315→        await db.listing.update({ where: { id: overpriced.id }, data: { price: newPrice } })
+   316→      } else {
+   317→        // игроку — только уведомление, что конкурент давит
+   318→        const rivalBot = sorted.find((l) => l.seller.isBot && l.sellerId !== overpriced.sellerId)
+   319→        if (rivalBot && Math.random() < 0.6) {
+   320→          const rp = Math.round(rivalBot.price * (1 - 0.04 - Math.random() * 0.05))
+   321→          if (rp > cheapest.price && rp >= 50) {
+   322→            await db.listing.update({ where: { id: rivalBot.id }, data: { price: rp } })
+   323→          }
+   324→          await notifyUser(
+   325→            overpriced.sellerId, 'market', 'Конкурент сбивает цену',
+   326→            `Такой же «${overpriced.title}» уже продают за ${fmtMoney(Math.min(rp, cheapest.price))}. Покупатели уходят к нему — подумайте о цене.`,
+   327→          )
+   328→        }
+   329→      }
+   330→    }
+   331→  }
+   332→
+   333→  // 3. Скидки на залежалый товар
+   334→  if (tick % 6 === 0) {
+   335→    const stale = await db.listing.findMany({
+   336→      where: {
+   337→        status: 'active', createdAt: { lt: new Date(Date.now() - 2 * 3_600_000) },
+   338→        price: { gt: 0 }, seller: { isBot: true },
+   339→      },
+   340→      take: 6, orderBy: { createdAt: 'asc' },
+   341→    })
+   342→    for (const l of stale) {
+   343→      if (Math.random() < 0.5) continue
+   344→      const newPrice = Math.round(l.price * 0.95)
+   345→      const floor = Math.round(l.baseValue * 0.35)
+   346→      if (newPrice < floor) continue
+   347→      await db.listing.update({ where: { id: l.id }, data: { price: newPrice } })
+   348→    }
+   349→  }
+   350→
+   351→  // 4. Боты скупают выгодное
+   352→  if (tick % 3 === 0) {
+   353→    const cats = await db.marketIndex.findMany()
+   354→    const allActive = await db.listing.findMany({
+   355→      where: { status: 'active', price: { gt: 0 } },
+   356→      include: { seller: true },
+   357→      orderBy: { createdAt: 'asc' }, take: 60,
+   358→    })
+   359→    for (const l of allActive) {
+   360→      if (Math.random() < 0.85) continue
+   361→      const idxMult = (cats.find((c) => c.category === l.category)?.multiplier ?? 1) * (CONDITION_MULT[l.condition] ?? 0.8)
+   362→      const est = l.baseValue * idxMult
+   363→      if (l.price > est * 0.82) continue
+   364→      const bot = await randomBot()
+   365→      if (!bot || bot.id === l.sellerId) continue
+   366→      await completeSale({ listingId: l.id, buyer: bot, price: l.price, via: 'engine' })
+   367→      break // максимум одна движка-покупка за тик
+   368→    }
+   369→  }
+   370→
+   371→  // 5. Боты забирают халяву
+   372→  const freebies = await db.listing.findMany({
+   373→    where: { status: 'active', price: 0 },
+   374→    include: { seller: true }, take: 3,
+   375→  })
+   376→  for (const f of freebies) {
+   377→    if (Math.random() < 0.6) {
+   378→      const bot = await randomBot()
+   379→      if (bot && bot.id !== f.sellerId) {
+   380→        await completeSale({ listingId: f.id, buyer: bot, price: 0, via: 'engine' })
+   381→      }
+   382→    }
+   383→  }
+   384→
+   385→  // 6. Боты стучатся к игрокам в чат
+   386→  if (tick % 2 === 0) {
+   387→    const playerListings = await db.listing.findMany({
+   388→      where: { status: 'active', seller: { isBot: false }, createdAt: { lt: new Date(Date.now() - 3 * 60_000) } },
+   389→      take: 10, orderBy: { createdAt: 'desc' },
+   390→    })
+   391→    for (const pl of playerListings) {
+   392→      if (Math.random() > 0.22) continue
+   393→      const existing = await db.chat.findMany({ where: { listingId: pl.id, sellerId: pl.sellerId } })
+   394→      const botChats = existing.filter((c) => c.buyerId !== pl.sellerId)
+   395→      if (botChats.length >= 2) continue
+   396→      const bot = await randomBot()
+   397→      if (!bot) continue
+   398→      const meta = { botRole: 'buyer' as const, botLimit: Math.round(pl.price * (1 - 0.05 - Math.random() * 0.12)), rounds: 0 }
+   399→      const chat = await db.chat.create({
+   400→        data: { listingId: pl.id, buyerId: bot.id, sellerId: pl.sellerId, meta: JSON.stringify(meta) },
+   401→      })
+   402→      const opener = botOpener(chat, pl, bot)
+   403→      const m = await db.message.create({
+   404→        data: {
+   405→          chatId: chat.id, senderType: 'bot', senderId: bot.id, senderName: bot.displayName,
+   406→          kind: 'text', text: opener.text,
+   407→        },
+   408→      })
+   409→      await db.notification.create({
+   410→        data: { userId: pl.sellerId, kind: 'message', title: bot.displayName, body: m.text.slice(0, 80) },
+   411→      })
+   412→      await emitTo(`user:${pl.sellerId}`, 'notify', {
+   413→        id: `local_${m.id}`, kind: 'message', title: bot.displayName, body: m.text.slice(0, 80), readAt: null, createdAt: m.createdAt.toISOString(),
+   414→      })
+   415→      break
+   416→    }
+   417→  }
+   418→}
+   419→
+   420→// ---------- АУКЦИОН ----------
+   421→async function auctionTick(tick: number) {
+   422→  const activeLots = await db.auctionLot.findMany({ where: { status: 'active' } })
+   423→
+   424→  // создать лоты
+   425→  const valuable = CATALOG.filter((i) => i.basePrice >= 12_000)
+   426→  if (activeLots.length < 3 && Math.random() < 0.18 && valuable.length) {
+   427→    const item = rnd(valuable)
+   428→    const cond = Math.random() < 0.5 ? 'excellent' : 'good'
+   429→    const mult = await getCategoryMult(item.category)
+   430→    const est = Math.round(item.basePrice * (CONDITION_MULT[cond] ?? 1) * mult)
+   431→    await db.auctionLot.create({
+   432→      data: {
+   433→        itemKey: item.key, title: item.title, image: CATEGORY_IMAGE[item.category] ?? '/img/cat-electronics.jpg',
+   434→        category: item.category, condition: cond, baseValue: item.basePrice,
+   435→        startPrice: Math.round(est * (0.5 + Math.random() * 0.2)),
+   436→        endsAt: new Date(Date.now() + randInt(15, 45) * 60_000),
+   437→      },
+   438→    })
+   439→  }
+   440→
+   441→  // ставки ботов
+   442→  if (tick % 2 === 0) {
+   443→    for (const lot of activeLots) {
+   444→      if (lot.endsAt.getTime() - Date.now() < 30_000) continue
+   445→      if (Math.random() > 0.3) continue
+   446→      const step = auctionStep(lot.startPrice)
+   447→      const mult = await getCategoryMult(lot.category)
+   448→      const est = Math.round(lot.baseValue * (CONDITION_MULT[lot.condition] ?? 1) * mult)
+   449→      const privateLimit = Math.round(est * (0.85 + Math.random() * 0.5))
+   450→      const nextBid = (lot.currentBid ?? lot.startPrice) + step
+   451→      if (nextBid > privateLimit) continue
+   452→      // перебить
+   453→      const prevBidderId = lot.currentBidderId
+   454→      const bot = await randomBot()
+   455→      if (!bot) continue
+   456→      if (bot.id === prevBidderId) continue
+   457→      await db.auctionBid.create({
+   458→        data: { lotId: lot.id, userId: bot.id, userName: bot.displayName, amount: nextBid },
+   459→      })
+   460→      await db.auctionLot.update({
+   461→        where: { id: lot.id },
+   462→        data: { currentBid: nextBid, currentBidderId: bot.id, currentBidderName: bot.displayName, bidCount: { increment: 1 } },
+   463→      })
+   464→      // вернуть деньги игроку, которого перебили
+   465→      if (prevBidderId) {
+   466→        const prev = await db.user.findUnique({ where: { id: prevBidderId } })
+   467→        if (prev && !prev.isBot && lot.currentBid) {
+   468→          await db.user.update({ where: { id: prev.id }, data: { balance: { increment: lot.currentBid } } })
+   469→          await notifyUser(prev.id, 'market', 'Вас перебили на аукционе', `Лот «${lot.title}» уходит за ${fmtMoney(nextBid)}. Ставка возвращена на счёт.`)
+   470→        }
+   471→      }
+   472→      await emitTo('global', 'auction:update', { lotId: lot.id })
+   473→    }
+   474→  }
+   475→
+   476→  // завершение
+   477→  const due = await db.auctionLot.findMany({
+   478→    where: { status: 'active', endsAt: { lte: new Date() } },
+   479→  })
+   480→  for (const lot of due) {
+   481→    if (!lot.currentBidderId || !lot.currentBid) {
+   482→      await db.auctionLot.update({ where: { id: lot.id }, data: { status: 'cancelled', finishedAt: new Date() } })
+   483→      continue
+   484→    }
+   485→    const winner = await db.user.findUnique({ where: { id: lot.currentBidderId } })
+   486→    if (!winner) continue
+   487→    if (!winner.isBot) {
+   488→      await db.transaction.create({
+   489→        data: { userId: winner.id, type: 'purchase', amount: -lot.currentBid, note: `Аукцион: ${lot.title}` },
+   490→      })
+   491→      await notifyUser(winner.id, 'deal', 'Вы выиграли аукцион', `«${lot.title}» за ${fmtMoney(lot.currentBid)} уже в инвентаре`)
+   492→    } else {
+   493→      await db.user.update({ where: { id: winner.id }, data: { balance: { decrement: lot.currentBid } } })
+   494→    }
+   495→    const item = await db.item.create({
+   496→      data: {
+   497→        ownerId: winner.id, itemKey: lot.itemKey, title: lot.title, category: lot.category,
+   498→        condition: lot.condition, image: lot.image, baseValue: lot.baseValue,
+   499→        purchasePrice: lot.currentBid, fromUserId: null,
+   500→      },
+   501→    })
+   502→    await db.auctionLot.update({ where: { id: lot.id }, data: { status: 'finished', finishedAt: new Date() } })
+   503→    await emitTo('global', 'auction:update', { lotId: lot.id, finished: true })
+   504→  }
+   505→}
+   506→
+   507→// ---------- ФИНАНСЫ ----------
+   508→async function financeTick() {
+   509→  // проценты по вкладам
+   510→  const users = await db.user.findMany({
+   511→    where: { deposit: { gt: 0 }, depositAt: { lt: new Date(Date.now() - 3_600_000) } },
+   512→    take: 50,
+   513→  })
+   514→  for (const u of users) {
+   515→    if (!u.depositAt) continue
+   516→    const hours = Math.floor((Date.now() - u.depositAt.getTime()) / 3_600_000)
+   517→    if (hours < 1) continue
+   518→    const interest = Math.round(u.deposit * 0.001 * hours)
+   519→    if (interest <= 0) continue
+   520→    await db.user.update({
+   521→      where: { id: u.id },
+   522→      data: { deposit: { increment: interest }, depositAt: new Date(u.depositAt.getTime() + hours * 3_600_000) },
+   523→    })
+   524→    if (!u.isBot) {
+   525→      await db.transaction.create({ data: { userId: u.id, type: 'interest', amount: interest, note: `Проценты по вкладу (${hours} ч.)` } })
+   526→    }
+   527→  }
+   528→  // пеня по налогам
+   529→  const debtors = await db.user.findMany({
+   530→    where: { isBot: false, taxDebt: { gt: 0 }, taxPenaltyAt: { lt: new Date(Date.now() - 86_400_000) } },
+   531→  })
+   532→  for (const u of debtors) {
+   533→    const penalty = Math.round(u.taxDebt * 0.1)
+   534→    await db.user.update({
+   535→      where: { id: u.id },
+   536→      data: { taxDebt: { increment: penalty }, taxPenaltyAt: new Date() },
+   537→    })
+   538→    await db.taxBill.create({
+   539→      data: { userId: u.id, amount: penalty, reason: 'Пеня 10% за просрочку налога', dueAt: new Date(Date.now() + 86_400_000) },
+   540→    })
+   541→    await notifyUser(u.id, 'tax', 'Пеня от ФНС', `Начислена пеня ${fmtMoney(penalty)}. Задолженность растёт каждый день.`)
+   542→  }
+   543→  // просроченные кредиты
+   544→  const overdue = await db.loan.findMany({ where: { status: 'active', dueAt: { lt: new Date() } } })
+   545→  for (const l of overdue) {
+   546→    await db.loan.update({ where: { id: l.id }, data: { status: 'overdue' } })
+   547→    const owner = await db.user.findUnique({ where: { id: l.userId } })
+   548→    if (owner && !owner.isBot) {
+   549→      const newScore = Math.max(300, owner.creditScore - 80)
+   550→      await db.user.update({ where: { id: owner.id }, data: { creditScore: newScore } })
+   551→      await notifyUser(l.userId, 'system', 'Кредит просрочен', `Банк ждёт погашения. Кредитный рейтинг упал до ${newScore} — лимит срезан, ставка выросла. Покупки ограничены при долге свыше 30 000 ₽.`)
+   552→    } else {
+   553→      await notifyUser(l.userId, 'system', 'Кредит просрочен', 'Банк ждёт погашения. Покупки ограничены при долге свыше 30 000 ₽.')
+   554→    }
+   555→  }
+   556→}
+   557→
+   558→// ---------- ПРОЧЕЕ ----------
+   559→async function repairTick() {
+   560→  const ready = await db.repairOrder.findMany({
+   561→    where: { status: 'in_progress', readyAt: { lte: new Date() } }, take: 20,
+   562→  })
+   563→  for (const r of ready) {
+   564→    await db.repairOrder.update({ where: { id: r.id }, data: { status: 'ready' } })
+   565→    await notifyUser(r.userId, 'system', 'Ремонт завершён', 'Ваш товар готов — заберите в сервисе.')
+   566→  }
+   567→}
+   568→
+   569→async function deliveryTick() {
+   570→  await deliverDue()
+   571→}
+   572→
+   573→async function presenceTick() {
+   574→  const bots = await db.user.findMany({ where: { isBot: true }, take: 200 })
+   575→  const n = randInt(4, 9)
+   576→  for (let i = 0; i < n && bots.length; i++) {
+   577→    const b = rnd(bots)
+   578→    await db.user.update({ where: { id: b.id }, data: { lastSeenAt: new Date() } })
+   579→  }
+   580→  // боты должны быть платёжеспособны
+   581→  const poor = await db.user.findMany({ where: { isBot: true, balance: { lt: 60_000 } }, take: 5 })
+   582→  for (const p of poor) {
+   583→    await db.user.update({ where: { id: p.id }, data: { balance: { increment: 200_000 } } })
+   584→  }
+   585→}
+   586→
+   587→export async function tickAll() {
+   588→  if (!g.__avitoEngine) return
+   589→  g.__avitoEngine.tick++
+   590→  const tick = g.__avitoEngine.tick
+   591→  try {
+   592→    await marketTick(tick)
+   593→    await botsTick(tick)
+   594→    await auctionTick(tick)
+   595→    await deliveryTick()
+   596→    await repairTick()
+   597→    if (tick % 4 === 0) await financeTick()
+   598→    await presenceTick()
+   599→    if (tick % 8 === 0) await ensureDailyQuestsAll()
+   600→  } catch (e) {
+   601→    console.error('[engine] tick error:', e)
+   602→  }
+   603→}
+   604→
+   605→// задания генерим всем активным игрокам
+   606→async function ensureDailyQuestsAll() {
+   607→  const players = await db.user.findMany({ where: { isBot: false }, take: 100 })
+   608→  for (const p of players) {
+   609→    await ensureDailyQuests(p.id)
+   610→  }
+   611→}
+   612→
+   613→export function startEngine() {
+   614→  if (g.__avitoEngine?.started) return
+   615→  g.__avitoEngine = { started: true, tick: 0 }
+   616→  console.log('[engine] живой рынок запущен')
+   617→  // первичная инициализация индексов
+   618→  db.marketIndex.count().then(async (c) => {
+   619→    if (c === 0) {
+   620→      const cats = [...new Set(CATALOG.map((i) => i.category))]
+   621→      for (const cat of cats) {
+   622→        await db.marketIndex.create({ data: { category: cat, multiplier: 0.85 + Math.random() * 0.35 } })
+   623→      }
+   624→      console.log('[engine] индексы рынка созданы:', cats.length)
+   625→    }
+   626→  }).catch(() => {})
+   627→  const timer = setInterval(() => {
+   628→    tickAll().catch((e) => console.error('[engine] fatal:', e))
+   629→  }, 15_000)
+   630→  if (typeof timer === 'object' && 'unref' in timer) timer.unref()
+   631→}
+   632→

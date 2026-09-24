@@ -65,3 +65,33 @@ export async function onListingCreated(listing: {
   await recordPricePoint(listing.itemKey, listing.price)
   await notifySavedSearches(listing)
 }
+
+// Цена на объявление снизилась — оповещаем всех, кто добавил его в избранное.
+export async function notifyPriceDrop(
+  listing: { id: string; sellerId: string; title: string; price: number },
+  oldPrice: number,
+): Promise<void> {
+  try {
+    if (listing.price >= oldPrice) return
+    const favs = await db.favorite.findMany({
+      where: { listingId: listing.id },
+      select: { userId: true },
+      take: 100,
+    })
+    const dropPct = Math.round((1 - listing.price / oldPrice) * 100)
+    if (dropPct < 3) return // мелочь не стоит уведомления
+    const seen = new Set<string>()
+    for (const f of favs) {
+      if (f.userId === listing.sellerId || seen.has(f.userId)) continue
+      seen.add(f.userId)
+      await notifyUser(
+        f.userId,
+        'market',
+        'Цена снизилась',
+        `«${listing.title}» подешевел${dropPct >= 10 ? ' сильно' : ''}: ${oldPrice.toLocaleString('ru-RU')} → ${listing.price.toLocaleString('ru-RU')} ₽ (−${dropPct}%). Из избранного можно забрать.`,
+      )
+    }
+  } catch {
+    // уведомления не критичны
+  }
+}

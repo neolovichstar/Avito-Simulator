@@ -52,8 +52,9 @@ httpServer.prependListener('request', (req: IncomingMessage, res: ServerResponse
   const pathname = qIndex === -1 ? rawUrl : rawUrl.slice(0, qIndex)
   const method = (req.method ?? 'GET').toUpperCase()
 
-  // engine.io handshake / polling (socket.io path '/') — не трогаем
-  if (pathname === '/' && rawUrl.includes('EIO=')) return
+  // engine.io (socket.io) обслуживает свои пути сам: polling (/socket.io/?EIO=…)
+  // и websocket-upgrade не должны перехватываться роутером — пропускаем как есть
+  if (rawUrl.includes('EIO=') || pathname === '/socket.io' || pathname.startsWith('/socket.io/')) return
 
   // объявляем запрос своим: url больше не начинается с '/' → engine.io пропустит
   req.url = 'realtime-claimed'
