@@ -1,6 +1,6 @@
 'use client'
 
-// Avito — главное приложение. Вкладки: Главная, Избранное, Продать, Сообщения, Профиль
+// «Сделка» — главное приложение. Вкладки: Главная, Избранное, Продать, Сообщения, Профиль
 import { useCallback, useEffect, useState } from 'react'
 import { Home, Heart, PlusCircle, MessageSquare, User, ShoppingBag } from 'lucide-react'
 import { useOS } from '@/lib/store'
@@ -17,7 +17,7 @@ import SellerScreen from './SellerScreen'
 
 type Tab = 'feed' | 'fav' | 'sell' | 'chats' | 'profile'
 
-// Внутренняя навигация Avito: стек экранов (объявление → продавец → объявление …)
+// Внутренняя навигация «Сделки»: стек экранов (объявление → продавец → объявление …)
 type View = { type: 'listing' | 'seller' | 'chat'; id: string }
 
 const TABS: { key: Tab; label: string; icon: typeof Home }[] = [
@@ -66,9 +66,9 @@ export default function AvitoApp() {
 
   return (
     <div className="h-full flex flex-col bg-[#f4f5f7]">
-      {/* шапка Avito */}
+      {/* шапка «Сделки» */}
       <div className="bg-white border-b border-black/5 px-4 pt-2 pb-2 flex items-center gap-2 shrink-0">
-        <AvitoLogo />
+        <DealWordmark />
         <div className="ml-auto text-right">
           <div className="text-[11px] text-neutral-400 leading-none">{session?.city ?? 'Москва'}</div>
           <div className="text-xs font-semibold text-neutral-800 mt-1">
@@ -115,7 +115,7 @@ export default function AvitoApp() {
       </div>
 
       {/* нижняя навигация как в Avito */}
-      <nav className="shrink-0 bg-white border-t border-black/5 flex" aria-label="Разделы Avito">
+      <nav className="shrink-0 bg-white border-t border-black/5 flex" aria-label="Разделы приложения">
         {TABS.map(({ key, label, icon: Icon }) => {
           const active = tab === key && !top
           const isSell = key === 'sell'
@@ -125,12 +125,12 @@ export default function AvitoApp() {
               onClick={() => { reset(); setTab(key) }}
               aria-label={label}
               className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] transition-colors ${
-                active ? 'text-[#00AAFF]' : 'text-neutral-400'
+                active ? 'text-[#965EEB]' : 'text-neutral-400'
               }`}
             >
               {isSell ? (
                 <span className={`w-7 h-7 -mt-3 rounded-full flex items-center justify-center shadow-md ${
-                  active ? 'bg-[#00AAFF] text-white' : 'bg-neutral-200 text-neutral-500'
+                  active ? 'bg-[#965EEB] text-white' : 'bg-neutral-200 text-neutral-500'
                 }`}>
                   <PlusCircle size={20} />
                 </span>
@@ -151,16 +151,24 @@ export default function AvitoApp() {
   )
 }
 
-export function AvitoLogo() {
+export function DealWordmark() {
   return (
     <div className="flex items-center gap-1.5 select-none">
-      <svg width="26" height="26" viewBox="0 0 48 48" aria-hidden>
-        <circle cx="17" cy="18" r="11" fill="#00AAFF" />
-        <circle cx="34" cy="15" r="7" fill="#04E061" />
-        <circle cx="35" cy="33" r="9" fill="#965EEB" />
-        <circle cx="15" cy="36" r="6.5" fill="#FF4053" />
+      <svg width="24" height="24" viewBox="0 0 48 48" aria-hidden>
+        <defs>
+          <linearGradient id="dealWmGrad" x1="10" y1="8" x2="38" y2="40" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stopColor="#B37BF5" />
+            <stop offset="1" stopColor="#7C3AED" />
+          </linearGradient>
+        </defs>
+        <path
+          d="M21.5 6.5 H39 a2.5 2.5 0 0 1 2.5 2.5 V26.5 a3 3 0 0 1-.88 2.12 L27.5 41.74 a3 3 0 0 1-4.24 0 L6.62 25.1 a3 3 0 0 1 0-4.24 L19.38 7.38 a3 3 0 0 1 2.12-.88 Z"
+          fill="url(#dealWmGrad)"
+        />
+        <circle cx="33" cy="15" r="3.2" fill="#ffffff" />
+        <path d="M14.5 26.5 l5.5 5.5 L30 21.5" stroke="#ffffff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" opacity="0.92" fill="none" />
       </svg>
-      <span className="text-lg font-extrabold tracking-tight text-neutral-900">Avito</span>
+      <span className="text-lg font-extrabold tracking-tight text-neutral-900">Сделка</span>
     </div>
   )
 }

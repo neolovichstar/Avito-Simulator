@@ -168,7 +168,7 @@ async function dailySpecial() {
     await db.marketEvent.create({
       data: {
         category: 'all', kind: 'tax_raid', magnitude: 0,
-        headline: 'ФНС проводит массовую проверку продавцов', body: 'У кого долги по налогу — пеня. У кого порядок — премия.',
+        headline: 'Налоговая проводит массовую проверку продавцов', body: 'У кого долги по налогу — пеня. У кого порядок — премия.',
         expiresAt: new Date(Date.now() + 6 * 3_600_000),
       },
     })
@@ -581,7 +581,7 @@ async function financeTick() {
     await db.taxBill.create({
       data: { userId: u.id, amount: penalty, reason: 'Пеня 10% за просрочку налога', dueAt: new Date(Date.now() + 86_400_000) },
     })
-    await notifyUser(u.id, 'tax', 'Пеня от ФНС', `Начислена пеня ${fmtMoney(penalty)}. Задолженность растёт каждый день.`)
+    await notifyUser(u.id, 'tax', 'Пеня налоговой', `Начислена пеня ${fmtMoney(penalty)}. Задолженность растёт каждый день.`)
   }
   // просроченные кредиты
   const overdue = await db.loan.findMany({ where: { status: 'active', dueAt: { lt: new Date() } } })

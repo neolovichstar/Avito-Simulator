@@ -127,7 +127,7 @@ export default function BankApp() {
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
                     <Landmark className="size-5" />
-                    <span className="text-sm font-semibold tracking-wide">Альфа-Банк</span>
+                    <span className="text-sm font-semibold tracking-wide">Столичный Банк</span>
                   </div>
                   {/* Чип */}
                   <div className="h-8 w-11 rounded-md bg-gradient-to-br from-yellow-200 via-yellow-400 to-yellow-500 p-[3px] shadow-inner">
@@ -462,7 +462,7 @@ export default function BankApp() {
             )}
 
             <div className="pb-2 text-center text-[10px] text-neutral-300">
-              Альфа-Банк · вклады не застрахованы, это игра
+              Столичный Банк · вклады не застрахованы, это игра
             </div>
           </div>
         ) : null}

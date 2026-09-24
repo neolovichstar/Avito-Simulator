@@ -24,7 +24,7 @@ export default function TaxesApp() {
       const d = await api.taxes()
       setData(d)
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Не удалось загрузить данные ФНС')
+      setError(e instanceof ApiError ? e.message : 'Не удалось загрузить данные налоговой')
     } finally {
       setLoading(false)
     }
@@ -83,7 +83,7 @@ export default function TaxesApp() {
                   <Landmark className="size-5" />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold">ФНС · Личный кабинет</div>
+                  <div className="text-sm font-semibold">Налоговая · Личный кабинет</div>
                   <div className="text-[11px] text-white/60">Налог на профессиональный доход</div>
                 </div>
               </div>

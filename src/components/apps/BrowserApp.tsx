@@ -36,13 +36,13 @@ const KIND_BADGE: Record<string, { label: string; cls: string }> = {
   fashion: { label: 'Тренд', cls: 'bg-purple-100 text-purple-700' },
   crisis: { label: 'Кризис', cls: 'bg-orange-100 text-orange-700' },
   opu: { label: 'Дефицит', cls: 'bg-fuchsia-100 text-fuchsia-700' },
-  tax_raid: { label: 'Проверка ФНС', cls: 'bg-slate-200 text-slate-700' },
+  tax_raid: { label: 'Налоговая проверка', cls: 'bg-slate-200 text-slate-700' },
   supply: { label: 'Поставки', cls: 'bg-teal-100 text-teal-700' },
   garage: { label: 'Гаражная распродажа', cls: 'bg-yellow-100 text-yellow-700' },
 }
 
 const SITES = [
-  { site: 'avito.ru', title: 'Avito', desc: 'Объявления и сделки', icon: ShoppingBag, cls: 'bg-blue-50 text-blue-600' },
+  { site: 'sdelka.ru', title: 'Сделка', desc: 'Объявления и сделки', icon: ShoppingBag, cls: 'bg-violet-50 text-violet-600' },
   { site: 'news.market', title: 'Market News', desc: 'Новости рынка', icon: TrendingUp, cls: 'bg-emerald-50 text-emerald-600' },
   { site: 'forum.market', title: 'Market Forum', desc: 'Сообщество ресейлеров', icon: Users, cls: 'bg-violet-50 text-violet-600' },
   { site: 'banki.ru', title: 'Банки.ру', desc: 'Ставки и вклады', icon: CreditCard, cls: 'bg-amber-50 text-amber-600' },
@@ -590,7 +590,7 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp: (app: 'avito' | '
           </div>
         )}
 
-        {current.type === 'site' && current.site === 'avito.ru' && (
+        {current.type === 'site' && current.site === 'sdelka.ru' && (
           <div className="p-4">
             <div className="mx-auto max-w-xs overflow-hidden rounded-[2rem] border-[6px] border-neutral-300 bg-white shadow-xl">
               <div className="flex h-5 items-center justify-center bg-neutral-200">
@@ -598,9 +598,9 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp: (app: 'avito' | '
               </div>
               <div className="bg-gradient-to-b from-[#00A0E3] to-[#0489C6] px-5 py-7 text-center text-white">
                 <ShoppingBag className="mx-auto size-10" />
-                <div className="mt-3 text-lg font-bold">Вы на сайте Avito</div>
+                <div className="mt-3 text-lg font-bold">Вы на сайте Сделки</div>
                 <p className="mt-1.5 text-xs leading-relaxed text-white/85">
-                  Это мобильная версия avito.ru в браузере. В приложении удобнее: живая лента, чаты, сделки и
+                  Это мобильная версия sdelka.ru в браузере. В приложении удобнее: живая лента, чаты, сделки и
                   продвижение объявлений.
                 </p>
               </div>
@@ -610,7 +610,7 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp: (app: 'avito' | '
                   style={{ backgroundColor: '#00A0E3' }}
                   onClick={() => onOpenApp('avito')}
                 >
-                  Открыть приложение Avito
+                  Открыть приложение Сделка
                 </Button>
                 <p className="mt-2 text-center text-[10px] text-neutral-400">Откроется внутри системы</p>
               </div>
@@ -645,12 +645,12 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp: (app: 'avito' | '
                   <CreditCard className="size-6" />
                 </div>
                 <div>
-                  <div className="text-base font-bold">Альфа-Банк</div>
+                  <div className="text-base font-bold">Столичный Банк</div>
                   <div className="text-[11px] text-neutral-400">banki.ru · обзор ставок</div>
                 </div>
               </div>
               <p className="mt-3 text-xs leading-relaxed text-neutral-600">
-                Альфа-Банк в этой игре один, зато надёжный. Кредит выдают за секунду: ставка 15%, срок 7 дней,
+                Столичный Банк в этой игре один, зато надёжный. Кредит выдают за секунду: ставка 15%, срок 7 дней,
                 лимит растёт вместе с уровнем игрока. Накопительный вклад приносит 0.1% в час — маленькие деньги,
                 но капают круглосуточно. Пока кредит не погашен, новый не выдадут.
               </p>
@@ -701,7 +701,7 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp: (app: 'avito' | '
               },
               {
                 t: '4. Налоги',
-                b: '4% с каждой продажи капает в счёт ФНС автоматически. Не платите больше суток — получите пеню 10% в сутки, а долг от 10 000 заблокирует продажи.',
+                b: '4% с каждой продажи капает в счёт налоговой автоматически. Не платите больше суток — получите пеню 10% в сутки, а долг от 10 000 заблокирует продажи.',
               },
               {
                 t: '5. Кредит и вклад',

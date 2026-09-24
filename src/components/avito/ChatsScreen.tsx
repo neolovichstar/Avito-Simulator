@@ -78,7 +78,7 @@ export default function ChatsScreen({ onOpenChat }: { onOpenChat: (id: string) =
                 <p className="text-[10px] text-neutral-400 truncate mt-0.5">{c.listingTitle}</p>
               </div>
               {c.unread > 0 && (
-                <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#00AAFF] text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#965EEB] text-white text-[11px] font-bold flex items-center justify-center shrink-0">
                   {c.unread}
                 </span>
               )}

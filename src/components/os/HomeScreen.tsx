@@ -1,16 +1,13 @@
 'use client'
 
-import { useSyncExternalStore } from 'react'
-import { useOS, type AppKey } from '@/lib/store'
+import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useOS, type AppKey, type WidgetKey } from '@/lib/store'
 import { fmtMoney } from '@/lib/format'
+import { wallpaperClass } from '@/lib/wallpapers'
+import { api } from '@/lib/api'
 import AppIcon from './AppIcon'
 import { APP_TILE, DOCK_APPS, HOME_GRID } from './app-logos'
-
-const WALLPAPER =
-  'radial-gradient(circle at 18% 10%, rgba(124,58,237,0.4), transparent 50%),' +
-  'radial-gradient(circle at 85% 22%, rgba(37,99,235,0.35), transparent 48%),' +
-  'radial-gradient(circle at 55% 92%, rgba(14,165,233,0.28), transparent 55%),' +
-  'linear-gradient(180deg, #0b0b16 0%, #06060c 60%, #030307 100%)'
+import type { CareerData, DeliveryDTO } from '@/lib/types'
 
 // Живые тики каждые 1000 мс без setState в эффекте (useSyncExternalStore).
 function useClock(): Date | null {
@@ -25,69 +22,140 @@ function useClock(): Date | null {
   return ts ? new Date(ts) : null
 }
 
+const glass = 'rounded-2xl bg-white/10 backdrop-blur-md'
+const WIDGET_CLASS = 'min-h-11 rounded-2xl bg-white/10 px-3.5 py-2 text-left backdrop-blur-md outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-white/70'
+
+// Данные для «умных» виджетов: первый активный квест и активная доставка
+function useWidgetData() {
+  const [quest, setQuest] = useState<{ title: string; progress: string } | null>(null)
+  const [delivery, setDelivery] = useState<{ title: string; status: string } | null>(null)
+  useEffect(() => {
+    let alive = true
+    api.career().then((c: CareerData) => {
+      if (!alive) return
+      const q = c.quests.find((x) => !x.claimed && x.progress > 0) ?? c.quests.find((x) => !x.claimed)
+      if (q) setQuest({ title: q.title, progress: `${Math.min(q.progress, q.target)}/${q.target}` })
+    }).catch(() => {})
+    api.deliveries().then((d: { items: DeliveryDTO[] }) => {
+      if (!alive) return
+      const act = d.items.find((x) => x.status === 'in_transit')
+      if (act) setDelivery({ title: act.title, status: 'В пути' })
+    }).catch(() => {})
+    return () => { alive = false }
+  }, [])
+  return { quest, delivery }
+}
+
+function Widget({
+  w,
+  now,
+  online,
+  balance,
+  data,
+  onOpenApp,
+}: {
+  w: WidgetKey
+  now: Date | null
+  online: number
+  balance: number
+  data: { quest: { title: string; progress: string } | null; delivery: { title: string; status: string } | null }
+  onOpenApp: (app: AppKey) => void
+}) {
+  if (w === 'clock') {
+    return (
+      <div aria-label="Время и дата" className={`flex flex-col justify-center px-3.5 py-2 ${glass}`}>
+        <p className="text-2xl font-light leading-none tabular-nums text-white" suppressHydrationWarning>
+          {now ? now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '\u00A0'}
+        </p>
+        <p className="mt-1.5 text-[11px] leading-none text-white/70" suppressHydrationWarning>
+          {now ? now.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'long' }) : '\u00A0'}
+        </p>
+      </div>
+    )
+  }
+  if (w === 'online') {
+    return (
+      <div aria-label={`Онлайн: ${online}`} className={`flex items-center gap-2 px-3 ${glass}`}>
+        <span className="relative flex h-2 w-2" aria-hidden="true">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+        </span>
+        <span className="text-base font-semibold tabular-nums text-white">{online}</span>
+      </div>
+    )
+  }
+  if (w === 'wallet') {
+    return (
+      <button type="button" aria-label="Открыть кошелёк в приложении Банк" onClick={() => onOpenApp('bank')} className={WIDGET_CLASS}>
+        <span className="block text-[10px] uppercase tracking-wider text-white/60">Кошелёк</span>
+        <span className="mt-0.5 block text-base font-semibold tabular-nums text-white">{fmtMoney(balance)}</span>
+      </button>
+    )
+  }
+  if (w === 'quest') {
+    return (
+      <button type="button" aria-label="Открыть задания" onClick={() => onOpenApp('career')} className={WIDGET_CLASS}>
+        <span className="block text-[10px] uppercase tracking-wider text-white/60">Задания</span>
+        {data.quest ? (
+          <>
+            <span className="mt-0.5 block max-w-40 truncate text-xs font-medium text-white">{data.quest.title}</span>
+            <span className="mt-1 flex items-center gap-1.5">
+              <span className="h-1.5 w-16 overflow-hidden rounded-full bg-white/20">
+                <span className="block h-full rounded-full bg-emerald-400" />
+              </span>
+              <span className="text-[10px] font-semibold tabular-nums text-white/80">{data.quest.progress}</span>
+            </span>
+          </>
+        ) : (
+          <span className="mt-0.5 block text-xs text-white/60">На сегодня всё чисто</span>
+        )}
+      </button>
+    )
+  }
+  // delivery
+  return (
+    <button type="button" aria-label="Открыть доставки" onClick={() => onOpenApp('delivery')} className={WIDGET_CLASS}>
+      <span className="block text-[10px] uppercase tracking-wider text-white/60">Доставка</span>
+      {data.delivery ? (
+        <>
+          <span className="mt-0.5 block max-w-40 truncate text-xs font-medium text-white">{data.delivery.title}</span>
+          <span className={`mt-0.5 block text-[10px] font-semibold ${data.delivery.status === 'В пути' ? 'text-amber-300' : 'text-emerald-300'}`}>
+            {data.delivery.status}
+          </span>
+        </>
+      ) : (
+        <span className="mt-0.5 block text-xs text-white/60">Посылок нет</span>
+      )}
+    </button>
+  )
+}
+
 export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
   const balance = useOS((s) => s.session?.balance ?? 0)
   const unreadChats = useOS((s) => s.unreadChats)
   const online = useOS((s) => s.online)
+  const wallpaper = useOS((s) => s.wallpaper)
+  const widgets = useOS((s) => s.widgets)
   const now = useClock()
+  const data = useWidgetData()
 
   return (
     <div
-      className="absolute inset-0 flex flex-col pt-14"
-      style={{ backgroundImage: WALLPAPER }}
+      className={`absolute inset-0 flex flex-col pt-14 ${wallpaperClass(wallpaper)}`}
       role="region"
       aria-label="Домашний экран"
     >
-      {/* Виджеты: время + онлайн + кошелёк — компактный стеклянный ряд */}
+      {/* Виджеты — выбранные пользователем */}
       <div className="flex items-stretch justify-between gap-2.5 px-6">
-        <div
-          aria-label="Время и дата"
-          className="flex flex-col justify-center rounded-2xl bg-white/10 px-3.5 py-2 backdrop-blur-md"
-        >
-          <p
-            className="text-2xl font-light leading-none tabular-nums text-white"
-            suppressHydrationWarning
-          >
-            {now
-              ? now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-              : '\u00A0'}
-          </p>
-          <p className="mt-1.5 text-[11px] leading-none text-white/70" suppressHydrationWarning>
-            {now
-              ? now.toLocaleDateString('ru-RU', {
-                  weekday: 'short',
-                  day: 'numeric',
-                  month: 'long',
-                })
-              : '\u00A0'}
-          </p>
-        </div>
-
         <div className="flex items-stretch gap-2.5">
-          <div
-            aria-label={`Онлайн: ${online}`}
-            className="flex items-center gap-2 rounded-2xl bg-white/10 px-3 backdrop-blur-md"
-          >
-            <span className="relative flex h-2 w-2" aria-hidden="true">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-            </span>
-            <span className="text-base font-semibold tabular-nums text-white">{online}</span>
-          </div>
-
-          <button
-            type="button"
-            aria-label="Открыть кошелёк в приложении Банк"
-            onClick={() => onOpenApp('bank')}
-            className="min-h-11 rounded-2xl bg-white/10 px-3.5 py-2 text-left backdrop-blur-md outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-white/70"
-          >
-            <span className="block text-[10px] uppercase tracking-wider text-white/60">
-              Кошелёк
-            </span>
-            <span className="mt-0.5 block text-base font-semibold tabular-nums text-white">
-              {fmtMoney(balance)}
-            </span>
-          </button>
+          {widgets.filter((w) => w === 'clock').map((w) => (
+            <Widget key={w} w={w} now={now} online={online} balance={balance} data={data} onOpenApp={onOpenApp} />
+          ))}
+        </div>
+        <div className="flex items-stretch gap-2.5">
+          {widgets.filter((w) => w !== 'clock').map((w) => (
+            <Widget key={w} w={w} now={now} online={online} balance={balance} data={data} onOpenApp={onOpenApp} />
+          ))}
         </div>
       </div>
 

@@ -318,7 +318,7 @@ export const CATALOG: CatalogItem[] = [
   },
   {
     key: 'yandex-station-mini',
-    title: 'Яндекс Станция Мини',
+    title: 'Умная колонка Мини',
     category: 'electronics',
     basePrice: 4200,
     jitter: 0.2,

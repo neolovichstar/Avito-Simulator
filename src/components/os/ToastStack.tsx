@@ -7,11 +7,11 @@ import { useOS, type AppKey } from '@/lib/store'
 import { openAppForToast } from '@/lib/toast-apps'
 
 const APP_META: Record<string, { app: string; icon: LucideIcon; bg: string; openApp: AppKey }> = {
-  avito: { app: 'Avito', icon: ShoppingBag, bg: 'linear-gradient(145deg,#35c3ff,#0091d5)', openApp: 'avito' },
-  message: { app: 'Avito', icon: MessageSquare, bg: 'linear-gradient(145deg,#35c3ff,#0091d5)', openApp: 'avito' },
-  deal: { app: 'Avito', icon: ShoppingBag, bg: 'linear-gradient(145deg,#35c3ff,#0091d5)', openApp: 'avito' },
+  avito: { app: 'Сделка', icon: ShoppingBag, bg: 'linear-gradient(145deg,#B37BF5,#7C3AED)', openApp: 'avito' },
+  message: { app: 'Сделка', icon: MessageSquare, bg: 'linear-gradient(145deg,#B37BF5,#7C3AED)', openApp: 'avito' },
+  deal: { app: 'Сделка', icon: ShoppingBag, bg: 'linear-gradient(145deg,#B37BF5,#7C3AED)', openApp: 'avito' },
   tax: { app: 'Налоги', icon: Receipt, bg: 'linear-gradient(145deg,#4a5568,#2d3748)', openApp: 'taxes' },
-  market: { app: 'Avito', icon: TrendingUp, bg: 'linear-gradient(145deg,#35c3ff,#0091d5)', openApp: 'avito' },
+  market: { app: 'Сделка', icon: TrendingUp, bg: 'linear-gradient(145deg,#B37BF5,#7C3AED)', openApp: 'avito' },
   system: { app: 'Система', icon: Bell, bg: 'linear-gradient(145deg,#9ca3af,#4b5563)', openApp: 'settings' },
 }
 
@@ -25,7 +25,7 @@ function metaFor(title: string, body: string) {
   return APP_META.system
 }
 
-export default function ToastStack() {
+export default function ToastStack({ variant = 'phone' }: { variant?: 'phone' | 'desktop' }) {
   const toastQueue = useOS((s) => s.toastQueue)
   const dropToast = useOS((s) => s.dropToast)
   const openApp = useOS((s) => s.openApp)
@@ -35,7 +35,11 @@ export default function ToastStack() {
   return (
     <div
       aria-live="polite"
-      className="pointer-events-none absolute inset-x-3 top-12 z-50 flex flex-col gap-2"
+      className={
+        variant === 'desktop'
+          ? 'pointer-events-none fixed right-4 top-4 z-[70] flex w-96 flex-col gap-2'
+          : 'pointer-events-none absolute inset-x-3 top-12 z-50 flex flex-col gap-2'
+      }
     >
       {toastQueue.map((t) => {
         const meta = metaFor(t.title, t.body)

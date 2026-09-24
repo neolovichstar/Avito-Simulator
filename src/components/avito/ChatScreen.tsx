@@ -136,7 +136,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
     return (
       <div className="h-full bg-white flex flex-col items-center justify-center gap-3 p-6 text-center">
         <p className="text-sm text-red-500">{error}</p>
-        <button onClick={onBack} className="text-sm font-medium text-[#00AAFF]">Назад</button>
+        <button onClick={onBack} className="text-sm font-medium text-[#965EEB]">Назад</button>
       </div>
     )
   }
@@ -197,7 +197,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
           return (
             <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 ${
-                mine ? 'bg-[#00AAFF] text-white rounded-br-md' : 'bg-white text-neutral-900 rounded-bl-md shadow-sm'
+                mine ? 'bg-[#965EEB] text-white rounded-br-md' : 'bg-white text-neutral-900 rounded-bl-md shadow-sm'
               }`}>
                 {m.kind === 'invoice' ? (
                   <div className="min-w-[180px]">
@@ -267,7 +267,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
           onClick={send}
           disabled={sending || !text.trim()}
           aria-label="Отправить"
-          className="w-11 h-11 rounded-full bg-[#00AAFF] text-white flex items-center justify-center shrink-0 active:scale-95 transition-transform disabled:opacity-40"
+          className="w-11 h-11 rounded-full bg-[#965EEB] text-white flex items-center justify-center shrink-0 active:scale-95 transition-transform disabled:opacity-40"
         >
           {sending ? <Loader2 size={18} className="animate-spin" /> : <SendHorizontal size={18} />}
         </button>
@@ -298,7 +298,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
             />
             <button
               onClick={sendInvoice}
-              className="w-full h-12 rounded-xl bg-[#00AAFF] text-white font-bold text-sm active:scale-[0.98] transition-transform"
+              className="w-full h-12 rounded-xl bg-[#965EEB] text-white font-bold text-sm active:scale-[0.98] transition-transform"
             >
               Отправить счёт
             </button>

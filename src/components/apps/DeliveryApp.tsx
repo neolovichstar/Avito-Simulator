@@ -115,7 +115,7 @@ export default function DeliveryApp() {
                 <PackageOpen className="size-8 text-neutral-300" aria-hidden />
                 <div className="mt-2 text-sm font-medium text-neutral-700">Доставок пока нет</div>
                 <div className="mt-1 max-w-64 text-xs leading-relaxed text-neutral-400">
-                  Курьером можно получить товар при покупке в Avito — выберите доставку при оплате.
+                  Курьером можно получить товар при покупке в Сделке — выберите доставку при оплате.
                 </div>
               </div>
             ) : (
@@ -219,7 +219,7 @@ export default function DeliveryApp() {
             )}
 
             <div className="pb-2 text-center text-[10px] text-neutral-300">
-              Avito Доставка · осмотр при получении, это игра
+              Сделка Доставка · осмотр при получении, это игра
             </div>
           </>
         )}

@@ -250,3 +250,77 @@
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
 }
+
+/* ============================================================
+   ТЁМНАЯ ТЕМА v2: добивка проблемных мест
+   ============================================================ */
+
+/* hover на светлых поверхностях не должен темнеть (инверсия) */
+.theme-dark .hover\:bg-neutral-100:hover { background-color: #23272e !important; }
+.theme-dark .hover\:bg-neutral-50:hover { background-color: #1e2228 !important; }
+.theme-dark .hover\:bg-neutral-200:hover { background-color: #2c313a !important; }
+.theme-dark .hover\:bg-gray-100:hover { background-color: #23272e !important; }
+.theme-dark .hover\:bg-slate-100:hover { background-color: #23272e !important; }
+.theme-dark .hover\:bg-white:hover { background-color: #23272e !important; }
+.theme-dark .hover\:bg-red-50:hover { background-color: rgba(239,68,68,0.14) !important; }
+
+/* разделители списков */
+.theme-dark .divide-neutral-100 > :not([hidden]) ~ :not([hidden]) { border-color: #262b31; }
+.theme-dark .divide-neutral-200 > :not([hidden]) ~ :not([hidden]) { border-color: #2a2f36; }
+
+/* фиолетовый бренд «Сделки» — светлее в темноте */
+.theme-dark .text-\[\#965EEB\] { color: #bda0f5; }
+.theme-dark .text-\[\#7C3AED\] { color: #b39af3; }
+
+/* инпуты и текстовые поля */
+.theme-dark input, .theme-dark textarea { color-scheme: dark; }
+.theme-dark input::placeholder, .theme-dark textarea::placeholder { color: #575d65; }
+
+/* мягкие тени вместо глубоких чёрных */
+.theme-dark .shadow-sm { box-shadow: 0 1px 3px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04); }
+.theme-dark .shadow-md { box-shadow: 0 4px 12px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.05); }
+
+/* прогресс-бары и треки */
+.theme-dark .bg-neutral-100\/80, .theme-dark [class*="bg-neutral-100/"] { background-color: #121417; }
+
+/* ============================================================
+   ОБОИ (класс-модификаторы вместо inline style — надёжно при гидрации)
+   ============================================================ */
+.wp-wave {
+  background-image: url(/img/wall/wave.png),
+    radial-gradient(circle at 20% 15%, rgba(124,58,237,0.45), transparent 55%),
+    linear-gradient(180deg, #14102b, #090614);
+  background-size: cover;
+  background-position: center;
+}
+.wp-peak {
+  background-image: url(/img/wall/peak.png),
+    linear-gradient(180deg, #2b1d4d 0%, #6d3a6e 55%, #c96f7c 100%);
+  background-size: cover;
+  background-position: center;
+}
+.wp-city {
+  background-image: url(/img/wall/city.png),
+    linear-gradient(180deg, #101423 0%, #1c2237 60%, #3c2f45 100%);
+  background-size: cover;
+  background-position: center;
+}
+.wp-marble {
+  background-image: url(/img/wall/marble.png),
+    linear-gradient(160deg, #0d2b23 0%, #10332a 55%, #1c4a3c 100%);
+  background-size: cover;
+  background-position: center;
+}
+.wp-aurora {
+  background-image:
+    radial-gradient(circle at 18% 10%, rgba(124,58,237,0.4), transparent 50%),
+    radial-gradient(circle at 85% 22%, rgba(37,99,235,0.35), transparent 48%),
+    radial-gradient(circle at 55% 92%, rgba(14,165,233,0.28), transparent 55%),
+    linear-gradient(180deg, #0b0b16 0%, #06060c 60%, #030307 100%);
+}
+.wp-ember {
+  background-image:
+    radial-gradient(circle at 78% 12%, rgba(251,146,60,0.4), transparent 52%),
+    radial-gradient(circle at 12% 82%, rgba(190,18,60,0.35), transparent 55%),
+    linear-gradient(180deg, #1c0f18 0%, #2b1220 55%, #0d0509 100%);
+}

@@ -3,10 +3,10 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: "Avito — Симулятор ресейла",
+  title: "Сделка — Симулятор перепродажи",
   description:
     "Игра-симулятор перепродажи: живой рынок с ИИ-продавцами, торг в чатах, банк, налоги, аукцион и ремонт — всё как в жизни.",
-  keywords: ["Avito", "симулятор", "ресейл", "игра", "экономика", "телеграм миниапп"],
+  keywords: ["сделка", "симулятор", "перепродажа", "ресейл", "игра", "экономика", "телеграм миниапп"],
   other: {
     "format-detection": "telephone=no",
   },

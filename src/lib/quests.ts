@@ -16,7 +16,7 @@ export interface QuestDef {
 }
 
 export const QUEST_POOL: QuestDef[] = [
-  { id: 'q_sell_2', title: 'План продаж', desc: (t) => `Продайте ${t} товара на Авито`, kind: 'sell', target: 2, reward: 2000, xpReward: 80, weight: 3 },
+  { id: 'q_sell_2', title: 'План продаж', desc: (t) => `Продайте ${t} товара на Сделке`, kind: 'sell', target: 2, reward: 2000, xpReward: 80, weight: 3 },
   { id: 'q_sell_4', title: 'Торговый зал', desc: (t) => `Продайте ${t} товара за день`, kind: 'sell', target: 4, reward: 4500, xpReward: 150, weight: 1 },
   { id: 'q_buy_2', title: 'Закупка', desc: (t) => `Купите ${t} товара для перепродажи`, kind: 'buy', target: 2, reward: 1800, xpReward: 70, weight: 3 },
   { id: 'q_buy_3', title: 'Оптовик', desc: (t) => `Купите ${t} товара за день`, kind: 'buy', target: 3, reward: 3000, xpReward: 110, weight: 2 },

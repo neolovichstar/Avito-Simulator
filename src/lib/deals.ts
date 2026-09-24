@@ -175,7 +175,7 @@ export async function completeSale(opts: {
           userId: opts.buyer.id, listingId: listing.id, title: listing.title, image: listing.image,
           price: price + DELIVERY_FEE, itemKey: listing.itemKey, category: listing.category,
           listedCondition: listing.condition, realCondition: realCond, baseValue: listing.baseValue,
-          courier: ['СДЭК', 'Boxberry', 'Авито Доставка', 'Яндекс Доставка'][Math.floor(Math.random() * 4)],
+          courier: ['Пони-Экспресс', 'Синяя Точка', 'Сделка Доставка', 'Курьер Сразу'][Math.floor(Math.random() * 4)],
           eta: new Date(Date.now() + deliveryEtaSeconds() * 1000),
         },
       })

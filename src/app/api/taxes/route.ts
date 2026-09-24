@@ -57,7 +57,7 @@ export async function POST(req: Request) {
   const stats = await import('@/lib/deals').then((m) => m.bumpStats(user.id, { taxPaid: pay }))
   await import('@/lib/deals').then((m) => m.checkAchievements(user.id))
   if (pay >= user.taxDebt) {
-    await notifyUser(user.id, 'tax', 'Налоги оплачены', `Задолженность ${pay.toLocaleString('ru-RU')} ₽ погашена полностью. ФНС довольна.`)
+    await notifyUser(user.id, 'tax', 'Налоги оплачены', `Задолженность погашена полностью. Налоговая довольна.`)
   }
   const fresh = await db.user.findUnique({ where: { id: user.id } })
   return Response.json({ ok: true, balance: fresh?.balance ?? user.balance, taxDebt: fresh?.taxDebt ?? 0, totalPaid: stats.taxPaid })

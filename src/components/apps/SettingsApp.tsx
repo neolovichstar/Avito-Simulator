@@ -7,7 +7,8 @@ import {
   Shield, Star, Volume2, Wallet,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
-import { useOS } from '@/lib/store'
+import { useOS, ALL_WIDGETS, WIDGET_LABEL, type WidgetKey } from '@/lib/store'
+import { WALLPAPERS, wallpaperPreviewStyle } from '@/lib/wallpapers'
 import { fmtMoney, initials, hueColor, timeAgo } from '@/lib/format'
 import type { ProfileData, BlockedSellerDTO } from '@/lib/types'
 import { Button } from '@/components/ui/button'
@@ -49,6 +50,10 @@ export default function SettingsApp() {
   const setSound = useOS((s) => s.setSound)
   const theme = useOS((s) => s.theme)
   const setTheme = useOS((s) => s.setTheme)
+  const wallpaper = useOS((s) => s.wallpaper)
+  const setWallpaper = useOS((s) => s.setWallpaper)
+  const widgets = useOS((s) => s.widgets)
+  const setWidgets = useOS((s) => s.setWidgets)
 
   const [profile, setProfile] = useState<ProfileData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -233,6 +238,53 @@ export default function SettingsApp() {
               <Row icon={<Handshake className="size-4" />} label="Сделок" value={dealsCount !== null ? String(dealsCount) : null} />
             </SectionCard>
 
+            {/* Персонализация: обои и виджеты */}
+            <SectionCard title="Персонализация">
+              <div className="px-4 py-3">
+                <div className="text-sm font-medium text-neutral-800">Обои</div>
+                <div className="mt-2.5 grid grid-cols-4 gap-2.5">
+                  {WALLPAPERS.map((w) => (
+                    <button
+                      key={w.id}
+                      aria-label={`Обои: ${w.name}`}
+                      aria-pressed={wallpaper === w.id}
+                      onClick={() => setWallpaper(w.id)}
+                      className={`group relative h-16 overflow-hidden rounded-xl border transition active:scale-95 ${
+                        wallpaper === w.id ? 'border-[#965EEB] ring-2 ring-[#965EEB]/40' : 'border-neutral-200 hover:border-neutral-300'
+                      }`}
+                      style={wallpaperPreviewStyle(w.id)}
+                    >
+                      <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-1 pb-0.5 pt-3 text-[9px] font-semibold text-white">
+                        {w.name}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="border-t border-neutral-100 px-4 py-3">
+                <div className="text-sm font-medium text-neutral-800">Виджеты</div>
+                <div className="mt-1 text-xs text-neutral-500">Что показывать на домашнем экране и рабочем столе</div>
+                <div className="mt-2 space-y-1">
+                  {ALL_WIDGETS.map((w: WidgetKey) => {
+                    const on = widgets.includes(w)
+                    return (
+                      <div key={w} className="flex items-center justify-between rounded-lg px-1 py-1.5">
+                        <span className="text-sm text-neutral-700">{WIDGET_LABEL[w]}</span>
+                        <Switch
+                          checked={on}
+                          onCheckedChange={(v) => {
+                            const next = v ? [...widgets, w] : widgets.filter((x) => x !== w)
+                            setWidgets(next)
+                          }}
+                          aria-label={`Виджет: ${WIDGET_LABEL[w]}`}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </SectionCard>
+
             {/* Безопасность: чёрный список продавцов */}
             <SectionCard title={`Безопасность · чёрный список${blocked?.length ? ` (${blocked.length})` : ''}`}>
               {blocked === null ? (
@@ -297,13 +349,13 @@ export default function SettingsApp() {
               <div className="px-4 py-3">
                 <div className="flex items-center gap-2">
                   <Info className="size-4 text-neutral-400" />
-                  <span className="text-sm font-medium text-neutral-800">Avito Simulator</span>
+                  <span className="text-sm font-medium text-neutral-800">Сделка</span>
                   <span className="ml-auto rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-500">
-                    версия 1.0.0
+                    версия 2.0.0
                   </span>
                 </div>
                 <p className="mt-2 text-xs leading-relaxed text-neutral-500">
-                  Avito Simulator — игра-симулятор перепродажи. Экономика живая: цены двигают ИИ-боты и реальные
+                  «Сделка» — игра-симулятор перепродажи. Экономика живая: цены двигают ИИ-боты и реальные
                   игроки. Налоги, банк, рынок — как в жизни.
                 </p>
               </div>

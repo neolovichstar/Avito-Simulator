@@ -94,7 +94,7 @@ export default function ProfileScreen({ onOpenListing, onGoSell }: {
       const res = await api.updatePrice(priceEdit.id, val)
       setPriceEdit(null)
       pushToast(
-        'Avito',
+        'Сделка',
         res.warStarted
           ? `Цена изменена: ${fmtNum(res.oldPrice ?? priceEdit.price)} → ${fmtNum(val)} ₽. Конкуренты уже отреагируют`
           : 'Цена обновлена',
@@ -194,7 +194,7 @@ export default function ProfileScreen({ onOpenListing, onGoSell }: {
           myListings.length === 0 ? (
             <div className="bg-white rounded-2xl p-8 text-center">
               <p className="text-sm text-neutral-500">Нет активных объявлений</p>
-              <button onClick={onGoSell} className="mt-2 text-xs font-semibold text-[#00AAFF]">
+              <button onClick={onGoSell} className="mt-2 text-xs font-semibold text-[#965EEB]">
                 Выставить вещь из инвентаря
               </button>
             </div>
@@ -217,7 +217,7 @@ export default function ProfileScreen({ onOpenListing, onGoSell }: {
                     <button
                       onClick={() => openPriceEdit(l)}
                       disabled={busy === l.id}
-                      className="h-8 px-3 rounded-lg bg-[#00AAFF]/10 text-[#0095E0] text-[11px] font-semibold flex items-center gap-1 disabled:opacity-50"
+                      className="h-8 px-3 rounded-lg bg-[#965EEB]/10 text-[#7C3AED] text-[11px] font-semibold flex items-center gap-1 disabled:opacity-50"
                     >
                       <Pencil size={11} /> Цена
                     </button>
@@ -259,7 +259,7 @@ export default function ProfileScreen({ onOpenListing, onGoSell }: {
                     <p className="text-sm font-semibold text-neutral-900 truncate">{i.title}</p>
                     <div className="flex items-center gap-1.5 mt-1">
                       <ConditionBadge condition={i.condition} />
-                      {i.listed && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#00AAFF]/10 text-[#00AAFF] font-bold">ВЫСТАВЛЕНО</span>}
+                      {i.listed && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#965EEB]/10 text-[#965EEB] font-bold">ВЫСТАВЛЕНО</span>}
                     </div>
                     <p className="text-[11px] text-neutral-400 mt-1">
                       за {fmtNum(i.purchasePrice)} ₽ · рынок ~{fmtNum(i.estValue)} ₽
@@ -367,7 +367,7 @@ export default function ProfileScreen({ onOpenListing, onGoSell }: {
                 onChange={(e) => setPriceInput(e.target.value.replace(/[^\d]/g, ''))}
                 onKeyDown={(e) => { if (e.key === 'Enter') void savePrice() }}
                 placeholder="0 — отдать даром"
-                className="w-full h-12 rounded-xl border border-neutral-200 bg-neutral-50 px-4 text-base font-bold text-neutral-900 outline-none focus:border-[#00AAFF]"
+                className="w-full h-12 rounded-xl border border-neutral-200 bg-neutral-50 px-4 text-base font-bold text-neutral-900 outline-none focus:border-[#965EEB]"
                 aria-label="Новая цена"
               />
             </div>
@@ -400,14 +400,14 @@ export default function ProfileScreen({ onOpenListing, onGoSell }: {
                       <div key={r.id} className="flex items-center gap-2">
                         <span
                           className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white shrink-0"
-                          style={{ background: r.isMine ? '#00AAFF' : hueColor(r.seller.length * 47 % 360) }}
+                          style={{ background: r.isMine ? '#965EEB' : hueColor(r.seller.length * 47 % 360) }}
                           aria-hidden
                         >
                           {initials(r.seller)}
                         </span>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1">
-                            <p className={`text-[10px] truncate ${r.isMe ? 'font-bold text-[#0084c9]' : 'text-neutral-600'}`}>
+                            <p className={`text-[10px] truncate ${r.isMe ? 'font-bold text-[#7C3AED]' : 'text-neutral-600'}`}>
                               {r.isMe ? 'Вы' : r.seller}
                             </p>
                             {cheapest && !r.isMe && (
@@ -416,12 +416,12 @@ export default function ProfileScreen({ onOpenListing, onGoSell }: {
                           </div>
                           <div className="mt-0.5 h-1 rounded-full bg-neutral-200 overflow-hidden">
                             <div
-                              className={`h-full rounded-full ${r.isMe ? 'bg-[#00AAFF]' : cheapest ? 'bg-emerald-400' : 'bg-neutral-400'}`}
+                              className={`h-full rounded-full ${r.isMe ? 'bg-[#965EEB]' : cheapest ? 'bg-emerald-400' : 'bg-neutral-400'}`}
                               style={{ width: `${Math.max(8, Math.round((r.price / max) * 100))}%` }}
                             />
                           </div>
                         </div>
-                        <span className={`text-[11px] font-bold shrink-0 ${r.isMe ? 'text-[#0084c9]' : 'text-neutral-700'}`}>
+                        <span className={`text-[11px] font-bold shrink-0 ${r.isMe ? 'text-[#7C3AED]' : 'text-neutral-700'}`}>
                           {fmtNum(r.price)} ₽
                         </span>
                       </div>
@@ -460,7 +460,7 @@ export default function ProfileScreen({ onOpenListing, onGoSell }: {
               <button
                 onClick={() => void savePrice()}
                 disabled={priceBusy}
-                className="h-12 rounded-xl bg-[#00AAFF] text-sm font-bold text-white active:scale-[0.98] transition disabled:opacity-60 flex items-center justify-center"
+                className="h-12 rounded-xl bg-[#965EEB] text-sm font-bold text-white active:scale-[0.98] transition disabled:opacity-60 flex items-center justify-center"
               >
                 {priceBusy ? <Loader2 size={16} className="animate-spin" /> : 'Сохранить'}
               </button>

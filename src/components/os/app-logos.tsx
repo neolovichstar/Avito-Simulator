@@ -7,83 +7,97 @@ import type { AppKey } from '@/lib/store'
 // Кастомные SVG-логотипы приложений ОС (чистый SVG, без эмодзи, без lucide).
 // Каждый логотип — белый/двухтоновый силуэт, который кладётся на градиентную
 // плитку AppIcon (фон плитки передаётся через APP_TILE[app].background).
+// Бренд площадки — «Сделка»: бирка-ценник как центральный образ.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Avito: два фирменных кружка (синий #00AAFF + зелёный #04E061) — как есть.
-export function AvitoLogo() {
+// Сделка: наклонная бирка-ценник с отверстием (фирменный образ площадки).
+export function DealLogo() {
   return (
     <svg
-      width="36"
-      height="26"
-      viewBox="0 0 36 26"
+      viewBox="0 0 48 48"
       fill="none"
       aria-hidden="true"
       focusable="false"
-      className="text-white"
+      className="h-9 w-9"
     >
-      <circle cx="11" cy="13" r="9" fill="#00AAFF" />
-      <circle cx="27" cy="16" r="6.5" fill="#04E061" />
-      <circle cx="11" cy="13" r="3.4" fill="#ffffff" />
-      <circle cx="27" cy="16" r="2.6" fill="#ffffff" />
+      <defs>
+        <linearGradient id="dealGrad" x1="10" y1="8" x2="38" y2="40" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#B37BF5" />
+          <stop offset="1" stopColor="#7C3AED" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M21.5 6.5 H39 a2.5 2.5 0 0 1 2.5 2.5 V26.5 a3 3 0 0 1-.88 2.12 L27.5 41.74 a3 3 0 0 1-4.24 0 L6.62 25.1 a3 3 0 0 1 0-4.24 L19.38 7.38 a3 3 0 0 1 2.12-.88 Z"
+        fill="url(#dealGrad)"
+      />
+      <circle cx="33" cy="15" r="3.2" fill="#ffffff" />
+      <path
+        d="M14.5 26.5 l5.5 5.5 L30 21.5"
+        stroke="#ffffff"
+        strokeWidth="3.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity="0.92"
+      />
     </svg>
   )
 }
 
-// Банк: Сбер-стайл — разомкнутое кольцо + белая галочка-прутик.
+// Банк: монета с рублём — свой образ, без отсылок к реальным банкам.
 export function BankLogo() {
   return (
     <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+      <circle cx="24" cy="24" r="17" fill="#ffffff" opacity="0.95" />
+      <circle cx="24" cy="24" r="13.2" stroke="#1B9A45" strokeWidth="2.2" opacity="0.55" />
       <path
-        d="M38.29 15.75 A16.5 16.5 0 1 1 28.27 8.06"
-        stroke="#ffffff"
-        strokeWidth="5"
-        strokeLinecap="round"
-      />
-      <path
-        d="M15.5 24.5 L21.5 31 L33 18.5"
-        stroke="#ffffff"
-        strokeWidth="5"
+        d="M19.5 33 V14.5 h6.2 a6.6 6.6 0 0 1 0 13.2 H16.8 M16.8 31 h11"
+        stroke="#157F2A"
+        strokeWidth="2.8"
         strokeLinecap="round"
         strokeLinejoin="round"
+        fill="none"
       />
     </svg>
   )
 }
 
-// Налоги: гербовый щит с тремя полосами (упрощённая геральдика ФНС).
+// Налоги: квитанция с зубчатым краем и знаком процента.
 export function TaxesLogo() {
   return (
     <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
       <path
-        d="M24 5.5 L38 10.8 V23.5 C38 32.2 32.1 38.9 24 42 C15.9 38.9 10 32.2 10 23.5 V10.8 Z"
-        stroke="#ffffff"
-        strokeWidth="3.4"
-        strokeLinejoin="round"
+        d="M13 6 h22 v33 l-3.7 -2.6 -3.6 2.6 -3.7 -2.6 -3.6 2.6 -3.7 -2.6 L13 39 Z"
+        fill="#ffffff"
+        opacity="0.95"
       />
       <path
-        d="M14.5 19.5 H33.5 M14.5 25 H33.5 M14.5 30.5 H33.5"
-        stroke="#ffffff"
-        strokeWidth="3.4"
+        d="M17.5 14.5 h13 M17.5 19.5 h13 M17.5 24.5 h8"
+        stroke="#2D3748"
+        strokeWidth="2.4"
         strokeLinecap="round"
       />
+      <circle cx="19.6" cy="30.8" r="2.5" stroke="#2D3748" strokeWidth="2" />
+      <circle cx="28.4" cy="34.6" r="2.5" stroke="#2D3748" strokeWidth="2" />
+      <path d="M29.5 28.5 l-11 8" stroke="#2D3748" strokeWidth="2.2" strokeLinecap="round" />
     </svg>
   )
 }
 
-// Браузер: компас-роза в круге (двухтоновая стрелка, как у Safari).
+// Браузер: глобус с меридианами и орбитой-спутником.
 export function BrowserLogo() {
   return (
     <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
-      <circle cx="24" cy="24" r="16" stroke="#ffffff" strokeWidth="3.4" />
+      <circle cx="24" cy="24" r="15" stroke="#ffffff" strokeWidth="3" />
+      <ellipse cx="24" cy="24" rx="7" ry="15" stroke="#ffffff" strokeWidth="2.2" opacity="0.75" />
+      <path d="M9.5 19.5 h29 M9.5 28.5 h29" stroke="#ffffff" strokeWidth="2.2" opacity="0.75" />
+      <circle cx="37.5" cy="11.5" r="3" fill="#ffffff" />
       <path
-        d="M24 9.8 V13 M24 35 V38.2 M9.8 24 H13 M35 24 H38.2"
+        d="M37.5 8.5 a15.5 15.5 0 0 0 -12 -4"
         stroke="#ffffff"
-        strokeWidth="2.4"
+        strokeWidth="1.8"
+        opacity="0.5"
         strokeLinecap="round"
-        opacity="0.7"
       />
-      <path d="M33.5 14.5 L21.7 21.7 L26.3 26.3 Z" fill="#ffffff" />
-      <path d="M14.5 33.5 L26.3 26.3 L21.7 21.7 Z" fill="#ffffff" opacity="0.45" />
     </svg>
   )
 }
@@ -163,14 +177,12 @@ export function DeliveryLogo() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Реестр плиток: градиент фона + логотип + подпись для каждого AppKey.
-// Градиенты подобраны «как в реальности»: 3 стопа для фирменных цветов
-// (Avito/Банк/Налоги), точные пары из ТЗ для остальных.
 // ─────────────────────────────────────────────────────────────────────────────
 export const APP_TILE: Record<AppKey, { label: string; background: string; icon: ReactNode }> = {
   avito: {
-    label: 'Avito',
-    background: 'linear-gradient(160deg, #FFFFFF 0%, #EEF1F4 55%, #DCE1E7 100%)',
-    icon: <AvitoLogo />,
+    label: 'Сделка',
+    background: 'linear-gradient(160deg, #FFFFFF 0%, #F3EEFB 55%, #E4D8F7 100%)',
+    icon: <DealLogo />,
   },
   bank: {
     label: 'Банк',

@@ -16,10 +16,10 @@ interface NotifApp {
 }
 
 const KIND_APP: Record<string, NotifApp> = {
-  deal: { app: 'Avito', icon: ShoppingBag, bg: 'linear-gradient(145deg,#35c3ff,#0091d5)', openApp: 'avito' },
-  message: { app: 'Avito', icon: MessageSquare, bg: 'linear-gradient(145deg,#35c3ff,#0091d5)', openApp: 'avito' },
+  deal: { app: 'Сделка', icon: ShoppingBag, bg: 'linear-gradient(145deg,#B37BF5,#7C3AED)', openApp: 'avito' },
+  message: { app: 'Сделка', icon: MessageSquare, bg: 'linear-gradient(145deg,#B37BF5,#7C3AED)', openApp: 'avito' },
   tax: { app: 'Налоги', icon: Receipt, bg: 'linear-gradient(145deg,#4a5568,#2d3748)', openApp: 'taxes' },
-  market: { app: 'Avito', icon: TrendingUp, bg: 'linear-gradient(145deg,#35c3ff,#0091d5)', openApp: 'avito' },
+  market: { app: 'Сделка', icon: TrendingUp, bg: 'linear-gradient(145deg,#B37BF5,#7C3AED)', openApp: 'avito' },
   system: { app: 'Система', icon: Info, bg: 'linear-gradient(145deg,#9ca3af,#4b5563)', openApp: 'settings' },
 }
 

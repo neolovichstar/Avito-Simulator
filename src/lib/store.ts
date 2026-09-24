@@ -5,6 +5,17 @@ import type { SessionUser, NotificationDTO } from '@/lib/types'
 
 export type AppKey = 'avito' | 'bank' | 'taxes' | 'browser' | 'settings' | 'repair' | 'auction' | 'career' | 'delivery'
 
+// Виджеты домашнего экрана / рабочего стола ПК
+export type WidgetKey = 'clock' | 'wallet' | 'online' | 'quest' | 'delivery'
+export const ALL_WIDGETS: WidgetKey[] = ['clock', 'wallet', 'online', 'quest', 'delivery']
+export const WIDGET_LABEL: Record<WidgetKey, string> = {
+  clock: 'Часы и дата',
+  wallet: 'Кошелёк',
+  online: 'Онлайн',
+  quest: 'Задания',
+  delivery: 'Доставки',
+}
+
 interface OSState {
   booted: boolean
   locked: boolean
@@ -22,6 +33,8 @@ interface OSState {
   flashlight: boolean
   brightness: number // 0.4..1
   theme: 'light' | 'dark'
+  wallpaper: string // id из реестра обоев (src/lib/wallpapers.ts)
+  widgets: WidgetKey[] // какие виджеты показывать
 
   setBooted: (v: boolean) => void
   setLocked: (v: boolean) => void
@@ -44,6 +57,8 @@ interface OSState {
   setBrightness: (v: number) => void
   setTheme: (t: 'light' | 'dark') => void
   toggleTheme: () => void
+  setWallpaper: (id: string) => void
+  setWidgets: (w: WidgetKey[]) => void
   refreshSession: (u: Partial<SessionUser>) => void
 }
 
@@ -66,6 +81,8 @@ export const useOS = create<OSState>((set, get) => ({
   flashlight: false,
   brightness: 1,
   theme: 'light',
+  wallpaper: 'wave',
+  widgets: ['clock', 'wallet', 'online'],
 
   setBooted: (v) => set({ booted: v }),
   setLocked: (v) => set({ locked: v }),
@@ -100,5 +117,7 @@ export const useOS = create<OSState>((set, get) => ({
   setBrightness: (v) => set({ brightness: Math.max(0.4, Math.min(1, v)) }),
   setTheme: (t) => set({ theme: t }),
   toggleTheme: () => set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
+  setWallpaper: (id) => set({ wallpaper: id }),
+  setWidgets: (w) => set({ widgets: w.length ? w : ['clock', 'wallet', 'online'] }),
   refreshSession: (u) => set((s) => (s.session ? { session: { ...s.session, ...u } } : {})),
 }))

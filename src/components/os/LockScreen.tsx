@@ -3,12 +3,7 @@
 import { useRef, useState, useSyncExternalStore } from 'react'
 import { ChevronUp } from 'lucide-react'
 import { useOS } from '@/lib/store'
-
-const WALLPAPER =
-  'radial-gradient(circle at 20% 12%, rgba(124,58,237,0.5), transparent 55%),' +
-  'radial-gradient(circle at 82% 28%, rgba(37,99,235,0.42), transparent 50%),' +
-  'radial-gradient(circle at 50% 90%, rgba(168,85,247,0.35), transparent 55%),' +
-  'linear-gradient(180deg, #0b0b16 0%, #06060c 60%, #030307 100%)'
+import { wallpaperClass } from '@/lib/wallpapers'
 
 // Живые тики каждые 1000 мс без setState в эффекте (useSyncExternalStore).
 function useClock(): Date | null {
@@ -27,6 +22,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   const battery = useOS((s) => s.battery)
   const online = useOS((s) => s.online)
   const notifications = useOS((s) => s.notifications)
+  const wallpaper = useOS((s) => s.wallpaper)
 
   const now = useClock()
   const [leaving, setLeaving] = useState(false)
@@ -44,8 +40,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     <div
       className={`absolute inset-0 z-50 flex flex-col px-6 pb-8 pt-20 transition-transform duration-[400ms] ease-out ${
         leaving ? '-translate-y-full' : 'translate-y-0'
-      }`}
-      style={{ backgroundImage: WALLPAPER }}
+      } ${wallpaperClass(wallpaper)}`}
       role="dialog"
       aria-label="Экран блокировки"
     >

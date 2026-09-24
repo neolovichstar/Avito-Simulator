@@ -353,7 +353,7 @@ export const TX_TYPE_LABEL: Record<string, string> = {
   loan: 'Кредит',
   repay: 'Погашение кредита',
   tax: 'Налог',
-  penalty: 'Пеня ФНС',
+  penalty: 'Пеня налоговой',
   deposit: 'Пополнение вклада',
   withdraw: 'Снятие вклада',
   interest: 'Проценты по вкладу',

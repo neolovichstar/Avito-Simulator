@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useOS } from '@/lib/store'
+import { useOS, type AppKey } from '@/lib/store'
 import { api, setToken } from '@/lib/api'
 import { useRealtime } from '@/lib/use-realtime'
 import PhoneFrame from '@/components/os/PhoneFrame'
@@ -13,6 +13,7 @@ import NotificationCenter from '@/components/os/NotificationCenter'
 import ControlCenter from '@/components/os/ControlCenter'
 import ToastStack from '@/components/os/ToastStack'
 import RecentsOverlay from '@/components/os/RecentsOverlay'
+import DesktopShell from '@/components/desktop/DesktopShell'
 import AvitoApp from '@/components/avito/AvitoApp'
 import BankApp from '@/components/apps/BankApp'
 import TaxesApp from '@/components/apps/TaxesApp'
@@ -25,11 +26,15 @@ import DeliveryApp from '@/components/apps/DeliveryApp'
 
 const BATTERY_KEY = 'avito_sim_battery'
 const THEME_KEY = 'avito_sim_theme'
+const WALLPAPER_KEY = 'avito_sim_wallpaper'
+const WIDGETS_KEY = 'avito_sim_widgets'
+const DESKTOP_MIN_WIDTH = 1024
 
 export default function Home() {
   const [recentsOpen, setRecentsOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [controlOpen, setControlOpen] = useState(false)
+  const [isDesktop, setIsDesktop] = useState(false)
   const swipeStartY = useRef<number | null>(null)
   const booted = useOS((s) => s.booted)
   const locked = useOS((s) => s.locked)
@@ -49,7 +54,17 @@ export default function Home() {
   const theme = useOS((s) => s.theme)
   const setNotifications = useOS((s) => s.setNotifications)
   const pushToast = useOS((s) => s.pushToast)
+  const setWallpaper = useOS((s) => s.setWallpaper)
+  const setWidgets = useOS((s) => s.setWidgets)
   const authTried = useRef(false)
+
+  // ---------- ПК / ТЕЛЕФОН ----------
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= DESKTOP_MIN_WIDTH)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   // ---------- AUTH ----------
   const doAuth = useCallback(async () => {
@@ -103,12 +118,21 @@ export default function Home() {
     return () => clearInterval(t)
   }, [session, setOnline])
 
-  // ---------- БАТАРЕЯ ----------
+  // ---------- БАТАРЕЯ / ТЕМА / ОБОИ / ВИДЖЕТЫ ----------
   useEffect(() => {
     const saved = Number(localStorage.getItem(BATTERY_KEY) ?? '100')
     setBattery(Number.isFinite(saved) ? saved : 100)
     const savedTheme = localStorage.getItem(THEME_KEY)
     if (savedTheme === 'dark' || savedTheme === 'light') useOS.getState().setTheme(savedTheme)
+    const savedWall = localStorage.getItem(WALLPAPER_KEY)
+    if (savedWall) useOS.getState().setWallpaper(savedWall)
+    try {
+      const raw = localStorage.getItem(WIDGETS_KEY)
+      if (raw) {
+        const arr = JSON.parse(raw) as string[]
+        if (Array.isArray(arr) && arr.length) useOS.getState().setWidgets(arr as never)
+      }
+    } catch { /* ignore */ }
   }, [setBattery])
 
   useEffect(() => {
@@ -132,6 +156,15 @@ export default function Home() {
     localStorage.setItem(THEME_KEY, theme)
   }, [theme])
 
+  // persist обоев и виджетов
+  useEffect(() => {
+    const unsub1 = useOS.subscribe((s) => {
+      if (s.wallpaper) localStorage.setItem(WALLPAPER_KEY, s.wallpaper)
+      localStorage.setItem(WIDGETS_KEY, JSON.stringify(s.widgets))
+    })
+    return unsub1
+  }, [])
+
   const claimDailyBonus = useCallback(async () => {
     try {
       const st = await api.bonusState()
@@ -152,7 +185,7 @@ export default function Home() {
     claimDailyBonus()
   }
 
-  // ---------- ЖЕСТ: СВАЙП СВЕРХУ ВНИЗ — ЦЕНТР УПРАВЛЕНИЯ ----------
+  // ---------- ЖЕСТ: СВАЙП СВЕРХУ ВНИЗ — ЦЕНТР УПРАВЛЕНИЯ (телефон) ----------
   const onTouchStart = (e: React.TouchEvent) => {
     swipeStartY.current = e.touches[0]?.clientY ?? null
   }
@@ -165,8 +198,8 @@ export default function Home() {
     }
   }
 
-  const renderApp = () => {
-    switch (currentApp) {
+  const renderApp = (app?: AppKey) => {
+    switch (app ?? currentApp) {
       case 'avito': return <AvitoApp />
       case 'bank': return <BankApp />
       case 'taxes': return <TaxesApp />
@@ -180,6 +213,35 @@ export default function Home() {
     }
   }
 
+  // ---------- ПК-РЕЖИМ (Windows 11) ----------
+  if (isDesktop) {
+    return (
+      <main className="min-h-[100dvh] bg-neutral-950">
+        {!session ? (
+          <div className="fixed inset-0 flex flex-col items-center justify-center gap-3" style={{ backgroundImage: 'linear-gradient(180deg,#0b0b16,#030307)' }}>
+            <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
+            <p className="text-xs text-white/50">Загрузка системы...</p>
+          </div>
+        ) : (
+          <DesktopShell
+            locked={locked}
+            onUnlock={unlock}
+            renderApp={(app) => renderApp(app)}
+            theme={theme}
+          />
+        )}
+        <ToastStack variant="desktop" />
+        {/* яркость: затемняющий слой поверх всего */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 z-[90] bg-black transition-opacity duration-200"
+          style={{ opacity: (1 - brightness) * 0.6 }}
+        />
+      </main>
+    )
+  }
+
+  // ---------- ТЕЛЕФОН ----------
   return (
     <main className="min-h-[100dvh] flex items-center justify-center bg-neutral-950">
       <PhoneFrame>

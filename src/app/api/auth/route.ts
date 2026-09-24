@@ -28,7 +28,7 @@ export async function POST(req: Request) {
           displayName,
           photoUrl: tg.photo_url ?? null,
           city: 'Москва',
-          bio: 'Новичок на Авито',
+          bio: 'Новичок на Сделке',
         },
       })
     }
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
     user = existing
       ? await db.user.update({ where: { id: existing.id }, data: { lastSeenAt: new Date() } })
       : await db.user.create({
-          data: { username, displayName: devName, city: 'Москва', bio: 'Новичок на Авито' },
+          data: { username, displayName: devName, city: 'Москва', bio: 'Новичок на Сделке' },
         })
   }
 

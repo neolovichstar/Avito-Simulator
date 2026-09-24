@@ -2,7 +2,7 @@
 
 // Лента объявлений: крупные фотокарточки 16:10, поиск, категории, сортировка, избранное
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Search, SlidersHorizontal, Heart, MapPin, Star, Zap, BellPlus, X, SearchX, History, Activity, Scale, Handshake } from 'lucide-react'
+import { Search, SlidersHorizontal, Heart, MapPin, Star, Zap, BellPlus, X, SearchX, History, Activity, Scale, Handshake, Smartphone, Laptop, Tv, Shirt, Footprints, Sofa, WashingMachine, Bike, Dumbbell, Music, Car, Baby, BookOpen, LayoutGrid } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { CATEGORIES, CATEGORY_LABEL, CONDITION_LABEL, CONDITION_MULT } from '@/lib/catalog-types'
 import type { CategoryKey } from '@/lib/catalog-types'
@@ -129,9 +129,9 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
     try {
       await api.createSavedSearch(query, category === 'all' ? null : category)
       loadSaved()
-      pushToast('Avito', 'Поиск сохранён — будем сообщать о новых объявлениях')
+      pushToast('Сделка', 'Поиск сохранён — будем сообщать о новых объявлениях')
     } catch (e) {
-      pushToast('Avito', e instanceof ApiError ? e.message : 'Не удалось сохранить поиск')
+      pushToast('Сделка', e instanceof ApiError ? e.message : 'Не удалось сохранить поиск')
     }
   }
 
@@ -183,7 +183,7 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
     setCompare((prev) => {
       if (prev.some((c) => c.id === l.id)) return prev.filter((c) => c.id !== l.id)
       if (prev.length >= 3) {
-        pushToast('Avito', 'В сравнении максимум три товара')
+        pushToast('Сделка', 'В сравнении максимум три товара')
         return prev
       }
       return [...prev, l]
@@ -203,8 +203,8 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Поиск на Авито"
-              aria-label="Поиск на Авито"
+              placeholder="Поиск на Сделке"
+              aria-label="Поиск на Сделке"
               className="bg-transparent outline-none text-sm w-full placeholder:text-neutral-400"
             />
           </div>
@@ -224,7 +224,7 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
             aria-label="Сортировка"
             aria-expanded={showSort}
             className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
-              showSort ? 'bg-[#00AAFF] text-white' : 'bg-[#f0f1f3] text-neutral-500'
+              showSort ? 'bg-[#965EEB] text-white' : 'bg-[#f0f1f3] text-neutral-500'
             }`}
           >
             <SlidersHorizontal size={18} aria-hidden />
@@ -238,7 +238,7 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
                   key={k}
                   onClick={() => { setSort(k) }}
                   className={`px-3.5 h-10 rounded-xl text-xs font-semibold transition-colors ${
-                    sort === k ? 'bg-[#00AAFF] text-white' : 'bg-[#f0f1f3] text-neutral-600'
+                    sort === k ? 'bg-[#965EEB] text-white' : 'bg-[#f0f1f3] text-neutral-600'
                   }`}
                 >
                   {label}
@@ -256,12 +256,28 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
             )}
           </div>
         )}
-        {/* категории */}
-        <div className="flex gap-2 mt-2 overflow-x-auto [scrollbar-width:none]">
-          <CatChip active={category === 'all'} onClick={() => setCategory('all')} label="Все" />
-          {CATEGORIES.map((c) => (
-            <CatChip key={c.key} active={category === c.key} onClick={() => setCategory(c.key)} label={c.label} />
-          ))}
+        {/* категории — фирменная полоса кружков с иконками */}
+        <div className="flex gap-3.5 mt-3 overflow-x-auto [scrollbar-width:none] pb-1" role="tablist" aria-label="Категории">
+          <CategoryCircle
+            label="Все"
+            active={category === 'all'}
+            onClick={() => setCategory('all')}
+            icon={<LayoutGrid size={20} aria-hidden />}
+            color="bg-neutral-200 text-neutral-600"
+          />
+          {CATEGORIES.map((c) => {
+            const meta = CATEGORY_ICON[c.key]
+            return (
+              <CategoryCircle
+                key={c.key}
+                label={c.label}
+                active={category === c.key}
+                onClick={() => setCategory(c.key)}
+                icon={<meta.icon size={20} aria-hidden />}
+                color={meta.color}
+              />
+            )
+          })}
         </div>
         {/* сохранённые поиски */}
         {saved.length > 0 && (
@@ -269,7 +285,7 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
             {saved.map((s) => (
               <span
                 key={s.id}
-                className="shrink-0 flex items-center gap-1.5 h-9 pl-3 pr-1.5 rounded-full border border-[#00AAFF]/40 bg-[#f5fbff] text-xs font-medium text-[#0084c9]"
+                className="shrink-0 flex items-center gap-1.5 h-9 pl-3 pr-1.5 rounded-full border border-[#965EEB]/40 bg-[#f5fbff] text-xs font-medium text-[#7C3AED]"
               >
                 <button
                   onClick={() => applySaved(s)}
@@ -282,7 +298,7 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
                 <button
                   onClick={() => removeSaved(s.id)}
                   aria-label="Удалить поиск"
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-[#0084c9]/60 active:bg-black/5"
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-[#7C3AED]/60 active:bg-black/5"
                 >
                   <X size={13} aria-hidden />
                 </button>
@@ -474,6 +490,59 @@ function ViewedStrip({ items, onOpen, onClear }: {
   )
 }
 
+// Иконка и цвет каждой категории — фирменная полоса кружков как в настоящем приложении
+const CATEGORY_ICON: Record<string, { icon: typeof Smartphone; color: string }> = {
+  phones: { icon: Smartphone, color: 'bg-sky-100 text-sky-600' },
+  laptops: { icon: Laptop, color: 'bg-indigo-100 text-indigo-600' },
+  electronics: { icon: Tv, color: 'bg-blue-100 text-blue-600' },
+  clothes: { icon: Shirt, color: 'bg-pink-100 text-pink-600' },
+  sneakers: { icon: Footprints, color: 'bg-orange-100 text-orange-600' },
+  furniture: { icon: Sofa, color: 'bg-amber-100 text-amber-700' },
+  appliances: { icon: WashingMachine, color: 'bg-cyan-100 text-cyan-700' },
+  hobby: { icon: Bike, color: 'bg-emerald-100 text-emerald-600' },
+  sport: { icon: Dumbbell, color: 'bg-lime-100 text-lime-700' },
+  music: { icon: Music, color: 'bg-violet-100 text-violet-600' },
+  auto: { icon: Car, color: 'bg-red-100 text-red-600' },
+  kids: { icon: Baby, color: 'bg-fuchsia-100 text-fuchsia-600' },
+  books: { icon: BookOpen, color: 'bg-stone-200 text-stone-600' },
+}
+
+function CategoryCircle({ label, icon, color, active, onClick }: {
+  label: string
+  icon: ReactNode
+  color: string
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      role="tab"
+      aria-selected={active}
+      className="shrink-0 flex flex-col items-center gap-1 group"
+    >
+      <span
+        className={`w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-90 ${
+          color
+        } ${
+          active
+            ? 'ring-2 ring-[#965EEB] ring-offset-2 ring-offset-white'
+            : 'group-hover:brightness-95'
+        }`}
+      >
+        {icon}
+      </span>
+      <span
+        className={`max-w-16 truncate text-[10px] leading-tight ${
+          active ? 'font-semibold text-[#965EEB]' : 'text-neutral-500'
+        }`}
+      >
+        {label}
+      </span>
+    </button>
+  )
+}
+
 export function ListingCard({ listing: l, onOpen, onFav, fav, comparing, onCompareToggle }: {
   listing: FeedListing
   onOpen: () => void
@@ -575,18 +644,18 @@ function MarketPulseStrip({ items, flash, onPick }: {
   }
   return (
     <section
-      className={`shrink-0 rounded-2xl bg-white shadow-sm overflow-hidden transition-shadow ${flash ? 'ring-2 ring-[#00AAFF]/50 shadow-md' : ''}`}
+      className={`shrink-0 rounded-2xl bg-white shadow-sm overflow-hidden transition-shadow ${flash ? 'ring-2 ring-[#965EEB]/50 shadow-md' : ''}`}
       aria-label="Пульс рынка"
     >
       <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-1">
-        <Activity size={13} className="text-[#00AAFF]" aria-hidden />
+        <Activity size={13} className="text-[#965EEB]" aria-hidden />
         <h2 className="text-xs font-semibold text-neutral-800">Пульс рынка</h2>
         <span className="text-[10px] text-neutral-400">за час</span>
         {flash && (
-          <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-[#00AAFF]">
+          <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-[#965EEB]">
             <span className="relative flex h-1.5 w-1.5" aria-hidden>
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#00AAFF] opacity-75" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#00AAFF]" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#965EEB] opacity-75" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#965EEB]" />
             </span>
             живое
           </span>
