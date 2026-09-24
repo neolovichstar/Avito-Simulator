@@ -10,7 +10,6 @@ import {
 import { api, ApiError } from '@/lib/api'
 import { fmtMoney, initials, hueColor } from '@/lib/format'
 import { useOS } from '@/lib/store'
-import { playSound } from '@/lib/sounds'
 import { Button } from '@/components/ui/button'
 
 type Board = {
@@ -142,7 +141,6 @@ export default function LeaderboardApp() {
             type="button"
             onClick={() => {
               setTab(t.key)
-              playSound('tap')
             }}
             className={`press flex h-9 flex-1 items-center justify-center gap-1 rounded-lg text-[11px] font-semibold transition-colors ${
               tab === t.key ? 'bg-amber-400 text-[#231d33]' : 'bg-white/10 text-white/70 hover:bg-white/15'

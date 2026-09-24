@@ -5,7 +5,6 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { Bot, ChevronDown, ChevronUp, Gavel, History, Info, Loader2, Trophy } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
-import { playSound } from '@/lib/sounds'
 import { fmtMoney, timeAgo } from '@/lib/format'
 import { getSocket } from '@/lib/use-realtime'
 import { CONDITION_LABEL } from '@/lib/catalog-types'
@@ -217,7 +216,6 @@ export default function AuctionApp() {
       const res = await api.auctionBid(lot.id, amount)
       const os = useOS.getState()
       os.refreshSession({ balance: res.balance })
-      playSound('bid')
       os.pushToast('Аукцион', 'Ставка принята')
       closePanel()
       await load()

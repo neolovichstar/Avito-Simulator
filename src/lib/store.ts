@@ -29,7 +29,6 @@ interface OSState {
   notifications: NotificationDTO[]
   unreadChats: number
   toastQueue: { id: number; title: string; body: string }[]
-  soundOn: boolean
   dnd: boolean // «Не беспокоить»: тосты не всплывают, уведомления копятся в центре
   flashlight: boolean
   brightness: number // 0.4..1
@@ -53,7 +52,6 @@ interface OSState {
   setUnreadChats: (n: number) => void
   pushToast: (title: string, body: string) => void
   dropToast: (id: number) => void
-  setSound: (v: boolean) => void
   setDnd: (v: boolean) => void
   setFlashlight: (v: boolean) => void
   setBrightness: (v: number) => void
@@ -65,7 +63,6 @@ interface OSState {
 }
 
 const g = globalThis as unknown as { __osToastId?: number }
-const s_openRef = { current: null as AppKey | null }
 
 export const useOS = create<OSState>((set, get) => ({
   booted: false,
@@ -80,7 +77,6 @@ export const useOS = create<OSState>((set, get) => ({
   notifications: [],
   unreadChats: 0,
   toastQueue: [],
-  soundOn: true,
   dnd: false,
   flashlight: false,
   brightness: 1,
@@ -97,9 +93,6 @@ export const useOS = create<OSState>((set, get) => ({
       currentApp: app,
       openApps: s.openApps[0] === app ? s.openApps : [app, ...s.openApps.filter((a) => a !== app)].slice(0, 6),
     }))
-    // динамический импорт — чтобы не зациклить store ↔ sounds статически
-    if (app !== s_openRef.current) void import('@/lib/sounds').then((m) => m.playSound('open')).catch(() => {})
-    s_openRef.current = app
   },
   closeApp: () => set({ currentApp: null }),
   goHome: () => set({ currentApp: null }),
@@ -117,13 +110,11 @@ export const useOS = create<OSState>((set, get) => ({
     g.__osToastId = (g.__osToastId ?? 0) + 1
     const id = g.__osToastId
     set((s) => ({ toastQueue: [...s.toastQueue, { id, title, body }].slice(-3) }))
-    void import('@/lib/sounds').then((m) => m.playSound('notify')).catch(() => {})
     setTimeout(() => {
       set((s) => ({ toastQueue: s.toastQueue.filter((t) => t.id !== id) }))
     }, 4200)
   },
   dropToast: (id) => set((s) => ({ toastQueue: s.toastQueue.filter((t) => t.id !== id) })),
-  setSound: (v) => set({ soundOn: v }),
   setDnd: (v) => set({ dnd: v }),
   setFlashlight: (v) => set({ flashlight: v }),
   setBrightness: (v) => set({ brightness: Math.max(0.4, Math.min(1, v)) }),

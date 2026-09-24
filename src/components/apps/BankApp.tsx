@@ -1,13 +1,15 @@
 'use client'
 
-// Приложение «Банк» — тёмный банковский редизайн (градиент, круглые действия,
-// кошелёк с картой, аккордеоны, нижняя навигация, экран «Анализ»).
-import { useCallback, useEffect, useMemo, useState } from 'react'
+// Приложение «Банк» — канон мобильного Сбербанка (без бренда):
+// зелёный градиентный хедер, круглые действия, кошелёк-карусель со свайпами
+// (мышь + палец), сторис, операции с цветными иконками, анализ с донатом,
+// история с CSV, нижняя навигация.
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ArrowDownRight, ArrowLeftRight, ArrowUpRight, Bell, BellRing, Building2, Car, ChevronDown,
-  ChevronRight, CreditCard, FileDown, Gauge, History, Home, Info, Landmark, Lightbulb, Loader2,
-  PieChart, PiggyBank, Plus, QrCode, Receipt, Search, Send, ShieldCheck, Smartphone, Wifi, X,
-  type LucideIcon,
+  AlertTriangle, ArrowDownRight, ArrowLeftRight, ArrowUpRight, Banknote, Bell, BellRing, Building2, Car,
+  ChevronDown, ChevronRight, CreditCard, FileDown, Gauge, History, Home, Info, Landmark, Lightbulb, Loader2,
+  Percent, PieChart, PiggyBank, Plus, QrCode, Receipt, Search, Send, ShieldAlert, ShieldCheck, ShoppingBag,
+  Smartphone, TrendingUp, Undo2, Wifi, X, type LucideIcon,
 } from 'lucide-react'
 import { api, ApiError, exportCsvUrl } from '@/lib/api'
 import { useOS } from '@/lib/store'
@@ -16,7 +18,7 @@ import { TX_TYPE_LABEL } from '@/lib/types'
 import type { BankData, SessionUser, TransactionDTO } from '@/lib/types'
 import { creditLabel, DEPOSIT_RATE_PER_HOUR } from '@/lib/economy'
 import { useCountUp } from '@/lib/use-count-up'
-import { playSound } from '@/lib/sounds'
+import { useDrag } from '@/lib/use-swipe'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,7 +29,7 @@ type Screen = 'main' | 'payments' | 'analytics' | 'history'
 type SectionKey = 'deposit' | 'security' | 'loan'
 
 const GREEN = '#21A038'
-const GREEN_SOFT = '#5FD989'
+const GREEN_DARK = '#12842F'
 
 const MONTH_NOM = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
 const MONTH_PREP = ['январе', 'феврале', 'марте', 'апреле', 'мае', 'июне', 'июле', 'августе', 'сентябре', 'октябре', 'ноябре', 'декабре']
@@ -47,12 +49,6 @@ function dayRates(): { eur: string; eurUp: boolean; usd: string; usdUp: boolean 
   }
 }
 
-const TIPS: { title: string; body: string }[] = [
-  { title: 'Осторожно, курьер!', body: 'Курьер может подменить товар при доставке — в таких случаях работает страховка сделки.' },
-  { title: 'Считайте профит', body: 'Не берите кредит на лот без профита — ставка съест всю маржу с перепродажи.' },
-  { title: 'Налоги не ждут', body: 'Налоги лучше платить вовремя — за просрочку начисляется пеня 10% в сутки.' },
-]
-
 function plural(n: number, one: string, few: string, many: string): string {
   const m10 = n % 10
   const m100 = n % 100
@@ -61,9 +57,23 @@ function plural(n: number, one: string, few: string, many: string): string {
   return many
 }
 
+function greeting(): string {
+  const h = new Date().getHours()
+  if (h < 5) return 'Доброй ночи'
+  if (h < 12) return 'Доброе утро'
+  if (h < 18) return 'Добрый день'
+  return 'Добрый вечер'
+}
+
 function toAmount(v: string): number {
   return Math.max(0, Math.floor(Number(v.replace(/[^\d]/g, '')) || 0))
 }
+
+const TIPS: { title: string; body: string }[] = [
+  { title: 'Осторожно, курьер!', body: 'Курьер может подменить товар при доставке — в таких случаях работает страховка сделки.' },
+  { title: 'Считайте профит', body: 'Не берите кредит на лот без профита — ставка съест всю маржу с перепродажи.' },
+  { title: 'Налоги не ждут', body: 'Налоги лучше платить вовремя — за просрочку начисляется пеня 10% в сутки.' },
+]
 
 // ---- Агрегация операций для «Анализа» ----
 interface AggCat {
@@ -74,36 +84,36 @@ interface AggCat {
   count: number
 }
 
-const CAT_META: Record<string, { label: string; color: string }> = {
-  purchase: { label: 'Покупки', color: '#F87171' },
-  sale: { label: 'Продажи', color: '#34D399' },
-  loan: { label: 'Кредиты', color: '#60A5FA' },
-  repay: { label: 'Погашение кредита', color: '#818CF8' },
-  tax: { label: 'Налоги', color: '#FBBF24' },
-  penalty: { label: 'Пени налоговой', color: '#FB923C' },
-  deposit: { label: 'Пополнение вклада', color: '#2DD4BF' },
-  withdraw: { label: 'Снятие вклада', color: '#38BDF8' },
-  interest: { label: 'Проценты по вкладу', color: '#4ADE80' },
-  boost: { label: 'Продвижение', color: '#E879F9' },
-  transfer: { label: 'Переводы людям', color: '#22D3EE' },
+const CAT_META: Record<string, { label: string; color: string; icon: LucideIcon }> = {
+  purchase: { label: 'Покупки', color: '#E5484D', icon: ShoppingBag },
+  sale: { label: 'Продажи', color: '#21A038', icon: TrendingUp },
+  loan: { label: 'Кредиты', color: '#3F74E0', icon: Landmark },
+  repay: { label: 'Погашение кредита', color: '#6C5CE7', icon: Undo2 },
+  tax: { label: 'Налоги', color: '#D9980D', icon: Receipt },
+  penalty: { label: 'Пени налоговой', color: '#E07A2F', icon: AlertTriangle },
+  deposit: { label: 'Пополнение вклада', color: '#0FA98E', icon: PiggyBank },
+  withdraw: { label: 'Снятие вклада', color: '#0E86B8', icon: Banknote },
+  interest: { label: 'Проценты по вкладу', color: '#43A047', icon: Percent },
+  boost: { label: 'Продвижение', color: '#C244CB', icon: TrendingUp },
+  transfer: { label: 'Переводы людям', color: '#7B8794', icon: Send },
 }
-const FALLBACK_COLORS = ['#22D3EE', '#A3E635', '#F472B6', '#FACC15', '#94A3B8', '#C084FC']
+const FALLBACK_COLORS = ['#0E86B8', '#7CB305', '#C244CB', '#D9980D', '#7B8794', '#6C5CE7']
 
-function catFor(t: TransactionDTO): { label: string; color: string } {
+function catMeta(t: TransactionDTO): { label: string; color: string; icon: LucideIcon } {
   const meta = CAT_META[t.type]
   if (meta) return meta
   const word = (t.note ?? '').trim().split(/\s+/)[0]?.replace(/[^\p{L}\p{N}%-]/gu, '') || t.type
   let h = 0
   for (let i = 0; i < word.length; i++) h = (h * 31 + word.charCodeAt(i)) >>> 0
   const label = word.charAt(0).toUpperCase() + word.slice(1)
-  return { label, color: FALLBACK_COLORS[h % FALLBACK_COLORS.length] }
+  return { label, color: FALLBACK_COLORS[h % FALLBACK_COLORS.length], icon: ArrowLeftRight }
 }
 
 function buildCats(txs: TransactionDTO[], mode: 'out' | 'in'): AggCat[] {
   const map = new Map<string, AggCat>()
   for (const t of txs) {
     if (mode === 'out' ? t.amount >= 0 : t.amount <= 0) continue
-    const { label, color } = catFor(t)
+    const { label, color } = catMeta(t)
     const key = label.toLowerCase()
     const cur = map.get(key) ?? { key, label, color, total: 0, count: 0 }
     cur.total += Math.abs(t.amount)
@@ -114,7 +124,7 @@ function buildCats(txs: TransactionDTO[], mode: 'out' | 'in'): AggCat[] {
   if (arr.length > 6) {
     const rest = arr.slice(6)
     const other: AggCat = {
-      key: '__other', label: 'Прочее', color: '#94A3B8',
+      key: '__other', label: 'Прочее', color: '#7B8794',
       total: rest.reduce((s, c) => s + c.total, 0),
       count: rest.reduce((s, c) => s + c.count, 0),
     }
@@ -124,6 +134,8 @@ function buildCats(txs: TransactionDTO[], mode: 'out' | 'in'): AggCat[] {
 }
 
 // ---- Локальные UI-примитивы ----
+const CARD_CLS = 'rounded-2xl bg-white ring-1 ring-black/[0.05] shadow-[0_1px_3px_rgba(16,35,47,0.06)]'
+
 function Section({ title, open, onToggle, children }: {
   title: string
   open: boolean
@@ -131,41 +143,229 @@ function Section({ title, open, onToggle, children }: {
   children: React.ReactNode
 }) {
   return (
-    <div className="overflow-hidden rounded-2xl bg-[#141e17] ring-1 ring-white/5">
-      <button type="button" onClick={onToggle} className="flex w-full items-center justify-between px-4 py-3.5 text-left transition active:bg-white/5">
-        <span className="text-sm font-semibold text-white">{title}</span>
-        <ChevronDown className={`size-4 text-white/40 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+    <div className={`overflow-hidden ${CARD_CLS}`}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between px-4 py-3.5 text-left transition active:bg-neutral-50"
+      >
+        <span className="text-[15px] font-semibold text-neutral-900">{title}</span>
+        <ChevronDown className={`size-4 text-neutral-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && <div className="border-t border-white/5 px-4 py-4">{children}</div>}
+      {open && <div className="border-t border-neutral-100 px-4 py-4">{children}</div>}
     </div>
   )
 }
 
 function ActionCircle({ icon: Icon, label, onClick }: { icon: LucideIcon; label: string; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="group flex flex-col items-center gap-2">
-      <span className="flex size-16 items-center justify-center rounded-full border border-emerald-300/10 bg-[#182f20] shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] transition group-active:scale-95">
-        <Icon className="size-5 text-[#6FD98A]" />
+    <button type="button" onClick={onClick} className="group flex flex-col items-center gap-1.5">
+      <span className="flex size-14 items-center justify-center rounded-full bg-white/16 ring-1 ring-white/25 backdrop-blur-sm transition group-active:scale-95 group-hover:bg-white/25">
+        <Icon className="size-[22px] text-white" strokeWidth={2} />
       </span>
-      <span className="text-[11px] font-medium text-white/60">{label}</span>
+      <span className="max-w-[72px] text-center text-[10.5px] font-medium leading-tight text-white/90">{label}</span>
     </button>
   )
 }
 
 function TxRow({ t }: { t: TransactionDTO }) {
+  const { color, icon: Icon } = catMeta(t)
   return (
-    <div className="flex items-center justify-between gap-2 py-2.5">
-      <div className="min-w-0">
-        <div className="truncate text-sm font-medium text-white">{TX_TYPE_LABEL[t.type] ?? t.type}</div>
-        <div className="truncate text-[11px] text-white/40">
+    <div className="flex items-center gap-3 py-2.5">
+      <span
+        className="flex size-9 shrink-0 items-center justify-center rounded-full"
+        style={{ backgroundColor: `${color}1A`, color }}
+        aria-hidden="true"
+      >
+        <Icon className="size-4" strokeWidth={2.1} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[13.5px] font-medium text-neutral-900">{TX_TYPE_LABEL[t.type] ?? t.type}</div>
+        <div className="truncate text-[11px] text-neutral-400">
           {t.counterpartyName ?? t.note ?? '—'} · {timeAgo(t.createdAt)}
         </div>
       </div>
-      <div className={`shrink-0 text-sm font-semibold tabular-nums ${t.amount >= 0 ? 'text-[#4CCB63]' : 'text-red-400'}`}>
+      <div className={`shrink-0 text-[13.5px] font-semibold tabular-nums ${t.amount >= 0 ? 'text-[#1B9A3E]' : 'text-neutral-900'}`}>
         {t.amount >= 0 ? '+' : ''}
         {fmtMoney(t.amount)}
       </div>
     </div>
+  )
+}
+
+// ---- Кошелёк-карусель со свайпами (мышь + палец) ----
+function WalletCarousel({
+  data, animatedBalance, holderName, maskedCard, onDeposit, onWithdraw, onLoan, onRepay,
+}: {
+  data: BankData
+  animatedBalance: number
+  holderName: string
+  maskedCard: string
+  onDeposit: () => void
+  onWithdraw: () => void
+  onLoan: () => void
+  onRepay: () => void
+}) {
+  const viewportRef = useRef<HTMLDivElement>(null)
+  const [slide, setSlide] = useState(0)
+  const [dragX, setDragX] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const movedRef = useRef(false)
+
+  const count = 3
+  const { onPointerDown } = useDrag({
+    onStart: () => {
+      setDragging(true)
+      movedRef.current = false
+    },
+    onMove: (dx, dy) => {
+      if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.2) movedRef.current = true
+      // резина на краях
+      const atEdge = (slide === 0 && dx > 0) || (slide === count - 1 && dx < 0)
+      setDragX(atEdge ? dx * 0.35 : dx)
+    },
+    onEnd: (dx, dy) => {
+      setDragging(false)
+      setDragX(0)
+      const w = viewportRef.current?.clientWidth ?? 320
+      if (Math.abs(dx) > Math.abs(dy) * 1.2 && Math.abs(dx) > Math.max(56, w * 0.16)) {
+        setSlide((s) => Math.max(0, Math.min(count - 1, s + (dx < 0 ? 1 : -1))))
+      }
+    },
+  })
+
+  const rate = String(DEPOSIT_RATE_PER_HOUR * 100).replace('.', ',')
+
+  const slides = [
+    // ── Карта ──
+    <div key="card" className="relative w-full shrink-0 select-none overflow-hidden rounded-2xl px-4 py-4 text-white" style={{ background: 'linear-gradient(135deg,#23B24A 0%,#0E8F33 55%,#0B6B27 100%)' }}>
+      <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-14 size-40 rounded-full bg-white/10" />
+      <div aria-hidden="true" className="pointer-events-none absolute -bottom-16 -left-8 size-36 rounded-full bg-black/10" />
+      <div className="relative">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="h-7 w-10 rounded-md bg-gradient-to-br from-yellow-200 via-yellow-400 to-yellow-600 shadow-inner" aria-hidden="true" />
+            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/70">Дебетовая</span>
+          </div>
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-white/60">Столичный Банк</span>
+        </div>
+        <div className="mt-4 font-mono text-[15px] tracking-[0.16em] text-white/90">{maskedCard}</div>
+        <div className="mt-3.5 flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[9.5px] uppercase tracking-widest text-white/55">Держатель</div>
+            <div className="truncate text-[11.5px] font-semibold uppercase text-white/90">{holderName}</div>
+          </div>
+          <div className="text-right">
+            <div className="text-[9.5px] uppercase tracking-widest text-white/55">Доступно</div>
+            <div className="text-[26px] font-bold leading-none tabular-nums text-white">{fmtMoney(animatedBalance)}</div>
+          </div>
+        </div>
+        <div className="mt-4 flex gap-2">
+          <button
+            type="button"
+            onClick={onDeposit}
+            className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full bg-white text-[13px] font-semibold text-[#0E7A2B] transition active:scale-[0.98]"
+          >
+            <Plus className="size-4" /> Пополнить
+          </button>
+          <button
+            type="button"
+            onClick={() => useOS.getState().pushToast('Реквизиты', 'Счёт №40817 · Столичный Банк')}
+            className="flex h-9 items-center justify-center rounded-full bg-white/15 px-4 text-[13px] font-semibold text-white ring-1 ring-white/30 transition active:scale-[0.98]"
+          >
+            Реквизиты
+          </button>
+        </div>
+      </div>
+    </div>,
+    // ── Вклад ──
+    <div key="deposit" className="relative w-full shrink-0 select-none overflow-hidden rounded-2xl px-4 py-4 text-white" style={{ background: 'linear-gradient(135deg,#10B3A0 0%,#0C8A7B 60%,#08695E 100%)' }}>
+      <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-12 size-36 rounded-full bg-white/10" />
+      <div className="relative">
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-white/75">
+            <PiggyBank className="size-3.5" /> Вклад «Копилка»
+          </span>
+          <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold text-white/90">{rate}% в час</span>
+        </div>
+        <div className="mt-4 text-[26px] font-bold leading-none tabular-nums text-white">{fmtMoney(data.deposit)}</div>
+        <div className="mt-1 text-[11px] text-white/65">Деньги на вкладе не тратятся на покупки</div>
+        <div className="mt-4 flex gap-2">
+          <button type="button" onClick={onDeposit} className="flex h-9 flex-1 items-center justify-center rounded-full bg-white text-[13px] font-semibold text-[#0B6E62] transition active:scale-[0.98]">
+            Пополнить
+          </button>
+          <button type="button" onClick={onWithdraw} className="flex h-9 flex-1 items-center justify-center rounded-full bg-white/15 text-[13px] font-semibold text-white ring-1 ring-white/30 transition active:scale-[0.98]">
+            Снять
+          </button>
+        </div>
+      </div>
+    </div>,
+    // ── Кредит ──
+    data.activeLoan ? (
+      <div key="loan" className="relative w-full shrink-0 select-none overflow-hidden rounded-2xl px-4 py-4 text-white" style={{ background: 'linear-gradient(135deg,#E4605E 0%,#C93F3C 60%,#A32E2C 100%)' }}>
+        <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-12 size-36 rounded-full bg-white/10" />
+        <div className="relative">
+          <span className="text-[11px] font-semibold uppercase tracking-widest text-white/75">Остаток долга</span>
+          <div className="mt-4 text-[26px] font-bold leading-none tabular-nums text-white">{fmtMoney(data.activeLoan.owed)}</div>
+          <div className="mt-1 text-[11px] text-white/70">
+            Ставка {data.activeLoan.rate}% · до {new Date(data.activeLoan.dueAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+          </div>
+          <button type="button" onClick={onRepay} className="mt-4 flex h-9 w-full items-center justify-center rounded-full bg-white text-[13px] font-semibold text-[#A32E2C] transition active:scale-[0.98]">
+            Погасить
+          </button>
+        </div>
+      </div>
+    ) : (
+      <div key="loan" className="relative w-full shrink-0 select-none overflow-hidden rounded-2xl px-4 py-4 text-white" style={{ background: 'linear-gradient(135deg,#5C6B7E 0%,#3D4A5C 60%,#2C3644 100%)' }}>
+        <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-12 size-36 rounded-full bg-white/10" />
+        <div className="relative">
+          <span className="text-[11px] font-semibold uppercase tracking-widest text-white/75">Кредитный лимит</span>
+          <div className="mt-4 text-[26px] font-bold leading-none tabular-nums text-white">{fmtMoney(data.loanLimit)}</div>
+          <div className="mt-1 text-[11px] text-white/65">Ставка {data.creditRate ?? 15}% · срок 7 дней</div>
+          <button type="button" onClick={onLoan} className="mt-4 flex h-9 w-full items-center justify-center rounded-full bg-white text-[13px] font-semibold text-[#2C3644] transition active:scale-[0.98]">
+            Взять кредит
+          </button>
+        </div>
+      </div>
+    ),
+  ]
+
+  return (
+    <section className={CARD_CLS} aria-label="Кошелёк">
+      <div className="flex items-center justify-between px-4 pt-3.5">
+        <div className="text-[15px] font-semibold text-neutral-900">Кошелёк</div>
+        <div className="flex items-center gap-1.5" role="tablist" aria-label="Слайды кошелька">
+          {slides.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              role="tab"
+              aria-selected={slide === i}
+              aria-label={`Слайд ${i + 1}`}
+              onClick={() => setSlide(i)}
+              className={`h-1.5 rounded-full transition-all duration-300 ${slide === i ? 'w-5 bg-[#21A038]' : 'w-1.5 bg-neutral-300 hover:bg-neutral-400'}`}
+            />
+          ))}
+        </div>
+      </div>
+      <div
+        ref={viewportRef}
+        className="mt-3 cursor-grab overflow-hidden px-3 pb-3.5 active:cursor-grabbing"
+        style={{ touchAction: 'pan-y' }}
+        onPointerDown={onPointerDown}
+      >
+        <div
+          className="flex"
+          style={{
+            transform: `translateX(calc(${-slide * 100}% + ${dragX}px))`,
+            transition: dragging ? 'none' : 'transform 320ms cubic-bezier(0.22, 1, 0.36, 1)',
+          }}
+        >
+          {slides}
+        </div>
+      </div>
+    </section>
   )
 }
 
@@ -238,10 +438,8 @@ export default function BankApp() {
       const os = useOS.getState()
       os.refreshSession(patch)
       os.pushToast('Банк', 'Операция выполнена')
-      playSound('cash')
       await load()
     } catch (e) {
-      playSound('error')
       setFormError(e instanceof ApiError ? e.message : 'Не удалось выполнить операцию')
     } finally {
       setBusy(false)
@@ -316,421 +514,401 @@ export default function BankApp() {
     { icon: Landmark, label: 'Кредит', run: () => gotoSection('loan') },
   ]
 
+  const stories: { label: string; ring: string; icon: LucideIcon; color: string; run: () => void }[] = [
+    { label: 'Курьеры', ring: 'conic-gradient(#F59E0B,#FBBF24,#F59E0B)', icon: ShieldAlert, color: '#D97706', run: () => pushToast('Осторожно, курьер!', 'Курьер может подменить товар при доставке — в таких случаях работает страховка сделки.') },
+    { label: 'Копилка', ring: 'conic-gradient(#10B3A0,#2DD4BF,#10B3A0)', icon: PiggyBank, color: '#0C8A7B', run: () => gotoSection('deposit') },
+    { label: 'Кредит', ring: 'conic-gradient(#5C6B7E,#94A3B8,#5C6B7E)', icon: Landmark, color: '#475569', run: () => gotoSection('loan') },
+    { label: 'Налоги', ring: 'conic-gradient(#3F74E0,#6C9BF5,#3F74E0)', icon: Receipt, color: '#3F74E0', run: () => openApp('taxes') },
+  ]
+
   const services: { icon: LucideIcon; label: string; sub: string; color: string; run?: () => void }[] = [
-    { icon: Smartphone, label: 'Мобильная связь', sub: 'Сим-карты и связь', color: '#34D399' },
-    { icon: Wifi, label: 'Интернет', sub: 'Провайдеры', color: '#60A5FA' },
-    { icon: Building2, label: 'ЖКХ', sub: 'Квартплата', color: '#FBBF24' },
-    { icon: Receipt, label: 'Налоги', sub: 'Налоговая', color: '#F87171', run: () => openApp('taxes') },
-    { icon: Car, label: 'Штрафы', sub: 'Транспорт', color: '#94A3B8' },
-    { icon: Send, label: 'Переводы', sub: 'Людям по имени', color: '#E879F9' },
+    { icon: Smartphone, label: 'Мобильная связь', sub: 'Сим-карты и связь', color: '#21A038' },
+    { icon: Wifi, label: 'Интернет', sub: 'Провайдеры', color: '#3F74E0' },
+    { icon: Building2, label: 'ЖКХ', sub: 'Квартплата', color: '#D9980D' },
+    { icon: Receipt, label: 'Налоги', sub: 'Налоговая', color: '#E5484D', run: () => openApp('taxes') },
+    { icon: Car, label: 'Штрафы', sub: 'Транспорт', color: '#7B8794' },
+    { icon: Send, label: 'Переводы', sub: 'Людям по имени', color: '#C244CB' },
   ]
 
   return (
-    <div className="flex h-full flex-col bg-[linear-gradient(180deg,#132b1d_0%,#0f1712_42%,#0b120e_100%)] text-white">
+    <div className="flex h-full flex-col bg-[#F2F4F7] text-neutral-900">
       <div className="flex-1 overflow-y-auto [scrollbar-width:thin]">
         {loading && !data ? (
           <div className="space-y-4 p-4">
-            <div className="h-24 rounded-3xl bg-white/5 animate-pulse" />
-            <div className="flex justify-between">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="size-16 rounded-full bg-white/5 animate-pulse" />
-              ))}
-            </div>
-            <div className="h-40 rounded-3xl bg-white/5 animate-pulse" />
-            <div className="h-14 rounded-2xl bg-white/5 animate-pulse" />
-            <div className="flex items-center justify-center gap-2 text-sm text-white/40">
+            <div className="h-56 rounded-b-[26px] bg-white/70 animate-pulse" />
+            <div className="h-44 rounded-2xl bg-white animate-pulse" />
+            <div className="h-16 rounded-2xl bg-white animate-pulse" />
+            <div className="flex items-center justify-center gap-2 text-sm text-neutral-400">
               <Loader2 className="size-4 animate-spin" /> Загрузка банка…
             </div>
           </div>
         ) : error && !data ? (
           <div className="p-4">
-            <div className="rounded-2xl bg-[#2a1416] p-6 text-center ring-1 ring-red-500/20">
-              <p className="text-sm font-medium text-red-300">{error}</p>
+            <div className={`${CARD_CLS} p-6 text-center`}>
+              <p className="text-sm font-medium text-red-600">{error}</p>
               <Button className="mt-4 rounded-xl text-white" style={{ backgroundColor: GREEN }} onClick={load}>
                 Повторить
               </Button>
             </div>
           </div>
         ) : data ? (
-          <div key={screen} className="screen-enter space-y-4 p-4 pb-2">
+          <div key={screen} className="screen-enter pb-2">
             {/* ===== ГЛАВНЫЙ ===== */}
             {screen === 'main' && (
               <>
-                {/* Шапка: аватар / поиск / колокольчик */}
-                <div className="flex items-center gap-3">
-                  <Avatar className="size-9 shrink-0 ring-1 ring-white/10">
-                    {session?.photoUrl && <AvatarImage src={session.photoUrl} alt={holderName} />}
-                    <AvatarFallback className="bg-[#1f3a29] text-xs font-semibold text-[#7FDB96]">
-                      {firstName.slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="relative flex-1">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-white/35" />
-                    <input
-                      value={searchQ}
-                      onChange={(e) => setSearchQ(e.target.value)}
-                      onFocus={() => setSearchFocus(true)}
-                      onBlur={() => setSearchFocus(false)}
-                      placeholder="Поиск по приложению"
-                      aria-label="Поиск по приложению"
-                      className="h-10 w-full rounded-full border border-white/10 bg-black/25 pl-9 pr-3 text-sm text-white placeholder:text-white/35 outline-none transition focus:border-[#21A038]/60"
-                    />
-                    {searchFocus && searchFound.length > 0 && (
-                      <div className="absolute inset-x-0 top-11 z-20 overflow-hidden rounded-2xl border border-white/10 bg-[#101a14] shadow-xl shadow-black/40">
-                        {searchFound.map((item) => (
-                          <button
-                            key={item.label}
-                            type="button"
-                            // mousedown, чтобы blur не съел клик
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => {
-                              item.run()
-                              setSearchQ('')
-                            }}
-                            className="block w-full px-3.5 py-2.5 text-left text-sm text-white/80 transition hover:bg-white/5 hover:text-white"
-                          >
-                            {item.label}
-                          </button>
+                {/* ── Зелёный градиентный хедер ── */}
+                <div
+                  className="px-4 pb-10 pt-3.5"
+                  style={{ background: `linear-gradient(165deg,#31BB4F 0%,#1FA243 46%,${GREEN_DARK} 100%)` }}
+                >
+                  {/* аватар / поиск / колокольчик */}
+                  <div className="flex items-center gap-2.5">
+                    <Avatar className="size-9 shrink-0 ring-2 ring-white/40">
+                      {session?.photoUrl && <AvatarImage src={session.photoUrl} alt={holderName} />}
+                      <AvatarFallback className="bg-white text-xs font-bold text-[#12842F]">
+                        {firstName.slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="relative flex-1">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-white/70" />
+                      <input
+                        value={searchQ}
+                        onChange={(e) => setSearchQ(e.target.value)}
+                        onFocus={() => setSearchFocus(true)}
+                        onBlur={() => setSearchFocus(false)}
+                        placeholder="Платежи и переводы"
+                        aria-label="Поиск по приложению"
+                        className="h-10 w-full rounded-full border border-white/25 bg-white/15 pl-9 pr-3 text-sm text-white outline-none backdrop-blur-sm transition placeholder:text-white/65 focus:border-white/50 focus:bg-white/25"
+                      />
+                      {searchFocus && searchFound.length > 0 && (
+                        <div className="absolute inset-x-0 top-11 z-20 overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-black/10">
+                          {searchFound.map((item) => (
+                            <button
+                              key={item.label}
+                              type="button"
+                              // mousedown, чтобы blur не съел клик
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                item.run()
+                                setSearchQ('')
+                              }}
+                              className="block w-full px-4 py-2.5 text-left text-sm text-neutral-800 transition hover:bg-neutral-50 hover:text-neutral-900"
+                            >
+                              {item.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      aria-label="Уведомления"
+                      onClick={() => pushToast('Уведомления', 'Новых уведомлений нет')}
+                      className="relative flex size-10 shrink-0 items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-white/25 backdrop-blur-sm transition active:scale-95"
+                    >
+                      <Bell className="size-4.5" />
+                      <span className="absolute right-2.5 top-2.5 size-1.5 rounded-full bg-white" />
+                    </button>
+                  </div>
+
+                  {/* приветствие + курсы */}
+                  <div className="mt-4" suppressHydrationWarning>
+                    <h1 className="text-[26px] font-bold leading-tight tracking-tight text-white">
+                      {greeting()}, {firstName}
+                    </h1>
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20">
+                        $ {rates.usd}
+                        {rates.usdUp ? <ArrowUpRight className="size-3.5 text-[#B7F5C6]" /> : <ArrowDownRight className="size-3.5 text-[#FFD3D3]" />}
+                      </span>
+                      <span className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20">
+                        € {rates.eur}
+                        {rates.eurUp ? <ArrowUpRight className="size-3.5 text-[#B7F5C6]" /> : <ArrowDownRight className="size-3.5 text-[#FFD3D3]" />}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* круглые действия */}
+                  <div className="mt-5 grid grid-cols-3 gap-y-3.5">
+                    {actions.map((a) => (
+                      <ActionCircle key={a.label} icon={a.icon} label={a.label} onClick={a.run} />
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Контент поверх хедера ── */}
+                <div className="relative -mt-6 space-y-3 px-3 pb-2">
+                  <WalletCarousel
+                    data={data}
+                    animatedBalance={animatedBalance}
+                    holderName={holderName}
+                    maskedCard={maskedCard}
+                    onDeposit={() => gotoSection('deposit')}
+                    onWithdraw={() => gotoSection('deposit')}
+                    onLoan={() => gotoSection('loan')}
+                    onRepay={() => gotoSection('loan')}
+                  />
+
+                  {/* сторис */}
+                  <div className="flex justify-between gap-1 px-1.5">
+                    {stories.map((s) => (
+                      <button key={s.label} type="button" onClick={s.run} className="group flex w-16 flex-col items-center gap-1.5">
+                        <span className="flex size-[54px] items-center justify-center rounded-full p-[2.5px] transition group-active:scale-95" style={{ background: s.ring }} aria-hidden="true">
+                          <span className="flex size-full items-center justify-center rounded-full bg-white">
+                            <s.icon className="size-5" style={{ color: s.color }} strokeWidth={2.1} />
+                          </span>
+                        </span>
+                        <span className="text-[10.5px] font-medium leading-tight text-neutral-700">{s.label}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* совет дня (ротация) */}
+                  {!tipClosed && (
+                    <section className="relative rounded-2xl bg-[#FFF7E6] p-3.5 ring-1 ring-amber-200/80">
+                      <button
+                        type="button"
+                        aria-label="Закрыть совет"
+                        onClick={() => setTipClosed(true)}
+                        className="absolute right-2.5 top-2.5 flex size-6 items-center justify-center rounded-full text-amber-500/70 transition hover:bg-amber-100 hover:text-amber-700"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                      <div className="flex gap-3 pr-6">
+                        <Lightbulb className="mt-0.5 size-5 shrink-0 text-amber-500" />
+                        <div>
+                          <div className="text-[13.5px] font-semibold text-amber-800">{TIPS[tipIdx].title}</div>
+                          <p className="mt-0.5 text-[12.5px] leading-snug text-amber-900/70">{TIPS[tipIdx].body}</p>
+                        </div>
+                      </div>
+                    </section>
+                  )}
+
+                  {formError && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
+                      {formError}
+                    </div>
+                  )}
+
+                  {/* операции */}
+                  <section className={`${CARD_CLS} px-4 py-3.5`}>
+                    <div className="flex items-center justify-between">
+                      <div className="text-[15px] font-semibold text-neutral-900">Операции</div>
+                      <button className="flex items-center gap-0.5 text-[13px] font-semibold text-[#21A038] transition active:opacity-70" onClick={() => setScreen('history')}>
+                        Все
+                        <ChevronRight className="size-4" />
+                      </button>
+                    </div>
+                    {data.transactions.length === 0 ? (
+                      <p className="mt-3 pb-1 text-xs text-neutral-400">Операций пока нет — купите или продайте что-нибудь.</p>
+                    ) : (
+                      <div className="mt-1 divide-y divide-neutral-100">
+                        {data.transactions.slice(0, 4).map((t) => (
+                          <TxRow key={t.id} t={t} />
                         ))}
                       </div>
                     )}
-                  </div>
-                  <button
-                    type="button"
-                    aria-label="Уведомления"
-                    onClick={() => pushToast('Уведомления', 'Новых уведомлений нет')}
-                    className="relative flex size-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-black/25 text-white/70 transition active:scale-95"
-                  >
-                    <Bell className="size-4.5" />
-                    <span className="absolute right-2.5 top-2.5 size-1.5 rounded-full bg-[#2FBE51]" />
-                  </button>
-                </div>
-
-                {/* Приветствие + курсы */}
-                <div>
-                  <h1 className="text-2xl font-bold tracking-tight">{firstName},</h1>
-                  <div className="mt-1 flex items-center gap-4 text-[13px] text-white/50">
-                    <span className="flex items-center gap-1">
-                      Курс евро: € {rates.eur}
-                      {rates.eurUp ? (
-                        <ArrowUpRight className="size-3.5 text-[#4CCB63]" />
-                      ) : (
-                        <ArrowDownRight className="size-3.5 text-red-400" />
-                      )}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      $ {rates.usd}
-                      {rates.usdUp ? (
-                        <ArrowUpRight className="size-3.5 text-[#4CCB63]" />
-                      ) : (
-                        <ArrowDownRight className="size-3.5 text-red-400" />
-                      )}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Круглые кнопки-действия */}
-                <div className="grid grid-cols-3 gap-y-4 rounded-3xl bg-[#141e17]/60 py-4 ring-1 ring-white/5">
-                  {actions.map((a) => (
-                    <ActionCircle key={a.label} icon={a.icon} label={a.label} onClick={a.run} />
-                  ))}
-                </div>
-
-                {/* Кошелёк */}
-                <section className="rounded-3xl bg-[#16211a] p-4 ring-1 ring-white/5">
-                  <div className="flex items-center justify-between">
-                    <div className="text-base font-semibold">Кошелёк</div>
-                    <button
-                      type="button"
-                      aria-label="Пополнить"
-                      onClick={() => gotoSection('deposit')}
-                      className="flex size-8 items-center justify-center rounded-full bg-[#21A038]/15 text-[#4CCB63] transition active:scale-95"
-                    >
-                      <Plus className="size-4.5" />
-                    </button>
-                  </div>
-                  <div className="relative mt-3 overflow-hidden rounded-2xl bg-[linear-gradient(135deg,#22382b_0%,#13221a_55%,#0e1811_100%)] p-4 ring-1 ring-white/10">
-                    <div className="pointer-events-none absolute -right-8 -top-10 size-32 rounded-full bg-white/5" />
-                    <div className="relative">
-                      <div className="flex items-center justify-between">
-                        <div className="h-6 w-9 rounded-[5px] bg-gradient-to-br from-yellow-200 via-yellow-400 to-yellow-600 shadow-inner" />
-                        <span className="text-[10px] font-semibold uppercase tracking-widest text-white/45">
-                          Столичный Банк
-                        </span>
-                      </div>
-                      <div className="mt-4 flex items-center gap-2 font-mono text-base tracking-[0.14em] text-white/85">
-                        <CreditCard className="size-4 text-white/35" />
-                        {maskedCard}
-                      </div>
-                      <div className="mt-4 flex items-end justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="text-[10px] uppercase tracking-widest text-white/40">Держатель</div>
-                          <div className="truncate text-xs font-semibold uppercase text-white/80">{holderName}</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-[10px] uppercase tracking-widest text-white/40">Баланс</div>
-                          <div className="text-2xl font-bold tabular-nums text-white">{fmtMoney(animatedBalance)}</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between">
-                    <span className="text-[11px] text-white/35">Вклад не застрахован — это игра</span>
-                    <button
-                      type="button"
-                      onClick={() => pushToast('Кошелёк', 'Пока доступна одна карта')}
-                      className="flex items-center gap-0.5 text-xs font-semibold text-[#4CCB63] transition active:opacity-70"
-                    >
-                      Все карты
-                      <ChevronRight className="size-3.5" />
-                    </button>
-                  </div>
-                </section>
-
-                {/* Совет дня (ротация) */}
-                {!tipClosed && (
-                  <section className="relative rounded-2xl bg-[linear-gradient(135deg,#2b2410_0%,#1c170a_100%)] p-4 ring-1 ring-amber-300/15">
-                    <button
-                      type="button"
-                      aria-label="Закрыть совет"
-                      onClick={() => setTipClosed(true)}
-                      className="absolute right-2.5 top-2.5 flex size-6 items-center justify-center rounded-full text-white/35 transition hover:bg-white/5 hover:text-white/70"
-                    >
-                      <X className="size-3.5" />
-                    </button>
-                    <div className="flex gap-3 pr-6">
-                      <Lightbulb className="mt-0.5 size-5 shrink-0 text-amber-300" />
-                      <div>
-                        <div className="text-sm font-semibold text-amber-200">{TIPS[tipIdx].title}</div>
-                        <p className="mt-0.5 text-[13px] leading-snug text-white/65">{TIPS[tipIdx].body}</p>
-                      </div>
-                    </div>
                   </section>
-                )}
 
-                {formError && (
-                  <div className="rounded-xl border border-red-500/20 bg-[#2a1416] px-3 py-2 text-xs text-red-300">
-                    {formError}
-                  </div>
-                )}
-
-                {/* Аккордеоны */}
-                <div className="space-y-3">
-                  <Section
-                    title="Вклады и счета"
-                    open={openSection === 'deposit'}
-                    onToggle={() => setOpenSection((s) => (s === 'deposit' ? null : 'deposit'))}
-                  >
-                    <div className="rounded-xl bg-[#14251a] p-3.5 ring-1 ring-emerald-400/10">
-                      <div className="text-xs text-white/45">На вкладе</div>
-                      <div className="text-2xl font-bold text-[#5FD989]">{fmtMoney(data.deposit)}</div>
-                      <div className="mt-0.5 text-[11px] text-white/35">
-                        {String(DEPOSIT_RATE_PER_HOUR * 100).replace('.', ',')}% в час · начисление ежечасно
-                      </div>
-                    </div>
-                    <p className="mt-3 text-xs leading-relaxed text-white/45">
-                      Деньги на вкладе не тратятся на покупки — снимите их, когда соберётесь на закупку.
-                    </p>
-                    <div className="mt-3">
-                      <div className="text-xs text-white/45">Сумма</div>
-                      <Input
-                        className="mt-1.5 h-11 rounded-xl border-white/10 bg-black/25 text-base font-semibold text-white placeholder:text-white/30"
-                        inputMode="numeric"
-                        value={depositInput}
-                        placeholder="0"
-                        onChange={(e) => setDepositInput(e.target.value)}
-                      />
-                    </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      <Button
-                        className="h-11 rounded-xl text-sm font-semibold text-white"
-                        style={{ backgroundColor: GREEN }}
-                        disabled={busy || toAmount(depositInput) <= 0}
-                        onClick={() => applyMutation(() => api.depositOp(toAmount(depositInput), 'top'))}
-                      >
-                        {busy ? <Loader2 className="size-4 animate-spin" /> : 'Пополнить'}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="h-11 rounded-xl border-white/10 bg-white/5 text-sm font-semibold text-[#5FD989] hover:bg-white/10 hover:text-[#5FD989]"
-                        disabled={busy || toAmount(depositInput) <= 0}
-                        onClick={() => applyMutation(() => api.depositOp(toAmount(depositInput), 'withdraw'))}
-                      >
-                        {busy ? <Loader2 className="size-4 animate-spin" /> : 'Снять'}
-                      </Button>
-                    </div>
-                  </Section>
-
-                  <Section
-                    title="Безопасность"
-                    open={openSection === 'security'}
-                    onToggle={() => setOpenSection((s) => (s === 'security' ? null : 'security'))}
-                  >
-                    <div className="flex items-center justify-between py-1">
-                      <div className="flex items-center gap-2.5">
-                        <ShieldCheck className="size-4.5 text-[#6FD98A]" />
-                        <div>
-                          <div className="text-sm font-medium text-white">Вход по пину</div>
-                          <div className="text-[11px] text-white/35">Код при входе в банк</div>
+                  {/* аккордеоны */}
+                  <div className="space-y-2.5">
+                    <Section
+                      title="Вклады и счета"
+                      open={openSection === 'deposit'}
+                      onToggle={() => setOpenSection((s) => (s === 'deposit' ? null : 'deposit'))}
+                    >
+                      <div className="rounded-xl bg-[#EAF8F1] p-3.5 ring-1 ring-[#21A038]/15">
+                        <div className="text-xs text-neutral-500">На вкладе</div>
+                        <div className="text-2xl font-bold text-[#12842F]">{fmtMoney(data.deposit)}</div>
+                        <div className="mt-0.5 text-[11px] text-neutral-500">
+                          {String(DEPOSIT_RATE_PER_HOUR * 100).replace('.', ',')}% в час · начисление ежечасно
                         </div>
                       </div>
-                      <Switch checked={pinOn} onCheckedChange={setPinOn} className="data-[state=checked]:bg-[#21A038] data-[state=unchecked]:bg-white/10" />
-                    </div>
-                    <div className="mt-2 flex items-center justify-between border-t border-white/5 py-3">
-                      <div className="flex items-center gap-2.5">
-                        <BellRing className="size-4.5 text-[#6FD98A]" />
-                        <div>
-                          <div className="text-sm font-medium text-white">Уведомления об операциях</div>
-                          <div className="text-[11px] text-white/35">Пуш после каждой операции</div>
-                        </div>
+                      <p className="mt-3 text-xs leading-relaxed text-neutral-500">
+                        Деньги на вкладе не тратятся на покупки — снимите их, когда соберётесь на закупку.
+                      </p>
+                      <div className="mt-3">
+                        <div className="text-xs text-neutral-500">Сумма</div>
+                        <Input
+                          className="mt-1.5 h-11 rounded-xl border-neutral-200 bg-white text-base font-semibold text-neutral-900 placeholder:text-neutral-300"
+                          inputMode="numeric"
+                          value={depositInput}
+                          placeholder="0"
+                          onChange={(e) => setDepositInput(e.target.value)}
+                        />
                       </div>
-                      <Switch checked={opsNotifOn} onCheckedChange={setOpsNotifOn} className="data-[state=checked]:bg-[#21A038] data-[state=unchecked]:bg-white/10" />
-                    </div>
-                    <div className="flex items-center justify-between border-t border-white/5 pt-3">
-                      <div className="flex items-center gap-2.5">
-                        <Gauge className="size-4.5 text-[#6FD98A]" />
-                        <div>
-                          <div className="text-sm font-medium text-white">Рейтинг: {score}</div>
-                          <div className="text-[11px] text-white/35">Влияет на лимит и ставку</div>
-                        </div>
-                      </div>
-                      <span className={`text-xs font-semibold ${credit.cls}`}>{credit.label}</span>
-                    </div>
-                  </Section>
-
-                  <Section
-                    title="Кредиты"
-                    open={openSection === 'loan'}
-                    onToggle={() => setOpenSection((s) => (s === 'loan' ? null : 'loan'))}
-                  >
-                    <div className="mb-3 flex items-center justify-between rounded-xl bg-white/5 px-3.5 py-2.5 text-xs">
-                      <span className="text-white/45">Лимит</span>
-                      <span className="font-semibold text-white">{fmtMoney(data.loanLimit)}</span>
-                      <span className="text-white/45">Ставка</span>
-                      <span className="font-semibold text-white">{data.creditRate ?? 15}%</span>
-                    </div>
-
-                    {data.activeLoan ? (
-                      <>
-                        <div className="rounded-xl bg-[#2a1416] p-3.5 ring-1 ring-red-500/15">
-                          <div className="text-xs text-red-300/70">Остаток долга</div>
-                          <div className="text-2xl font-bold text-red-400">{fmtMoney(data.activeLoan.owed)}</div>
-                        </div>
-                        <div className="mt-3 space-y-1 text-xs text-white/45">
-                          <div className="flex justify-between">
-                            <span>Выдано</span>
-                            <span className="font-medium text-white/75">{fmtMoney(data.activeLoan.principal)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Ставка</span>
-                            <span className="font-medium text-white/75">{data.activeLoan.rate}%</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Срок до</span>
-                            <span className="font-medium text-white/75">
-                              {new Date(data.activeLoan.dueAt).toLocaleString('ru-RU', {
-                                day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-                              })}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="mt-3">
-                          <div className="text-xs text-white/45">Сумма погашения</div>
-                          <Input
-                            className="mt-1.5 h-11 rounded-xl border-white/10 bg-black/25 text-base font-semibold text-white placeholder:text-white/30"
-                            inputMode="numeric"
-                            value={repayAmount ? String(repayAmount) : ''}
-                            placeholder="0"
-                            onChange={(e) => setRepayAmount(Math.min(toAmount(e.target.value), data.activeLoan?.owed ?? 0))}
-                          />
-                          <Slider
-                            className="mt-4 [&_[data-slot=slider-range]]:bg-[#21A038] [&_[data-slot=slider-thumb]]:border-[#21A038] [&_[data-slot=slider-thumb]]:bg-[#16211a] [&_[data-slot=slider-track]]:bg-white/10"
-                            value={[Math.min(repayAmount, data.activeLoan.owed)]}
-                            min={100}
-                            max={Math.max(100, Math.round(data.activeLoan.owed))}
-                            step={100}
-                            onValueChange={(v) => setRepayAmount(v[0] ?? 0)}
-                          />
-                        </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
                         <Button
-                          className="mt-4 h-11 w-full rounded-xl text-sm font-semibold text-white"
+                          className="h-11 rounded-xl text-sm font-semibold text-white"
                           style={{ backgroundColor: GREEN }}
-                          disabled={busy || repayAmount <= 0}
-                          onClick={() => applyMutation(() => api.repayLoan(repayAmount))}
+                          disabled={busy || toAmount(depositInput) <= 0}
+                          onClick={() => applyMutation(() => api.depositOp(toAmount(depositInput), 'top'))}
                         >
-                          {busy ? <Loader2 className="size-4 animate-spin" /> : 'Погасить'}
+                          {busy ? <Loader2 className="size-4 animate-spin" /> : 'Пополнить'}
                         </Button>
-                      </>
-                    ) : (
-                      <>
-                        <div className="rounded-xl bg-[#14251a] p-3.5 ring-1 ring-emerald-400/10">
-                          <div className="text-xs text-white/45">Сумма кредита</div>
-                          <div className="text-2xl font-bold text-[#5FD989]">{fmtMoney(loanAmount)}</div>
-                        </div>
-                        <div className="mt-3">
-                          <div className="text-xs text-white/45">От 1 000 до {fmtMoney(Math.max(1000, data.loanLimit))}</div>
-                          <Input
-                            className="mt-1.5 h-11 rounded-xl border-white/10 bg-black/25 text-base font-semibold text-white placeholder:text-white/30"
-                            inputMode="numeric"
-                            value={loanAmount ? String(loanAmount) : ''}
-                            placeholder="0"
-                            onChange={(e) => setLoanAmount(Math.min(toAmount(e.target.value), Math.max(1000, data.loanLimit)))}
-                          />
-                          <Slider
-                            className="mt-4 [&_[data-slot=slider-range]]:bg-[#21A038] [&_[data-slot=slider-thumb]]:border-[#21A038] [&_[data-slot=slider-thumb]]:bg-[#16211a] [&_[data-slot=slider-track]]:bg-white/10"
-                            value={[Math.min(Math.max(loanAmount, 1000), Math.max(1000, data.loanLimit))]}
-                            min={1000}
-                            max={Math.max(1000, data.loanLimit)}
-                            step={500}
-                            onValueChange={(v) => setLoanAmount(v[0] ?? 1000)}
-                          />
-                        </div>
                         <Button
-                          className="mt-4 h-11 w-full rounded-xl text-sm font-semibold text-white"
-                          style={{ backgroundColor: GREEN }}
-                          disabled={busy || data.loanLimit < 1000 || loanAmount < 1000}
-                          onClick={() => applyMutation(() => api.takeLoan(loanAmount))}
+                          variant="outline"
+                          className="h-11 rounded-xl border-neutral-200 bg-white text-sm font-semibold text-[#12842F] hover:bg-[#EAF8F1] hover:text-[#12842F]"
+                          disabled={busy || toAmount(depositInput) <= 0}
+                          onClick={() => applyMutation(() => api.depositOp(toAmount(depositInput), 'withdraw'))}
                         >
-                          {busy ? <Loader2 className="size-4 animate-spin" /> : 'Взять кредит'}
+                          {busy ? <Loader2 className="size-4 animate-spin" /> : 'Снять'}
                         </Button>
-                        <p className="mt-2 text-center text-[11px] leading-relaxed text-white/35">
-                          Срок 7 дней. Погашение вовремя повышает рейтинг (+40), просрочка роняет его (−80).
-                        </p>
-                      </>
-                    )}
-                  </Section>
-                </div>
+                      </div>
+                    </Section>
 
-                {/* Последние операции */}
-                <section className="rounded-2xl bg-[#141e17] p-4 ring-1 ring-white/5">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-semibold">Последние операции</div>
-                    <button className="text-xs font-medium text-[#4CCB63]" onClick={() => setScreen('history')}>
-                      Вся история
-                    </button>
+                    <Section
+                      title="Безопасность"
+                      open={openSection === 'security'}
+                      onToggle={() => setOpenSection((s) => (s === 'security' ? null : 'security'))}
+                    >
+                      <div className="flex items-center justify-between py-1">
+                        <div className="flex items-center gap-2.5">
+                          <ShieldCheck className="size-4.5 text-[#21A038]" />
+                          <div>
+                            <div className="text-sm font-medium text-neutral-900">Вход по пину</div>
+                            <div className="text-[11px] text-neutral-400">Код при входе в банк</div>
+                          </div>
+                        </div>
+                        <Switch checked={pinOn} onCheckedChange={setPinOn} className="data-[state=checked]:bg-[#21A038] data-[state=unchecked]:bg-neutral-200" />
+                      </div>
+                      <div className="mt-2 flex items-center justify-between border-t border-neutral-100 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <BellRing className="size-4.5 text-[#21A038]" />
+                          <div>
+                            <div className="text-sm font-medium text-neutral-900">Уведомления об операциях</div>
+                            <div className="text-[11px] text-neutral-400">Пуш после каждой операции</div>
+                          </div>
+                        </div>
+                        <Switch checked={opsNotifOn} onCheckedChange={setOpsNotifOn} className="data-[state=checked]:bg-[#21A038] data-[state=unchecked]:bg-neutral-200" />
+                      </div>
+                      <div className="flex items-center justify-between border-t border-neutral-100 pt-3">
+                        <div className="flex items-center gap-2.5">
+                          <Gauge className="size-4.5 text-[#21A038]" />
+                          <div>
+                            <div className="text-sm font-medium text-neutral-900">Рейтинг: {score}</div>
+                            <div className="text-[11px] text-neutral-400">Влияет на лимит и ставку</div>
+                          </div>
+                        </div>
+                        <span className={`text-xs font-semibold ${credit.cls}`}>{credit.label}</span>
+                      </div>
+                    </Section>
+
+                    <Section
+                      title="Кредиты"
+                      open={openSection === 'loan'}
+                      onToggle={() => setOpenSection((s) => (s === 'loan' ? null : 'loan'))}
+                    >
+                      <div className="mb-3 flex items-center justify-between rounded-xl bg-neutral-100 px-3.5 py-2.5 text-xs">
+                        <span className="text-neutral-500">Лимит</span>
+                        <span className="font-semibold text-neutral-900">{fmtMoney(data.loanLimit)}</span>
+                        <span className="text-neutral-500">Ставка</span>
+                        <span className="font-semibold text-neutral-900">{data.creditRate ?? 15}%</span>
+                      </div>
+
+                      {data.activeLoan ? (
+                        <>
+                          <div className="rounded-xl bg-red-50 p-3.5 ring-1 ring-red-200">
+                            <div className="text-xs text-red-500/80">Остаток долга</div>
+                            <div className="text-2xl font-bold text-red-600">{fmtMoney(data.activeLoan.owed)}</div>
+                          </div>
+                          <div className="mt-3 space-y-1 text-xs text-neutral-500">
+                            <div className="flex justify-between">
+                              <span>Выдано</span>
+                              <span className="font-medium text-neutral-800">{fmtMoney(data.activeLoan.principal)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Ставка</span>
+                              <span className="font-medium text-neutral-800">{data.activeLoan.rate}%</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Срок до</span>
+                              <span className="font-medium text-neutral-800">
+                                {new Date(data.activeLoan.dueAt).toLocaleString('ru-RU', {
+                                  day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+                                })}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="mt-3">
+                            <div className="text-xs text-neutral-500">Сумма погашения</div>
+                            <Input
+                              className="mt-1.5 h-11 rounded-xl border-neutral-200 bg-white text-base font-semibold text-neutral-900 placeholder:text-neutral-300"
+                              inputMode="numeric"
+                              value={repayAmount ? String(repayAmount) : ''}
+                              placeholder="0"
+                              onChange={(e) => setRepayAmount(Math.min(toAmount(e.target.value), data.activeLoan?.owed ?? 0))}
+                            />
+                            <Slider
+                              className="mt-4 [&_[data-slot=slider-range]]:bg-[#21A038] [&_[data-slot=slider-thumb]]:border-[#21A038] [&_[data-slot=slider-thumb]]:bg-white [&_[data-slot=slider-track]]:bg-neutral-200"
+                              value={[Math.min(repayAmount, data.activeLoan.owed)]}
+                              min={100}
+                              max={Math.max(100, Math.round(data.activeLoan.owed))}
+                              step={100}
+                              onValueChange={(v) => setRepayAmount(v[0] ?? 0)}
+                            />
+                          </div>
+                          <Button
+                            className="mt-4 h-11 w-full rounded-xl text-sm font-semibold text-white"
+                            style={{ backgroundColor: GREEN }}
+                            disabled={busy || repayAmount <= 0}
+                            onClick={() => applyMutation(() => api.repayLoan(repayAmount))}
+                          >
+                            {busy ? <Loader2 className="size-4 animate-spin" /> : 'Погасить'}
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <div className="rounded-xl bg-[#EAF8F1] p-3.5 ring-1 ring-[#21A038]/15">
+                            <div className="text-xs text-neutral-500">Сумма кредита</div>
+                            <div className="text-2xl font-bold text-[#12842F]">{fmtMoney(loanAmount)}</div>
+                          </div>
+                          <div className="mt-3">
+                            <div className="text-xs text-neutral-500">От 1 000 до {fmtMoney(Math.max(1000, data.loanLimit))}</div>
+                            <Input
+                              className="mt-1.5 h-11 rounded-xl border-neutral-200 bg-white text-base font-semibold text-neutral-900 placeholder:text-neutral-300"
+                              inputMode="numeric"
+                              value={loanAmount ? String(loanAmount) : ''}
+                              placeholder="0"
+                              onChange={(e) => setLoanAmount(Math.min(toAmount(e.target.value), Math.max(1000, data.loanLimit)))}
+                            />
+                            <Slider
+                              className="mt-4 [&_[data-slot=slider-range]]:bg-[#21A038] [&_[data-slot=slider-thumb]]:border-[#21A038] [&_[data-slot=slider-thumb]]:bg-white [&_[data-slot=slider-track]]:bg-neutral-200"
+                              value={[Math.min(Math.max(loanAmount, 1000), Math.max(1000, data.loanLimit))]}
+                              min={1000}
+                              max={Math.max(1000, data.loanLimit)}
+                              step={500}
+                              onValueChange={(v) => setLoanAmount(v[0] ?? 1000)}
+                            />
+                          </div>
+                          <Button
+                            className="mt-4 h-11 w-full rounded-xl text-sm font-semibold text-white"
+                            style={{ backgroundColor: GREEN }}
+                            disabled={busy || data.loanLimit < 1000 || loanAmount < 1000}
+                            onClick={() => applyMutation(() => api.takeLoan(loanAmount))}
+                          >
+                            {busy ? <Loader2 className="size-4 animate-spin" /> : 'Взять кредит'}
+                          </Button>
+                          <p className="mt-2 text-center text-[11px] leading-relaxed text-neutral-400">
+                            Срок 7 дней. Погашение вовремя повышает рейтинг (+40), просрочка роняет его (−80).
+                          </p>
+                        </>
+                      )}
+                    </Section>
                   </div>
-                  {data.transactions.length === 0 ? (
-                    <p className="mt-3 text-xs text-white/40">Операций пока нет — купите или продайте что-нибудь.</p>
-                  ) : (
-                    <div className="mt-1 divide-y divide-white/5">
-                      {data.transactions.slice(0, 3).map((t) => (
-                        <TxRow key={t.id} t={t} />
-                      ))}
-                    </div>
-                  )}
-                </section>
 
-                <div className="pb-1 pt-1 text-center text-[10px] text-white/25">
-                  Столичный Банк · вклады не застрахованы, это игра
+                  <div className="pb-1 pt-1 text-center text-[10px] text-neutral-400">
+                    Столичный Банк · вклады не застрахованы, это игра
+                  </div>
                 </div>
               </>
             )}
 
             {/* ===== ПЛАТЕЖИ ===== */}
             {screen === 'payments' && (
-              <>
-                <h1 className="text-xl font-bold tracking-tight">Платежи</h1>
-                <p className="-mt-2 text-xs text-white/40">Услуги и переводы — выберите категорию</p>
+              <div className="space-y-4 p-4">
+                <h1 className="text-[22px] font-bold tracking-tight text-neutral-900">Платежи</h1>
+                <p className="-mt-2.5 text-xs text-neutral-400">Услуги и переводы — выберите категорию</p>
                 <div className="grid grid-cols-2 gap-3">
                   {services.map((s) => (
                     <button
@@ -740,38 +918,38 @@ export default function BankApp() {
                         if (s.run) s.run()
                         else pushToast('Платежи', 'Раздел скоро появится')
                       }}
-                      className="rounded-2xl bg-[#141e17] p-4 text-left ring-1 ring-white/5 transition active:scale-[0.98]"
+                      className={`${CARD_CLS} p-4 text-left transition active:scale-[0.98]`}
                     >
                       <span
                         className="flex size-10 items-center justify-center rounded-full"
-                        style={{ backgroundColor: `${s.color}22`, color: s.color }}
+                        style={{ backgroundColor: `${s.color}1A`, color: s.color }}
                       >
                         <s.icon className="size-5" />
                       </span>
-                      <div className="mt-3 text-sm font-medium text-white">{s.label}</div>
-                      <div className="text-[11px] text-white/35">{s.sub}</div>
+                      <div className="mt-3 text-sm font-semibold text-neutral-900">{s.label}</div>
+                      <div className="text-[11px] text-neutral-400">{s.sub}</div>
                     </button>
                   ))}
                 </div>
-                <div className="rounded-2xl bg-[#141e17] p-4 text-[11px] leading-relaxed text-white/40 ring-1 ring-white/5">
+                <div className={`${CARD_CLS} p-4 text-[11px] leading-relaxed text-neutral-400`}>
                   Переводы людям — из чата сделки: напишите продавцу и оплатите счёт, операция появится в истории банка.
                 </div>
-              </>
+              </div>
             )}
 
             {/* ===== АНАЛИЗ ===== */}
             {screen === 'analytics' && (
-              <>
-                <h1 className="text-xl font-bold tracking-tight">Анализ финансов</h1>
+              <div className="space-y-4 p-4">
+                <h1 className="text-[22px] font-bold tracking-tight text-neutral-900">Анализ финансов</h1>
 
-                <div className="flex rounded-full bg-white/5 p-1">
+                <div className="flex rounded-full bg-[#E8EBEF] p-1">
                   {(['out', 'in'] as const).map((m) => (
                     <button
                       key={m}
                       type="button"
                       onClick={() => setAnalyticsMode(m)}
-                      className={`flex-1 rounded-full py-1.5 text-xs font-medium transition ${
-                        analyticsMode === m ? 'bg-[#21A038] text-white shadow' : 'text-white/50 hover:text-white/80'
+                      className={`flex-1 rounded-full py-1.5 text-xs font-semibold transition ${
+                        analyticsMode === m ? 'bg-[#21A038] text-white shadow' : 'text-neutral-500 hover:text-neutral-800'
                       }`}
                     >
                       {m === 'out' ? 'Расходы' : 'Зачисления'}
@@ -780,25 +958,25 @@ export default function BankApp() {
                 </div>
 
                 <div className="text-center">
-                  <div className="text-3xl font-bold tabular-nums tracking-tight text-white">{fmtMoney(catsTotal)}</div>
-                  <div className="mt-0.5 text-xs text-white/40">
+                  <div className="text-3xl font-bold tabular-nums tracking-tight text-neutral-900">{fmtMoney(catsTotal)}</div>
+                  <div className="mt-0.5 text-xs text-neutral-400">
                     {analyticsMode === 'out' ? 'Расход' : 'Зачисление'} в {monthPrep} · по последним операциям
                   </div>
                 </div>
 
                 {catsTotal <= 0 ? (
-                  <div className="flex flex-col items-center rounded-2xl bg-[#141e17] p-8 text-center ring-1 ring-white/5">
-                    <Info className="size-6 text-white/25" />
-                    <p className="mt-2 text-sm text-white/50">Операций пока нет</p>
-                    <p className="mt-1 text-xs text-white/30">Совершите покупки или продажи — аналитика появится здесь</p>
+                  <div className={`flex flex-col items-center ${CARD_CLS} p-8 text-center`}>
+                    <Info className="size-6 text-neutral-300" />
+                    <p className="mt-2 text-sm text-neutral-500">Операций пока нет</p>
+                    <p className="mt-1 text-xs text-neutral-400">Совершите покупки или продажи — аналитика появится здесь</p>
                   </div>
                 ) : (
                   <>
                     {/* Донат */}
-                    <div className="flex justify-center">
+                    <div className={`flex justify-center ${CARD_CLS} py-6`}>
                       <div className="relative">
                         <svg viewBox="0 0 140 140" className="size-44" role="img" aria-label="Распределение по категориям">
-                          <circle cx="70" cy="70" r={R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={16} />
+                          <circle cx="70" cy="70" r={R} fill="none" stroke="rgba(16,35,47,0.06)" strokeWidth={16} />
                           {donutSegs.map((s) => (
                             <circle
                               key={s.key}
@@ -815,8 +993,8 @@ export default function BankApp() {
                           ))}
                         </svg>
                         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                          <span className="text-sm font-semibold text-white">{monthNom}</span>
-                          <span className="text-[11px] text-white/40">
+                          <span className="text-sm font-semibold text-neutral-900">{monthNom}</span>
+                          <span className="text-[11px] text-neutral-400">
                             {catsOps} {plural(catsOps, 'операция', 'операции', 'операций')}
                           </span>
                         </div>
@@ -824,43 +1002,44 @@ export default function BankApp() {
                     </div>
 
                     {/* Категории */}
-                    <div className="divide-y divide-white/5 rounded-2xl bg-[#141e17] px-4 ring-1 ring-white/5">
+                    <div className={`divide-y divide-neutral-100 ${CARD_CLS} px-4`}>
                       {cats.map((c) => (
                         <div key={c.key} className="flex items-center justify-between gap-3 py-3">
                           <div className="flex min-w-0 items-center gap-3">
                             <span
-                              className="flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-bold"
-                              style={{ backgroundColor: `${c.color}22`, color: c.color }}
+                              className="flex size-9 shrink-0 items-center justify-center rounded-full"
+                              style={{ backgroundColor: `${c.color}1A`, color: c.color }}
+                              aria-hidden="true"
                             >
                               {c.label.charAt(0)}
                             </span>
                             <div className="min-w-0">
-                              <div className="truncate text-sm font-medium text-white">{c.label}</div>
-                              <div className="text-[11px] text-white/40">
+                              <div className="truncate text-sm font-medium text-neutral-900">{c.label}</div>
+                              <div className="text-[11px] text-neutral-400">
                                 {c.count} {plural(c.count, 'операция', 'операции', 'операций')}
                               </div>
                             </div>
                           </div>
-                          <div className="shrink-0 text-sm font-semibold tabular-nums text-white">{fmtMoney(c.total)}</div>
+                          <div className="shrink-0 text-sm font-semibold tabular-nums text-neutral-900">{fmtMoney(c.total)}</div>
                         </div>
                       ))}
                     </div>
                   </>
                 )}
-              </>
+              </div>
             )}
 
             {/* ===== ИСТОРИЯ ===== */}
             {screen === 'history' && (
-              <>
+              <div className="space-y-4 p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <h1 className="text-xl font-bold tracking-tight">История операций</h1>
+                  <h1 className="text-[22px] font-bold tracking-tight text-neutral-900">История операций</h1>
                   {data.transactions.length > 0 && (
                     <a
                       href={exportCsvUrl()}
                       download
                       aria-label="Скачать историю операций в CSV"
-                      className="flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-[#21A038]/15 px-3 text-[11px] font-semibold text-[#4CCB63] outline-none transition-colors hover:bg-[#21A038]/25 focus-visible:ring-2 focus-visible:ring-[#21A038]/40"
+                      className="flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-[#21A038]/10 px-3 text-[11px] font-semibold text-[#12842F] outline-none transition-colors hover:bg-[#21A038]/20 focus-visible:ring-2 focus-visible:ring-[#21A038]/40"
                     >
                       <FileDown className="size-3.5" aria-hidden="true" />
                       CSV
@@ -868,25 +1047,25 @@ export default function BankApp() {
                   )}
                 </div>
                 {data.transactions.length === 0 ? (
-                  <div className="rounded-2xl bg-[#141e17] p-6 text-center ring-1 ring-white/5">
-                    <p className="text-sm text-white/50">Здесь появятся все ваши покупки, продажи и операции с банком.</p>
+                  <div className={`${CARD_CLS} p-6 text-center`}>
+                    <p className="text-sm text-neutral-500">Здесь появятся все ваши покупки, продажи и операции с банком.</p>
                   </div>
                 ) : (
-                  <div className="divide-y divide-white/5 rounded-2xl bg-[#141e17] px-4 py-1 ring-1 ring-white/5">
+                  <div className={`divide-y divide-neutral-100 ${CARD_CLS} px-4 py-1`}>
                     {data.transactions.map((t) => (
                       <TxRow key={t.id} t={t} />
                     ))}
                   </div>
                 )}
-              </>
+              </div>
             )}
           </div>
         ) : null}
       </div>
 
       {/* Нижняя навигация */}
-      <nav className="shrink-0 border-t border-white/5 bg-[#0b120e]/95 backdrop-blur">
-        <div className="grid grid-cols-4">
+      <nav className="shrink-0 border-t border-neutral-200 bg-white/95 backdrop-blur">
+        <div className="grid grid-cols-4 pb-[env(safe-area-inset-bottom)]">
           {nav.map((n) => {
             const active = screen === n.key
             return (
@@ -895,12 +1074,13 @@ export default function BankApp() {
                 type="button"
                 onClick={() => setScreen(n.key)}
                 aria-current={active ? 'page' : undefined}
-                className={`flex flex-col items-center gap-1 py-2.5 transition ${
-                  active ? 'text-[#2FBE51]' : 'text-white/40 hover:text-white/70'
+                className={`flex flex-col items-center gap-0.5 pt-2.5 pb-2 transition ${
+                  active ? 'text-[#21A038]' : 'text-neutral-400 hover:text-neutral-600'
                 }`}
               >
-                <n.icon className="size-5" />
-                <span className="text-[10px] font-medium">{n.label}</span>
+                <n.icon className="size-[22px]" strokeWidth={active ? 2.3 : 2} />
+                <span className="text-[10px] font-semibold">{n.label}</span>
+                <span className={`h-1 w-1 rounded-full transition ${active ? 'bg-[#21A038]' : 'bg-transparent'}`} aria-hidden="true" />
               </button>
             )
           })}

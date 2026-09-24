@@ -2,10 +2,10 @@
 
 // Центр управления: свайп сверху вниз, как в настоящем телефоне.
 // Фонарик включает РЕАЛЬНУЮ вспышку (Torch API), яркость затемняет экран,
-// звук и зарядка — системные переключатели ОС.
+// зарядка — системный переключатель ОС.
 import { useSyncExternalStore } from 'react'
 import {
-  BatteryCharging, ChevronDown, Flashlight, Moon, MoonStar, Settings, Sun, SunDim, Volume2, VolumeX, Zap, Wifi,
+  BatteryCharging, ChevronDown, Flashlight, Moon, MoonStar, Settings, Sun, SunDim, Wallet, Zap, Wifi,
 } from 'lucide-react'
 import { useOS, type AppKey } from '@/lib/store'
 import { enableTorch, stopTorch } from '@/lib/torch'
@@ -71,8 +71,6 @@ export default function ControlCenter({
 }) {
   const flashlight = useOS((s) => s.flashlight)
   const setFlashlight = useOS((s) => s.setFlashlight)
-  const soundOn = useOS((s) => s.soundOn)
-  const setSound = useOS((s) => s.setSound)
   const dnd = useOS((s) => s.dnd)
   const setDnd = useOS((s) => s.setDnd)
   const charging = useOS((s) => s.charging)
@@ -163,11 +161,15 @@ export default function ControlCenter({
               onClick={toggleFlash}
             />
             <Tile
-              active={soundOn}
-              icon={soundOn ? <Volume2 className="size-4.5" aria-hidden="true" /> : <VolumeX className="size-4.5" aria-hidden="true" />}
-              label="Звук"
-              sub={soundOn ? 'Включён' : 'Без звука'}
-              onClick={() => setSound(!soundOn)}
+              active
+              activeCls="bg-emerald-500 text-white"
+              icon={<Wallet className="size-4.5" aria-hidden="true" />}
+              label="Кошелёк"
+              sub="Открыть Столичный Банк"
+              onClick={() => {
+                onClose()
+                onOpenApp('bank')
+              }}
             />
             <Tile
               active={dnd}
@@ -202,7 +204,7 @@ export default function ControlCenter({
             <Tile
               icon={<Settings className="size-4.5" aria-hidden="true" />}
               label="Настройки"
-              sub="Тема, звук, Telegram"
+              sub="Тема, Telegram"
               onClick={() => {
                 onClose()
                 onOpenApp('settings')

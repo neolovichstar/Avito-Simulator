@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useOS, type AppKey } from '@/lib/store'
 import { api, setToken } from '@/lib/api'
 import { useRealtime } from '@/lib/use-realtime'
+import { useSwipe } from '@/lib/use-swipe'
 import PhoneFrame from '@/components/os/PhoneFrame'
 import StatusBar from '@/components/os/StatusBar'
 import LockScreen from '@/components/os/LockScreen'
@@ -37,7 +38,6 @@ export default function Home() {
   const [notifOpen, setNotifOpen] = useState(false)
   const [controlOpen, setControlOpen] = useState(false)
   const [isDesktop, setIsDesktop] = useState(false)
-  const swipeStartY = useRef<number | null>(null)
   const booted = useOS((s) => s.booted)
   const locked = useOS((s) => s.locked)
   const session = useOS((s) => s.session)
@@ -197,18 +197,13 @@ export default function Home() {
     claimDailyBonus()
   }
 
-  // ---------- ЖЕСТ: СВАЙП СВЕРХУ ВНИЗ — ЦЕНТР УПРАВЛЕНИЯ (телефон) ----------
-  const onTouchStart = (e: React.TouchEvent) => {
-    swipeStartY.current = e.touches[0]?.clientY ?? null
-  }
-  const onTouchMove = (e: React.TouchEvent) => {
-    if (swipeStartY.current === null) return
-    const y = e.touches[0]?.clientY ?? 0
-    if (y - swipeStartY.current > 34) {
-      swipeStartY.current = null
-      setControlOpen(true)
-    }
-  }
+  // ---------- ЖЕСТ: СВАЙП СВЕРХУ ВНИЗ — ЦЕНТР УПРАВЛЕНИЯ (телефон + мышь на ПК) ----------
+  const controlSwipe = useSwipe({
+    threshold: 30,
+    onSwipe: (dir) => {
+      if (dir === 'down') setControlOpen(true)
+    },
+  })
 
   const renderApp = (app?: AppKey) => {
     switch (app ?? currentApp) {
@@ -302,13 +297,12 @@ export default function Home() {
           />
         )}
 
-        {/* верхняя зона-жест: свайп вниз или тап — центр управления */}
+        {/* верхняя зона-жест: свайп вниз (палец или мышь) или тап — центр управления */}
         <div
           role="button"
           aria-label="Открыть центр управления"
           className="absolute left-0 right-16 top-0 z-[59] h-8 outline-none focus-visible:ring-2 focus-visible:ring-white/50"
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
+          onPointerDown={controlSwipe.onPointerDown}
           onClick={() => setControlOpen(true)}
         />
 

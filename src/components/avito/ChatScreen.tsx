@@ -9,7 +9,6 @@ import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
 import { getSocket } from '@/lib/use-realtime'
 import { fmtMoney, fmtTime } from '@/lib/format'
-import { playSound } from '@/lib/sounds'
 import { CONDITION_LABEL } from '@/lib/catalog-types'
 import type { ChatDetailData, ChatMessageDTO } from '@/lib/types'
 
@@ -53,7 +52,6 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
       if (d.chatId !== id) return
       setTyping(false)
       const mine = d.message.senderType === 'user'
-      if (!mine) playSound('message')
       setChat((prev) => {
         if (!prev) return prev
         if (prev.messages.some((m) => m.id === d.message.id)) return prev
@@ -119,11 +117,9 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
     try {
       const res = await api.payInvoice(id, invoiceId)
       refreshSession({ balance: res.balance })
-      playSound('kaching')
       pushToast('Сделка', 'Счёт оплачен. Товар ваш!')
       await load()
     } catch (e) {
-      playSound('error')
       setMsg(e instanceof ApiError ? e.message : 'Не удалось оплатить')
     } finally {
       setSending(false)

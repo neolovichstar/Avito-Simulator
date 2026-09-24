@@ -12,7 +12,6 @@ import {
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
 import { fmtMoney, fmtDateTime, initials } from '@/lib/format'
-import { playSound } from '@/lib/sounds'
 import type { TaxBillDTO, TaxData } from '@/lib/types'
 
 type Tab = 'home' | 'bills' | 'taxes' | 'more'
@@ -168,13 +167,11 @@ export default function TaxesApp() {
     setPayError(null)
     try {
       const res = await api.payTaxes()
-      playSound('cash')
       const os = useOS.getState()
       os.refreshSession({ balance: res.balance, taxDebt: res.taxDebt })
       os.pushToast('Налоги', 'Задолженность погашена')
       await load()
     } catch (e) {
-      playSound('error')
       setPayError(e instanceof ApiError ? e.message : 'Не удалось оплатить задолженность')
     } finally {
       setBusy(false)
@@ -206,6 +203,22 @@ export default function TaxesApp() {
     const el = e.currentTarget
     const max = el.scrollWidth - el.clientWidth
     setSlide(max <= 0 ? 0 : Math.round((el.scrollLeft / max) * 1))
+  }
+
+  // Промо-карусель мышью на ПК: зажми и тяни (на телефоне работает нативный тач-скролл)
+  const onPromoPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return
+    const el = e.currentTarget
+    const start = { x: e.clientX, left: el.scrollLeft }
+    const move = (ev: PointerEvent) => {
+      el.scrollLeft = start.left - (ev.clientX - start.x)
+    }
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
   }
 
   const payButton = data && (
@@ -307,7 +320,8 @@ export default function TaxesApp() {
                   <div className="mt-6">
                     <div
                       onScroll={onPromoScroll}
-                      className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                      onPointerDown={onPromoPointerDown}
+                      className="-mx-4 flex snap-x snap-mandatory cursor-grab gap-3 overflow-x-auto px-4 select-none [scrollbar-width:none] active:cursor-grabbing [&::-webkit-scrollbar]:hidden"
                     >
                       <div className="relative h-[120px] w-[86%] shrink-0 snap-center overflow-hidden rounded-2xl bg-[linear-gradient(135deg,#e9efff_0%,#d3dfff_100%)] p-4 text-[#1b3b8c]">
                         <Coins className="absolute -right-3 -top-3 size-24 text-[#1b3b8c]/10" strokeWidth={1.4} />

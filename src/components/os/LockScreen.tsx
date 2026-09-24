@@ -5,11 +5,11 @@
 // Никаких паролей и пин-кодов — это игра, телефон открывается одним касанием.
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { Lock, MoonStar } from 'lucide-react'
+import { ChevronUp, Lock, MoonStar } from 'lucide-react'
 import { useOS } from '@/lib/store'
 import { api } from '@/lib/api'
 import { fmtMoney } from '@/lib/format'
-import { playSound } from '@/lib/sounds'
+import { useDrag } from '@/lib/use-swipe'
 
 // Живые тики каждые 1000 мс без setState в эффекте (useSyncExternalStore).
 function useClock(): Date | null {
@@ -35,8 +35,12 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   const [leaving, setLeaving] = useState(false)
   const leavingRef = useRef(false)
   const timerRef = useRef(0)
-  const touchStartY = useRef<number | null>(null)
   const [day, setDay] = useState<{ deals: number; net: number } | null>(null)
+
+  // свайп вверх с «следованиями за пальцем/мышью»: работает и на телефоне, и на ПК
+  const [dragY, setDragY] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const movedRef = useRef(false)
 
   // итоги дня — только для авторизованной сессии, один раз при монтировании
   useEffect(() => {
@@ -58,14 +62,38 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     return () => window.clearTimeout(t)
   }, [])
 
-  // Разблокировка: одно касание / клавиша — никаких паролей, это смартфон в игре
+  // Разблокировка: свайп / тап / клавиша — никаких паролей, это смартфон в игре
   const unlock = useCallback(() => {
     if (leavingRef.current) return
     leavingRef.current = true
     setLeaving(true)
-    playSound('unlock')
     timerRef.current = window.setTimeout(onUnlock, LEAVE_ANIMATION_MS)
   }, [onUnlock])
+
+  const { onPointerDown } = useDrag({
+    onStart: () => {
+      if (leavingRef.current) return
+      setDragging(true)
+      movedRef.current = false
+    },
+    onMove: (dx, dy) => {
+      if (Math.abs(dx) > 8 || Math.abs(dy) > 8) movedRef.current = true
+      if (leavingRef.current) return
+      // вверх — следует за пальцем, вниз — заметно ослаблен (упругость)
+      setDragY(dy < 0 ? dy * 0.95 : dy * 0.16)
+    },
+    onEnd: (_dx, dy) => {
+      setDragging(false)
+      if (leavingRef.current) return
+      if (dy < -70) unlock()
+      else setDragY(0) // пружинка назад
+    },
+  })
+
+  // тап без драга — тоже разблокирует (после реального драга клик гасим)
+  const onClick = () => {
+    if (!movedRef.current) unlock()
+  }
 
   // Enter или пробел тоже разблокируют (доступность с клавиатуры)
   useEffect(() => {
@@ -79,32 +107,23 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [unlock])
 
-  // Свайп вверх — как на настоящем смартфоне; тап и клавиши тоже работают
-  const onTouchStart = (e: React.TouchEvent) => {
-    touchStartY.current = e.touches[0]?.clientY ?? null
-  }
-  const onTouchEnd = (e: React.TouchEvent) => {
-    const start = touchStartY.current
-    touchStartY.current = null
-    if (start === null) return
-    const end = e.changedTouches[0]?.clientY ?? start
-    if (start - end > 36) unlock()
-  }
-
   const previews = notifications.filter((n) => !n.readAt).slice(0, 3)
   const dealsLabel =
     day && (day.deals === 1 ? 'сделка' : day.deals < 5 ? 'сделки' : 'сделок')
 
   return (
     <div
-      className={`absolute inset-0 z-50 cursor-pointer overflow-hidden select-none transition-transform duration-[400ms] ease-out ${
-        leaving ? '-translate-y-full' : 'translate-y-0'
+      className={`absolute inset-0 z-50 cursor-pointer overflow-hidden select-none ease-out ${
+        dragging ? '' : 'transition-transform duration-[400ms]'
       }`}
       role="dialog"
-      aria-label="Экран блокировки — коснитесь или проведите вверх, чтобы открыть"
-      onClick={unlock}
-      onTouchStart={onTouchStart}
-      onTouchEnd={onTouchEnd}
+      aria-label="Экран блокировки — проведите вверх или коснитесь, чтобы открыть"
+      onClick={onClick}
+      onPointerDown={onPointerDown}
+      style={{
+        transform: leaving ? 'translateY(-100%)' : `translateY(${dragY}px)`,
+        opacity: leaving ? 0.3 : dragging ? Math.max(0.55, 1 + dragY / 460) : 1,
+      }}
     >
       {/* ─── Тёмная сцена с мягкими бликами, как на системном экране блокировки ─── */}
       <div aria-hidden="true" className="absolute inset-0 bg-[#0b0812]" />
@@ -204,13 +223,15 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
 
         {/* Подсказка снизу: свайп/тап — и телефон открыт */}
         <div className="shrink-0 pt-3 text-center">
-          <span
+          <ChevronUp
             aria-hidden="true"
-            className="mx-auto block h-1.5 w-32 rounded-full bg-white/80"
+            className="mx-auto size-6 animate-bounce text-white/85"
+            strokeWidth={2.4}
           />
-          <p className="mt-3 animate-pulse text-[13px] font-medium text-white/80">
+          <p className="mt-1 animate-pulse text-[13px] font-medium text-white/80">
             Проведите вверх, чтобы открыть
           </p>
+          <p className="mt-0.5 text-[11px] text-white/45">На ПК — потяните мышью вверх</p>
         </div>
       </div>
     </div>

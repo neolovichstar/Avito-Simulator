@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   BatteryCharging, Ban, Bot, CheckCircle2, Database, Handshake, Info, Loader2, MapPin, Moon, MoonStar, NotebookText, RefreshCw,
-  Send, Server, Shield, Star, Volume2, Wallet, Zap,
+  Send, Server, Shield, Star, Wallet, Zap,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS, ALL_WIDGETS, WIDGET_LABEL, type WidgetKey } from '@/lib/store'
@@ -47,10 +47,8 @@ export default function SettingsApp() {
   const battery = useOS((s) => s.battery)
   const charging = useOS((s) => s.charging)
   const setCharging = useOS((s) => s.setCharging)
-  const soundOn = useOS((s) => s.soundOn)
   const dnd = useOS((s) => s.dnd)
   const setDnd = useOS((s) => s.setDnd)
-  const setSound = useOS((s) => s.setSound)
   const theme = useOS((s) => s.theme)
   const setTheme = useOS((s) => s.setTheme)
   const wallpaper = useOS((s) => s.wallpaper)
@@ -248,16 +246,6 @@ export default function SettingsApp() {
                   <div className="text-xs text-neutral-500">Уровень батареи: {battery}%</div>
                 </div>
                 <Switch checked={charging} onCheckedChange={setCharging} />
-              </div>
-              <div className="flex items-center gap-3 border-t border-neutral-100 px-4 py-3">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
-                  <Volume2 className="size-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium text-neutral-800">Звук</div>
-                  <div className="text-xs text-neutral-500">{soundOn ? 'Включён' : 'Выключен'}</div>
-                </div>
-                <Switch checked={soundOn} onCheckedChange={setSound} />
               </div>
               <div className="flex items-center gap-3 border-t border-neutral-100 px-4 py-3">
                 <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
