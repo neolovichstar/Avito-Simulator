@@ -16,15 +16,24 @@ export default function AppIcon({
   icon,
   label,
   color,
+  background,
   badge,
   onClick,
 }: {
   icon: ReactNode
   label: string
-  color: string
+  /** Базовый цвет плитки: из него строится градиент (если нет background). */
+  color?: string
+  /** Готовый CSS-градиент/фон плитки — перекрывает color. */
+  background?: string
   badge?: number
   onClick: () => void
 }) {
+  const base = color ?? '#4B5563'
+  const tileBackground =
+    background ??
+    `linear-gradient(145deg, ${shade(base, 45)}, ${shade(base, -40)})`
+
   return (
     <button
       type="button"
@@ -33,14 +42,15 @@ export default function AppIcon({
       className="flex w-full flex-col items-center gap-1.5 rounded-2xl outline-none transition-transform duration-150 active:scale-90 focus-visible:ring-2 focus-visible:ring-white/80"
     >
       <span
-        className="relative block aspect-square w-full rounded-[1.4rem] shadow-[0_10px_24px_-6px_rgba(0,0,0,0.6)]"
-        style={{
-          backgroundImage: `linear-gradient(145deg, ${shade(color, 45)}, ${shade(color, -40)})`,
-        }}
+        className="relative block aspect-square w-full rounded-[1.4rem] shadow-[0_12px_26px_-6px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.35),inset_0_-10px_16px_-10px_rgba(0,0,0,0.35)]"
+        style={{ backgroundImage: tileBackground }}
       >
-        <span className="absolute inset-0 flex items-center justify-center text-white">
-          {icon}
-        </span>
+        {/* Блик сверху — стеклянный отблеск, как у настоящих иконок ОС */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-[46%] rounded-t-[1.4rem] bg-gradient-to-b from-white/25 via-white/5 to-transparent"
+        />
+        <span className="absolute inset-0 flex items-center justify-center">{icon}</span>
         {badge !== undefined && badge > 0 && (
           <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-semibold leading-none text-white shadow-md">
             {badge > 99 ? '99+' : badge}

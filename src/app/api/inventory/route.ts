@@ -3,6 +3,7 @@ import { getSessionUser, unauthorized } from '@/lib/session'
 import { getCategoryMult } from '@/lib/engine'
 import { CONDITION_MULT } from '@/lib/catalog-types'
 import type { InventoryItemDTO } from '@/lib/types'
+import { itemImage } from '@/lib/item-images'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +26,7 @@ export async function GET(req: Request) {
   }
   const out: InventoryItemDTO[] = items.map((i) => ({
     id: i.id, itemKey: i.itemKey, title: i.title, category: i.category, condition: i.condition,
-    image: i.image, baseValue: i.baseValue, purchasePrice: i.purchasePrice,
+    image: itemImage(i.itemKey, i.category), baseValue: i.baseValue, purchasePrice: i.purchasePrice,
     estValue: Math.round(i.baseValue * (CONDITION_MULT[i.condition] ?? 0.8) * (mults.get(i.category) ?? 1)),
     createdAt: i.createdAt.toISOString(),
     listed: listedIds.has(i.id),

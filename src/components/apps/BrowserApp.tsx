@@ -1,10 +1,11 @@
 'use client'
 
-// Мини-браузер с набором игровых сайтов: стартовая, avito.ru, news.market, forum.market, banki.ru, help.guide.
+// Мини-браузер: игровые сайты + НАСТОЯЩИЙ интернет через серверный прокси /api/browse.
+// Любой адрес можно открыть по-настоящему, а текст без адреса уходит в поиск DuckDuckGo.
 import { useEffect, useState } from 'react'
 import {
-  BookOpen, ChevronLeft, ChevronRight, CreditCard, Globe, Loader2, RotateCw,
-  ShoppingBag, TrendingDown, TrendingUp, Users,
+  BookOpen, ChevronLeft, ChevronRight, CreditCard, ExternalLink, Globe, Loader2,
+  Lock, RotateCw, Search, ShoppingBag, TrendingDown, TrendingUp, Users,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { fmtDateTime, timeAgo } from '@/lib/format'
@@ -13,14 +14,20 @@ import type { MarketStats } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
-function normalizeSite(raw: string): string {
-  const t = raw.trim().toLowerCase()
-  if (!t) return 'start'
-  const host = t
-    .replace(/^[a-z]+:\/\//, '')
-    .split(/[/?#]/)[0]
-    .replace(/^www\./, '')
-  return host || 'start'
+// вид записи в истории навигации
+type NavEntry =
+  | { type: 'site'; site: string }
+  | { type: 'web'; url: string }
+  | { type: 'search'; query: string }
+
+function entryKey(e: NavEntry): string {
+  return e.type === 'site' ? e.site : e.type === 'web' ? `web:${e.url}` : `search:${e.query}`
+}
+
+function isProbablyUrl(s: string): boolean {
+  if (/\s/.test(s)) return false
+  if (/^https?:\/\//i.test(s)) return true
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?$/i.test(s.trim())
 }
 
 const KIND_BADGE: Record<string, { label: string; cls: string }> = {
@@ -41,6 +48,10 @@ const SITES = [
   { site: 'banki.ru', title: 'Банки.ру', desc: 'Ставки и вклады', icon: CreditCard, cls: 'bg-amber-50 text-amber-600' },
   { site: 'help.guide', title: 'Help Guide', desc: 'Гайд для новичка', icon: BookOpen, cls: 'bg-slate-100 text-slate-600' },
 ] as const
+
+const WEB_CHIPS = [
+  'wikipedia.org', 'habr.com', 'lenta.ru', 'bbc.com', 'reddit.com', 'github.com',
+]
 
 const FORUM_POSTS = [
   {
@@ -124,14 +135,33 @@ function ForumPostCard({ post }: { post: ForumPost }) {
   )
 }
 
-function NewsSite({
-  news, loading, error, onRetry,
-}: {
-  news: MarketStats | null
-  loading: boolean
-  error: string | null
-  onRetry: () => void
-}) {
+function NewsSite() {
+  const [news, setNews] = useState<MarketStats | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [retry, setRetry] = useState(0)
+
+  useEffect(() => {
+    let alive = true
+    api
+      .market()
+      .then((d) => {
+        if (alive) {
+          setNews(d)
+          setLoading(false)
+        }
+      })
+      .catch((e) => {
+        if (alive) {
+          setError(e instanceof ApiError ? e.message : 'Не удалось загрузить новости')
+          setLoading(false)
+        }
+      })
+    return () => {
+      alive = false
+    }
+  }, [retry])
+
   if (loading && !news) {
     return (
       <div className="space-y-3 p-4">
@@ -150,7 +180,7 @@ function NewsSite({
       <div className="p-4">
         <div className="rounded-2xl border border-red-100 bg-red-50 p-6 text-center">
           <p className="text-sm font-medium text-red-700">{error}</p>
-          <Button className="mt-4 rounded-xl" onClick={onRetry}>
+          <Button className="mt-4 rounded-xl" onClick={() => setRetry((k) => k + 1)}>
             Повторить
           </Button>
         </div>
@@ -166,13 +196,12 @@ function NewsSite({
         <div className="mt-0.5 text-[11px] text-white/80">Новости обновляются рынком в реальном времени</div>
       </div>
 
-      {/* Индексные плашки */}
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none]">
         {news.indexes.map((idx) => {
           const up = idx.multiplier >= 1
           return (
             <div key={idx.category} className="min-w-[118px] shrink-0 rounded-2xl bg-white p-3 shadow-sm">
-              <div className="truncate text-[11px] text-neutral-500">{CATEGORY_LABEL[idx.category] ?? idx.category}</div>
+              <div className="truncate text-[11px] text-neutral-500">{idx.category}</div>
               <div className={'mt-1 flex items-center gap-1 text-sm font-bold ' + (up ? 'text-emerald-600' : 'text-red-500')}>
                 {up ? <TrendingUp className="size-4" /> : <TrendingDown className="size-4" />}
                 x{idx.multiplier.toFixed(2)}
@@ -182,7 +211,6 @@ function NewsSite({
         })}
       </div>
 
-      {/* События */}
       {news.events.length === 0 ? (
         <div className="rounded-2xl bg-white p-5 text-center shadow-sm">
           <p className="text-xs text-neutral-400">Свежих новостей пока нет — рынок спит.</p>
@@ -207,58 +235,238 @@ function NewsSite({
   )
 }
 
-export default function BrowserApp({ onOpenApp }: { onOpenApp: (app: 'avito' | 'bank') => void }) {
-  const [nav, setNav] = useState<{ items: string[]; idx: number }>({ items: ['start'], idx: 0 })
-  const [urlInput, setUrlInput] = useState('start')
-  const [news, setNews] = useState<MarketStats | null>(null)
-  const [newsLoading, setNewsLoading] = useState(false)
-  const [newsError, setNewsError] = useState<string | null>(null)
-  const [reloadKey, setReloadKey] = useState(0)
-
-  const current = nav.items[nav.idx] ?? 'start'
+// ---------- НАСТОЯЩАЯ ВЕБ-СТРАНИЦА ----------
+// МОНТИРУЕТСЯ С key=url+reloadKey родителем — состояние сбрасывается само,
+// в эффекте только асинхронные вызовы (правило react-hooks/set-state-in-effect)
+function WebPage({ url, onNavigate }: { url: string; onNavigate: (url: string) => void }) {
+  const [data, setData] = useState<{ title: string; text: string; links: { href: string; title: string }[] } | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    setUrlInput(current)
-  }, [current])
-
-  useEffect(() => {
-    if (current !== 'news.market') return
     let alive = true
-    setNewsLoading(true)
-    setNewsError(null)
     api
-      .market()
+      .browsePage(url)
       .then((d) => {
-        if (alive) {
-          setNews(d)
-          setNewsLoading(false)
-        }
+        if (!alive) return
+        setData({ title: d.title, text: d.text, links: d.links })
+        setLoading(false)
       })
       .catch((e) => {
-        if (alive) {
-          setNewsError(e instanceof ApiError ? e.message : 'Не удалось загрузить новости')
-          setNewsLoading(false)
-        }
+        if (!alive) return
+        setError(e instanceof ApiError ? e.message : 'Не удалось загрузить страницу')
+        setLoading(false)
       })
     return () => {
       alive = false
     }
-  }, [current, reloadKey])
+  }, [url])
 
-  const go = (site: string) => {
-    if (site === current) {
+  let host = url
+  try {
+    host = new URL(url).hostname.replace(/^www\./, '')
+  } catch { /* как есть */ }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 p-12">
+        <Loader2 className="size-6 animate-spin text-sky-500" />
+        <p className="text-xs text-neutral-400">Загружаем настоящую страницу…</p>
+        <p className="text-[11px] text-neutral-300">{host}</p>
+      </div>
+    )
+  }
+  if (error) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center p-8 text-center">
+        <Globe className="size-12 text-neutral-300" />
+        <div className="mt-4 text-base font-semibold">Страница не открылась</div>
+        <p className="mt-1 max-w-[250px] text-xs leading-relaxed text-neutral-500">{error}</p>
+        <div className="mt-4 flex gap-2">
+          <Button variant="outline" className="rounded-full" onClick={() => window.location.reload()}>
+            Обновить
+          </Button>
+          <Button
+            variant="outline"
+            className="rounded-full"
+            onClick={() => window.open(url, '_blank', 'noopener')}
+          >
+            Открыть в новой вкладке
+          </Button>
+        </div>
+      </div>
+    )
+  }
+  if (!data) return null
+
+  return (
+    <div className="min-h-full bg-white">
+      <div className="border-b border-neutral-100 bg-neutral-50/80 px-4 py-3">
+        <div className="flex items-center gap-1.5 text-[11px] text-neutral-400">
+          <Lock className="size-3" />
+          <span className="truncate">{host}</span>
+        </div>
+        <div className="mt-1 text-base font-bold leading-snug text-neutral-900">{data.title}</div>
+      </div>
+      <div className="space-y-2.5 px-4 py-4">
+        {data.text.split('\n').map((p, i) =>
+          p ? (
+            <p key={i} className="text-[13px] leading-relaxed text-neutral-700">
+              {p}
+            </p>
+          ) : null,
+        )}
+      </div>
+      {data.links.length > 0 && (
+        <div className="border-t border-neutral-100 px-4 py-4">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Ссылки на странице</div>
+          <ul className="mt-2 space-y-1">
+            {data.links.slice(0, 20).map((l) => (
+              <li key={l.href}>
+                <button
+                  type="button"
+                  onClick={() => onNavigate(l.href)}
+                  className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left transition-colors active:bg-neutral-100"
+                >
+                  <Globe className="size-3.5 shrink-0 text-sky-500" />
+                  <span className="min-w-0 flex-1 truncate text-[13px] text-sky-700">{l.title}</span>
+                  <ExternalLink className="size-3 shrink-0 text-neutral-300" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------- НАСТОЯЩИЙ ПОИСК ----------
+function WebSearch({ query, onNavigate }: { query: string; onNavigate: (url: string) => void }) {
+  const [data, setData] = useState<{ results: { title: string; href: string; snippet: string; source: string }[] } | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    api
+      .browseSearch(query)
+      .then((d) => {
+        if (!alive) return
+        setData({ results: d.results })
+        setLoading(false)
+      })
+      .catch((e) => {
+        if (!alive) return
+        setError(e instanceof ApiError ? e.message : 'Поиск не удался')
+        setLoading(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [query])
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 p-12">
+        <Loader2 className="size-6 animate-spin text-sky-500" />
+        <p className="text-xs text-neutral-400">Ищем в настоящем интернете…</p>
+      </div>
+    )
+  }
+  if (error) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center p-8 text-center">
+        <Search className="size-10 text-neutral-300" />
+        <div className="mt-3 text-sm font-semibold">Поиск недоступен</div>
+        <p className="mt-1 max-w-[240px] text-xs text-neutral-500">{error}</p>
+      </div>
+    )
+  }
+  if (!data || data.results.length === 0) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center p-8 text-center">
+        <Search className="size-10 text-neutral-300" />
+        <div className="mt-3 text-sm font-semibold">Ничего не найдено</div>
+        <p className="mt-1 text-xs text-neutral-500">Попробуйте другой запрос</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-3">
+      <div className="px-1 pb-2 text-[11px] text-neutral-400">
+        Нашлось в интернете: {data.results.length}
+      </div>
+      <ul className="space-y-2">
+        {data.results.map((r, i) => (
+          <li key={i}>
+            <button
+              type="button"
+              onClick={() => onNavigate(r.href)}
+              className="w-full rounded-2xl bg-white p-3.5 text-left shadow-sm transition-transform active:scale-[0.99]"
+            >
+              <div className="flex items-center gap-1.5 text-[10px] text-neutral-400">
+                <Lock className="size-3" />
+                <span className="truncate">{(() => { try { return new URL(r.href).hostname } catch { return r.href } })()}</span>
+              </div>
+              <div className="mt-1 text-sm font-semibold leading-snug text-sky-700">{r.title}</div>
+              {r.snippet && <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-neutral-600">{r.snippet}</p>}
+              <span className="mt-1.5 inline-block rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-500">{r.source}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+export default function BrowserApp({ onOpenApp }: { onOpenApp: (app: 'avito' | 'bank') => void }) {
+  const [nav, setNav] = useState<{ items: NavEntry[]; idx: number }>({ items: [{ type: 'site', site: 'start' }], idx: 0 })
+  const [urlInput, setUrlInput] = useState('start')
+  const [reloadKey, setReloadKey] = useState(0)
+
+  const current = nav.items[nav.idx] ?? { type: 'site', site: 'start' }
+  const currentKey = entryKey(current)
+
+  // синхронизация строки адреса с навигацией: официальный паттерн
+  // «adjust state when props change» — setState прямо во время рендера
+  const [lastKey, setLastKey] = useState(currentKey)
+  if (currentKey !== lastKey) {
+    setLastKey(currentKey)
+    setUrlInput(
+      current.type === 'site'
+        ? current.site
+        : current.type === 'web'
+          ? current.url
+          : current.query,
+    )
+  }
+
+  const go = (entry: NavEntry) => {
+    if (entryKey(entry) === currentKey) {
       setReloadKey((k) => k + 1)
       return
     }
     setNav((n) => {
-      const items = [...n.items.slice(0, n.idx + 1), site]
+      const items = [...n.items.slice(0, n.idx + 1), entry]
       return { items, idx: items.length - 1 }
     })
   }
 
-  const submitUrl = () => go(normalizeSite(urlInput))
+  const submitUrl = () => {
+    const t = urlInput.trim()
+    if (!t) return
+    if (isProbablyUrl(t)) {
+      go({ type: 'web', url: /^https?:\/\//i.test(t) ? t : `https://${t}` })
+    } else {
+      go({ type: 'search', query: t })
+    }
+  }
   const back = () => setNav((n) => ({ ...n, idx: Math.max(0, n.idx - 1) }))
   const forward = () => setNav((n) => ({ ...n, idx: Math.min(n.items.length - 1, n.idx + 1) }))
+
+  const secure = current.type === 'web'
 
   return (
     <div className="h-full flex flex-col bg-[#f5f6f8] text-neutral-900">
@@ -287,31 +495,87 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp: (app: 'avito' | '
         >
           <RotateCw className="size-4" />
         </button>
-        <Input
-          className="h-9 min-w-0 flex-1 rounded-full border-0 bg-neutral-100 text-[13px]"
-          value={urlInput}
-          placeholder="Введите адрес сайта"
-          onChange={(e) => setUrlInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') submitUrl()
-          }}
-        />
-        <Button className="h-9 shrink-0 rounded-full px-4 text-xs font-semibold" onClick={submitUrl}>
-          Go
-        </Button>
+        <div className="relative min-w-0 flex-1">
+          {secure && (
+            <Lock className="pointer-events-none absolute left-3 top-1/2 size-3 -translate-y-1/2 text-emerald-500" />
+          )}
+          <Input
+            className={`h-9 min-w-0 w-full rounded-full border-0 bg-neutral-100 pr-8 text-[13px] ${secure ? 'pl-7' : ''}`}
+            value={urlInput}
+            placeholder="Адрес или поисковый запрос"
+            onChange={(e) => setUrlInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') submitUrl()
+            }}
+          />
+          <button
+            type="button"
+            aria-label="Искать или открыть"
+            onClick={submitUrl}
+            className="absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-full bg-neutral-200 text-neutral-600 transition active:scale-90"
+          >
+            <Search className="size-3.5" />
+          </button>
+        </div>
       </div>
 
-      {/* Контент сайтов */}
+      {/* Контент */}
       <div className="flex-1 overflow-y-auto [scrollbar-width:thin]">
-        {current === 'start' && (
+        {current.type === 'web' && (
+          <WebPage key={`web:${current.url}:${reloadKey}`} url={current.url} onNavigate={(u) => go({ type: 'web', url: u })} />
+        )}
+
+        {current.type === 'search' && (
+          <WebSearch key={`search:${current.query}:${reloadKey}`} query={current.query} onNavigate={(u) => go({ type: 'web', url: u })} />
+        )}
+
+        {current.type === 'site' && current.site === 'start' && (
           <div className="p-4">
-            <div className="text-lg font-bold">Стартовая страница</div>
-            <p className="mt-0.5 text-xs text-neutral-500">Сайты этой вселенной — выбирайте закладку.</p>
-            <div className="mt-4 grid grid-cols-2 gap-3">
+            {/* настоящий поиск */}
+            <div className="rounded-3xl bg-gradient-to-br from-sky-500 to-blue-600 p-4 text-white shadow-sm">
+              <div className="flex items-center gap-2 text-base font-bold">
+                <Globe className="size-5" />
+                Настоящий интернет
+              </div>
+              <p className="mt-1 text-[11px] leading-relaxed text-white/85">
+                Введите адрес сайта или что угодно для поиска — страницы грузятся из реальной сети.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <Input
+                  className="h-10 flex-1 rounded-full border-0 bg-white/95 text-[13px] text-neutral-900 placeholder:text-neutral-400"
+                  value={urlInput === 'start' ? '' : urlInput}
+                  placeholder="Например: wikipedia.org"
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') submitUrl()
+                  }}
+                />
+                <Button className="h-10 rounded-full bg-white px-4 text-neutral-900 hover:bg-white/90" onClick={submitUrl}>
+                  <Search className="size-4" />
+                </Button>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {WEB_CHIPS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => go({ type: 'web', url: `https://${c}` })}
+                    className="rounded-full bg-white/15 px-3 py-1.5 text-[11px] font-medium text-white transition active:scale-95"
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-5 mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
+              Сайты этой вселенной
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               {SITES.map((s) => (
                 <button
                   key={s.site}
-                  onClick={() => go(s.site)}
+                  onClick={() => go({ type: 'site', site: s.site })}
                   className="rounded-2xl border border-neutral-200 bg-white p-4 text-left transition hover:border-neutral-300 active:scale-[0.98]"
                 >
                   <div className={'flex size-10 items-center justify-center rounded-xl ' + s.cls}>
@@ -323,11 +587,10 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp: (app: 'avito' | '
                 </button>
               ))}
             </div>
-            <div className="mt-6 text-center text-[10px] text-neutral-300">Мини-браузер · 5 сайтов в сети</div>
           </div>
         )}
 
-        {current === 'avito.ru' && (
+        {current.type === 'site' && current.site === 'avito.ru' && (
           <div className="p-4">
             <div className="mx-auto max-w-xs overflow-hidden rounded-[2rem] border-[6px] border-neutral-300 bg-white shadow-xl">
               <div className="flex h-5 items-center justify-center bg-neutral-200">
@@ -355,16 +618,11 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp: (app: 'avito' | '
           </div>
         )}
 
-        {current === 'news.market' && (
-          <NewsSite
-            news={news}
-            loading={newsLoading}
-            error={newsError}
-            onRetry={() => setReloadKey((k) => k + 1)}
-          />
+        {current.type === 'site' && current.site === 'news.market' && (
+          <NewsSite key={`news:${reloadKey}`} />
         )}
 
-        {current === 'forum.market' && (
+        {current.type === 'site' && current.site === 'forum.market' && (
           <div className="space-y-3 p-4">
             <div className="rounded-2xl bg-violet-600 p-4 text-white shadow-sm">
               <div className="flex items-center gap-2">
@@ -379,7 +637,7 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp: (app: 'avito' | '
           </div>
         )}
 
-        {current === 'banki.ru' && (
+        {current.type === 'site' && current.site === 'banki.ru' && (
           <div className="p-4">
             <div className="rounded-2xl bg-white p-5 shadow-sm">
               <div className="flex items-center gap-3">
@@ -418,7 +676,7 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp: (app: 'avito' | '
           </div>
         )}
 
-        {current === 'help.guide' && (
+        {current.type === 'site' && current.site === 'help.guide' && (
           <div className="space-y-3 p-4">
             <div className="rounded-2xl bg-slate-700 p-4 text-white shadow-sm">
               <div className="flex items-center gap-2">
@@ -460,19 +718,6 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp: (app: 'avito' | '
               </div>
             ))}
             <div className="pb-2 text-center text-[10px] text-neutral-300">Обновлено: {fmtDateTime(new Date())}</div>
-          </div>
-        )}
-
-        {!['start', 'avito.ru', 'news.market', 'forum.market', 'banki.ru', 'help.guide'].includes(current) && (
-          <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-            <Globe className="size-12 text-neutral-300" />
-            <div className="mt-4 text-base font-semibold">Сайт недоступен</div>
-            <p className="mt-1 max-w-[240px] text-xs leading-relaxed text-neutral-500">
-              Не удалось открыть «{current}». Проверьте адрес или вернитесь на стартовую страницу.
-            </p>
-            <Button variant="outline" className="mt-4 rounded-full" onClick={() => go('start')}>
-              На стартовую страницу
-            </Button>
           </div>
         )}
       </div>

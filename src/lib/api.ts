@@ -113,6 +113,10 @@ export const api = {
   // рынок
   market: () => req<MarketStats>('/api/market'),
 
+  // настоящий интернет через прокси
+  browsePage: (url: string) => req<{ kind: 'page'; url: string; title: string; text: string; links: { href: string; title: string }[] }>(`/api/browse?url=${encodeURIComponent(url)}`),
+  browseSearch: (q: string) => req<{ kind: 'search'; query: string; results: { title: string; href: string; snippet: string; source: string }[] }>(`/api/browse?q=${encodeURIComponent(q)}`),
+
   // профиль и прочее
   profile: () => req<ProfileData>('/api/profile'),
   notifications: () => req<{ items: NotificationDTO[] }>('/api/notifications'),

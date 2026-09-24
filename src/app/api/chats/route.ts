@@ -5,6 +5,7 @@ import { botOpener } from '@/lib/chat-engine'
 import { CONDITION_MULT } from '@/lib/catalog-types'
 import { getCategoryMult } from '@/lib/engine'
 import type { ChatListItem } from '@/lib/types'
+import { itemImage } from '@/lib/item-images'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,7 +42,7 @@ export async function GET(req: Request) {
       id: c.id,
       listingId: c.listingId,
       listingTitle: c.listing.title,
-      listingImage: c.listing.image,
+      listingImage: itemImage(c.listing.itemKey, c.listing.category),
       listingPrice: c.listing.price,
       listingStatus: c.listing.status,
       lastMessage: last ? {
@@ -110,7 +111,7 @@ export async function POST(req: Request) {
   return Response.json({
     id: chat.id,
     listing: {
-      id: listing.id, title: listing.title, price: listing.price, image: listing.image,
+      id: listing.id, title: listing.title, price: listing.price, image: itemImage(listing.itemKey, listing.category),
       status: listing.status, condition: listing.condition,
     },
     counterpart: {

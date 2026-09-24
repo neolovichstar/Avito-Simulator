@@ -41,8 +41,10 @@ async function main() {
         city: p.city,
         bio: `${p.job}, ${p.age} лет`,
         balance: randInt(300_000, 1_500_000),
-        ratingSum: randInt(70, 100) * randInt(3, 30),
-        ratingCount: randInt(20, 300),
+        ...(() => {
+          const rc = randInt(20, 300)
+          return { ratingCount: rc, ratingSum: Math.round(rc * (3.4 + Math.random() * 1.5)) }
+        })(),
         lastSeenAt: new Date(Date.now() - randInt(0, 60) * 60_000),
       },
     })

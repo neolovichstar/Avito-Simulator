@@ -152,3 +152,68 @@ Stage Summary:
 - Экономика живая: 24 бота с личностями торгуют сами, конкурируют, пишут в чаты, скупают халяву
 - OpenRouter: основная модель deepseek/deepseek-chat, запасная mistral-small-3.2 (gpt-4o-mini заблокирован в регионе)
 - Realtime :3003 работает (онлайн 24-25), тосты/уведомления/typing — живые
+
+---
+Task ID: 6-a
+Agent: frontend-styling-expert
+Task: Полировка иконок ОС — кастомные SVG-логотипы «как в реальности» + компактные виджеты HomeScreen
+
+Work Log:
+- Создан src/components/os/app-logos.tsx ('use client'): 9 чистых SVG-логотипов вместо lucide-иконок — AvitoLogo (два кружка #00AAFF/#04E061, сохранён 1:1), BankLogo (Сбер-стайл: разомкнутое кольцо-дуга 315° + белая галочка-прутик со скруглениями), TaxesLogo (гербовый щит с тремя белыми полосами, strokeLinejoin round), BrowserLogo (компас-роза в круге: двухтоновая стрелка белый/белый-45% + 4 риски-градуса), SettingsLogo (настоящая шестерёнка: 8 зубьев-rect с rotate(45°i) + кольцо stroke 6.4 с отверстием), RepairLogo (гаечный ключ + молоток крестом, силуэт «build»), AuctionLogo (гавел судьи с подставкой), CareerLogo (кубок-трофей), DeliveryLogo (фургон) — последние четыре на базе Material Design path 24x24 через transform="translate(3.6 3.6) scale(1.7)", все aria-hidden + focusable=false, размер h-9 w-9
+- В app-logos.tsx реестр APP_TILE: Record<AppKey, {label, background, icon}> — градиенты плиток: Avito белый 3-стоп (FFFFFF→EEF1F4→DCE1E7), Банк #2FBE51→#21A038→#157F2A (вокруг фирменного #21A038), Налоги #4A5568→#2D3748→#1A202C (вокруг #2D3748), Браузер #0EA5E9→#0284C7, Настройки #6B7280→#4B5563, Сервис #F59E0B→#D97706, Аукцион #D4A017→#B45309, Задания #7C3AED→#6D28D9, Доставки #065F46→#064E3B (точные пары из ТЗ); плюс списки HOME_GRID (порядок сетки) и DOCK_APPS — эмодзи не использованы
+- AppIcon.tsx: новый опциональный prop background (готовый CSS-градиент, перекрывает color; color теперь optional с fallback #4B5563 — обратная совместимость); плитка «богаче»: многослойная тень shadow-[0_12px_26px_-6px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.35),inset_0_-10px_16px_-10px_rgba(0,0,0,0.35)] (внешняя + белая линия-кант сверху + внутренняя тень снизу) и стеклянный блик — абсолютный span h-[46%] rounded-t-[1.4rem] bg-gradient-to-b from-white/25 via-white/5 to-transparent; badge/label/active:scale-90/aria-label не тронуты
+- HomeScreen.tsx: сетка и док переведены на map по HOME_GRID/DOCK_APPS с APP_TILE (контракты сохранены: grid-cols-4, badge=unreadChats только у Avito в сетке и доке, все onOpenApp('avito'|'bank'|'taxes'|'browser'|'settings'|'repair'|'auction'|'career'|'delivery') идентичны); виджет времени компактнее — стеклянная пилюля bg-white/10 backdrop-blur с часами text-2xl font-light вместо text-5xl на весь угол, дата сокращена до «пн, 3 февраля» (weekday short + day + month long); добавлен виджет «Онлайн N» рядом с кошельком: green dot (bg-emerald-400 + animate-ping ореол opacity-60, aria-hidden) + число из useOS online, aria-label «Онлайн: N»; пилюли в ряду items-stretch (одинаковая высота), кошелёк ужат до text-base/text-[10px] при min-h-11; useClock на useSyncExternalStore без setState в эффектах — сохранён
+- Не тронуты: store.ts (AppKey только импортирован как type), ControlCenter.tsx, StatusBar.tsx, AvitoApp.tsx (там свой AvitoLogo), остальные файлы; lucide-импорты из HomeScreen удалены (не используются)
+
+Stage Summary:
+- Иконки ОС теперь «как в реальности»: у каждого приложения собственный отрисованный SVG-силуэт на градиентной плитке с бликом, внутренними тенями и кантом — вместо голых lucide-глифов
+- Новые файлы/изменения: + src/components/os/app-logos.tsx, ~ src/components/os/AppIcon.tsx (background prop + gloss), ~ src/components/os/HomeScreen.tsx (виджеты время/онлайн/кошелёк + map по реестру)
+- Контракт не изменён: только useOS (session.balance, unreadChats, online), onOpenApp(AppKey) от родителя, сетка 4 колонки, док, page-dots и бейдж unreadChats работают как раньше
+- bunx tsc --noEmit: ошибок в src/components/os нет (4 pre-existing: examples/, skills/, api/repair/route.ts); bunx eslint src/components/os — 0 проблем (exit 0)
+- Тач-таргеты 44px+ (пилюли min-h-11, плитки ~70px), aria-label на всех кнопках и виджетах, без setState в эффектах, без эмодзи
+
+---
+Task ID: 6-b
+Agent: frontend-styling-expert
+Task: Полировка Avito UI — FeedScreen и ListingScreen (больше изображений, меньше текста)
+
+Work Log:
+- FeedScreen.tsx переписан: лента стала одноколоночной из крупных фотокарточек — фото aspect-[16/10] на всю ширину (390x244, object-cover), карточка rounded-2xl/overflow-hidden/shadow-sm; цена крупно (text-xl font-extrabold) поверх фото на градиенте снизу (для price=0 — «Даром» зелёным); бейдж «ТОП» (фиолетовый, Zap) для boosted; зелёный чип «Дешевле рынка N%» на фото (локальная cheaperPercent(): est = baseValue * CONDITION_MULT[condition], как marginHint на бэке, показ при >=10%, cap 90); название — 1 строка truncate; строка продавца: аватар-кружок 20px (hueColor(id.length*47%360) + initials) + имя + зелёная точка онлайн + рейтинг звездой (Star, clamp до 5.0 — данные ботов превышают 5); строка «Город · 2 ч» (локальный shortAgo(), MapPin)
+- Меньше текста: убраны ConditionBadge из карточки, лишний скрытый heart-хак и отдельная кнопка избранного под карточкой; сердечко теперь плавающая кнопка 44x44 (bg-black/30 backdrop-blur) поверх фото с aria-label «В избранное/Убрать из избранного» (кликабельная зона, а не 16px иконка)
+- Логика сохранена целиком: api.feed({q,category,sort,page,limit}), поиск (форма+Enter), чипы категорий (горизонтальный скролл), сортировка (Свежие/Дешевле/Дороже), favoritesMode (загрузка через api.listing по getFavs), loading/error/empty; добавлена пагинация «Показать ещё» (h-11, pageRef + load(page+1), только когда items.length < total); скелетоны — 3 карточки animate-pulse (фото 16:10 + 2 строки); export ListingCard и getFavs сохранены (ProfileScreen импортирует)
+- ВАЖНО найдено и исправлено в браузере: контейнер ленты «flex flex-col gap-3» сжимал карточки до 13px (flex-shrink) — из-за этого клики по сердечку/фото промахивались; добавлен shrink-0 карточкам/скелетонам/состояниям — проверено elementsFromPoint и реальными кликами
+- ListingScreen.tsx переработан: фото aspect-[4/3] rounded-2xl (бейджи «Отдам даром»/«ТОП» на фото), цена text-3xl font-extrabold + зелёная пилюля «Дешевле рынка на N%» по data.marginHint (поле из ListingDetailData; вместо старого ручного potential), название, ConditionBadge ОДИН раз (дубль убран), метрики в одну строку иконок: MapPin город · Eye просмотры · Clock времяAgo
+- Продавец: аватар 44px (hueColor+initials), имя + онлайн-точка, рейтинг Star (clamp 5.0) + (кол-во), кнопка «Написать» (h-11, bg-[#00AAFF]/10) в той же карточке — логика openChat сохранена; блок «на Авито X» убран (меньше текста)
+- Описание: line-clamp-4 + «Показать полностью»/«Свернуть» (локальный useState, aria-expanded, тумба только для длинных текстов >120 символов)
+- Покупка: вместо двух кнопок в футере — одна sticky-кнопка «Купить за N ₽» (h-11, bg-[#00AAFF], disabled при балансе < цены) → нижний шит «Как получите товар?» с ДВУМЯ радио-карточками (role=radiogroup/radio, aria-checked, индикатор-кружок): «Самовывоз N ₽ — осмотр и торг при встрече» (HandCoins) и «Курьер +350 ₽ — без осмотра и торга» (Truck, AlertTriangle, disabled при price=0); подтверждение внизу шита пересчитывает итог (N+DELIVERY_FEE) и вызывает api.buyListing(id, {courier}) — проверено покупкой в браузере (баланс обновился, okMsg, шит закрылся)
+- Мелочи: скелетон загрузки вместо спиннера (фото 4:3 + строки + блок продавца), кнопка «Назад» 44x44, error-экран с h-11 кнопкой, кнопки h-11 в isMine-блоке (Продвинуть/Снять/Продать ещё), gap-3/p-3, aria-hidden на декоративных иконках, без эмодзи
+- НЕ тронуты: ChatScreen, ChatsScreen, ProfileScreen, SellScreen, AvitoApp (ConditionBadge/логотип импортируются как были), src/lib/* и все api-контракты
+- Проверка браузером (agent-browser): локскрин → Avito → лента (20 карточек 16:10, сердечко 44px, «Показать ещё» 20→41), поиск «Гитара», фильтр «Книги», сортировка «Дешевле» (295→308→1014), карточка товара (фото 4:3, бейдж «Дешевле рынка на 19%»), шит покупки (радио-карточки, итог 3361→3711 при курьере), покупка самовывозом прошла; избранное (2 шт., таб «Избранное» показывает 2 карточки); ошибок в консоли нет
+
+Stage Summary:
+- Изменены только 2 файла: src/components/avito/FeedScreen.tsx и src/components/avito/ListingScreen.tsx — лента и карточка товара теперь фото-первыми, текст минимизирован
+- Контракты соблюдены: FeedListing (seller.rating/online, baseValue, boosted) и ListingDetailData (marginHint, sellerOnline, sellerRating, specs) использованы по фактическим полям types.ts; api.feed/listing/buyListing/openChat/boostListing/removeListing без изменений; export ListingCard/getFavs сохранены для ProfileScreen
+- Рейтинг в UI клампится до 5.0 (в сид-данных ботов ratingSum завышен — сам бэк не трогал, это вне зоны задачи)
+- bunx tsc --noEmit: 0 ошибок в components/avito (4 pre-existing ошибки вне зоны: examples/, skills/, src/app/api/repair/route.ts); bunx eslint src/components/avito — чисто
+
+---
+Task ID: 7
+Agent: main (Z.ai Code)
+Task: Раунд улучшений UX: реальный интернет, центр управления, фонарик, уведомления, фото товаров, чистка "|", git push
+
+Work Log:
+- Чистка "|" в речи ИИ: sanitize в chat-engine.saveAndEmit (палки -> ". "), чистка БД (1 сообщение + 1 уведомление), страховка pretty() на клиенте в ChatScreen (текст и системные)
+- Центр управления: новый ControlCenter.tsx (z-55, blur, плитки Фонарик/Звук/Зарядка/Настройки, слайдер яркости, часы/онлайн/батарея); жест свайп сверху вниз + тап по верхней зоне (левая часть статус-бара, right-16 чтобы не перекрывать колокольчик); store: flashlight + brightness
+- Фонарик РЕАЛЬНЫЙ: src/lib/torch.ts — getUserMedia(front camera) + track.applyConstraints({torch:true}); если устройства/разрешения нет — виртуальный режим со свечением на экране; индикатор в статус-баре
+- Яркость: затемняющий overlay z-58 (opacity (1-brightness)*0.72), слайдер в центре управления
+- Уведомления «как в жизни»: NotificationCenter переписан — squircle-иконка приложения с градиентом, ИМЯ ПРИЛОЖЕНИЯ (Avito/Налоги/Браузер/Система), заголовок, 2 строки текста, синяя точка непрочитанного, ТАП РАЗВОРАЧИВАЕТ: полный текст + кнопка «Открыть {приложение}» (переход в приложение); ToastStack теперь heads-up сверху с иконкой приложения + кнопкой «Открыть»
+- НАСТОЯЩИЙ ИНТЕРНЕТ: /api/browse (сессия, rate limit 24/мин, TTL-кеш 5/10 мин); fetch через curl (child_process) — bun TLS-fingerprint блокируют Wikipedia/Cloudflare; чистка HTML -> текст + ссылки; Поиск: Bing News RSS (прямые ссылки из url=) + Wikipedia opensearch, фолбэк Google News RSS; BrowserApp: адресная строка с замком, настоящие страницы (title + текст + кликабельные ссылки), настоящие результаты поиска с бейджами источника, чипы wikipedia/habr/lenta/bbc/reddit/github; игровые сайты сохранены (avito.ru, news.market, forum.market, banki.ru, help.guide)
+- Фото товаров: 46 изображений сгенерированы (public/img/p/, стиль любительских фото с Авито); src/lib/item-images.ts — itemImage(itemKey, category); перекрытие на сервере во ВСЕХ выдачах: feed/listing (dto), chats, chat/[id], auction, deliveries, inventory, repair; poco-x5-pro перегенерирован (был watermark)
+- Полировка UI (подагенты): 6-a — кастомные SVG-логотипы 9 приложений (Сбер-галка, гербовый щит, компас, шестерня, гаечный ключ, гавел, кубок, фургон), объёмные плитки (блик + тени), компактный виджет времени + виджет «Онлайн N»; 6-b — лента Avito: крупные фотокарточки 16:10, цена поверх фото, сердце 44px на фото, минимум текста, скелетоны, пагинация; карточка товара: большое фото 4:3, sticky «Купить за N», описание clamp-4 + «Показать полностью», радио-карточки Самовывоз/Курьер
+- Исправлено: tsc RepairOrderDTO itemImage; рейтинг ботов 43.5 -> кламп в ratingOf (max 5.0) + пересчёт в БД (3.4..4.9) + фикс seed.ts; react-hooks/set-state-in-effect в BrowserApp (remount по key + render-time adjust); белый экран при Fast Refresh был ложным
+- git: remote origin https://github.com/neolovichstar/Avito-Simulator.git, .env/db/ вынесены из git (секреты), push ожидает токен пользователя (в сессии токен обрезан)
+
+Stage Summary:
+- Проверено браузером: разблокировка, новые иконки, центр управления (открытие/фонарик/яркость), уведомления (иконки/разворачивание/«Открыть»), настоящий поиск (реальные новости), lenta.ru открывается с живыми заголовками, лента с фото товаров, карточка товара, чат с ботом: «не, 2000 это совсем мало... а то на айфон мечты коплю» — без палок
+- tsc: 0 ошибок (кроме pre-existing examples/skills), eslint: 0 проблем
+- Осталось: push в GitHub (нужен полный токен), cron webDevReview создан

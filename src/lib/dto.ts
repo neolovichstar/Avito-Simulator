@@ -1,6 +1,7 @@
 // Серверные мапперы Prisma -> DTO
 import type { Listing, User } from '@prisma/client'
 import type { FeedListing } from '@/lib/types'
+import { itemImage } from '@/lib/item-images'
 
 export function isOnline(user: Pick<User, 'isBot' | 'lastSeenAt'>): boolean {
   if (user.isBot) return Date.now() - user.lastSeenAt.getTime() < 15 * 60_000
@@ -8,7 +9,10 @@ export function isOnline(user: Pick<User, 'isBot' | 'lastSeenAt'>): boolean {
 }
 
 export function ratingOf(u: Pick<User, 'ratingSum' | 'ratingCount'>): number {
-  return u.ratingCount ? Math.round((u.ratingSum / u.ratingCount) * 10) / 10 : 0
+  if (!u.ratingCount) return 0
+  // защита от кривых данных: рейтинг не может быть выше 5
+  const raw = u.ratingSum / u.ratingCount
+  return Math.round(Math.min(5, Math.max(0, raw)) * 10) / 10
 }
 
 export function listingDTO(l: Listing & { seller: User }, viewerId: string | null): FeedListing {
@@ -19,7 +23,7 @@ export function listingDTO(l: Listing & { seller: User }, viewerId: string | nul
     baseValue: l.baseValue,
     category: l.category,
     condition: l.condition,
-    image: l.image,
+    image: itemImage(l.itemKey, l.category),
     city: l.city,
     createdAt: l.createdAt.toISOString(),
     views: l.views,

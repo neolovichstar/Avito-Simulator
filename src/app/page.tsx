@@ -10,6 +10,7 @@ import LockScreen from '@/components/os/LockScreen'
 import HomeScreen from '@/components/os/HomeScreen'
 import NavBar from '@/components/os/NavBar'
 import NotificationCenter from '@/components/os/NotificationCenter'
+import ControlCenter from '@/components/os/ControlCenter'
 import ToastStack from '@/components/os/ToastStack'
 import RecentsOverlay from '@/components/os/RecentsOverlay'
 import AvitoApp from '@/components/avito/AvitoApp'
@@ -27,6 +28,8 @@ const BATTERY_KEY = 'avito_sim_battery'
 export default function Home() {
   const [recentsOpen, setRecentsOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
+  const [controlOpen, setControlOpen] = useState(false)
+  const swipeStartY = useRef<number | null>(null)
   const booted = useOS((s) => s.booted)
   const locked = useOS((s) => s.locked)
   const session = useOS((s) => s.session)
@@ -40,6 +43,8 @@ export default function Home() {
   const setBattery = useOS((s) => s.setBattery)
   const setCharging = useOS((s) => s.setCharging)
   const setOnline = useOS((s) => s.setOnline)
+  const flashlight = useOS((s) => s.flashlight)
+  const brightness = useOS((s) => s.brightness)
   const setNotifications = useOS((s) => s.setNotifications)
   const pushToast = useOS((s) => s.pushToast)
   const authTried = useRef(false)
@@ -124,6 +129,19 @@ export default function Home() {
     setCharging(charging)
   }
 
+  // ---------- ЖЕСТ: СВАЙП СВЕРХУ ВНИЗ — ЦЕНТР УПРАВЛЕНИЯ ----------
+  const onTouchStart = (e: React.TouchEvent) => {
+    swipeStartY.current = e.touches[0]?.clientY ?? null
+  }
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (swipeStartY.current === null) return
+    const y = e.touches[0]?.clientY ?? 0
+    if (y - swipeStartY.current > 34) {
+      swipeStartY.current = null
+      setControlOpen(true)
+    }
+  }
+
   const renderApp = () => {
     switch (currentApp) {
       case 'avito': return <AvitoApp />
@@ -163,9 +181,36 @@ export default function Home() {
         {locked && <LockScreen onUnlock={unlock} />}
 
         {/* уведомления и тосты */}
-        <NotificationCenter open={notifOpen} onClose={() => setNotifOpen(false)} />
+        <NotificationCenter open={notifOpen} onClose={() => setNotifOpen(false)} onOpenApp={(a) => { setNotifOpen(false); openApp(a) }} />
+        <ControlCenter open={controlOpen} onClose={() => setControlOpen(false)} onOpenApp={(a) => { setControlOpen(false); openApp(a) }} />
         <ToastStack />
         <RecentsOverlay open={recentsOpen} onClose={() => setRecentsOpen(false)} onResume={() => setRecentsOpen(false)} />
+
+        {/* яркость: затемняющий слой поверх всего */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-[58] bg-black transition-opacity duration-200"
+          style={{ opacity: (1 - brightness) * 0.72 }}
+        />
+
+        {/* свечение фонарика на экране (для устройств без вспышки) */}
+        {flashlight && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 z-[57] h-28"
+            style={{ background: 'radial-gradient(ellipse at 50% -18%, rgba(255,255,230,0.55), transparent 68%)' }}
+          />
+        )}
+
+        {/* верхняя зона-жест: свайп вниз или тап — центр управления */}
+        <div
+          role="button"
+          aria-label="Открыть центр управления"
+          className="absolute left-0 right-16 top-0 z-[59] h-8 outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onClick={() => setControlOpen(true)}
+        />
 
         {/* навигационная панель */}
         <NavBar

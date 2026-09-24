@@ -5,6 +5,7 @@ import { notifyUser, bumpStats, bumpQuests, checkAchievements } from '@/lib/deal
 import { CONDITION_LABEL } from '@/lib/catalog-types'
 import { fmtMoney } from '@/lib/format'
 import type { RepairOrderDTO, InventoryItemDTO } from '@/lib/types'
+import { itemImage } from '@/lib/item-images'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,7 +33,7 @@ export async function GET(req: Request) {
     return {
       id: o.id,
       itemTitle: item?.title ?? 'Товар',
-      itemImage: item?.image ?? '/img/cat-electronics.jpg',
+      itemImage: itemImage(item?.itemKey, item?.category),
       fromCondition: o.fromCondition,
       toCondition: o.toCondition,
       cost: o.cost,
@@ -46,7 +47,7 @@ export async function GET(req: Request) {
     .filter((i) => nextCondition(i.condition) !== null && !listedIds.has(i.id) && !inRepairIds.has(i.id))
     .map((i) => ({
       id: i.id, itemKey: i.itemKey, title: i.title, category: i.category, condition: i.condition,
-      image: i.image, baseValue: i.baseValue, purchasePrice: i.purchasePrice,
+      image: itemImage(i.itemKey, i.category), baseValue: i.baseValue, purchasePrice: i.purchasePrice,
       estValue: i.baseValue, createdAt: i.createdAt.toISOString(), listed: false,
     }))
 
@@ -91,7 +92,7 @@ export async function POST(req: Request) {
     balance: fresh?.balance ?? user.balance,
     quote,
     order: {
-      id: order.id, itemTitle: item.title, itemImage: item.image,
+      id: order.id, itemTitle: item.title, itemImage: itemImage(item.itemKey, item.category),
       fromCondition: order.fromCondition, toCondition: order.toCondition, cost: order.cost,
       status: 'in_progress' as const, startedAt: order.startedAt.toISOString(), readyAt: order.readyAt.toISOString(),
     },

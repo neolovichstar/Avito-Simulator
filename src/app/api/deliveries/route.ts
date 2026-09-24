@@ -2,6 +2,7 @@ import { db } from '@/lib/db'
 import { getSessionUser, unauthorized } from '@/lib/session'
 import { deliverDue } from '@/lib/deals'
 import type { DeliveryDTO } from '@/lib/types'
+import { itemImage } from '@/lib/item-images'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +18,7 @@ export async function GET(req: Request) {
   const items: DeliveryDTO[] = rows.map((d) => ({
     id: d.id,
     title: d.title,
-    image: d.image,
+    image: itemImage(d.itemKey, d.category),
     price: d.price,
     courier: d.courier,
     status: d.status as 'in_transit' | 'delivered',

@@ -19,6 +19,8 @@ interface OSState {
   unreadChats: number
   toastQueue: { id: number; title: string; body: string }[]
   soundOn: boolean
+  flashlight: boolean
+  brightness: number // 0.4..1
 
   setBooted: (v: boolean) => void
   setLocked: (v: boolean) => void
@@ -37,6 +39,8 @@ interface OSState {
   pushToast: (title: string, body: string) => void
   dropToast: (id: number) => void
   setSound: (v: boolean) => void
+  setFlashlight: (v: boolean) => void
+  setBrightness: (v: number) => void
   refreshSession: (u: Partial<SessionUser>) => void
 }
 
@@ -56,6 +60,8 @@ export const useOS = create<OSState>((set, get) => ({
   unreadChats: 0,
   toastQueue: [],
   soundOn: true,
+  flashlight: false,
+  brightness: 1,
 
   setBooted: (v) => set({ booted: v }),
   setLocked: (v) => set({ locked: v }),
@@ -86,5 +92,7 @@ export const useOS = create<OSState>((set, get) => ({
   },
   dropToast: (id) => set((s) => ({ toastQueue: s.toastQueue.filter((t) => t.id !== id) })),
   setSound: (v) => set({ soundOn: v }),
+  setFlashlight: (v) => set({ flashlight: v }),
+  setBrightness: (v) => set({ brightness: Math.max(0.4, Math.min(1, v)) }),
   refreshSession: (u) => set((s) => (s.session ? { session: { ...s.session, ...u } } : {})),
 }))

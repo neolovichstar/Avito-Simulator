@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { getSessionUser, unauthorized } from '@/lib/session'
 import { isOnline } from '@/lib/dto'
+import { itemImage } from '@/lib/item-images'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,7 +30,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     id: chat.id,
     listing: {
       id: chat.listing.id, title: chat.listing.title, price: chat.listing.price,
-      image: chat.listing.image, status: chat.listing.status, condition: chat.listing.condition,
+      image: itemImage(chat.listing.itemKey, chat.listing.category), status: chat.listing.status, condition: chat.listing.condition,
     },
     counterpart: {
       id: counterpart.id, displayName: counterpart.displayName, isBot: counterpart.isBot,

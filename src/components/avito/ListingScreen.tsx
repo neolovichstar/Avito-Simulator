@@ -1,15 +1,15 @@
 'use client'
 
-// Страница объявления: карточка товара, продавец, покупка (самовывоз/курьер)
+// Страница объявления: большое фото, продавец, покупка (самовывоз/курьер — радио-карточки)
 import { useCallback, useEffect, useState } from 'react'
 import {
   ChevronLeft, MapPin, Eye, Star, Truck, HandCoins, MessageSquare, ShoppingBag,
-  TrendingUp, Zap, Loader2, PackageCheck, AlertTriangle,
+  TrendingDown, Zap, Loader2, PackageCheck, AlertTriangle, Clock,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
 import { fmtNum, fmtMoney, timeAgo, initials, hueColor } from '@/lib/format'
-import { CATEGORY_LABEL, CONDITION_LABEL } from '@/lib/catalog-types'
+import { CATEGORY_LABEL } from '@/lib/catalog-types'
 import { DELIVERY_FEE } from '@/lib/economy'
 import type { ListingDetailData } from '@/lib/types'
 import type { SpecItem } from '@/lib/specs'
@@ -25,6 +25,8 @@ export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [buyOpen, setBuyOpen] = useState(false)
+  const [mode, setMode] = useState<'pickup' | 'courier'>('pickup')
+  const [showDesc, setShowDesc] = useState(false)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const [okMsg, setOkMsg] = useState('')
@@ -105,8 +107,17 @@ export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
 
   if (loading && !data) {
     return (
-      <div className="h-full bg-white flex items-center justify-center">
-        <Loader2 className="animate-spin text-neutral-300" size={28} />
+      <div className="h-full bg-white flex flex-col">
+        <div className="shrink-0 px-2 py-2 flex items-center border-b border-black/5">
+          <div className="w-11 h-11" />
+        </div>
+        <div className="flex-1 p-3 space-y-3 animate-pulse">
+          <div className="aspect-[4/3] rounded-2xl bg-neutral-100" />
+          <div className="h-7 bg-neutral-100 rounded-lg w-1/2" />
+          <div className="h-4 bg-neutral-100 rounded w-3/4" />
+          <div className="h-4 bg-neutral-100 rounded w-1/3" />
+          <div className="h-[76px] bg-neutral-100 rounded-2xl" />
+        </div>
       </div>
     )
   }
@@ -114,56 +125,63 @@ export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
     return (
       <div className="h-full bg-white flex flex-col items-center justify-center gap-3 p-6 text-center">
         <p className="text-sm text-red-500">{error}</p>
-        <button onClick={onBack} className="text-sm font-medium text-[#00AAFF]">Вернуться в ленту</button>
+        <button onClick={onBack} className="h-11 px-4 text-sm font-semibold text-[#00AAFF]">Вернуться в ленту</button>
       </div>
     )
   }
   if (!data) return null
 
   const isMine = data.mine
-  const potential = data.price > 0 ? Math.round(((data.baseValue - data.price) / data.price) * 100) : 100
+  const total = mode === 'courier' ? data.price + DELIVERY_FEE : data.price
+  const balance = session?.balance ?? 0
+  const longDesc = data.description.length > 120
 
   return (
-    <div className="h-full flex flex-col bg-white">
+    <div className="h-full flex flex-col bg-white relative">
       <div className="shrink-0 px-2 py-2 flex items-center border-b border-black/5">
-        <button onClick={onBack} aria-label="Назад" className="w-10 h-10 flex items-center justify-center rounded-full active:bg-neutral-100">
-          <ChevronLeft size={22} />
+        <button onClick={onBack} aria-label="Назад" className="w-11 h-11 flex items-center justify-center rounded-full active:bg-neutral-100">
+          <ChevronLeft size={22} aria-hidden />
         </button>
         <span className="text-sm font-semibold text-neutral-800 truncate">{CATEGORY_LABEL[data.category] ?? 'Товар'}</span>
       </div>
 
       <div className="flex-1 overflow-y-auto [scrollbar-width:thin]">
-        <div className="aspect-square bg-neutral-100 relative">
-          { }
-          <img src={data.image} alt={data.title} className="w-full h-full object-cover" />
-          {data.price === 0 && (
-            <span className="absolute top-3 left-3 bg-[#04E061] text-white text-xs font-bold px-2 py-1 rounded-lg">Отдам даром</span>
-          )}
-          {data.boosted && (
-            <span className="absolute top-3 right-3 bg-[#965EEB] text-white text-xs font-bold px-2 py-1 rounded-lg flex items-center gap-1">
-              <Zap size={12} /> Продвинуто
-            </span>
-          )}
-        </div>
+        <div className="p-3 space-y-4">
+          {/* фото */}
+          <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-neutral-100">
+            <img src={data.image} alt={data.title} className="w-full h-full object-cover" />
+            {data.price === 0 && (
+              <span className="absolute top-3 left-3 bg-[#04E061] text-white text-xs font-bold px-2 py-1 rounded-lg">Отдам даром</span>
+            )}
+            {data.boosted && (
+              <span className="absolute top-3 right-3 bg-[#965EEB] text-white text-xs font-bold px-2 py-1 rounded-lg flex items-center gap-1">
+                <Zap size={12} aria-hidden /> ТОП
+              </span>
+            )}
+          </div>
 
-        <div className="p-4 space-y-4">
-          <div>
-            <div className="flex items-baseline gap-2">
-              <span className={`text-3xl font-extrabold ${data.price === 0 ? 'text-[#04a94e]' : 'text-neutral-900'}`}>
+          {/* цена, название, метрики */}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`text-3xl font-extrabold tracking-tight ${data.price === 0 ? 'text-[#04a94e]' : 'text-neutral-900'}`}>
                 {data.price === 0 ? 'Даром' : `${fmtNum(data.price)} ₽`}
               </span>
-              {data.price > 0 && data.price < data.baseValue && (
-                <span className="text-xs text-green-600 font-semibold flex items-center gap-1">
-                  <TrendingUp size={12} /> дешевле рынка на {potential}%
+              {data.price > 0 && data.marginHint > 0 && (
+                <span className="flex items-center gap-1 text-xs font-bold text-green-700 bg-green-50 px-2 py-1 rounded-lg">
+                  <TrendingDown size={12} aria-hidden /> Дешевле рынка на {data.marginHint}%
                 </span>
               )}
             </div>
-            <h1 className="text-base font-semibold text-neutral-900 mt-1 leading-snug">{data.title}</h1>
-            <div className="flex items-center gap-2 mt-2 text-xs text-neutral-400">
-              <MapPin size={12} /> {data.city}
-              <span>·</span> {timeAgo(data.createdAt)}
-              <span>·</span>
-              <span className="flex items-center gap-1"><Eye size={12} /> {data.views}</span>
+            <h1 className="text-base font-semibold text-neutral-900 leading-snug">{data.title}</h1>
+            <div className="flex items-center gap-2">
+              <ConditionBadge condition={data.condition} />
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-neutral-400 pt-0.5">
+              <MapPin size={12} aria-hidden /> {data.city}
+              <span aria-hidden>·</span>
+              <span className="flex items-center gap-1"><Eye size={12} aria-hidden /> {data.views}</span>
+              <span aria-hidden>·</span>
+              <span className="flex items-center gap-1"><Clock size={12} aria-hidden /> {timeAgo(data.createdAt)}</span>
             </div>
           </div>
 
@@ -172,24 +190,31 @@ export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
             <div
               className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
               style={{ background: hueColor(data.seller.id.length * 47 % 360) }}
+              aria-hidden
             >
               {initials(data.seller.displayName)}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="text-sm font-semibold text-neutral-900 truncate">{data.seller.displayName}</span>
-                {data.sellerOnline && <span className="w-2 h-2 rounded-full bg-[#04E061] shrink-0" aria-label="онлайн" />}
+                {data.sellerOnline && <span className="w-2 h-2 rounded-full bg-[#04E061] shrink-0" aria-label="Продавец онлайн" />}
               </div>
               <div className="text-xs text-neutral-400 flex items-center gap-1 mt-0.5">
-                <Star size={11} className="text-amber-400 fill-amber-400" />
-                {data.sellerRating > 0 ? data.sellerRating.toFixed(1) : 'новый'}
+                <Star size={11} className="text-amber-400 fill-amber-400" aria-hidden />
+                {data.sellerRating > 0 ? Math.min(5, data.sellerRating).toFixed(1) : 'новый'}
                 <span>({data.seller.ratingCount})</span>
-                <span>· на Авито {timeAgo(data.sellerJoined)}</span>
               </div>
             </div>
+            <button
+              onClick={chat}
+              disabled={busy}
+              className="h-11 px-4 rounded-2xl bg-[#00AAFF]/10 text-[#00AAFF] font-semibold text-sm flex items-center gap-1.5 shrink-0 active:scale-[0.98] transition-transform disabled:opacity-50"
+            >
+              <MessageSquare size={16} aria-hidden /> Написать
+            </button>
           </div>
 
-          {/* характеристики товара */}
+          {/* характеристики */}
           {data.specs && data.specs.length > 0 && (
             <div>
               <h2 className="text-sm font-semibold text-neutral-900 mb-2">Характеристики</h2>
@@ -204,41 +229,44 @@ export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
             </div>
           )}
 
-          {/* описание */}
+          {/* описание — максимум 4 строки */}
           <div>
             <h2 className="text-sm font-semibold text-neutral-900 mb-1">Описание</h2>
-            <p className="text-sm text-neutral-600 leading-relaxed">{data.description}</p>
-            <div className="flex gap-2 mt-3">
-              <ConditionBadge condition={data.condition} />
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-500 font-medium">
-                Рынок: ~{fmtNum(data.baseValue)} ₽
-              </span>
-            </div>
+            <p className={`text-sm text-neutral-600 leading-relaxed ${!showDesc && longDesc ? 'line-clamp-4' : ''}`}>{data.description}</p>
+            {longDesc && (
+              <button
+                onClick={() => setShowDesc((s) => !s)}
+                aria-expanded={showDesc}
+                className="text-sm font-semibold text-[#00AAFF] mt-1.5"
+              >
+                {showDesc ? 'Свернуть' : 'Показать полностью'}
+              </button>
+            )}
           </div>
 
           {isMine && (
-            <div className="bg-[#f0f7ff] rounded-2xl p-3 space-y-2">
+            <div className="bg-[#f0f7ff] rounded-2xl p-3 space-y-2.5">
               <div className="text-xs text-neutral-600 flex items-center gap-1.5">
-                <PackageCheck size={14} className="text-[#00AAFF]" />
+                <PackageCheck size={14} className="text-[#00AAFF]" aria-hidden />
                 Это ваше объявление
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={boost}
                   disabled={busy || data.boosted}
-                  className="flex-1 h-10 rounded-xl bg-[#965EEB] text-white text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  className="flex-1 h-11 rounded-2xl bg-[#965EEB] text-white text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50"
                 >
-                  <Zap size={14} /> {data.boosted ? 'Уже продвинуто' : `Продвинуть · ${fmtMoney(149)}`}
+                  <Zap size={14} aria-hidden /> {data.boosted ? 'Уже продвинуто' : `Продвинуть · ${fmtMoney(149)}`}
                 </button>
                 <button
                   onClick={remove}
                   disabled={busy}
-                  className="h-10 px-4 rounded-xl bg-neutral-100 text-neutral-500 text-xs font-semibold disabled:opacity-50"
+                  className="h-11 px-4 rounded-2xl bg-white text-neutral-500 text-xs font-semibold disabled:opacity-50"
                 >
                   Снять
                 </button>
               </div>
-              <button onClick={onGoSell} className="text-xs text-[#00AAFF] font-medium">
+              <button onClick={onGoSell} className="text-xs text-[#00AAFF] font-semibold h-11 flex items-center">
                 Продать что-то ещё
               </button>
             </div>
@@ -246,73 +274,93 @@ export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
         </div>
       </div>
 
-      {/* кнопки действия */}
+      {/* покупка — sticky bottom */}
       {!isMine && (
-        <div className="shrink-0 p-3 border-t border-black/5 bg-white flex gap-2">
+        <div className="shrink-0 p-3 border-t border-black/5 bg-white/95 backdrop-blur">
           <button
-            onClick={chat}
-            disabled={busy}
-            className="h-12 px-4 rounded-xl bg-[#00AAFF]/10 text-[#00AAFF] font-semibold text-sm flex items-center gap-2 active:scale-[0.98] transition-transform"
+            onClick={() => { setMode('pickup'); setBuyOpen(true); setMsg('') }}
+            disabled={busy || balance < data.price}
+            className="w-full h-11 rounded-2xl bg-[#00AAFF] text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-40"
           >
-            <MessageSquare size={18} /> Написать
-          </button>
-          <button
-            onClick={() => { setBuyOpen(true); setMsg('') }}
-            disabled={busy || (session?.balance ?? 0) < data.price}
-            className="flex-1 h-12 rounded-xl bg-[#00AAFF] text-white font-semibold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-40"
-          >
-            <ShoppingBag size={18} />
-            {data.price === 0 ? 'Забрать даром' : `Купить · ${fmtNum(data.price)} ₽`}
+            <ShoppingBag size={17} aria-hidden />
+            {data.price === 0 ? 'Забрать даром' : `Купить за ${fmtNum(data.price)} ₽`}
           </button>
         </div>
       )}
-
-      {msg && <div className="shrink-0 px-4 pb-2 -mt-1 text-xs text-red-500">{msg}</div>}
-      {okMsg && (
-        <div className="shrink-0 px-4 pb-2 -mt-1 text-xs text-green-600 flex items-center gap-1">
-          <PackageCheck size={12} /> {okMsg}
+      {msg && !buyOpen && <div className="shrink-0 px-4 pb-2 text-xs text-red-500">{msg}</div>}
+      {okMsg && !buyOpen && (
+        <div className="shrink-0 px-4 pb-2 text-xs text-green-600 flex items-center gap-1">
+          <PackageCheck size={12} aria-hidden /> {okMsg}
         </div>
       )}
 
-      {/* диалог покупки */}
+      {/* выбор способа получения */}
       {buyOpen && (
-        <div className="absolute inset-0 z-40 bg-black/40 flex items-end" onClick={() => setBuyOpen(false)}>
-          <div className="bg-white w-full rounded-t-3xl p-4 space-y-3 animate-in slide-in-from-bottom-4" onClick={(e) => e.stopPropagation()}>
-            <div className="w-10 h-1 rounded-full bg-neutral-200 mx-auto" />
-            <h3 className="text-base font-bold text-neutral-900">Как получите товар?</h3>
-            <button
-              onClick={() => buy(false)}
-              disabled={busy}
-              className="w-full text-left border border-neutral-200 rounded-2xl p-3.5 active:bg-neutral-50 disabled:opacity-50"
-            >
-              <div className="flex items-center gap-2.5">
-                <HandCoins size={20} className="text-[#00AAFF]" />
-                <div>
-                  <div className="text-sm font-semibold text-neutral-900">Самовывоз</div>
-                  <div className="text-xs text-neutral-400 mt-0.5">Осмотрите товар и поторгуйтесь лично. Без доплат</div>
-                </div>
-              </div>
-            </button>
-            <button
-              onClick={() => buy(true)}
-              disabled={busy || data.price === 0}
-              className="w-full text-left border border-neutral-200 rounded-2xl p-3.5 active:bg-neutral-50 disabled:opacity-50"
-            >
-              <div className="flex items-center gap-2.5">
-                <Truck size={20} className="text-[#f59e0b]" />
-                <div>
-                  <div className="text-sm font-semibold text-neutral-900">
-                    Курьер · +{fmtMoney(DELIVERY_FEE)}
-                  </div>
-                  <div className="text-xs text-neutral-400 mt-0.5 flex items-center gap-1">
-                    <AlertTriangle size={11} className="text-amber-500" />
-                    Без осмотра и торга. Возможны скрытые дефекты
-                  </div>
-                </div>
-              </div>
-            </button>
-            {busy && <div className="flex justify-center py-1"><Loader2 size={18} className="animate-spin text-neutral-300" /></div>}
-            {msg && <div className="text-xs text-red-500">{msg}</div>}
+        <div className="absolute inset-0 z-40 bg-black/40 flex items-end" onClick={() => { if (!busy) setBuyOpen(false) }}>
+          <div className="bg-white w-full rounded-t-3xl animate-in slide-in-from-bottom-4" onClick={(e) => e.stopPropagation()}>
+            <div className="pt-3 flex justify-center">
+              <span className="w-10 h-1 rounded-full bg-neutral-200" aria-hidden />
+            </div>
+            <h3 className="text-base font-bold text-neutral-900 px-4 pt-2">Как получите товар?</h3>
+            <div role="radiogroup" aria-label="Способ получения" className="p-3 space-y-2">
+              <button
+                role="radio"
+                aria-checked={mode === 'pickup'}
+                onClick={() => setMode('pickup')}
+                disabled={busy}
+                className={`w-full text-left rounded-2xl border-2 p-3 flex items-start gap-3 transition-colors disabled:opacity-50 ${
+                  mode === 'pickup' ? 'border-[#00AAFF] bg-[#00AAFF]/5' : 'border-neutral-200'
+                }`}
+              >
+                <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${mode === 'pickup' ? 'border-[#00AAFF]' : 'border-neutral-300'}`} aria-hidden>
+                  {mode === 'pickup' && <span className="w-2.5 h-2.5 rounded-full bg-[#00AAFF]" />}
+                </span>
+                <HandCoins size={20} className="text-[#00AAFF] shrink-0 mt-0.5" aria-hidden />
+                <span className="flex-1 min-w-0">
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-neutral-900">Самовывоз</span>
+                    <span className="text-sm font-bold text-neutral-900">{data.price === 0 ? 'Даром' : `${fmtNum(data.price)} ₽`}</span>
+                  </span>
+                  <span className="block text-xs text-neutral-400 mt-0.5">Осмотр и торг при встрече</span>
+                </span>
+              </button>
+              <button
+                role="radio"
+                aria-checked={mode === 'courier'}
+                onClick={() => setMode('courier')}
+                disabled={busy || data.price === 0}
+                className={`w-full text-left rounded-2xl border-2 p-3 flex items-start gap-3 transition-colors disabled:opacity-50 ${
+                  mode === 'courier' ? 'border-[#00AAFF] bg-[#00AAFF]/5' : 'border-neutral-200'
+                }`}
+              >
+                <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${mode === 'courier' ? 'border-[#00AAFF]' : 'border-neutral-300'}`} aria-hidden>
+                  {mode === 'courier' && <span className="w-2.5 h-2.5 rounded-full bg-[#00AAFF]" />}
+                </span>
+                <Truck size={20} className="text-amber-500 shrink-0 mt-0.5" aria-hidden />
+                <span className="flex-1 min-w-0">
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-neutral-900">Курьер</span>
+                    <span className="text-sm font-bold text-neutral-900">+{fmtMoney(DELIVERY_FEE)}</span>
+                  </span>
+                  <span className="block text-xs text-neutral-400 mt-0.5 flex items-center gap-1">
+                    <AlertTriangle size={11} className="text-amber-500 shrink-0" aria-hidden />
+                    Без осмотра и торга
+                  </span>
+                </span>
+              </button>
+            </div>
+            {msg && <div className="px-4 pb-2 text-xs text-red-500">{msg}</div>}
+            {busy && <div className="flex justify-center pb-2"><Loader2 size={18} className="animate-spin text-neutral-300" aria-hidden /></div>}
+            <div className="p-3 border-t border-black/5">
+              <button
+                onClick={() => buy(mode === 'courier')}
+                disabled={busy || balance < total}
+                className="w-full h-11 rounded-2xl bg-[#00AAFF] text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-40"
+              >
+                <ShoppingBag size={17} aria-hidden />
+                {data.price === 0 ? 'Забрать даром' : `Купить за ${fmtNum(total)} ₽`}
+              </button>
+            </div>
           </div>
         </div>
       )}

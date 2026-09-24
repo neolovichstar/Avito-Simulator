@@ -6,6 +6,7 @@ import { rateLimit } from '@/lib/ratelimit'
 import { CONDITION_LABEL } from '@/lib/catalog-types'
 import { fmtMoney } from '@/lib/format'
 import type { AuctionLotDTO, AuctionData } from '@/lib/types'
+import { itemImage } from '@/lib/item-images'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,7 +28,7 @@ export async function GET(req: Request) {
   const out: AuctionLotDTO[] = lots.map((l) => ({
     id: l.id,
     title: l.title,
-    image: l.image,
+    image: itemImage(l.itemKey, l.category),
     category: l.category,
     condition: l.condition,
     baseValue: l.baseValue,
@@ -91,7 +92,7 @@ export async function POST(req: Request) {
 
   const fresh = await db.user.findUnique({ where: { id: user.id } })
   const dto: AuctionLotDTO = {
-    id: lot.id, title: lot.title, image: lot.image, category: lot.category,
+    id: lot.id, title: lot.title, image: itemImage(lot.itemKey, lot.category), category: lot.category,
     condition: lot.condition, baseValue: lot.baseValue, startPrice: lot.startPrice,
     currentBid: amount, currentBidderName: user.displayName, bidCount: lot.bidCount + 1,
     endsAt: endsAt.toISOString(), myBid: amount, isMine: true,

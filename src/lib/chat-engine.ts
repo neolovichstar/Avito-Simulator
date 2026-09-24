@@ -166,6 +166,10 @@ async function saveAndEmit(
   extra?: { kind?: 'invoice'; amount?: number; invoiceId?: string; offer?: number },
 ) {
   let clean = stripEmoji(text)
+    .replace(/\s*\|\s*/g, '. ') // модель любит палки-перечисления — чистим на самом низу
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([.,!?])/g, '$1')
+    .trim()
   if (extra?.offer) {
     // гарантируем, что цена озвучена в тексте (сравниваем только цифры)
     const digits = clean.replace(/[^0-9]/g, '')

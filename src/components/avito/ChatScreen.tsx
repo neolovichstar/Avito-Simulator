@@ -13,6 +13,9 @@ import { CONDITION_LABEL } from '@/lib/catalog-types'
 import type { ChatDetailData, ChatMessageDTO } from '@/lib/types'
 
 export default function ChatScreen({ id, onBack }: { id: string; onBack: () => void }) {
+  // страховка отображения: старые сообщения могли содержать палки-перечисления
+  const pretty = (t: string) => t.replace(/\s*\|\s*/g, '. ').replace(/\.{2,}/g, '.')
+
   const [chat, setChat] = useState<ChatDetailData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -184,7 +187,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
             return (
               <div key={m.id} className="flex justify-center">
                 <span className="text-[11px] text-neutral-500 bg-neutral-200/60 rounded-full px-3 py-1">
-                  {m.text}
+                  {pretty(m.text)}
                 </span>
               </div>
             )
@@ -218,7 +221,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
                     )}
                   </div>
                 ) : (
-                  <p className="text-sm leading-snug whitespace-pre-wrap break-words">{m.text}</p>
+                  <p className="text-sm leading-snug whitespace-pre-wrap break-words">{pretty(m.text)}</p>
                 )}
                 <div className={`text-[9px] mt-1 text-right ${mine ? 'text-white/60' : 'text-neutral-300'}`}>
                   {fmtTime(m.createdAt)}
