@@ -49,12 +49,26 @@ export interface PricePointDTO {
   at: string
 }
 
+export interface SimilarListingDTO {
+  id: string
+  title: string
+  price: number
+  condition: string
+  image: string
+  city: string
+  createdAt: string
+  boosted: boolean
+  sellerName: string
+  mine: boolean
+}
+
 export interface ListingDetailData extends FeedListing {
   description: string
   itemKey: string
   marginHint: number // сколько можно заработать %, ориентировочно
   sellerJoined: string
   priceHistory?: PricePointDTO[]
+  similar?: SimilarListingDTO[]
   purchasedByMe?: boolean // текущий пользователь покупал этот товар
   reviewedByMe?: boolean // и уже оставил отзыв
 }

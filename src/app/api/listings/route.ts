@@ -15,6 +15,7 @@ export async function GET(req: Request) {
   const q = url.searchParams.get('q')?.slice(0, 64) ?? ''
   const category = url.searchParams.get('category') ?? ''
   const sort = url.searchParams.get('sort') ?? 'new'
+  const city = url.searchParams.get('city')?.slice(0, 40) ?? ''
   const page = Math.max(1, Number(url.searchParams.get('page') ?? 1))
   const limit = Math.min(40, Math.max(4, Number(url.searchParams.get('limit') ?? 20)))
   const mine = url.searchParams.get('mine') === '1'
@@ -26,6 +27,7 @@ export async function GET(req: Request) {
     status: 'active' as const,
     ...(mine ? { sellerId: user!.id } : {}),
     ...(category && category !== 'all' ? { category } : {}),
+    ...(city && city !== 'all' ? { city } : {}),
     ...(q ? { OR: [{ title: { contains: q } }, { description: { contains: q } }] } : {}),
   }
 
@@ -34,7 +36,7 @@ export async function GET(req: Request) {
     : sort === 'expensive' ? [{ price: 'desc' as const }, { createdAt: 'desc' as const }]
     : [{ createdAt: 'desc' as const }]
 
-  const cacheKey = `feed:${q}|${category}|${sort}|${page}|${limit}`
+  const cacheKey = `feed:${q}|${category}|${city}|${sort}|${page}|${limit}`
 
   const load = async () => {
     const [rows, total] = await Promise.all([

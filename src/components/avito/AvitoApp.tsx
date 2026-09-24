@@ -87,6 +87,7 @@ export default function AvitoApp() {
             onOpenChat={openChat}
             onOpenSeller={openSeller}
             onGoSell={() => { reset(); setTab('sell') }}
+            onOpenListing={openListing}
           />
         )}
         {top?.type === 'seller' && (

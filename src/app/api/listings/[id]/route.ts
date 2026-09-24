@@ -18,7 +18,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     await db.listing.update({ where: { id }, data: { views: { increment: 1 } } }).catch(() => {})
   }
 
-  const [mult, purchase, review, history] = await Promise.all([
+  const [mult, purchase, review, history, similar] = await Promise.all([
     getCategoryMult(listing.category),
     user
       ? db.transaction.findFirst({ where: { listingId: id, userId: user.id, type: 'purchase', amount: { lt: 0 } } })
@@ -29,6 +29,13 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       orderBy: { createdAt: 'asc' },
       take: 40,
       select: { price: true, createdAt: true },
+    }),
+    // Конкуренты: те же товары других продавцов — кто дешевле виден сразу
+    db.listing.findMany({
+      where: { itemKey: listing.itemKey, status: 'active', id: { not: id } },
+      orderBy: { price: 'asc' },
+      take: 5,
+      include: { seller: { select: { displayName: true } } },
     }),
   ])
   const est = Math.round(listing.baseValue * (CONDITION_MULT[listing.condition] ?? 0.8) * mult)
@@ -50,5 +57,17 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     })),
     purchasedByMe: !!purchase,
     reviewedByMe: !!review,
+    similar: similar.map((s) => ({
+      id: s.id,
+      title: s.title,
+      price: s.price,
+      condition: s.condition,
+      image: s.image,
+      city: s.city,
+      createdAt: s.createdAt.toISOString(),
+      boosted: s.boostedUntil ? s.boostedUntil.getTime() > Date.now() : false,
+      sellerName: s.seller.displayName,
+      mine: user ? s.sellerId === user.id : false,
+    })),
   })
 }

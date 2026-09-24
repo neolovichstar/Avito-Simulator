@@ -44,6 +44,17 @@ const GENRE = ['Классика', 'Фантастика', 'Детектив', '
 const KIT = ['Полный комплект', 'Без коробки', 'С документами', 'Чеков нет']
 const TYPE = ['Портативное', 'Стационарное', 'Накопительное', 'Беспроводное']
 
+// Авто-аксессуары (не легковая машина): у шин/дисков/регистраторов не бывает «двигателя»
+const AUTO_ACCESSORY_PREFIX = [
+  'nokian-8', 'advocam', 'pioneer-2din', 'domkrat-2t', 'poperechniny',
+  'avtokompressor', 'diski-r16', 'hjc-shlem',
+]
+const AUTO_ACC_TYPE = ['Универсальный', 'Легковой', 'Кроссовер/внедорожник']
+const AUTO_ACC_BRAND = ['Популярный бренд', 'Китай, рабочий', 'Оригинал', 'Европа']
+const AUTO_ACC_KIT = ['Всё в комплекте', 'Крепления в наличии', 'Провода и ключи', 'Только сам предмет']
+const TIRE_R14 = ['R14', 'R15', 'R16', 'R17']
+const TIRE_SEASON = ['Лето', 'Зима (шипы)', 'Зима (липучка)', 'Всесезонка']
+
 export function specsFor(itemKey: string, category: string, listingId: string): SpecItem[] {
   const seed = hash(itemKey + '|' + listingId)
   switch (category) {
@@ -100,6 +111,34 @@ export function specsFor(itemKey: string, category: string, listingId: string): 
         { label: 'Год выпуска', value: pick(seed, YEAR, 12) },
       ]
     case 'auto':
+      // Легковая машина — пробег/двигатель; аксессуары — свои «железки»
+      if (AUTO_ACCESSORY_PREFIX.some((p) => itemKey === p)) {
+        if (itemKey === 'nokian-8') {
+          return [
+            { label: 'Диаметр', value: pick(seed, TIRE_R14, 2) },
+            { label: 'Сезон', value: pick(seed, TIRE_SEASON, 9) },
+            { label: 'Остаток протектора', value: pick(seed, ['60%', '70%', '80%'], 15) },
+          ]
+        }
+        if (itemKey === 'diski-r16') {
+          return [
+            { label: 'Диаметр', value: pick(seed, TIRE_R14, 3) },
+            { label: 'Крепёж', value: pick(seed, AUTO_ACC_KIT, 11) },
+            { label: 'Состояние', value: pick(seed, ['Без кривизны', 'Мелкие сколы', 'Требуют покраски'], 17) },
+          ]
+        }
+        if (itemKey === 'hjc-shlem') {
+          return [
+            { label: 'Размер', value: pick(seed, ['S', 'M', 'L', 'XL'], 5) },
+            { label: 'Состояние', value: pick(seed, ['Без падений', 'Мелкие царапины', 'После одного сезона'], 12) },
+          ]
+        }
+        return [
+          { label: 'Тип', value: pick(seed, AUTO_ACC_TYPE, 2) },
+          { label: 'Происхождение', value: pick(seed, AUTO_ACC_BRAND, 10) },
+          { label: 'Комплект', value: pick(seed, AUTO_ACC_KIT, 18) },
+        ]
+      }
       return [
         { label: 'Пробег', value: pick(seed, MILEAGE, 2) },
         { label: 'Двигатель', value: pick(seed, ENGINE, 10) },

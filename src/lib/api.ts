@@ -57,16 +57,18 @@ export const api = {
     post<{ token: string; user: SessionUser }>('/api/auth', { initData, devName: 'Игрок' }),
 
   // avito
-  feed: (params: { q?: string; category?: CategoryKey | 'all'; sort?: 'new' | 'cheap' | 'expensive'; page?: number; limit?: number; mine?: boolean }) => {
+  feed: (params: { q?: string; category?: CategoryKey | 'all'; sort?: 'new' | 'cheap' | 'expensive'; page?: number; limit?: number; mine?: boolean; city?: string }) => {
     const sp = new URLSearchParams()
     if (params.q) sp.set('q', params.q)
     if (params.category && params.category !== 'all') sp.set('category', params.category)
+    if (params.city && params.city !== 'all') sp.set('city', params.city)
     if (params.sort) sp.set('sort', params.sort)
     if (params.page) sp.set('page', String(params.page))
     if (params.limit) sp.set('limit', String(params.limit))
     if (params.mine) sp.set('mine', '1')
     return req<{ items: FeedListing[]; total: number }>('/api/listings?' + sp.toString())
   },
+  feedCities: () => req<{ cities: { city: string; count: number }[] }>('/api/cities'),
   listing: (id: string) => req<ListingDetailData>(`/api/listings/${id}`),
   createListing: (body: { itemId?: string; itemKey?: string; title: string; description: string; category: CategoryKey; condition: string; price: number }) =>
     post<{ listing: FeedListing }>('/api/listings', body),

@@ -14,14 +14,16 @@ import { CATEGORY_LABEL } from '@/lib/catalog-types'
 import { DELIVERY_FEE } from '@/lib/economy'
 import type { ListingDetailData, PricePointDTO } from '@/lib/types'
 import type { SpecItem } from '@/lib/specs'
+import { addViewed } from '@/lib/viewed'
 import { ConditionBadge } from './AvitoApp'
 
-export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, onGoSell }: {
+export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, onGoSell, onOpenListing }: {
   id: string
   onBack: () => void
   onOpenChat: (chatId: string) => void
   onOpenSeller?: (sellerId: string) => void
   onGoSell: () => void
+  onOpenListing?: (listingId: string) => void
 }) {
   const [data, setData] = useState<(ListingDetailData & { sellerOnline: boolean; sellerRating: number; specs?: SpecItem[] }) | null>(null)
   const [loading, setLoading] = useState(true)
@@ -51,6 +53,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
       const d = await api.listing(id)
       setData(d as ListingDetailData & { sellerOnline: boolean; sellerRating: number; specs?: SpecItem[] })
       setError('')
+      addViewed({ id: d.id, title: d.title, price: d.price, image: d.image })
       // отзывы о продавце — вторым запросом, не блокируя карточку
       api.userReviews(d.seller.id).then((r) => setSellerReviews(r.items)).catch(() => setSellerReviews([]))
     } catch (e) {
@@ -307,6 +310,11 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
           {/* динамика цен на этот товар */}
           {data.priceHistory && data.priceHistory.filter((p) => p.price > 0).length >= 2 && (
             <PriceHistoryCard points={data.priceHistory} />
+          )}
+
+          {/* похожие объявления: конкуренты по этому же товару */}
+          {data.similar && data.similar.length > 0 && (
+            <SimilarStrip items={data.similar} currentPrice={data.price} onOpen={(lid) => onOpenListing?.(lid)} />
           )}
 
           {/* характеристики */}
@@ -662,6 +670,64 @@ function PriceHistoryCard({ points }: { points: PricePointDTO[] }) {
         <path d={line} fill="none" stroke="#00AAFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         <circle cx={x(ps.length - 1)} cy={y(last)} r="3.5" fill="#00AAFF" stroke="white" strokeWidth="1.5" />
       </svg>
+    </div>
+  )
+}
+
+// Похожие объявления того же товара у других продавцов: рыночная конкуренция в лицо
+function SimilarStrip({ items, currentPrice, onOpen }: {
+  items: NonNullable<ListingDetailData['similar']>
+  currentPrice: number
+  onOpen: (id: string) => void
+}) {
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 mb-2">
+        <h2 className="text-sm font-semibold text-neutral-900">Похожие объявления</h2>
+        <span className="text-[11px] text-neutral-400">{items.length} шт.</span>
+      </div>
+      <div className="flex gap-2.5 overflow-x-auto pb-1 -mx-3 px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {items.map((s) => {
+          const diff = currentPrice > 0 ? Math.round(((s.price - currentPrice) / currentPrice) * 100) : 0
+          const cheaper = diff < 0
+          const equal = diff === 0
+          return (
+            <button
+              key={s.id}
+              onClick={() => onOpen(s.id)}
+              className="shrink-0 w-[150px] text-left bg-white rounded-2xl overflow-hidden border border-neutral-100 active:scale-[0.98] transition-transform"
+            >
+              <div className="relative aspect-[4/3] bg-neutral-100">
+                  <img src={s.image} alt="" className="w-full h-full object-cover" loading="lazy" />
+                {s.boosted && (
+                  <span className="absolute top-1.5 left-1.5 bg-[#965EEB] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+                    <Zap size={9} aria-hidden /> ТОП
+                  </span>
+                )}
+                {s.mine && (
+                  <span className="absolute top-1.5 right-1.5 bg-neutral-900/70 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md backdrop-blur-sm">
+                    Ваше
+                  </span>
+                )}
+              </div>
+              <div className="p-2 space-y-1">
+                <p className="text-[13px] font-extrabold text-neutral-900 leading-none">
+                  {s.price === 0 ? 'Даром' : `${fmtNum(s.price)} ₽`}
+                </p>
+                {!equal && currentPrice > 0 && s.price > 0 && (
+                  <p className={`text-[10px] font-semibold ${cheaper ? 'text-green-600' : 'text-neutral-400'}`}>
+                    {cheaper ? 'дешевле' : 'дороже'} на {Math.abs(diff)}%
+                  </p>
+                )}
+                <p className="text-[10px] text-neutral-500 truncate">{s.sellerName}</p>
+                <p className="text-[10px] text-neutral-400 flex items-center gap-0.5">
+                  <MapPin size={9} aria-hidden /> {s.city}
+                </p>
+              </div>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

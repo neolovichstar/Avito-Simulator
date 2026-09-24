@@ -2,12 +2,13 @@
 
 // Лента объявлений: крупные фотокарточки 16:10, поиск, категории, сортировка, избранное
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Search, SlidersHorizontal, Heart, MapPin, Star, Zap, BellPlus, X, SearchX } from 'lucide-react'
+import { Search, SlidersHorizontal, Heart, MapPin, Star, Zap, BellPlus, X, SearchX, History } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { CATEGORIES, CATEGORY_LABEL, CONDITION_MULT } from '@/lib/catalog-types'
 import type { CategoryKey } from '@/lib/catalog-types'
 import { fmtNum, initials, hueColor } from '@/lib/format'
 import { useOS } from '@/lib/store'
+import { getViewed, clearViewed, type ViewedItem } from '@/lib/viewed'
 import type { FeedListing, SavedSearchDTO } from '@/lib/types'
 
 const FAV_KEY = 'avito_sim_favs'
@@ -60,12 +61,16 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
   const [error, setError] = useState('')
   const [favs, setFavs] = useState<string[]>([])
   const [saved, setSaved] = useState<SavedSearchDTO[]>([])
+  const [viewed, setViewed] = useState<ViewedItem[]>([])
+  const [city, setCity] = useState<string>('all')
+  const [cities, setCities] = useState<{ city: string; count: number }[]>([])
   const pushToast = useOS((s) => s.pushToast)
   const scrollRef = useRef<HTMLDivElement>(null)
   const pageRef = useRef(1)
 
   useEffect(() => {
     setFavs(getFavs())
+    setViewed(getViewed())
     // разовая синхронизация избранного с сервером (для оповещений о снижении цены)
     const t = setTimeout(() => {
       api.favSyncAll(getFavs()).catch(() => {})
@@ -75,6 +80,7 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
 
   const loadSaved = useCallback(() => {
     api.savedSearches().then((r) => setSaved(r.searches)).catch(() => {})
+    api.feedCities().then((r) => setCities(r.cities.filter((c) => c.count > 0).slice(0, 12))).catch(() => {})
   }, [])
   useEffect(() => { loadSaved() }, [loadSaved])
 
@@ -114,7 +120,7 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
         setTotal(ok.length)
         return
       }
-      const res = await api.feed({ q: query, category, sort, page, limit: 20 })
+      const res = await api.feed({ q: query, category, city, sort, page, limit: 20 })
       setItems((prev) => (page === 1 ? res.items : [...prev, ...res.items]))
       setTotal(res.total)
     } catch (e) {
@@ -122,7 +128,7 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
     } finally {
       setLoading(false)
     }
-  }, [query, category, sort, favoritesMode])
+  }, [query, category, city, sort, favoritesMode])
 
   useEffect(() => { load(1) }, [load])
 
@@ -174,18 +180,29 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
           </button>
         </form>
         {showSort && (
-          <div className="flex gap-2 mt-2">
-            {([['new', 'Свежие'], ['cheap', 'Дешевле'], ['expensive', 'Дороже']] as const).map(([k, label]) => (
-              <button
-                key={k}
-                onClick={() => { setSort(k); setShowSort(false) }}
-                className={`px-3.5 h-10 rounded-xl text-xs font-semibold transition-colors ${
-                  sort === k ? 'bg-[#00AAFF] text-white' : 'bg-[#f0f1f3] text-neutral-600'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="flex flex-col gap-2 mt-2">
+            <div className="flex gap-2">
+              {([['new', 'Свежие'], ['cheap', 'Дешевле'], ['expensive', 'Дороже']] as const).map(([k, label]) => (
+                <button
+                  key={k}
+                  onClick={() => { setSort(k) }}
+                  className={`px-3.5 h-10 rounded-xl text-xs font-semibold transition-colors ${
+                    sort === k ? 'bg-[#00AAFF] text-white' : 'bg-[#f0f1f3] text-neutral-600'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {/* город */}
+            {cities.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto [scrollbar-width:none]" aria-label="Фильтр по городу">
+                <CatChip active={city === 'all'} onClick={() => setCity('all')} label="Вся Россия" />
+                {cities.map((c) => (
+                  <CatChip key={c.city} active={city === c.city} onClick={() => setCity(c.city)} label={`${c.city} · ${c.count}`} />
+                ))}
+              </div>
+            )}
           </div>
         )}
         {/* категории */}
@@ -228,6 +245,14 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
       <div ref={scrollRef} className="flex-1 overflow-y-auto [scrollbar-width:thin] p-3 flex flex-col gap-3">
         {!favoritesMode && total > 0 && !loading && (
           <div className="shrink-0 text-[11px] text-neutral-400 px-1">{fmtNum(total)} объявлений рядом</div>
+        )}
+        {/* Вы смотрели — только в чистой ленте без фильтров */}
+        {!favoritesMode && !query && category === 'all' && viewed.length > 0 && items.length > 0 && !loading && (
+          <ViewedStrip
+            items={viewed}
+            onOpen={(id) => onOpenListing(id)}
+            onClear={() => { clearViewed(); setViewed([]) }}
+          />
         )}
         {error && (
           <div className="shrink-0 bg-red-50 text-red-600 text-sm rounded-2xl p-3">{error}</div>
@@ -297,6 +322,47 @@ function CardSkeleton() {
       <div className="p-3 space-y-2">
         <div className="h-3.5 bg-neutral-100 rounded w-3/4" />
         <div className="h-3 bg-neutral-100 rounded w-1/2" />
+      </div>
+    </div>
+  )
+}
+
+// «Вы смотрели»: история просмотров из localStorage, горизонтальная лента миниатюр
+function ViewedStrip({ items, onOpen, onClear }: {
+  items: ViewedItem[]
+  onOpen: (id: string) => void
+  onClear: () => void
+}) {
+  return (
+    <div className="shrink-0 bg-white rounded-2xl shadow-sm p-3">
+      <div className="flex items-center gap-1.5 mb-2">
+        <History size={13} className="text-neutral-400" aria-hidden />
+        <h2 className="text-xs font-semibold text-neutral-800">Вы смотрели</h2>
+        <button
+          onClick={onClear}
+          className="ml-auto text-[11px] text-neutral-400 active:text-neutral-600 px-1"
+          aria-label="Очистить историю просмотров"
+        >
+          Очистить
+        </button>
+      </div>
+      <div className="flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {items.map((v) => (
+          <button
+            key={v.id}
+            onClick={() => onOpen(v.id)}
+            className="shrink-0 w-[96px] text-left active:scale-[0.97] transition-transform"
+            aria-label={v.title}
+          >
+            <div className="aspect-square rounded-xl overflow-hidden bg-neutral-100">
+              <img src={v.image} alt="" className="w-full h-full object-cover" loading="lazy" />
+            </div>
+            <p className="mt-1 text-[11px] font-bold text-neutral-800 leading-none truncate">
+              {v.price === 0 ? 'Даром' : `${fmtNum(v.price)} ₽`}
+            </p>
+            <p className="text-[10px] text-neutral-400 truncate mt-0.5">{v.title}</p>
+          </button>
+        ))}
       </div>
     </div>
   )
