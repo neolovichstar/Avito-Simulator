@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { getSessionUser, unauthorized } from '@/lib/session'
+import { bumpStats, bumpQuests } from '@/lib/deals'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,6 +18,10 @@ export async function POST(req: Request) {
       data: { balance: { decrement: amount }, deposit: { increment: amount }, depositAt: new Date() },
     })
     await db.transaction.create({ data: { userId: user.id, type: 'deposit', amount: -amount, note: 'Пополнение вклада' } })
+    if (user.deposit === 0) {
+      await bumpStats(user.id, { deposits: 1 })
+      await bumpQuests(user.id, 'deposit')
+    }
   } else {
     if (user.deposit < amount) return Response.json({ error: 'На вкладе недостаточно средств' }, { status: 400 })
     await db.user.update({

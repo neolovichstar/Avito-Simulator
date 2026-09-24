@@ -55,6 +55,11 @@ export function botOpener(chat: Chat, listing: Listing, bot: User): { text: stri
   return { text: greet, offer: listing.price, limit: meta.botLimit || Math.round(listing.price * 0.9) }
 }
 
+const AGREE_PHRASES = ['по рукам', 'окей', 'идёт', 'ладно', 'договорились']
+function pickAgree(): string {
+  return AGREE_PHRASES[Math.floor(Math.random() * AGREE_PHRASES.length)]
+}
+
 async function historyOf(chatId: string, viewerBotId: string): Promise<AiHistoryItem[]> {
   const msgs = await db.message.findMany({
     where: { chatId },
@@ -101,6 +106,37 @@ export async function botReply(chatId: string, playerMsg: { text?: string; invoi
 
   const history = await historyOf(chat.id, bot.id)
   const condLabel = CONDITION_LABEL[listing.condition] ?? listing.condition
+
+  // ---------- FAST-PATH БЕЗ LLM ----------
+  // Игрок согласился на последнюю цену бота → закрываем сделку скриптом.
+  // Это самый частый финал торга — экономим дневной бюджет ИИ (тир 1000/день).
+  const AGREE_RE = /(согласен|согласна|ставь\s*сч[её]т|по\s*рукам|давай|беру|забираю|окей|\bок\b|хорошо|ладно|идёт|идет)/i
+  if (playerMsg.text && meta.lastOffer && meta.lastOffer > 0 && AGREE_RE.test(playerMsg.text)) {
+    // согласие валидно, если последнее слово цены было за ботом и он предлагал lastOffer
+    const lastBotMsg = history.filter((h) => h.senderType === 'bot').at(-1)
+    if (lastBotMsg) {
+      if (!isBuyer) {
+        // бот-продавец выставляет счёт ровно на обещанную цену
+        const invoiceId = `inv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
+        await saveAndEmit(
+          chat.id, bot, `${pickAgree()} ${fmtMoney(meta.lastOffer)}. Ставлю счёт`, persona.typoRate,
+          { kind: 'invoice', amount: meta.lastOffer, invoiceId },
+        )
+        await saveSystem(chat.id, `Счёт от продавца: ${fmtMoney(meta.lastOffer)}. Оплатите, чтобы получить товар.`)
+        return
+      }
+      // бот-покупатель платит игроку-продавцу сразу
+      const res = await completeSale({
+        listingId: listing.id, buyer: bot, price: meta.lastOffer, via: 'chat', chatId: chat.id,
+      })
+      if (res.ok) {
+        await saveAndEmit(chat.id, bot, `${pickAgree()} оплатил, глянь`, persona.typoRate)
+        return
+      }
+    }
+  }
+  // ---------- /FAST-PATH ----------
+
   const reply = await aiNegotiate({
     persona,
     botRole: meta.botRole,

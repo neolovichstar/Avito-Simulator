@@ -3,19 +3,22 @@
 export const TAX_RATE = 0.04 // самозанятый
 export const TAX_BLOCK_LIMIT = 10_000 // задолженность, блокирующая продажи
 export const DEBT_BLOCK_LIMIT = 30_000 // долг по кредиту, блокирующий покупки
-export const BOOST_COST = 149
+export const BOOST_COST = 249
 export const DELIVERY_FEE = 350
 export const LOAN_RATE = 0.15
 export const LOAN_DAYS = 7
-export const DEPOSIT_RATE_PER_HOUR = 0.001 // 0.1% в час
+export const DEPOSIT_RATE_PER_HOUR = 0.0004 // 0.04% в час (~1% в день) — прогресс должен быть долгим
 export const PENALTY_DAILY = 0.10 // пеня 10% в сутки
 
+// ХАРДКОРНАЯ КРИВАЯ ПРОГРЕССИИ: уровень растёт степенью 2.4 —
+// ур. 5 ≈ 2 800 XP, ур. 10 ≈ 17 700 XP, ур. 15 ≈ 53 500 XP, ур. 20 ≈ 123 500 XP.
+// Развитие очень долгое и осознанное.
 export function levelFromXp(xp: number): number {
-  return Math.max(1, Math.floor(Math.sqrt(xp / 60)) + 1)
+  return Math.max(1, Math.floor(Math.pow(xp / 80, 1 / 2.4)) + 1)
 }
 
 export function xpForLevel(level: number): number {
-  return Math.pow(level - 1, 2) * 60
+  return Math.round(Math.pow(level - 1, 2.4) * 80)
 }
 
 export function levelProgress(xp: number): number {
@@ -26,7 +29,8 @@ export function levelProgress(xp: number): number {
 }
 
 export function loanLimitFor(level: number, creditScore = 500): number {
-  const base = 15_000 + level * 10_000
+  // хардкор: лимит растёт медленно с уровнем
+  const base = 12_000 + level * 6_000
   // рейтинг 300..850 → множитель 0.6x..1.4x
   const k = 0.6 + Math.max(0, Math.min(1, (creditScore - 300) / 550)) * 0.8
   return Math.round((base * k) / 500) * 500

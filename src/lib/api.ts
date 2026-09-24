@@ -181,12 +181,32 @@ export const api = {
   readNotifications: () => post<{ ok: boolean }>('/api/notifications', { action: 'read' }),
   stats: () => req<{ online: number }>('/api/stats'),
   daySummary: () => req<{ deals: number; buys: number; sales: number; net: number }>('/api/day-summary'),
+  leaderboard: () =>
+    req<{
+      balance: LeaderRowDTO[]
+      level: LeaderRowDTO[]
+      deals: LeaderRowDTO[]
+      profit: LeaderRowDTO[]
+    }>('/api/leaderboard'),
   systemStatus: () =>
     req<{
       redis: { enabled: boolean; alive: boolean; latencyMs: number | null; failStreak: number }
       db: { ok: boolean; latencyMs: number; provider: string }
+      ai: { used: number; limit: number; chatOnly: boolean }
       uptimeSec: number
     }>('/api/system/status'),
+}
+
+export interface LeaderRowDTO {
+  userId: string
+  name: string
+  photoUrl: string | null
+  isBot: boolean
+  online: boolean
+  level: number
+  value: number
+  rank: number
+  isMe: boolean
 }
 
 // Ссылка на скачивание CSV-истории операций (токен в query — для прямой ссылки)

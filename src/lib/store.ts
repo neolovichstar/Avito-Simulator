@@ -3,7 +3,7 @@
 import { create } from 'zustand'
 import type { SessionUser, NotificationDTO } from '@/lib/types'
 
-export type AppKey = 'avito' | 'bank' | 'taxes' | 'browser' | 'settings' | 'repair' | 'auction' | 'career' | 'delivery'
+export type AppKey = 'avito' | 'bank' | 'taxes' | 'browser' | 'settings' | 'repair' | 'auction' | 'career' | 'delivery' | 'leaderboard'
 
 // Виджеты домашнего экрана / рабочего стола ПК
 export type WidgetKey = 'clock' | 'wallet' | 'online' | 'quest' | 'delivery'

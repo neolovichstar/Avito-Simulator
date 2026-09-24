@@ -104,3 +104,9 @@ export function redisStatus() {
     failStreak: state.failStreak,
   }
 }
+
+/** GET-обёртка для внешних модулей (строковые значения). */
+export async function redisGet(key: string): Promise<string | null> {
+  const r = await command<string>(['GET', key])
+  return r ?? null
+}

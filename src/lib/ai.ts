@@ -2,6 +2,7 @@
 // торгуется как живой человек и сам принимает решения.
 import type { Persona } from '@/lib/personas-types'
 import { stripEmoji, fmtMoney } from '@/lib/format'
+import { redisEnabled } from '@/lib/redis'
 
 export interface AiHistoryItem {
   senderType: string
@@ -42,6 +43,52 @@ export interface AiReply {
 
 const MODEL = process.env.OPENROUTER_MODEL ?? 'deepseek/deepseek-chat'
 const MODEL_FALLBACK = process.env.OPENROUTER_MODEL_FALLBACK ?? 'mistralai/mistral-small-3.2-24b-instruct'
+
+// ---------- ДНЕВНОЙ БЮДЖЕТ ИИ ----------
+// Лимит запросов к OpenRouter в сутки (у юзера тариф 1000/день — держим запас).
+// ИИ используется ТОЛЬКО в чатах-переговорах; всё остальное (аукционы, рынок,
+// win-back, открытия) — скрипты без LLM. Типовые согласия в чатах тоже без LLM.
+export const AI_DAILY_BUDGET = Number(process.env.AI_DAILY_LIMIT ?? 240)
+
+interface BudgetState { date: string; used: number }
+const gB = globalThis as unknown as { __avitoAiBudget?: BudgetState }
+const memBudget: BudgetState = (gB.__avitoAiBudget ??= { date: '', used: 0 })
+
+function todayKey(): string {
+  return new Date().toISOString().slice(0, 10).replace(/-/g, '')
+}
+
+/** Списать один запрос ИИ. false — бюджет дня исчерпан (боты переходят на скрипты). */
+async function aiBudgetSpend(): Promise<boolean> {
+  const key = `ai:daily:${todayKey()}`
+  if (redisEnabled) {
+    const { redisLimit } = await import('@/lib/redis')
+    return redisLimit(key, AI_DAILY_BUDGET, 26 * 60 * 60_000)
+  }
+  // фолбэк в памяти (переживает HMR через globalThis)
+  const today = todayKey()
+  if (memBudget.date !== today) {
+    memBudget.date = today
+    memBudget.used = 0
+  }
+  if (memBudget.used >= AI_DAILY_BUDGET) return false
+  memBudget.used++
+  return true
+}
+
+/** Сколько запросов ИИ израсходовано сегодня (для Настроек). */
+export async function aiBudgetUsed(): Promise<number> {
+  if (redisEnabled) {
+    try {
+      const { redisGet } = await import('@/lib/redis')
+      const n = await redisGet(`ai:daily:${todayKey()}`)
+      return Number(n ?? 0)
+    } catch {
+      /* ниже фолбэк */
+    }
+  }
+  return memBudget.date === todayKey() ? memBudget.used : 0
+}
 
 export function withTypos(text: string, rate: number): string {
   if (rate <= 0 || Math.random() > 0.7) return text
@@ -251,6 +298,9 @@ export async function aiNegotiate(ctx: NegotiationContext): Promise<AiReply> {
     const r = ruleReply(ctx)
     return { ...r, source: 'rules' as const }
   }
+
+  // бюджет дня: исчерпан → скриптовый режим без единого запроса к OpenRouter
+  if (!(await aiBudgetSpend())) return fallback()
 
   const system = buildSystemPrompt(ctx)
   const historyLines = ctx.history

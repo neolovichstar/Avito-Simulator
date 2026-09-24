@@ -1,13 +1,13 @@
 'use client'
 
-// «Сделка» — главное приложение. Вкладки: Главная, Избранное, Продать, Сообщения, Профиль
+// «Сделка» — главное приложение. Шапка: город + баланс + уведомления + профиль.
+// Нижняя навигация как в Авито: Главная, Сообщения, круглая «+» (Продать), Избранное, Профиль
 import { useCallback, useEffect, useState } from 'react'
-import { Home, Heart, PlusCircle, MessageSquare, User, ShoppingBag } from 'lucide-react'
+import { Home, Heart, Plus, MessageCircle, User, Bell, ChevronDown } from 'lucide-react'
 import { useOS } from '@/lib/store'
 import { api } from '@/lib/api'
-import { timeAgo } from '@/lib/format'
-import type { FeedListing, ChatListItem } from '@/lib/types'
-import FeedScreen from './FeedScreen'
+import NotificationCenter from '@/components/os/NotificationCenter'
+import FeedScreen, { getFavs } from './FeedScreen'
 import ListingScreen from './ListingScreen'
 import SellScreen from './SellScreen'
 import ChatsScreen from './ChatsScreen'
@@ -22,9 +22,9 @@ type View = { type: 'listing' | 'seller' | 'chat'; id: string }
 
 const TABS: { key: Tab; label: string; icon: typeof Home }[] = [
   { key: 'feed', label: 'Главная', icon: Home },
+  { key: 'chats', label: 'Сообщения', icon: MessageCircle },
+  { key: 'sell', label: 'Продать', icon: Plus },
   { key: 'fav', label: 'Избранное', icon: Heart },
-  { key: 'sell', label: 'Продать', icon: PlusCircle },
-  { key: 'chats', label: 'Сообщения', icon: MessageSquare },
   { key: 'profile', label: 'Профиль', icon: User },
 ]
 
@@ -32,7 +32,10 @@ export default function AvitoApp() {
   const [tab, setTab] = useState<Tab>('feed')
   const [stack, setStack] = useState<View[]>([])
   const [unread, setUnread] = useState(0)
+  const [favCount, setFavCount] = useState(0)
+  const [notifOpen, setNotifOpen] = useState(false)
   const session = useOS((s) => s.session)
+  const notifUnread = useOS((s) => s.notifications.some((n) => !n.readAt))
   const top = stack[stack.length - 1] ?? null
 
   const refreshUnread = useCallback(async () => {
@@ -51,6 +54,14 @@ export default function AvitoApp() {
     }
   }, [refreshUnread])
 
+  // счётчик избранного для бейджа в навигации (localStorage, лёгкий опрос)
+  useEffect(() => {
+    const sync = () => setFavCount(getFavs().length)
+    sync()
+    const t = setInterval(sync, 2000)
+    return () => clearInterval(t)
+  }, [])
+
   const push = (v: View) => setStack((s) => [...s, v])
   const pop = () => {
     setStack((s) => {
@@ -65,15 +76,41 @@ export default function AvitoApp() {
   const openSeller = (id: string) => push({ type: 'seller', id })
 
   return (
-    <div className="h-full flex flex-col bg-[#f4f5f7]">
-      {/* шапка «Сделки» */}
-      <div className="bg-white border-b border-black/5 px-4 pt-2 pb-2 flex items-center gap-2 shrink-0">
-        <DealWordmark />
-        <div className="ml-auto text-right">
-          <div className="text-[11px] text-neutral-400 leading-none">{session?.city ?? 'Москва'}</div>
-          <div key={session?.balance ?? 0} className="value-pop text-xs font-semibold text-neutral-800 mt-1">
+    <div className="relative h-full flex flex-col bg-[#f4f5f7]">
+      {/* шапка (sticky): город «Москва ⌄» + баланс, колокольчик, профиль */}
+      <div className="bg-white shrink-0 px-4 pt-2.5 pb-2 flex items-center gap-1">
+        <div className="flex items-center gap-0.5 min-w-0" aria-label={`Город: ${session?.city ?? 'Москва'}`}>
+          <span className="text-[16px] font-bold text-neutral-900 leading-none truncate">{session?.city ?? 'Москва'}</span>
+          <ChevronDown size={17} strokeWidth={2.4} className="text-neutral-900 shrink-0" aria-hidden />
+        </div>
+        <div className="ml-auto flex items-center gap-1">
+          <span
+            key={session?.balance ?? 0}
+            className="value-pop flex items-center h-7 px-2.5 rounded-full bg-[#7C3AED]/10 text-xs font-bold text-[#7C3AED] tabular-nums"
+          >
             {session ? fmtBalance(session.balance) : '—'}
-          </div>
+          </span>
+          <button
+            onClick={() => setNotifOpen(true)}
+            aria-label="Уведомления"
+            className="relative w-9 h-9 rounded-full flex items-center justify-center text-neutral-800 active:bg-black/5 transition-colors"
+          >
+            <Bell size={21} strokeWidth={1.9} aria-hidden />
+            {notifUnread && <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#FF5555]" aria-hidden />}
+          </button>
+          <button
+            onClick={() => { reset(); setTab('profile') }}
+            aria-label="Профиль"
+            className="w-9 h-9 rounded-full flex items-center justify-center active:bg-black/5 transition-colors"
+          >
+            {session?.photoUrl ? (
+              <img src={session.photoUrl} alt="" className="w-7 h-7 rounded-full object-cover" />
+            ) : (
+              <span className="w-7 h-7 rounded-full bg-[#7C3AED]/10 text-[#7C3AED] flex items-center justify-center" aria-hidden>
+                <User size={16} />
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
@@ -114,39 +151,62 @@ export default function AvitoApp() {
         )}
       </div>
 
-      {/* нижняя навигация как в Avito */}
-      <nav className="shrink-0 bg-white border-t border-black/5 flex" aria-label="Разделы приложения">
+      {/* нижняя навигация как в Авито: 5 вкладок, в центре круглая фиолетовая «+» */}
+      <nav className="shrink-0 bg-white border-t border-black/5 flex items-stretch" aria-label="Разделы приложения">
         {TABS.map(({ key, label, icon: Icon }) => {
           const active = tab === key && !top
           const isSell = key === 'sell'
+          const badge = key === 'chats' ? unread : key === 'fav' ? favCount : 0
           return (
             <button
               key={key}
               onClick={() => { reset(); setTab(key) }}
               aria-label={label}
-              className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] transition-colors ${
-                active ? 'text-[#965EEB]' : 'text-neutral-400'
+              aria-current={active ? 'page' : undefined}
+              className={`relative flex-1 min-h-[58px] transition-colors ${
+                active ? 'text-[#7C3AED]' : 'text-neutral-500'
               }`}
             >
               {isSell ? (
-                <span className={`w-7 h-7 -mt-3 rounded-full flex items-center justify-center shadow-md ${
-                  active ? 'bg-[#965EEB] text-white' : 'bg-neutral-200 text-neutral-500'
-                }`}>
-                  <PlusCircle size={20} />
-                </span>
+                <>
+                  <span
+                    className="absolute left-1/2 -translate-x-1/2 -top-6 w-14 h-14 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shadow-lg shadow-[#7C3AED]/40 active:scale-95 transition-transform"
+                    aria-hidden
+                  >
+                    <Plus size={26} strokeWidth={2.4} />
+                  </span>
+                  <span className={`absolute bottom-[8px] left-1/2 -translate-x-1/2 text-[10px] leading-none whitespace-nowrap ${active ? 'font-semibold' : 'font-medium'}`}>
+                    {label}
+                  </span>
+                </>
               ) : (
-                <Icon size={22} strokeWidth={active ? 2.4 : 1.8} />
-              )}
-              <span className="text-[10px] leading-none">{label}</span>
-              {key === 'chats' && unread > 0 && (
-                <span className="absolute top-1 right-[22%] min-w-[16px] h-4 px-1 rounded-full bg-[#04E061] text-white text-[10px] font-bold flex items-center justify-center">
-                  {unread > 99 ? '99+' : unread}
+                <span className="absolute inset-x-0 top-1.5 flex flex-col items-center gap-1">
+                  <span className="relative flex items-center justify-center">
+                    <Icon size={24} strokeWidth={active ? 2.3 : 1.9} aria-hidden />
+                    {badge > 0 && (
+                      <span
+                        className={`absolute -top-1.5 -right-2.5 min-w-[17px] h-[17px] px-1 rounded-full text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white ${
+                          key === 'chats' ? 'bg-[#04E061]' : 'bg-[#FF5555]'
+                        }`}
+                      >
+                        {badge > 99 ? '99+' : badge}
+                      </span>
+                    )}
+                  </span>
+                  <span className={`text-[10px] leading-none ${active ? 'font-semibold' : 'font-medium'}`}>{label}</span>
                 </span>
               )}
             </button>
           )
         })}
       </nav>
+
+      {/* центр уведомлений — открывается по колокольчику в шапке */}
+      <NotificationCenter
+        open={notifOpen}
+        onClose={() => setNotifOpen(false)}
+        onOpenApp={(a) => { setNotifOpen(false); if (a === 'avito') { reset(); setTab('feed') } }}
+      />
     </div>
   )
 }

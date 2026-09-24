@@ -1,12 +1,12 @@
 'use client'
 
-// Лента объявлений: крупные фотокарточки 16:10, поиск, категории, сортировка, избранное
+// Лента объявлений в стиле Авито: 2 колонки плоских карточек, поиск, категории-чипы, фильтры-пилюли
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Search, SlidersHorizontal, Heart, MapPin, Star, Zap, BellPlus, X, SearchX, History, Activity, Scale, Handshake, Smartphone, Laptop, Tv, Shirt, Footprints, Sofa, WashingMachine, Bike, Dumbbell, Music, Car, Baby, BookOpen, LayoutGrid } from 'lucide-react'
+import { Search, SlidersHorizontal, Heart, Star, Zap, BellPlus, X, SearchX, History, Activity, Scale, Handshake, ArrowUpDown, Truck } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { CATEGORIES, CATEGORY_LABEL, CONDITION_LABEL, CONDITION_MULT } from '@/lib/catalog-types'
 import type { CategoryKey } from '@/lib/catalog-types'
-import { fmtNum, initials, hueColor } from '@/lib/format'
+import { fmtNum, initials, hueColor, timeAgo } from '@/lib/format'
 import { useOS } from '@/lib/store'
 import { getViewed, clearViewed, type ViewedItem } from '@/lib/viewed'
 import { getSocket } from '@/lib/use-realtime'
@@ -26,7 +26,13 @@ export function toggleFavLocal(id: string): string[] {
 }
 const toggleFav = toggleFavLocal
 
-// Короткий формат «2 ч» для строки «Москва · 2 ч»
+const SORT_LABEL: Record<'new' | 'cheap' | 'expensive', string> = {
+  new: 'по дате',
+  cheap: 'сначала дешевле',
+  expensive: 'сначала дороже',
+}
+
+// Короткий формат «2 ч» для строки «Когда» в шите сравнения
 function shortAgo(dateStr: string): string {
   const d = new Date(dateStr)
   const diff = Math.floor((Date.now() - d.getTime()) / 1000)
@@ -192,100 +198,99 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
 
   return (
     <div className="relative h-full flex flex-col">
-      {/* поиск и фильтры */}
-      <div className="bg-white px-3 pt-2 pb-2.5 border-b border-black/5 shrink-0">
+      {/* ШАПКА (sticky): большой скруглённый поиск + категории-чипы + фильтры-пилюли */}
+      <div className="bg-white px-3 pt-1.5 pb-2.5 border-b border-black/5 shrink-0">
         <form
           onSubmit={(e) => { e.preventDefault(); setQuery(q.trim()) }}
-          className="flex gap-2"
         >
-          <div className="flex-1 flex items-center gap-2 bg-[#f0f1f3] rounded-2xl px-3.5 h-11">
-            <Search size={17} className="text-neutral-400 shrink-0" aria-hidden />
+          <div className="flex items-center gap-2 bg-[#f0f1f3] rounded-xl px-3.5 h-11">
+            <Search size={18} className="text-neutral-500 shrink-0" aria-hidden />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Поиск на Сделке"
               aria-label="Поиск на Сделке"
-              className="bg-transparent outline-none text-sm w-full placeholder:text-neutral-400"
+              className="bg-transparent outline-none text-[15px] w-full placeholder:text-neutral-500"
             />
+            {q && (
+              <button
+                type="button"
+                onClick={() => { setQ(''); setQuery('') }}
+                aria-label="Очистить поиск"
+                className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-neutral-400 active:bg-black/5"
+              >
+                <X size={15} aria-hidden />
+              </button>
+            )}
           </div>
-          {(query || category !== 'all') && (
-            <button
-              type="button"
-              onClick={saveCurrent}
-              aria-label="Сохранить поиск"
-              className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 bg-[#e7f6ff] text-[#0098e8] active:scale-95 transition-transform"
-            >
-              <BellPlus size={18} aria-hidden />
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setShowSort((s) => !s)}
-            aria-label="Сортировка"
-            aria-expanded={showSort}
-            className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
-              showSort ? 'bg-[#965EEB] text-white' : 'bg-[#f0f1f3] text-neutral-500'
-            }`}
-          >
-            <SlidersHorizontal size={18} aria-hidden />
-          </button>
         </form>
+
+        {/* категории — горизонтальный скролл мелких чипов с бордером */}
+        <div className="flex gap-2 mt-2.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-0.5" role="tablist" aria-label="Категории">
+          <CatChip label="Все" active={category === 'all'} onClick={() => setCategory('all')} role="tab" ariaSelected={category === 'all'} />
+          {CATEGORIES.map((c) => (
+            <CatChip
+              key={c.key}
+              label={c.label}
+              active={category === c.key}
+              onClick={() => setCategory(c.key)}
+              role="tab"
+              ariaSelected={category === c.key}
+            />
+          ))}
+        </div>
+
+        {/* фильтры — мелкие пилюли с иконками */}
+        <div className="flex gap-2 mt-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Фильтры и сортировка">
+          <FilterPill
+            icon={<SlidersHorizontal size={13} aria-hidden />}
+            label="Фильтры"
+            active={showSort}
+            ariaExpanded={showSort}
+            onClick={() => setShowSort((s) => !s)}
+          />
+          <FilterPill
+            icon={<ArrowUpDown size={13} aria-hidden />}
+            label={`Сортировка: ${SORT_LABEL[sort]}`}
+            ariaExpanded={showSort}
+            onClick={() => setShowSort((s) => !s)}
+          />
+          {(query || category !== 'all') && (
+            <FilterPill
+              icon={<BellPlus size={13} aria-hidden />}
+              label="Сохранить поиск"
+              accent
+              onClick={() => saveCurrent()}
+            />
+          )}
+        </div>
+
+        {/* панель фильтров: сортировка + город */}
         {showSort && (
-          <div className="flex flex-col gap-2 mt-2">
-            <div className="flex gap-2">
-              {([['new', 'Свежие'], ['cheap', 'Дешевле'], ['expensive', 'Дороже']] as const).map(([k, label]) => (
-                <button
-                  key={k}
-                  onClick={() => { setSort(k) }}
-                  className={`px-3.5 h-10 rounded-xl text-xs font-semibold transition-colors ${
-                    sort === k ? 'bg-[#965EEB] text-white' : 'bg-[#f0f1f3] text-neutral-600'
-                  }`}
-                >
-                  {label}
-                </button>
+          <div className="flex flex-col gap-2 mt-2.5">
+            <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Сортировка">
+              {([['new', 'По дате'], ['cheap', 'Сначала дешевле'], ['expensive', 'Сначала дороже']] as const).map(([k, label]) => (
+                <CatChip key={k} label={label} active={sort === k} onClick={() => setSort(k)} />
               ))}
             </div>
-            {/* город */}
             {cities.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto [scrollbar-width:none]" aria-label="Фильтр по городу">
-                <CatChip active={city === 'all'} onClick={() => setCity('all')} label="Вся Россия" />
+              <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Фильтр по городу">
+                <CatChip label="Вся Россия" active={city === 'all'} onClick={() => setCity('all')} />
                 {cities.map((c) => (
-                  <CatChip key={c.city} active={city === c.city} onClick={() => setCity(c.city)} label={`${c.city} · ${c.count}`} />
+                  <CatChip key={c.city} label={`${c.city} · ${c.count}`} active={city === c.city} onClick={() => setCity(c.city)} />
                 ))}
               </div>
             )}
           </div>
         )}
-        {/* категории — фирменная полоса кружков с иконками */}
-        <div className="flex gap-3.5 mt-3 overflow-x-auto [scrollbar-width:none] pb-1" role="tablist" aria-label="Категории">
-          <CategoryCircle
-            label="Все"
-            active={category === 'all'}
-            onClick={() => setCategory('all')}
-            icon={<LayoutGrid size={20} aria-hidden />}
-            color="bg-neutral-200 text-neutral-600"
-          />
-          {CATEGORIES.map((c) => {
-            const meta = CATEGORY_ICON[c.key]
-            return (
-              <CategoryCircle
-                key={c.key}
-                label={c.label}
-                active={category === c.key}
-                onClick={() => setCategory(c.key)}
-                icon={<meta.icon size={20} aria-hidden />}
-                color={meta.color}
-              />
-            )
-          })}
-        </div>
+
         {/* сохранённые поиски */}
         {saved.length > 0 && (
-          <div className="flex gap-2 mt-2 overflow-x-auto [scrollbar-width:none]" aria-label="Сохранённые поиски">
+          <div className="flex gap-2 mt-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Сохранённые поиски">
             {saved.map((s) => (
               <span
                 key={s.id}
-                className="shrink-0 flex items-center gap-1.5 h-9 pl-3 pr-1.5 rounded-full border border-[#965EEB]/40 bg-[#f5fbff] text-xs font-medium text-[#7C3AED]"
+                className="shrink-0 flex items-center gap-1.5 h-8 pl-3 pr-1.5 rounded-full border border-[#7C3AED]/40 bg-[#7C3AED]/5 text-xs font-medium text-[#7C3AED]"
               >
                 <button
                   onClick={() => applySaved(s)}
@@ -298,9 +303,9 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
                 <button
                   onClick={() => removeSaved(s.id)}
                   aria-label="Удалить поиск"
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-[#7C3AED]/60 active:bg-black/5"
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-[#7C3AED]/60 active:bg-black/5"
                 >
-                  <X size={13} aria-hidden />
+                  <X size={12} aria-hidden />
                 </button>
               </span>
             ))}
@@ -308,8 +313,8 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
         )}
       </div>
 
-      {/* лента */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto [scrollbar-width:thin] p-3 flex flex-col gap-3">
+      {/* лента: 2 колонки плоских карточек */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto [scrollbar-width:thin] px-2 pt-2 pb-4 flex flex-col gap-3">
         {!favoritesMode && total > 0 && !loading && (
           <div className="shrink-0 text-[11px] text-neutral-400 px-1">{fmtNum(total)} объявлений рядом</div>
         )}
@@ -333,9 +338,9 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
           <div className="shrink-0 bg-red-50 text-red-600 text-sm rounded-2xl p-3">{error}</div>
         )}
         {loading && items.length === 0 ? (
-          <>
-            {Array.from({ length: 3 }).map((_, i) => <CardSkeleton key={i} />)}
-          </>
+          <div className="grid grid-cols-2 gap-x-2 gap-y-4 content-start">
+            {Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} />)}
+          </div>
         ) : items.length === 0 ? (
           <div className="shrink-0 text-center pt-14 px-8 space-y-3">
             <div className="mx-auto w-16 h-16 rounded-3xl bg-neutral-100 flex items-center justify-center" aria-hidden>
@@ -352,22 +357,24 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
           </div>
         ) : (
           <>
-            {items.map((l) => (
-              <ListingCard
-                key={l.id}
-                listing={l}
-                onOpen={() => onOpenListing(l.id)}
-                onFav={() => onFav(l.id)}
-                fav={favs.includes(l.id)}
-                comparing={compare.some((c) => c.id === l.id)}
-                onCompareToggle={!favoritesMode ? () => toggleCompare(l) : undefined}
-              />
-            ))}
+            <div className="grid grid-cols-2 gap-x-2 gap-y-4 content-start">
+              {items.map((l) => (
+                <ListingCard
+                  key={l.id}
+                  listing={l}
+                  onOpen={() => onOpenListing(l.id)}
+                  onFav={() => onFav(l.id)}
+                  fav={favs.includes(l.id)}
+                  comparing={compare.some((c) => c.id === l.id)}
+                  onCompareToggle={!favoritesMode ? () => toggleCompare(l) : undefined}
+                />
+              ))}
+            </div>
             {!favoritesMode && items.length < total && (
               <button
                 onClick={() => load(pageRef.current + 1)}
                 disabled={loading}
-                className="h-11 shrink-0 rounded-2xl bg-white text-sm font-semibold text-neutral-700 shadow-sm active:scale-[0.98] transition-transform disabled:opacity-50"
+                className="h-11 shrink-0 rounded-full border border-neutral-200 bg-white text-sm font-semibold text-neutral-800 active:scale-[0.98] transition-transform disabled:opacity-50"
               >
                 {loading ? 'Загрузка…' : 'Показать ещё'}
               </button>
@@ -379,14 +386,14 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
       {/* панель сравнения — плавает над нижней навигацией */}
       {compare.length > 0 && !showCompare && (
         <div
-          className="shrink-0 mx-3 mb-2 rounded-2xl bg-neutral-900 text-white shadow-xl p-2 flex items-center gap-2 animate-in slide-in-from-bottom-2"
+          className="shrink-0 mx-2 mb-2 rounded-2xl bg-neutral-900 text-white shadow-xl p-2 flex items-center gap-2 animate-in slide-in-from-bottom-2"
           role="toolbar"
           aria-label="Панель сравнения"
         >
-          <span className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-[#965EEB]/20 shrink-0" aria-hidden>
+          <span className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-[#7C3AED]/25 shrink-0" aria-hidden>
             <Scale size={16} className="text-[#c5a6f5]" />
             {compare.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#965EEB] text-[9px] font-bold flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#7C3AED] text-[9px] font-bold flex items-center justify-center">
                 {compare.length}
               </span>
             )}
@@ -397,7 +404,7 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
           <button
             onClick={() => setShowCompare(true)}
             disabled={compare.length < 2}
-            className="ml-auto h-9 px-4 rounded-xl bg-[#965EEB] text-xs font-bold active:scale-95 transition-transform disabled:opacity-40"
+            className="ml-auto h-9 px-4 rounded-xl bg-[#7C3AED] text-xs font-bold active:scale-95 transition-transform disabled:opacity-40"
           >
             Сравнить
           </button>
@@ -424,12 +431,21 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
   )
 }
 
-function CatChip({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
+// Категория-чип: высота 32, пилюля, активная — чёрная с белым текстом
+function CatChip({ label, active, onClick, role, ariaSelected }: {
+  label: string
+  active: boolean
+  onClick: () => void
+  role?: 'tab'
+  ariaSelected?: boolean
+}) {
   return (
     <button
       onClick={onClick}
-      className={`shrink-0 px-3.5 h-10 rounded-full text-xs font-semibold transition-colors ${
-        active ? 'bg-neutral-900 text-white' : 'bg-[#f0f1f3] text-neutral-600'
+      role={role}
+      aria-selected={ariaSelected}
+      className={`shrink-0 h-8 px-3.5 rounded-full text-[13px] font-medium border transition-colors active:scale-[0.97] ${
+        active ? 'bg-black text-white border-black' : 'bg-white border-neutral-200 text-neutral-800'
       }`}
     >
       {label}
@@ -437,12 +453,41 @@ function CatChip({ active, onClick, label }: { active: boolean; onClick: () => v
   )
 }
 
+// Фильтр-пилюля с иконкой (Фильтры / Сортировка / Сохранить поиск)
+function FilterPill({ icon, label, onClick, active, accent, ariaExpanded }: {
+  icon: ReactNode
+  label: string
+  onClick: () => void
+  active?: boolean
+  accent?: boolean
+  ariaExpanded?: boolean
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-expanded={ariaExpanded}
+      aria-pressed={active}
+      className={`shrink-0 flex items-center gap-1.5 h-8 px-3 rounded-full text-[13px] font-medium border transition-colors active:scale-[0.97] ${
+        active
+          ? 'bg-black text-white border-black'
+          : accent
+            ? 'bg-[#7C3AED]/5 border-[#7C3AED]/40 text-[#7C3AED]'
+            : 'bg-white border-neutral-200 text-neutral-800'
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  )
+}
+
 function CardSkeleton() {
   return (
-    <div className="shrink-0 bg-white rounded-2xl overflow-hidden shadow-sm">
-      <div className="aspect-[16/10] skeleton-shimmer bg-neutral-100" />
-      <div className="p-3 space-y-2">
-        <div className="h-3.5 skeleton-shimmer bg-neutral-100 rounded w-3/4" />
+    <div className="shrink-0">
+      <div className="aspect-[4/3] skeleton-shimmer bg-neutral-100 rounded-xl" />
+      <div className="pt-1.5 px-0.5 space-y-1.5">
+        <div className="h-3.5 skeleton-shimmer bg-neutral-100 rounded w-2/3" />
+        <div className="h-3 skeleton-shimmer bg-neutral-100 rounded w-full" />
         <div className="h-3 skeleton-shimmer bg-neutral-100 rounded w-1/2" />
       </div>
     </div>
@@ -456,7 +501,7 @@ function ViewedStrip({ items, onOpen, onClear }: {
   onClear: () => void
 }) {
   return (
-    <div className="shrink-0 bg-white rounded-2xl shadow-sm p-3">
+    <div className="shrink-0 bg-white rounded-2xl p-3">
       <div className="flex items-center gap-1.5 mb-2">
         <History size={13} className="text-neutral-400" aria-hidden />
         <h2 className="text-xs font-semibold text-neutral-800">Вы смотрели</h2>
@@ -490,59 +535,9 @@ function ViewedStrip({ items, onOpen, onClear }: {
   )
 }
 
-// Иконка и цвет каждой категории — фирменная полоса кружков как в настоящем приложении
-const CATEGORY_ICON: Record<string, { icon: typeof Smartphone; color: string }> = {
-  phones: { icon: Smartphone, color: 'bg-sky-100 text-sky-600' },
-  laptops: { icon: Laptop, color: 'bg-indigo-100 text-indigo-600' },
-  electronics: { icon: Tv, color: 'bg-blue-100 text-blue-600' },
-  clothes: { icon: Shirt, color: 'bg-pink-100 text-pink-600' },
-  sneakers: { icon: Footprints, color: 'bg-orange-100 text-orange-600' },
-  furniture: { icon: Sofa, color: 'bg-amber-100 text-amber-700' },
-  appliances: { icon: WashingMachine, color: 'bg-cyan-100 text-cyan-700' },
-  hobby: { icon: Bike, color: 'bg-emerald-100 text-emerald-600' },
-  sport: { icon: Dumbbell, color: 'bg-lime-100 text-lime-700' },
-  music: { icon: Music, color: 'bg-violet-100 text-violet-600' },
-  auto: { icon: Car, color: 'bg-red-100 text-red-600' },
-  kids: { icon: Baby, color: 'bg-fuchsia-100 text-fuchsia-600' },
-  books: { icon: BookOpen, color: 'bg-stone-200 text-stone-600' },
-}
-
-function CategoryCircle({ label, icon, color, active, onClick }: {
-  label: string
-  icon: ReactNode
-  color: string
-  active: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      onClick={onClick}
-      role="tab"
-      aria-selected={active}
-      className="shrink-0 flex flex-col items-center gap-1 group"
-    >
-      <span
-        className={`w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-90 ${
-          color
-        } ${
-          active
-            ? 'ring-2 ring-[#965EEB] ring-offset-2 ring-offset-white'
-            : 'group-hover:brightness-95'
-        }`}
-      >
-        {icon}
-      </span>
-      <span
-        className={`max-w-16 truncate text-[10px] leading-tight ${
-          active ? 'font-semibold text-[#965EEB]' : 'text-neutral-500'
-        }`}
-      >
-        {label}
-      </span>
-    </button>
-  )
-}
-
+// Карточка ленты в стиле Авито: плоская, без рамки и тени.
+// Фото 4/3 с круглыми белыми кнопками (сердечко, сравнение), под фото —
+// цена 15px bold, бейдж «Доставка Сделки», заголовок 13px, город, время.
 export function ListingCard({ listing: l, onOpen, onFav, fav, comparing, onCompareToggle }: {
   listing: FeedListing
   onOpen: () => void
@@ -553,84 +548,76 @@ export function ListingCard({ listing: l, onOpen, onFav, fav, comparing, onCompa
 }) {
   const cheap = cheaperPercent(l)
   return (
-    <div className={`press shrink-0 bg-white rounded-2xl overflow-hidden shadow-sm ${comparing ? 'ring-2 ring-[#965EEB] ring-offset-1 ring-offset-[#f4f5f7]' : ''}`}>
-      <div className="relative aspect-[16/10] bg-neutral-100">
-        <button onClick={onOpen} aria-label={l.title} className="absolute inset-0 w-full text-left">
-          <img src={l.image} alt="" className="w-full h-full object-cover" loading="lazy" />
-          {/* цена поверх фото */}
-          <span className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/70 to-transparent" aria-hidden />
-          <span
-            className={`absolute left-3 bottom-2.5 text-xl font-extrabold leading-none tracking-tight ${
-              l.price === 0 ? 'text-[#4ade80]' : 'text-white'
-            }`}
-          >
-            {l.price === 0 ? 'Даром' : `${fmtNum(l.price)} ₽`}
-          </span>
-          {cheap >= 10 && (
-            <span className="absolute right-3 bottom-2.5 bg-[#04E061] text-white text-[10px] font-bold px-1.5 py-1 rounded-md">
-              Дешевле рынка {cheap}%
-            </span>
-          )}
-          {l.boosted && (
-            <span className={`absolute top-2.5 bg-[#965EEB] text-white text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 ${onCompareToggle ? 'left-14' : 'left-2.5'}`}>
-              <Zap size={10} aria-hidden /> ТОП
-            </span>
-          )}
+    <div className={`press flex flex-col ${comparing ? 'ring-2 ring-[#7C3AED] ring-offset-2 ring-offset-[#f4f5f7] rounded-xl' : ''}`}>
+      <div className="relative">
+        <button onClick={onOpen} aria-label={l.title} className="block w-full text-left">
+          <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-neutral-100">
+            <img src={l.image} alt="" className="w-full h-full object-cover" loading="lazy" />
+            {cheap >= 10 && (
+              <span className="absolute left-1.5 bottom-1.5 bg-[#04E061] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">
+                Дешевле рынка {cheap}%
+              </span>
+            )}
+            {l.boosted && (
+              <span className={`absolute top-1.5 bg-[#7C3AED] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5 ${onCompareToggle ? 'left-10' : 'left-1.5'}`}>
+                <Zap size={9} aria-hidden /> ТОП
+              </span>
+            )}
+          </div>
         </button>
         {onCompareToggle && (
           <button
             onClick={onCompareToggle}
             aria-label={comparing ? `Убрать ${l.title} из сравнения` : `Добавить ${l.title} к сравнению`}
             aria-pressed={comparing}
-            className={`absolute top-2 left-2 w-9 h-9 rounded-full backdrop-blur-sm flex items-center justify-center active:scale-90 transition-all ${
-              comparing ? 'bg-[#965EEB] shadow-md' : 'bg-black/30'
-            }`}
+            className="absolute top-1.5 left-1.5 w-7 h-7 rounded-full bg-white shadow-md flex items-center justify-center active:scale-90 transition-transform duration-200 ease-out"
           >
-            <Scale size={15} className={comparing ? 'text-white' : 'text-white/90'} aria-hidden />
+            <Scale size={13} className={comparing ? 'text-[#7C3AED]' : 'text-neutral-700'} aria-hidden />
           </button>
         )}
         {onFav && (
           <button
             onClick={onFav}
             aria-label={fav ? 'Убрать из избранного' : 'В избранное'}
-            className="absolute top-2 right-2 w-11 h-11 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center active:scale-90 transition-transform"
+            aria-pressed={fav}
+            className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-white shadow-md flex items-center justify-center active:scale-90 transition-transform duration-200 ease-out"
           >
-            <Heart size={18} className={fav ? 'fill-[#FF4053] text-[#FF4053]' : 'text-white'} aria-hidden />
+            <Heart
+              size={14}
+              className={`transition-all duration-200 ease-out ${fav ? 'fill-[#FF5555] text-[#FF5555] scale-110' : 'text-neutral-600'}`}
+              aria-hidden
+            />
           </button>
         )}
       </div>
-      {/* название, продавец, место */}
-      <button onClick={onOpen} className="block w-full text-left p-3 space-y-2">
-        <p className="text-sm font-semibold text-neutral-900 truncate">{l.title}</p>
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span
-            className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white shrink-0"
-            style={{ background: hueColor(l.seller.id.length * 47 % 360) }}
-            aria-hidden
-          >
-            {initials(l.seller.displayName)}
-          </span>
-          <span className="text-xs text-neutral-500 truncate">{l.seller.displayName}</span>
-          {l.seller.online && <span className="dot-pulse w-1.5 h-1.5 rounded-full bg-[#04E061] shrink-0" aria-label="Продавец онлайн" />}
-          <span className="ml-auto flex items-center gap-0.5 text-[11px] text-neutral-500 shrink-0">
-            <Star size={10} className="text-amber-400 fill-amber-400" aria-hidden />
-            {l.seller.rating > 0 ? Math.min(5, l.seller.rating).toFixed(1) : 'новый'}
-          </span>
-        </div>
-        <div className="text-[11px] text-neutral-400 flex items-center gap-1">
-          <MapPin size={11} aria-hidden /> {l.city} · {shortAgo(l.createdAt)}
-          {l.negotiable && (
-            <span className="ml-auto flex items-center gap-0.5 font-medium text-[#965EEB]">
-              <Handshake size={11} aria-hidden /> Торг
-            </span>
-          )}
-        </div>
+      <button onClick={onOpen} className="block w-full text-left px-0.5 pt-1.5">
+        <p className={`text-[15px] font-bold leading-tight ${l.price === 0 ? 'text-emerald-600' : 'text-neutral-900'}`}>
+          {l.price === 0 ? 'Даром' : `${fmtNum(l.price)} ₽`}
+        </p>
+        {(l.price > 0 || l.negotiable) && (
+          <div className="mt-1 flex items-center flex-wrap gap-x-2.5 gap-y-0.5">
+            {l.price > 0 && (
+              <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-600">
+                <Truck size={11} aria-hidden /> Доставка Сделки
+              </span>
+            )}
+            {l.negotiable && (
+              <span className="flex items-center gap-1 text-[11px] font-medium text-[#7C3AED]">
+                <Handshake size={11} aria-hidden /> Торг
+              </span>
+            )}
+          </div>
+        )}
+        <p className="mt-1 text-[13px] text-neutral-900 truncate">{l.title}</p>
+        <p className="mt-0.5 text-xs text-neutral-500 truncate">{l.city}</p>
+        <p className="mt-0.5 text-[11px] text-neutral-400">{timeAgo(l.createdAt)}</p>
       </button>
     </div>
   )
 }
 
-// ПУЛЬС РЫНКА: карточки товаров, чья цена заметно двигалась за последний час.
+// ПУЛЬС РЫНКА: карточка-вставка с заголовком 18px и горизонтальным скроллом
+// товаров, чья цена заметно двигалась за последний час.
 // Тап — применяем поиск по товару. Вспышка при живом обновлении с рынка.
 // deltaPct < 0 — подешевел (зелёный), > 0 — подорожал (красный).
 function MarketPulseStrip({ items, flash, onPick }: {
@@ -644,31 +631,31 @@ function MarketPulseStrip({ items, flash, onPick }: {
   }
   return (
     <section
-      className={`shrink-0 rounded-2xl bg-white shadow-sm overflow-hidden transition-shadow ${flash ? 'ring-2 ring-[#965EEB]/50 shadow-md' : ''}`}
+      className={`shrink-0 rounded-2xl bg-white overflow-hidden transition-shadow ${flash ? 'ring-2 ring-[#7C3AED]/50 shadow-md' : ''}`}
       aria-label="Пульс рынка"
     >
-      <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-1">
-        <Activity size={13} className="text-[#965EEB]" aria-hidden />
-        <h2 className="text-xs font-semibold text-neutral-800">Пульс рынка</h2>
-        <span className="text-[10px] text-neutral-400">за час</span>
+      <div className="flex items-baseline gap-2 px-3 pt-3 pb-1">
+        <Activity size={15} className="text-[#7C3AED] self-center" aria-hidden />
+        <h2 className="text-lg font-bold text-neutral-900 leading-none">Пульс рынка</h2>
+        <span className="text-xs text-neutral-400">за час</span>
         {flash && (
-          <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-[#965EEB]">
+          <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-[#7C3AED]">
             <span className="relative flex h-1.5 w-1.5" aria-hidden>
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#965EEB] opacity-75" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#965EEB]" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#7C3AED] opacity-75" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#7C3AED]" />
             </span>
             живое
           </span>
         )}
       </div>
-      <div className="flex gap-2 overflow-x-auto px-2.5 pb-2.5 [scrollbar-width:none]">
+      <div className="flex gap-2 overflow-x-auto px-2.5 pb-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((p) => {
           const down = p.deltaPct < 0
           return (
             <button
               key={p.itemKey}
               onClick={() => onPick(queryOf(p.title))}
-              className="shrink-0 w-[124px] text-left rounded-xl border border-black/5 overflow-hidden bg-neutral-50 active:scale-[0.97] transition-transform"
+              className="shrink-0 w-[124px] text-left rounded-xl border border-neutral-200 overflow-hidden bg-neutral-50 active:scale-[0.97] transition-transform"
               aria-label={`${p.title}, цена ${fmtNum(p.price)}, ${down ? 'подешевел' : 'подорожал'} на ${Math.abs(p.deltaPct)}%`}
             >
               <div className="relative aspect-[16/10] bg-neutral-200">
@@ -780,7 +767,7 @@ function CompareSheet({ items, onClose, onClear, onOpen }: {
         <div className="shrink-0 px-4 pt-3 pb-2 border-b border-black/5">
           <div className="mx-auto mb-2.5 h-1 w-10 rounded-full bg-neutral-200" aria-hidden />
           <div className="flex items-center">
-            <Scale size={16} className="text-[#965EEB]" aria-hidden />
+            <Scale size={16} className="text-[#7C3AED]" aria-hidden />
             <h2 className="ml-1.5 text-sm font-bold text-neutral-900">Сравнение товаров</h2>
             <button
               onClick={onClear}

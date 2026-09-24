@@ -1,7 +1,7 @@
 import { db } from '@/lib/db'
 import { getSessionUser, unauthorized } from '@/lib/session'
 import { loanLimitFor, LOAN_DAYS, creditRateFor } from '@/lib/economy'
-import { notifyUser } from '@/lib/deals'
+import { notifyUser, bumpStats, bumpQuests } from '@/lib/deals'
 import { fmtMoney } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
@@ -68,6 +68,8 @@ export async function POST(req: Request) {
   await db.transaction.create({
     data: { userId: user.id, type: 'loan', amount, note: `Кредит на ${LOAN_DAYS} дней под ${rate}%` },
   })
+  await bumpStats(user.id, { loans: 1 })
+  await bumpQuests(user.id, 'loan')
   await notifyUser(user.id, 'system', 'Кредит выдан', `${fmtMoney(amount)} зачислено на счёт. К возврату ${fmtMoney(owed)} до ${new Date(Date.now() + LOAN_DAYS * 86_400_000).toLocaleDateString('ru-RU')}.`)
   const fresh = await db.user.findUnique({ where: { id: user.id } })
   return Response.json({ ok: true, balance: fresh?.balance ?? user.balance })

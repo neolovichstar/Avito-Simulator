@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { getSessionUser, unauthorized } from '@/lib/session'
 import { rateLimit } from '@/lib/ratelimit'
+import { bumpQuests } from '@/lib/deals'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,11 +36,18 @@ export async function POST(req: Request) {
     await db.favorite.deleteMany({ where: { userId: user.id, listingId } })
     return Response.json({ ok: true, on: false })
   }
-  await db.favorite.upsert({
+  const created = await db.favorite.upsert({
     where: { userId_listingId: { userId: user.id, listingId } },
     create: { userId: user.id, listingId },
     update: {},
   })
+  if (created) {
+    try {
+      await bumpQuests(user.id, 'fav')
+    } catch {
+      // квесты не должны ломать избранное
+    }
+  }
   return Response.json({ ok: true, on: true })
 }
 

@@ -15,6 +15,8 @@ import { isBlocked } from '@/lib/blocked'
 import { fireAutoBids, clearAutoBids } from '@/lib/autobid'
 import { fmtMoney } from '@/lib/format'
 import { cache } from '@/lib/cache'
+import { DEPOSIT_RATE_PER_HOUR } from '@/lib/economy'
+import { bumpStats, bumpQuests, checkAchievements } from '@/lib/deals'
 
 const g = globalThis as unknown as {
   __avitoEngine?: { started: boolean; tick: number; lastSpecialDay?: string }
@@ -531,6 +533,9 @@ async function auctionTick(tick: number) {
         data: { userId: winner.id, type: 'purchase', amount: -lot.currentBid, note: `Аукцион: ${lot.title}` },
       })
       await notifyUser(winner.id, 'deal', 'Вы выиграли аукцион', `«${lot.title}» за ${fmtMoney(lot.currentBid)} уже в инвентаре`)
+      await bumpStats(winner.id, { auctionWins: 1 })
+      await bumpQuests(winner.id, 'auction_win')
+      await checkAchievements(winner.id)
     } else {
       await db.user.update({ where: { id: winner.id }, data: { balance: { decrement: lot.currentBid } } })
     }
@@ -558,7 +563,7 @@ async function financeTick() {
     if (!u.depositAt) continue
     const hours = Math.floor((Date.now() - u.depositAt.getTime()) / 3_600_000)
     if (hours < 1) continue
-    const interest = Math.round(u.deposit * 0.001 * hours)
+    const interest = Math.round(u.deposit * DEPOSIT_RATE_PER_HOUR * hours)
     if (interest <= 0) continue
     await db.user.update({
       where: { id: u.id },

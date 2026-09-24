@@ -3,18 +3,17 @@
 // Приложение «Настройки» — стиль Android-настроек: белый фон, секции-карточки.
 import { useCallback, useEffect, useState } from 'react'
 import {
-  BatteryCharging, Ban, CheckCircle2, Database, Handshake, Info, Loader2, MapPin, Moon, MoonStar, NotebookText, RefreshCw,
+  BatteryCharging, Ban, Bot, CheckCircle2, Database, Handshake, Info, Loader2, MapPin, Moon, MoonStar, NotebookText, RefreshCw,
   Send, Server, Shield, Star, Volume2, Wallet, Zap,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS, ALL_WIDGETS, WIDGET_LABEL, type WidgetKey } from '@/lib/store'
+import { levelProgress, xpForLevel } from '@/lib/economy'
 import { WALLPAPERS, wallpaperPreviewStyle } from '@/lib/wallpapers'
 import { fmtMoney, initials, hueColor, timeAgo } from '@/lib/format'
 import type { ProfileData, BlockedSellerDTO } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-
-const XP_PER_LEVEL = 500
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -147,8 +146,13 @@ export default function SettingsApp() {
   const rating = profile?.rating ?? (session && session.ratingCount > 0 ? session.ratingSum / session.ratingCount : 0)
   const ratingCount = profile?.reviews.length ?? session?.ratingCount ?? 0
   const dealsCount = profile?.dealsCount ?? null
-  const xpInLevel = (session?.xp ?? 0) % XP_PER_LEVEL
-  const xpPct = Math.min(100, Math.round((xpInLevel / XP_PER_LEVEL) * 100))
+  const xpTotal = session?.xp ?? 0
+  const lvl = session?.level ?? 1
+  const curLvlXp = xpForLevel(lvl)
+  const nextLvlXp = xpForLevel(lvl + 1)
+  const xpInLevel = xpTotal - curLvlXp
+  const xpNeed = nextLvlXp - curLvlXp
+  const xpPct = levelProgress(xpTotal)
 
   return (
     <div className="h-full flex flex-col bg-white text-neutral-900">
@@ -199,17 +203,18 @@ export default function SettingsApp() {
                 </div>
               </div>
 
-              {/* Прогресс XP */}
+              {/* Прогресс XP (хардкорная кривая) */}
               <div className="mt-4">
                 <div className="flex justify-between text-[11px] text-neutral-500">
                   <span>Опыт</span>
                   <span>
-                    {xpInLevel} / {XP_PER_LEVEL} XP
+                    {xpInLevel} / {xpNeed} XP
                   </span>
                 </div>
                 <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-neutral-100">
                   <div className="h-full rounded-full bg-[#21A038] transition-all" style={{ width: `${xpPct}%` }} />
                 </div>
+                <p className="mt-1 text-[10px] text-neutral-400">Прогресс хардкорный: на высоких уровнях XP нужен в разы больше</p>
               </div>
 
               {/* Рейтинг и баланс */}
@@ -527,6 +532,29 @@ export default function SettingsApp() {
                       {sys ? `SQLite (Prisma) · запрос ${sys.db.latencyMs} мс` : 'проверяем…'}
                     </div>
                   </div>
+                </div>
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+                    <Bot className="size-4" aria-hidden />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium text-neutral-800">ИИ-запросы сегодня</div>
+                    <div className="text-xs text-neutral-500">
+                      {sys
+                        ? `${sys.ai.used} из ${sys.ai.limit} · только в чатах · всё остальное на скриптах`
+                        : 'проверяем…'}
+                    </div>
+                  </div>
+                  {sys && (
+                    <div className="w-16 shrink-0">
+                      <div className="h-1.5 overflow-hidden rounded-full bg-neutral-100">
+                        <div
+                          className={`h-full rounded-full ${sys.ai.used / sys.ai.limit > 0.85 ? 'bg-red-400' : 'bg-emerald-500'}`}
+                          style={{ width: `${Math.min(100, Math.round((sys.ai.used / sys.ai.limit) * 100))}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-3 px-4 py-3">
                   <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sky-50 text-sky-600">

@@ -1,6 +1,6 @@
 'use client'
 
-import { CreditCard, Globe, Receipt, Settings, ShoppingBag, Wrench, Gavel, Trophy, Truck, type LucideIcon } from 'lucide-react'
+import { CreditCard, Globe, Receipt, Settings, ShoppingBag, Wrench, Gavel, Trophy, Truck, Crown, type LucideIcon } from 'lucide-react'
 import { useOS, type AppKey } from '@/lib/store'
 
 const APP_META: Record<AppKey, { name: string; icon: LucideIcon; from: string; to: string }> = {
@@ -13,6 +13,7 @@ const APP_META: Record<AppKey, { name: string; icon: LucideIcon; from: string; t
   auction: { name: 'Аукцион', icon: Gavel, from: '#d4a017', to: '#713f12' },
   career: { name: 'Задания', icon: Trophy, from: '#7c3aed', to: '#2e1065' },
   delivery: { name: 'Доставки', icon: Truck, from: '#059669', to: '#064e3b' },
+  leaderboard: { name: 'Лидеры', icon: Crown, from: '#d4a017', to: '#78350f' },
 }
 
 export default function RecentsOverlay({

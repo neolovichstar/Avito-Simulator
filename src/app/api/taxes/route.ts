@@ -55,6 +55,7 @@ export async function POST(req: Request) {
   }
   await db.transaction.create({ data: { userId: user.id, type: 'tax', amount: -pay, note: 'Оплата налогов (самозанятый 4%)' } })
   const stats = await import('@/lib/deals').then((m) => m.bumpStats(user.id, { taxPaid: pay }))
+  await import('@/lib/deals').then((m) => m.bumpQuests(user.id, 'tax'))
   await import('@/lib/deals').then((m) => m.checkAchievements(user.id))
   if (pay >= user.taxDebt) {
     await notifyUser(user.id, 'tax', 'Налоги оплачены', `Задолженность погашена полностью. Налоговая довольна.`)

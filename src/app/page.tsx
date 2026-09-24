@@ -23,6 +23,7 @@ import RepairApp from '@/components/apps/RepairApp'
 import AuctionApp from '@/components/apps/AuctionApp'
 import CareerApp from '@/components/apps/CareerApp'
 import DeliveryApp from '@/components/apps/DeliveryApp'
+import LeaderboardApp from '@/components/apps/LeaderboardApp'
 
 const BATTERY_KEY = 'avito_sim_battery'
 const THEME_KEY = 'avito_sim_theme'
@@ -220,6 +221,7 @@ export default function Home() {
       case 'auction': return <AuctionApp />
       case 'career': return <CareerApp />
       case 'delivery': return <DeliveryApp />
+      case 'leaderboard': return <LeaderboardApp />
       default: return null
     }
   }

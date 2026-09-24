@@ -43,6 +43,21 @@ export function DealLogo() {
   )
 }
 
+// Лидеры: пьедестал-таблица с золотым лидером.
+export function LeaderboardLogo() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+      <rect x="9" y="26" width="10" height="14" rx="2" fill="#94A3B8" />
+      <rect x="19" y="18" width="10" height="22" rx="2" fill="#D4A017" />
+      <rect x="29" y="30" width="10" height="10" rx="2" fill="#C48A5A" />
+      <path
+        d="M24 6 l2.1 4.3 4.7 .7 -3.4 3.3 .8 4.7 -4.2 -2.2 -4.2 2.2 .8 -4.7 -3.4 -3.3 4.7 -.7 Z"
+        fill="#F5B60A"
+      />
+    </svg>
+  )
+}
+
 // Банк: монета с рублём — свой образ, без отсылок к реальным банкам.
 export function BankLogo() {
   return (
@@ -224,12 +239,18 @@ export const APP_TILE: Record<AppKey, { label: string; background: string; icon:
     background: 'linear-gradient(145deg, #065F46, #064E3B)',
     icon: <DeliveryLogo />,
   },
+  leaderboard: {
+    label: 'Лидеры',
+    background: 'linear-gradient(145deg, #F8FAFC 0%, #E2E8F0 45%, #CBD5E1 100%)',
+    icon: <LeaderboardLogo />,
+  },
 }
 
 // Порядок иконок на домашнем экране (сетка 4 колонки) и в доке.
 export const HOME_GRID: AppKey[] = [
   'avito',
   'bank',
+  'leaderboard',
   'taxes',
   'browser',
   'settings',
