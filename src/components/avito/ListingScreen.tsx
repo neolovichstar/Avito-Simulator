@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
+import { playSound } from '@/lib/sounds'
 import { fmtNum, fmtMoney, timeAgo, initials, hueColor } from '@/lib/format'
 import { CATEGORY_LABEL } from '@/lib/catalog-types'
 import { DELIVERY_FEE } from '@/lib/economy'
@@ -79,10 +80,12 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
     try {
       const res = await api.buyListing(id, { courier })
       refreshSession({ balance: res.balance })
+      playSound('kaching')
       setBuyOpen(false)
       setOkMsg(courier ? 'Курьер уже забирает товар — следите в приложении Доставки' : 'Товар ваш! Проверьте инвентарь в профиле')
       await load()
     } catch (e) {
+      playSound('error')
       setMsg(e instanceof ApiError ? e.message : 'Не удалось купить')
     } finally {
       setBusy(false)

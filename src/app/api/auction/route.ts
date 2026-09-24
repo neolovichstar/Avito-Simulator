@@ -2,7 +2,7 @@ import { db } from '@/lib/db'
 import { getSessionUser, unauthorized } from '@/lib/session'
 import { auctionStep } from '@/lib/economy'
 import { notifyUser, bumpStats, checkAchievements } from '@/lib/deals'
-import { rateLimit } from '@/lib/ratelimit'
+import { redisLimit } from '@/lib/redis'
 import { CONDITION_LABEL } from '@/lib/catalog-types'
 import { fmtMoney } from '@/lib/format'
 import { emitTo } from '@/lib/realtime-emit'
@@ -52,7 +52,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const user = await getSessionUser(req)
   if (!user) return unauthorized()
-  if (!rateLimit(`bid:${user.id}`, 15, 60_000)) {
+  if (!(await redisLimit(`bid:${user.id}`, 15, 60_000))) {
     return Response.json({ error: 'Слишком много ставок подряд' }, { status: 429 })
   }
   const body = (await req.json().catch(() => ({}))) as { lotId?: string; amount?: number }

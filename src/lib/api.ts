@@ -181,6 +181,12 @@ export const api = {
   readNotifications: () => post<{ ok: boolean }>('/api/notifications', { action: 'read' }),
   stats: () => req<{ online: number }>('/api/stats'),
   daySummary: () => req<{ deals: number; buys: number; sales: number; net: number }>('/api/day-summary'),
+  systemStatus: () =>
+    req<{
+      redis: { enabled: boolean; alive: boolean; latencyMs: number | null; failStreak: number }
+      db: { ok: boolean; latencyMs: number; provider: string }
+      uptimeSec: number
+    }>('/api/system/status'),
 }
 
 // Ссылка на скачивание CSV-истории операций (токен в query — для прямой ссылки)

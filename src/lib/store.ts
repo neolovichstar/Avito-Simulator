@@ -65,6 +65,7 @@ interface OSState {
 }
 
 const g = globalThis as unknown as { __osToastId?: number }
+const s_openRef = { current: null as AppKey | null }
 
 export const useOS = create<OSState>((set, get) => ({
   booted: false,
@@ -91,11 +92,15 @@ export const useOS = create<OSState>((set, get) => ({
   setLocked: (v) => set({ locked: v }),
   setSession: (u) => set({ session: u }),
   setSessionLoading: (v) => set({ sessionLoading: v }),
-  openApp: (app) =>
+  openApp: (app) => {
     set((s) => ({
       currentApp: app,
       openApps: s.openApps[0] === app ? s.openApps : [app, ...s.openApps.filter((a) => a !== app)].slice(0, 6),
-    })),
+    }))
+    // динамический импорт — чтобы не зациклить store ↔ sounds статически
+    if (app !== s_openRef.current) void import('@/lib/sounds').then((m) => m.playSound('open')).catch(() => {})
+    s_openRef.current = app
+  },
   closeApp: () => set({ currentApp: null }),
   goHome: () => set({ currentApp: null }),
   setBattery: (v) => set({ battery: Math.max(0, Math.min(100, v)) }),
@@ -112,6 +117,7 @@ export const useOS = create<OSState>((set, get) => ({
     g.__osToastId = (g.__osToastId ?? 0) + 1
     const id = g.__osToastId
     set((s) => ({ toastQueue: [...s.toastQueue, { id, title, body }].slice(-3) }))
+    void import('@/lib/sounds').then((m) => m.playSound('notify')).catch(() => {})
     setTimeout(() => {
       set((s) => ({ toastQueue: s.toastQueue.filter((t) => t.id !== id) }))
     }, 4200)

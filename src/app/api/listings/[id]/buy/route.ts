@@ -2,7 +2,7 @@ import { db } from '@/lib/db'
 import { getSessionUser, unauthorized } from '@/lib/session'
 import { completeSale } from '@/lib/deals'
 import { DELIVERY_FEE } from '@/lib/economy'
-import { rateLimit } from '@/lib/ratelimit'
+import { redisLimit } from '@/lib/redis'
 import { fmtMoney } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const user = await getSessionUser(req)
   if (!user) return unauthorized()
-  if (!rateLimit(`buy:${user.id}`, 20, 60_000)) {
+  if (!(await redisLimit(`buy:${user.id}`, 20, 60_000))) {
     return Response.json({ error: 'Слишком много покупок подряд' }, { status: 429 })
   }
   const { id } = await ctx.params

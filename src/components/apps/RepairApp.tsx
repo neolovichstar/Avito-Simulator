@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
+import { playSound } from '@/lib/sounds'
 import { fmtMoney } from '@/lib/format'
 import { CONDITION_LABEL } from '@/lib/catalog-types'
 import type { InventoryItemDTO, RepairOrderDTO } from '@/lib/types'
@@ -130,6 +131,7 @@ export default function RepairApp() {
       const os = useOS.getState()
       os.refreshSession({}) // баланс не меняется — товар появляется в инвентаре
       os.pushToast('Ремонт', 'Товар готов')
+      playSound('cash')
       await load()
     } catch (e) {
       useOS.getState().pushToast('Ремонт', e instanceof ApiError ? e.message : 'Не удалось забрать товар')

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
+import { playSound } from '@/lib/sounds'
 import { fmtMoney } from '@/lib/format'
 import type { CareerData, QuestDTO, BonusState } from '@/lib/types'
 import { Button } from '@/components/ui/button'
@@ -49,6 +50,7 @@ export default function CareerApp() {
       const os = useOS.getState()
       os.refreshSession({ balance: res.balance, xp: res.xp })
       os.pushToast('Карьера', `Награда получена: +${fmtMoney(quest.reward)} и +${quest.xpReward} XP`)
+      playSound('cash')
       await load()
     } catch (e) {
       setClaimError(e instanceof ApiError ? e.message : 'Не удалось забрать награду')

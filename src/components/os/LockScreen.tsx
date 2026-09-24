@@ -5,6 +5,7 @@ import { ChevronUp, ShoppingBag } from 'lucide-react'
 import { useOS } from '@/lib/store'
 import { api } from '@/lib/api'
 import { fmtMoney } from '@/lib/format'
+import { playSound } from '@/lib/sounds'
 import { wallpaperClass } from '@/lib/wallpapers'
 
 // Живые тики каждые 1000 мс без setState в эффекте (useSyncExternalStore).
@@ -50,6 +51,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   const unlock = () => {
     if (leaving) return
     setLeaving(true)
+    playSound('unlock')
     window.setTimeout(onUnlock, 400)
   }
 

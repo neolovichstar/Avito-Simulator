@@ -3,8 +3,8 @@
 // Приложение «Настройки» — стиль Android-настроек: белый фон, секции-карточки.
 import { useCallback, useEffect, useState } from 'react'
 import {
-  BatteryCharging, Ban, CheckCircle2, Handshake, Info, Loader2, MapPin, Moon, MoonStar, NotebookText, RefreshCw,
-  Send, Shield, Star, Volume2, Wallet,
+  BatteryCharging, Ban, CheckCircle2, Database, Handshake, Info, Loader2, MapPin, Moon, MoonStar, NotebookText, RefreshCw,
+  Send, Server, Shield, Star, Volume2, Wallet, Zap,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS, ALL_WIDGETS, WIDGET_LABEL, type WidgetKey } from '@/lib/store'
@@ -41,6 +41,8 @@ function Row({ icon, label, value }: { icon: React.ReactNode; label: string; val
   )
 }
 
+type SystemStatus = Awaited<ReturnType<typeof api.systemStatus>>
+
 export default function SettingsApp() {
   const session = useOS((s) => s.session)
   const battery = useOS((s) => s.battery)
@@ -58,6 +60,8 @@ export default function SettingsApp() {
   const setWidgets = useOS((s) => s.setWidgets)
 
   const [profile, setProfile] = useState<ProfileData | null>(null)
+  const [sys, setSys] = useState<SystemStatus | null>(null)
+  const [sysBusy, setSysBusy] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
@@ -87,6 +91,10 @@ export default function SettingsApp() {
       .then((r) => setBlocked(r.items))
       .catch(() => setBlocked([]))
     api.telegramStatus().then(setTg).catch(() => setTg({ linked: false, tgUsername: null, botUsername: 'resalesimbot' }))
+    const loadSys = () => api.systemStatus().then(setSys).catch(() => setSys(null))
+    loadSys()
+    const t = setInterval(loadSys, 30_000)
+    return () => clearInterval(t)
   }, [load])
 
   const getTgCode = async () => {
@@ -452,6 +460,88 @@ export default function SettingsApp() {
               )}
             </SectionCard>
 
+            {/* Инфраструктура */}
+            <SectionCard title="Инфраструктура">
+              <div className="divide-y divide-neutral-100">
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-500">
+                    <Zap className="size-4" aria-hidden />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 text-sm font-medium text-neutral-800">
+                      Redis-кэш
+                      {sys ? (
+                        sys.redis.alive ? (
+                          <span className="size-2 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)]" aria-hidden />
+                        ) : (
+                          <span className="size-2 shrink-0 rounded-full bg-red-400" aria-hidden />
+                        )
+                      ) : (
+                        <Loader2 className="size-3 animate-spin text-neutral-300" />
+                      )}
+                    </div>
+                    <div className="text-xs text-neutral-500">
+                      {sys
+                        ? sys.redis.alive
+                          ? `Upstash · подключён · ${sys.redis.latencyMs ?? '—'} мс`
+                          : sys.redis.enabled
+                            ? 'недоступен — лимиты на памяти'
+                            : 'не настроен — лимиты на памяти'
+                        : 'проверяем…'}
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 shrink-0 rounded-lg px-2.5 text-[11px] font-semibold"
+                    disabled={sysBusy}
+                    onClick={async () => {
+                      setSysBusy(true)
+                      try {
+                        setSys(await api.systemStatus())
+                      } catch {
+                        /* статус остаётся прежним */
+                      } finally {
+                        setSysBusy(false)
+                      }
+                    }}
+                  >
+                    {sysBusy ? <Loader2 className="size-3.5 animate-spin" /> : 'Проверить'}
+                  </Button>
+                </div>
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-violet-50 text-violet-600">
+                    <Database className="size-4" aria-hidden />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 text-sm font-medium text-neutral-800">
+                      База данных
+                      {sys && (
+                        <span
+                          className={`size-2 shrink-0 rounded-full ${sys.db.ok ? 'bg-emerald-500' : 'bg-red-400'}`}
+                          aria-hidden
+                        />
+                      )}
+                    </div>
+                    <div className="text-xs text-neutral-500">
+                      {sys ? `SQLite (Prisma) · запрос ${sys.db.latencyMs} мс` : 'проверяем…'}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sky-50 text-sky-600">
+                    <Server className="size-4" aria-hidden />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium text-neutral-800">Сервер</div>
+                    <div className="text-xs text-neutral-500">
+                      {sys ? `аптайм ${Math.floor(sys.uptimeSec / 60)} мин ${sys.uptimeSec % 60} с · Next.js 16` : 'проверяем…'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </SectionCard>
+
             {/* Об игре */}
             <SectionCard title="Об игре">
               <div className="px-4 py-3">
@@ -459,7 +549,7 @@ export default function SettingsApp() {
                   <Info className="size-4 text-neutral-400" />
                   <span className="text-sm font-medium text-neutral-800">Сделка</span>
                   <span className="ml-auto rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-500">
-                    версия 2.1.0
+                    версия 2.2.0
                   </span>
                 </div>
                 <p className="mt-2 text-xs leading-relaxed text-neutral-500">

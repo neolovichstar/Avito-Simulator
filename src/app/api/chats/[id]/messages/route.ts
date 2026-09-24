@@ -1,7 +1,7 @@
 import { db } from '@/lib/db'
 import { getSessionUser, unauthorized } from '@/lib/session'
 import { botReply } from '@/lib/chat-engine'
-import { rateLimit } from '@/lib/ratelimit'
+import { redisLimit } from '@/lib/redis'
 import { bumpStats, bumpQuests } from '@/lib/deals'
 import { emitTo } from '@/lib/realtime-emit'
 import { stripEmoji } from '@/lib/format'
@@ -12,7 +12,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const user = await getSessionUser(req)
   if (!user) return unauthorized()
   const { id } = await ctx.params
-  if (!rateLimit(`msg:${user.id}`, 15, 60_000)) {
+  if (!(await redisLimit(`msg:${user.id}`, 15, 60_000))) {
     return Response.json({ error: 'Слишком быстро. Бот ещё печатает' }, { status: 429 })
   }
   const body = (await req.json().catch(() => ({}))) as { text?: string; invoice?: number }
