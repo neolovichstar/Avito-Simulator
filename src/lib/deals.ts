@@ -212,6 +212,9 @@ export async function completeSale(opts: {
     if (price === 0) await bumpQuests(opts.buyer.id, 'free')
     await addXp(opts.buyer.id, Math.max(10, Math.round(price * 0.004)))
     await checkAchievements(opts.buyer.id)
+  } else if (opts.buyer.isBot) {
+    // боты тоже растут в опыте — лидерборды живут своей жизнью
+    await addXp(opts.buyer.id, Math.max(6, Math.round(price * 0.002)))
   }
   if (!seller.isBot) {
     let profitDelta = price
@@ -224,6 +227,9 @@ export async function completeSale(opts: {
     if (profitDelta > 0) await bumpQuests(seller.id, 'profit', profitDelta)
     await addXp(seller.id, Math.max(10, Math.round(price * 0.004)))
     await checkAchievements(seller.id)
+  } else if (seller.isBot) {
+    // XP ботам-продавцам: рейтинг площадки меняется в реальном времени
+    await addXp(seller.id, Math.max(6, Math.round(price * 0.002)))
   }
 
   // авто-отзыв от бота-покупателя

@@ -1,7 +1,7 @@
 'use client'
 
 // Приложение «Лидеры» — спортивное табло площадки: пьедестал топ-3 + списки по категориям.
-// Светлая тема, медальные акценты (золото/серебро/бронза), «ты» подсвечен фиолетовым.
+// Светлый-first интерфейс, медальные акценты (золото/серебро/бронза), «ты» подсвечен фиолетовым.
 
 import { useCallback, useEffect, useState } from 'react'
 import {
@@ -116,25 +116,25 @@ export default function LeaderboardApp() {
   return (
     <div className="flex h-full flex-col bg-[#f7f7f8]">
       {/* шапка */}
-      <header className="shrink-0 bg-gradient-to-b from-[#2b2440] to-[#231d33] px-4 pb-5 pt-4 text-white">
+      <header className="shrink-0 border-b border-neutral-100 bg-white px-4 pb-4 pt-4">
         <div className="flex items-center gap-2">
-          <Trophy className="size-5 text-amber-300" aria-hidden />
-          <h1 className="text-lg font-bold tracking-tight">Лидеры площадки</h1>
+          <Trophy className="size-5 text-amber-500" aria-hidden />
+          <h1 className="text-lg font-bold tracking-tight text-neutral-900">Лидеры площадки</h1>
           <Button
             variant="ghost"
             size="icon"
-            className="ml-auto size-8 text-white/70 hover:bg-white/10 hover:text-white"
+            className="ml-auto size-8 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
             onClick={() => void load()}
             aria-label="Обновить лидеров"
           >
             {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
           </Button>
         </div>
-        <p className="mt-1 text-xs text-white/60">Топ игроков и ботов. Обновляется каждые 20 секунд</p>
+        <p className="mt-1 text-xs text-neutral-500">Топ игроков и ботов. Обновляется каждые 20 секунд</p>
       </header>
 
       {/* табы */}
-      <nav className="flex shrink-0 gap-1 bg-[#2b2440] px-3 pb-3" aria-label="Категории лидеров">
+      <nav className="flex shrink-0 gap-1 border-b border-neutral-100 bg-white px-3 pb-3 pt-1" aria-label="Категории лидеров">
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -143,7 +143,7 @@ export default function LeaderboardApp() {
               setTab(t.key)
             }}
             className={`press flex h-9 flex-1 items-center justify-center gap-1 rounded-lg text-[11px] font-semibold transition-colors ${
-              tab === t.key ? 'bg-amber-400 text-[#231d33]' : 'bg-white/10 text-white/70 hover:bg-white/15'
+              tab === t.key ? 'bg-amber-400 text-amber-950 shadow-sm' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
             }`}
             aria-pressed={tab === t.key}
           >
@@ -156,10 +156,10 @@ export default function LeaderboardApp() {
       <main className="min-h-0 flex-1 overflow-y-auto px-3 pb-6">
         {loading && !boards ? (
           <div className="flex h-full items-center justify-center">
-            <Loader2 className="size-7 animate-spin text-neutral-300" />
+            <Loader2 className="size-7 animate-spin text-neutral-400" />
           </div>
         ) : error ? (
-          <div className="mt-10 text-center text-sm text-red-500">{error}</div>
+          <div className="mt-10 text-center text-sm text-red-600">{error}</div>
         ) : rows.length === 0 ? (
           <div className="mt-12 flex flex-col items-center gap-2 text-neutral-400">
             <CircleHelp className="size-8" aria-hidden />

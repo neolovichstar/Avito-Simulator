@@ -646,9 +646,32 @@ export async function tickAll() {
     if (tick % 4 === 0) await winBackSweep()
     await presenceTick()
     if (tick % 8 === 0) await ensureDailyQuestsAll()
+    if (tick % 40 === 0) await leaderboardTick()
   } catch (e) {
     console.error('[engine] tick error:', e)
   }
+}
+
+// Похвала за топ-3 площадки: не чаще раза в 6 часов, только живым игрокам
+async function leaderboardTick() {
+  const top = await db.user.findMany({
+    orderBy: [{ balance: 'desc' }, { xp: 'desc' }],
+    take: 3,
+    select: { id: true, displayName: true, isBot: true, balance: true },
+  })
+  const me = top.find((u) => !u.isBot)
+  if (!me) return
+  const recent = await db.notification.findFirst({
+    where: { userId: me.id, kind: 'leader', createdAt: { gt: new Date(Date.now() - 6 * 3_600_000) } },
+  })
+  if (recent) return
+  const rank = top.findIndex((u) => u.id === me.id) + 1
+  await notifyUser(
+    me.id,
+    'leader',
+    `Вы в топ-${rank} площадки`,
+    `С балансом ${fmtMoney(me.balance)} вы входите в тройку лидеров Сделки. Держите марку — боты дышат в спину!`,
+  )
 }
 
 // задания генерим всем активным игрокам

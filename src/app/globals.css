@@ -376,6 +376,37 @@
 .theme-dark [style*="background-color: rgb(33, 160, 56)"] { color-scheme: dark; }
 
 /* ============================================================
+   ТЁМНАЯ ТЕМА v4 — классы light-first редизайна приложений
+   (Аукцион, Карьера, Лидеры) + добивка остатков
+   ============================================================ */
+
+/* корни приложений */
+.theme-dark .bg-\[\#f6f4f1\] { background-color: #121110; }
+.theme-dark .bg-\[\#f4f3fb\] { background-color: #14102b; }
+
+/* золото аукциона: тёмное на белом -> светлое на тёмном */
+.theme-dark .text-\[\#a87f0e\], .theme-dark .text-\[\#8a6a0c\] { color: #e9c05e; }
+
+/* полупрозрачные нейтральные скелетоны */
+.theme-dark [class*="bg-neutral-200/"] { background-color: rgba(42, 47, 54, 0.85); }
+
+/* цветные плашки, не покрытые ранее */
+.theme-dark .text-lime-700 { color: #a3e635; }
+.theme-dark .text-orange-500 { color: #fb923c; }
+.theme-dark .bg-slate-50 { background-color: rgba(148, 163, 184, 0.12); }
+.theme-dark .border-orange-200 { border-color: rgba(249, 115, 22, 0.3); }
+.theme-dark .border-red-200 { border-color: rgba(229, 72, 77, 0.35); }
+.theme-dark .border-violet-300 { border-color: rgba(139, 92, 246, 0.45); }
+.theme-dark .border-amber-300 { border-color: rgba(245, 158, 11, 0.4); }
+.theme-dark .hover\:border-neutral-300:hover { border-color: #384049 !important; }
+
+/* «ты» в лидербордах: фиолетовая плашка с альфой */
+.theme-dark [class*="bg-violet-50/"] { background-color: rgba(139, 92, 246, 0.16); }
+
+/* белое кольцо вокруг онлайн-точки — в тёмной теме тёмное */
+.theme-dark .ring-white { --tw-ring-color: #1e2228; }
+
+/* ============================================================
    ОБОИ (класс-модификаторы вместо inline style — надёжно при гидрации)
    ============================================================ */
 .wp-wave {

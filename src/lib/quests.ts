@@ -37,6 +37,16 @@ export const QUEST_POOL: QuestDef[] = [
   { id: 'q_loan_1', title: 'Кредитная история', desc: (t) => `Возьмите ${t} кредит в банке`, kind: 'loan', target: 1, reward: 700, xpReward: 40, weight: 1 },
   { id: 'q_tax_1', title: 'Чистая совесть', desc: () => `Оплатите налоги без просрочки`, kind: 'tax', target: 1, reward: 1100, xpReward: 60, weight: 2 },
   { id: 'q_fav_3', title: 'На примете', desc: (t) => `Добавьте ${t} объявления в избранное`, kind: 'fav', target: 3, reward: 500, xpReward: 30, weight: 2 },
+  { id: 'q_sell_6', title: 'Супер-день продаж', desc: (t) => `Продайте ${t} товаров за день — площадка ахнет`, kind: 'sell', target: 6, reward: 8000, xpReward: 240, weight: 1 },
+  { id: 'q_buy_5', title: 'Крупный опт', desc: (t) => `Закупите ${t} товаров за день`, kind: 'buy', target: 5, reward: 5500, xpReward: 190, weight: 1 },
+  { id: 'q_profit_15000', title: 'Жирный куш', desc: (t) => `Заработайте ${t.toLocaleString('ru-RU')} ₽ прибыли за день`, kind: 'profit', target: 15000, reward: 11000, xpReward: 320, weight: 1 },
+  { id: 'q_chat_15', title: 'Золотой язык', desc: (t) => `Отправьте ${t} сообщений в чатах за день`, kind: 'chat', target: 15, reward: 1700, xpReward: 80, weight: 2 },
+  { id: 'q_bid_5', title: 'Ловец лотов', desc: (t) => `Сделайте ${t} ставок на аукционе за день`, kind: 'bid', target: 5, reward: 2800, xpReward: 110, weight: 1 },
+  { id: 'q_courier_2', title: 'Ничего не выходит из дома', desc: (t) => `Купите ${t} товара с доставкой за день`, kind: 'courier', target: 2, reward: 2100, xpReward: 90, weight: 1 },
+  { id: 'q_repair_2', title: 'Полный цех', desc: (t) => `Отремонтируйте ${t} вещи за день`, kind: 'repair', target: 2, reward: 3000, xpReward: 130, weight: 1 },
+  { id: 'q_free_2', title: 'Спасатель халявы', desc: (t) => `Заберите ${t} вещи «Отдам даром» за день`, kind: 'free', target: 2, reward: 1500, xpReward: 60, weight: 1 },
+  { id: 'q_spend_25000', title: 'Инвестор дня', desc: (t) => `Вложите ${t.toLocaleString('ru-RU')} ₽ в закупки за день`, kind: 'spend', target: 25000, reward: 4200, xpReward: 150, weight: 1 },
+  { id: 'q_fav_6', title: 'Разум и чувства', desc: (t) => `Добавьте ${t} объявлений в избранное за день`, kind: 'fav', target: 6, reward: 900, xpReward: 45, weight: 1 },
 ]
 
 export interface AchievementDef {
@@ -79,6 +89,15 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'reviewer_10', title: 'Арбитр площадки', desc: 'Оставьте 10 отзывов о сделках', reward: 2500 },
   { id: 'banker_3', title: 'Финансист', desc: 'Откройте 3 вклада в банке', reward: 3000 },
   { id: 'loaner_3', title: 'Кредитный дофин', desc: 'Возьмите 3 кредита', reward: 2500 },
+  { id: 'dealer_25', title: 'Сделки — моё всё', desc: 'Совершите 25 сделок', reward: 9000 },
+  { id: 'haggler_60', title: 'Гроза продавцов', desc: 'Выторгуйте скидку 5%+ в 60 сделках', reward: 25000 },
+  { id: 'bargain_15', title: 'Ценовой ниндзя', desc: 'Купите 15 вещей на 30%+ дешевле рынка', reward: 9000 },
+  { id: 'free_15', title: 'Спаситель вещей', desc: 'Заберите 15 вещей «Отдам даром»', reward: 6000 },
+  { id: 'courier_15', title: 'Диванный магнат', desc: 'Купите 15 вещей с доставкой курьером', reward: 8000 },
+  { id: 'bid_150', title: 'Постоянный участник', desc: 'Сделайте 150 ставок на аукционах', reward: 9000 },
+  { id: 'chatter_1000', title: 'Легенда чатов', desc: 'Отправьте 1000 сообщений в чатах', reward: 40000 },
+  { id: 'level_20', title: 'Живая легенда', desc: 'Достигните 20 уровня', reward: 120000 },
+  { id: 'collector_50', title: 'Весь склад — мой', desc: 'Имейте 50 вещей в инвентаре одновременно', reward: 30000 },
 ]
 
 export interface PlayerStats {
@@ -155,5 +174,14 @@ export function achievedIds(stats: PlayerStats, level: number, balance: number, 
   add('reviewer_10', stats.reviews >= 10)
   add('banker_3', stats.deposits >= 3)
   add('loaner_3', stats.loans >= 3)
+  add('dealer_25', stats.dealsTotal >= 25)
+  add('haggler_60', stats.haggles >= 60)
+  add('bargain_15', stats.bargains >= 15)
+  add('free_15', stats.freePicked >= 15)
+  add('courier_15', stats.courierBuys >= 15)
+  add('bid_150', stats.bids >= 150)
+  add('chatter_1000', stats.chat >= 1000)
+  add('level_20', level >= 20)
+  add('collector_50', inventoryCount >= 50)
   return out
 }
