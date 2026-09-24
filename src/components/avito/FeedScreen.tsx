@@ -1,10 +1,10 @@
 'use client'
 
 // Лента объявлений: крупные фотокарточки 16:10, поиск, категории, сортировка, избранное
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Search, SlidersHorizontal, Heart, MapPin, Star, Zap, BellPlus, X, SearchX, History, Activity } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Search, SlidersHorizontal, Heart, MapPin, Star, Zap, BellPlus, X, SearchX, History, Activity, Scale } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
-import { CATEGORIES, CATEGORY_LABEL, CONDITION_MULT } from '@/lib/catalog-types'
+import { CATEGORIES, CATEGORY_LABEL, CONDITION_LABEL, CONDITION_MULT } from '@/lib/catalog-types'
 import type { CategoryKey } from '@/lib/catalog-types'
 import { fmtNum, initials, hueColor } from '@/lib/format'
 import { useOS } from '@/lib/store'
@@ -67,6 +67,9 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
   const [cities, setCities] = useState<{ city: string; count: number }[]>([])
   const [pulse, setPulse] = useState<PulseItemDTO[]>([])
   const [pulseFlash, setPulseFlash] = useState(false)
+  // сравнение объявлений: до трёх карточек, шит со сводной таблицей
+  const [compare, setCompare] = useState<FeedListing[]>([])
+  const [showCompare, setShowCompare] = useState(false)
   const pushToast = useOS((s) => s.pushToast)
   const scrollRef = useRef<HTMLDivElement>(null)
   const pageRef = useRef(1)
@@ -176,8 +179,19 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
     api.favToggle(id, next.includes(id)).catch(() => {})
   }
 
+  const toggleCompare = (l: FeedListing) => {
+    setCompare((prev) => {
+      if (prev.some((c) => c.id === l.id)) return prev.filter((c) => c.id !== l.id)
+      if (prev.length >= 3) {
+        pushToast('Avito', 'В сравнении максимум три товара')
+        return prev
+      }
+      return [...prev, l]
+    })
+  }
+
   return (
-    <div className="h-full flex flex-col">
+    <div className="relative h-full flex flex-col">
       {/* поиск и фильтры */}
       <div className="bg-white px-3 pt-2 pb-2.5 border-b border-black/5 shrink-0">
         <form
@@ -329,6 +343,8 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
                 onOpen={() => onOpenListing(l.id)}
                 onFav={() => onFav(l.id)}
                 fav={favs.includes(l.id)}
+                comparing={compare.some((c) => c.id === l.id)}
+                onCompareToggle={!favoritesMode ? () => toggleCompare(l) : undefined}
               />
             ))}
             {!favoritesMode && items.length < total && (
@@ -343,6 +359,51 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
           </>
         )}
       </div>
+
+      {/* панель сравнения — плавает над нижней навигацией */}
+      {compare.length > 0 && !showCompare && (
+        <div
+          className="shrink-0 mx-3 mb-2 rounded-2xl bg-neutral-900 text-white shadow-xl p-2 flex items-center gap-2 animate-in slide-in-from-bottom-2"
+          role="toolbar"
+          aria-label="Панель сравнения"
+        >
+          <span className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-[#965EEB]/20 shrink-0" aria-hidden>
+            <Scale size={16} className="text-[#c5a6f5]" />
+            {compare.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#965EEB] text-[9px] font-bold flex items-center justify-center">
+                {compare.length}
+              </span>
+            )}
+          </span>
+          <span className="text-xs font-semibold leading-tight">
+            {compare.length < 2 ? 'Выберите ещё товар для сравнения' : 'Сравниваем товары'}
+          </span>
+          <button
+            onClick={() => setShowCompare(true)}
+            disabled={compare.length < 2}
+            className="ml-auto h-9 px-4 rounded-xl bg-[#965EEB] text-xs font-bold active:scale-95 transition-transform disabled:opacity-40"
+          >
+            Сравнить
+          </button>
+          <button
+            onClick={() => setCompare([])}
+            aria-label="Очистить сравнение"
+            className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center active:bg-white/20"
+          >
+            <X size={14} aria-hidden />
+          </button>
+        </div>
+      )}
+
+      {/* шит сравнения товаров */}
+      {showCompare && compare.length >= 2 && (
+        <CompareSheet
+          items={compare}
+          onClose={() => setShowCompare(false)}
+          onClear={() => { setCompare([]); setShowCompare(false) }}
+          onOpen={(id) => { setShowCompare(false); onOpenListing(id) }}
+        />
+      )}
     </div>
   )
 }
@@ -413,15 +474,17 @@ function ViewedStrip({ items, onOpen, onClear }: {
   )
 }
 
-export function ListingCard({ listing: l, onOpen, onFav, fav }: {
+export function ListingCard({ listing: l, onOpen, onFav, fav, comparing, onCompareToggle }: {
   listing: FeedListing
   onOpen: () => void
   onFav?: () => void
   fav?: boolean
+  comparing?: boolean
+  onCompareToggle?: () => void
 }) {
   const cheap = cheaperPercent(l)
   return (
-    <div className="shrink-0 bg-white rounded-2xl overflow-hidden shadow-sm active:scale-[0.99] transition-transform">
+    <div className={`shrink-0 bg-white rounded-2xl overflow-hidden shadow-sm active:scale-[0.99] transition-all ${comparing ? 'ring-2 ring-[#965EEB] ring-offset-1 ring-offset-[#f4f5f7]' : ''}`}>
       <div className="relative aspect-[16/10] bg-neutral-100">
         <button onClick={onOpen} aria-label={l.title} className="absolute inset-0 w-full text-left">
           <img src={l.image} alt="" className="w-full h-full object-cover" loading="lazy" />
@@ -440,11 +503,23 @@ export function ListingCard({ listing: l, onOpen, onFav, fav }: {
             </span>
           )}
           {l.boosted && (
-            <span className="absolute top-2.5 left-2.5 bg-[#965EEB] text-white text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1">
+            <span className={`absolute top-2.5 bg-[#965EEB] text-white text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 ${onCompareToggle ? 'left-14' : 'left-2.5'}`}>
               <Zap size={10} aria-hidden /> ТОП
             </span>
           )}
         </button>
+        {onCompareToggle && (
+          <button
+            onClick={onCompareToggle}
+            aria-label={comparing ? `Убрать ${l.title} из сравнения` : `Добавить ${l.title} к сравнению`}
+            aria-pressed={comparing}
+            className={`absolute top-2 left-2 w-9 h-9 rounded-full backdrop-blur-sm flex items-center justify-center active:scale-90 transition-all ${
+              comparing ? 'bg-[#965EEB] shadow-md' : 'bg-black/30'
+            }`}
+          >
+            <Scale size={15} className={comparing ? 'text-white' : 'text-white/90'} aria-hidden />
+          </button>
+        )}
         {onFav && (
           <button
             onClick={onFav}
@@ -545,5 +620,165 @@ function MarketPulseStrip({ items, flash, onPick }: {
         })}
       </div>
     </section>
+  )
+}
+
+// ШИТ СРАВНЕНИЯ: сводная таблица по 2-3 выбранным объявлениям.
+// Лучшая цена подсвечена зелёным, тап по колонке открывает объявление.
+function CompareSheet({ items, onClose, onClear, onOpen }: {
+  items: FeedListing[]
+  onClose: () => void
+  onClear: () => void
+  onOpen: (id: string) => void
+}) {
+  const activePrices = items.map((l) => l.price).filter((p) => p > 0)
+  const bestPrice = activePrices.length ? Math.min(...activePrices) : null
+  const cols = items.length
+  const gridCols = { gridTemplateColumns: `76px repeat(${cols}, minmax(0, 1fr))` }
+
+  const rows: { label: string; render: (l: FeedListing) => React.ReactNode }[] = [
+    {
+      label: 'Состояние',
+      render: (l): ReactNode => <span className="text-[11px] font-medium text-neutral-700">{CONDITION_LABEL[l.condition] ?? l.condition}</span>,
+    },
+    {
+      label: 'Город',
+      render: (l): ReactNode => <span className="text-[11px] text-neutral-600">{l.city}</span>,
+    },
+    {
+      label: 'Продавец',
+      render: (l): ReactNode => (
+        <span className="flex items-center gap-1 min-w-0">
+          <span
+            className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[7px] font-bold text-white shrink-0"
+            style={{ background: hueColor(l.seller.id.length * 47 % 360) }}
+            aria-hidden
+          >
+            {initials(l.seller.displayName)}
+          </span>
+          <span className="text-[11px] text-neutral-600 truncate">{l.seller.displayName}</span>
+        </span>
+      ),
+    },
+    {
+      label: 'Рейтинг',
+      render: (l): ReactNode => (
+        <span className="flex items-center gap-0.5 text-[11px] font-semibold text-neutral-700">
+          <Star size={10} className="text-amber-400 fill-amber-400" aria-hidden />
+          {l.seller.rating > 0 ? Math.min(5, l.seller.rating).toFixed(1) : 'новый'}
+          {l.seller.ratingCount > 0 && <span className="text-neutral-400 font-normal">({l.seller.ratingCount})</span>}
+        </span>
+      ),
+    },
+    {
+      label: 'К цене',
+      render: (l): ReactNode => {
+        const cheap = cheaperPercent(l)
+        return cheap >= 10 ? (
+          <span className="text-[11px] font-bold text-emerald-600">Дешевле на {cheap}%</span>
+        ) : (
+          <span className="text-[11px] text-neutral-400">По рынку</span>
+        )
+      },
+    },
+    {
+      label: 'Смотрели',
+      render: (l): ReactNode => <span className="text-[11px] text-neutral-600">{l.views} раз</span>,
+    },
+    {
+      label: 'Когда',
+      render: (l): ReactNode => <span className="text-[11px] text-neutral-600">{shortAgo(l.createdAt)}</span>,
+    },
+  ]
+
+  return (
+    <div
+      className="absolute inset-0 z-50 flex items-end bg-black/40"
+      onClick={onClose}
+      role="dialog"
+      aria-label="Сравнение товаров"
+    >
+      <div
+        className="w-full max-h-[92%] rounded-t-3xl bg-white flex flex-col animate-[sheet-up_220ms_ease-out]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* шапка */}
+        <div className="shrink-0 px-4 pt-3 pb-2 border-b border-black/5">
+          <div className="mx-auto mb-2.5 h-1 w-10 rounded-full bg-neutral-200" aria-hidden />
+          <div className="flex items-center">
+            <Scale size={16} className="text-[#965EEB]" aria-hidden />
+            <h2 className="ml-1.5 text-sm font-bold text-neutral-900">Сравнение товаров</h2>
+            <button
+              onClick={onClear}
+              className="ml-auto text-[11px] font-semibold text-neutral-400 active:text-neutral-600"
+            >
+              Очистить всё
+            </button>
+            <button
+              onClick={onClose}
+              aria-label="Закрыть сравнение"
+              className="ml-3 w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500 active:bg-neutral-200"
+            >
+              <X size={14} aria-hidden />
+            </button>
+          </div>
+        </div>
+
+        {/* таблица */}
+        <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-3 [scrollbar-width:thin]">
+          <div className="grid gap-x-1 min-w-0" style={gridCols}>
+            {/* строка: фото, название, цена, кнопка */}
+            <div />
+            {items.map((l) => (
+              <div key={l.id} className="px-1.5 min-w-0">
+                <button onClick={() => onOpen(l.id)} className="block w-full text-left" aria-label={`Открыть ${l.title}`}>
+                  <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-neutral-100">
+                    <img src={l.image} alt={l.title} className="w-full h-full object-cover" />
+                  </div>
+                  <p className="mt-1.5 text-[11px] font-semibold text-neutral-800 line-clamp-2 leading-snug min-h-[28px]">{l.title}</p>
+                  <p
+                    className={`text-base font-extrabold leading-tight ${
+                      l.price > 0 && l.price === bestPrice ? 'text-emerald-600' : 'text-neutral-900'
+                    }`}
+                  >
+                    {l.price === 0 ? 'Даром' : `${fmtNum(l.price)} ₽`}
+                  </p>
+                  {l.price > 0 && l.price === bestPrice && (
+                    <span className="mt-0.5 inline-flex rounded bg-emerald-100 px-1 py-0.5 text-[8px] font-bold text-emerald-600">
+                      лучшая цена
+                    </span>
+                  )}
+                </button>
+              </div>
+            ))}
+
+            {/* параметрные строки */}
+            {rows.map((row) => (
+              <div key={row.label} className="contents">
+                <div className="py-2 pr-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400 self-center">{row.label}</div>
+                {items.map((l) => (
+                  <div key={l.id} className="px-1.5 py-2 border-t border-neutral-100 min-w-0 flex items-center">
+                    {row.render(l)}
+                  </div>
+                ))}
+              </div>
+            ))}
+
+            {/* строка кнопок */}
+            <div />
+            {items.map((l) => (
+              <div key={l.id} className="px-1.5 pt-2 pb-1">
+                <button
+                  onClick={() => onOpen(l.id)}
+                  className="w-full h-9 rounded-xl bg-neutral-900 text-white text-[11px] font-bold active:scale-[0.97] transition-transform"
+                >
+                  Открыть
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }

@@ -7,6 +7,7 @@ import { db } from '@/lib/db'
 import { personaOf, botSay, parseChatMeta } from '@/lib/chat-engine'
 import { withTypos } from '@/lib/ai'
 import { notifyUser } from '@/lib/deals'
+import { isBlocked } from '@/lib/blocked'
 import { notifyPriceDrop, recordPricePoint } from '@/lib/market-hooks'
 import { emitTo } from '@/lib/realtime-emit'
 import { fmtMoney, stripEmoji } from '@/lib/format'
@@ -116,6 +117,8 @@ export async function onPlayerPriceDrop(
         )
       } else if (roll < 0.9) {
         // ТРЭШ-ТОК: бот открывает чат (свой листинг, игрок «покупатель») и высказывается
+        // заблокированному игроку ботов не писать — у него есть право молчать
+        if (await isBlocked(listing.sellerId, rival.sellerId)) continue
         const existing = await db.chat.findFirst({
           where: { listingId: rival.id, buyerId: listing.sellerId, sellerId: rival.sellerId },
         })
@@ -187,6 +190,8 @@ export async function botComebackOffers(): Promise<void> {
       const chatMeta = parseChatMeta(chat.meta)
       if (chatMeta.botRole !== 'seller') continue
       if (chatMeta.rounds < 2 || chatMeta.closed) continue // настоящий торг был, но не закрыт
+      // покупатель в чёрном списке — продавцу нечего ему предложить
+      if (await isBlocked(chat.buyerId, chat.sellerId)) continue
 
       // последнее слово за игроком, и прошло 4+ минут — «пауза», продавец нервничает
       const last = await db.message.findFirst({

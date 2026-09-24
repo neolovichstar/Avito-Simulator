@@ -4,6 +4,7 @@ import { listingDTO } from '@/lib/dto'
 import { cache } from '@/lib/cache'
 import { rateLimit } from '@/lib/ratelimit'
 import { onListingCreated } from '@/lib/market-hooks'
+import { blockedIds } from '@/lib/blocked'
 import { CATEGORY_LABEL } from '@/lib/catalog-types'
 import type { CategoryKey } from '@/lib/catalog-types'
 
@@ -60,6 +61,11 @@ export async function GET(req: Request) {
   let list = slice.map((l) => listingDTO(l, user?.id ?? null))
   if (sort === 'new' && page === 1) {
     list = [...list.filter((l) => l.boosted), ...list.filter((l) => !l.boosted)]
+  }
+  // чёрный список: объявления заблокированных продавцов не показываем
+  if (user && !mine) {
+    const blocked = await blockedIds(user.id)
+    if (blocked.length) list = list.filter((l) => !blocked.includes(l.seller.id))
   }
   return Response.json({ items: list, total })
 }

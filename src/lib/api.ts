@@ -148,6 +148,11 @@ export const api = {
   // конкуренты по товару (для шита цены)
   listingRivals: (listingId: string) => req<RivalsData>(`/api/listings/${listingId}/rivals`),
 
+  // чёрный список продавцов
+  blockedIds: () => req<{ ids: string[] }>('/api/blocked'),
+  toggleBlock: (sellerId: string) =>
+    post<{ ok: boolean; blocked: boolean; name?: string }>('/api/blocked', { sellerId }),
+
   // карьера: задания и достижения
   career: () => req<CareerData>('/api/career'),
   claimQuest: (questId: string) => post<{ ok: boolean; balance: number; xp: number }>('/api/career', { questId }),

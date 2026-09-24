@@ -7,6 +7,7 @@ import { specsFor } from '@/lib/specs'
 import { cache } from '@/lib/cache'
 import { recordPricePoint } from '@/lib/market-hooks'
 import { onPlayerPriceDrop } from '@/lib/price-war'
+import { blockedIds } from '@/lib/blocked'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,6 +45,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const est = Math.round(listing.baseValue * (CONDITION_MULT[listing.condition] ?? 0.8) * mult)
   const raw = listing.price > 0 ? Math.round(((est - listing.price) / listing.price) * 100) : 100
   const marginHint = Math.min(90, raw)
+  // заблокированных продавцов не показываем и среди похожих
+  const blocked = user ? await blockedIds(user.id) : []
 
   return Response.json({
     ...listingDTO(listing, user?.id ?? null),
@@ -60,7 +63,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     })),
     purchasedByMe: !!purchase,
     reviewedByMe: !!review,
-    similar: similar.map((s) => ({
+    similar: similar
+      .filter((s) => !blocked.includes(s.sellerId))
+      .map((s) => ({
       id: s.id,
       title: s.title,
       price: s.price,

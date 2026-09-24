@@ -4,6 +4,7 @@ import { rateLimit } from '@/lib/ratelimit'
 import { notifyUser } from '@/lib/deals'
 import { emitTo } from '@/lib/realtime-emit'
 import { personaOf } from '@/lib/chat-engine'
+import { isBlocked } from '@/lib/blocked'
 import { stripEmoji } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
@@ -76,7 +77,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   }
 
   // Бот-продавец узнаёт о жалобе и оправдывается в чате по-человечески
-  if (listing.seller.isBot) {
+  // (но заблокированному продавцу не пишем — пусть обида останется при нём)
+  if (listing.seller.isBot && !(await isBlocked(user.id, listing.sellerId))) {
     setTimeout(() => {
       botComplaintDefense(listing.id, listing.sellerId, user.id, listing.title, reason).catch(() => {})
     }, 6000 + Math.random() * 9000)

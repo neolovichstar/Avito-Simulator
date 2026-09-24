@@ -5,7 +5,7 @@ import { useCallback, useEffect, useId, useState } from 'react'
 import {
   ChevronLeft, MapPin, Eye, Star, Truck, HandCoins, MessageSquare, ShoppingBag,
   TrendingDown, Zap, Loader2, PackageCheck, AlertTriangle, Clock, BadgeCheck, PenLine,
-  Flag, LineChart, ShieldCheck, ChevronRight,
+  Flag, LineChart, ShieldCheck, ChevronRight, Ban, CircleSlash,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
@@ -43,6 +43,9 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
   const [complaintReason, setComplaintReason] = useState('spam')
   const [complaintSent, setComplaintSent] = useState(false)
   const [complaintBusy, setComplaintBusy] = useState(false)
+  // чёрный список: заблокирован ли продавец этого объявления
+  const [sellerBlocked, setSellerBlocked] = useState(false)
+  const [blockBusy, setBlockBusy] = useState(false)
   const session = useOS((s) => s.session)
   const pushToast = useOS((s) => s.pushToast)
   const refreshSession = useOS((s) => s.refreshSession)
@@ -56,6 +59,10 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
       addViewed({ id: d.id, title: d.title, price: d.price, image: d.image })
       // отзывы о продавце — вторым запросом, не блокируя карточку
       api.userReviews(d.seller.id).then((r) => setSellerReviews(r.items)).catch(() => setSellerReviews([]))
+      // состояние чёрного списка для продавца
+      if (!d.mine) {
+        api.blockedIds().then((r) => setSellerBlocked(r.ids.includes(d.seller.id))).catch(() => {})
+      }
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Ошибка загрузки')
     } finally {
@@ -140,6 +147,25 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
       pushToast('Avito', e instanceof ApiError ? e.message : 'Не удалось отправить жалобу')
     } finally {
       setComplaintBusy(false)
+    }
+  }
+
+  const toggleBlockSeller = async () => {
+    if (!data) return
+    setBlockBusy(true)
+    try {
+      const res = await api.toggleBlock(data.seller.id)
+      setSellerBlocked(res.blocked)
+      pushToast(
+        'Avito',
+        res.blocked
+          ? `«${res.name ?? data.seller.displayName}» заблокирован — объявления скрыты из ленты`
+          : 'Продавец разблокирован',
+      )
+    } catch (e) {
+      pushToast('Avito', e instanceof ApiError ? e.message : 'Не удалось изменить список')
+    } finally {
+      setBlockBusy(false)
     }
   }
 
@@ -561,7 +587,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
       {/* жалоба — bottom sheet */}
       {complaintOpen && (
         <div className="absolute inset-0 z-40 bg-black/40 flex items-end" onClick={() => { if (!complaintBusy) setComplaintOpen(false) }}>
-          <div className="bg-white w-full rounded-t-3xl animate-in slide-in-from-bottom-4" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Жалоба на объявление">
+          <div className="bg-white w-full rounded-t-3xl max-h-[86%] overflow-y-auto [scrollbar-width:thin] animate-in slide-in-from-bottom-4" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Жалоба на объявление">
             <div className="pt-3 flex justify-center">
               <span className="w-10 h-1 rounded-full bg-neutral-200" aria-hidden />
             </div>
@@ -606,6 +632,34 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
                   {complaintBusy ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Flag size={16} aria-hidden />}
                   Отправить жалобу
                 </button>
+              </div>
+            )}
+            {/* чёрный список: действует мгновенно, объявления скрываются из ленты */}
+            {!data.mine && (
+              <div className="border-t border-black/5 p-3">
+                <button
+                  onClick={toggleBlockSeller}
+                  disabled={blockBusy}
+                  className={`w-full h-11 rounded-2xl text-sm font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-40 ${
+                    sellerBlocked
+                      ? 'bg-neutral-100 text-neutral-600'
+                      : 'bg-red-50 text-red-500'
+                  }`}
+                >
+                  {blockBusy ? (
+                    <Loader2 size={15} className="animate-spin" aria-hidden />
+                  ) : sellerBlocked ? (
+                    <CircleSlash size={15} aria-hidden />
+                  ) : (
+                    <Ban size={15} aria-hidden />
+                  )}
+                  {sellerBlocked ? `Разблокировать ${data.seller.displayName}` : `Заблокировать ${data.seller.displayName}`}
+                </button>
+                <p className="mt-1.5 text-[10px] leading-relaxed text-neutral-400">
+                  {sellerBlocked
+                    ? 'Объявления продавца снова появятся в ленте.'
+                    : 'Его объявления исчезнут из вашей ленты, а боты-продавцы перестанут вам писать.'}
+                </p>
               </div>
             )}
           </div>

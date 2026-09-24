@@ -11,6 +11,7 @@ import { auctionStep } from '@/lib/economy'
 import { emitTo } from '@/lib/realtime-emit'
 import { onListingCreated, notifyPriceDrop } from '@/lib/market-hooks'
 import { botComebackOffers } from '@/lib/price-war'
+import { isBlocked } from '@/lib/blocked'
 import { fmtMoney } from '@/lib/format'
 import { cache } from '@/lib/cache'
 
@@ -418,6 +419,8 @@ async function botsTick(tick: number) {
       if (botChats.length >= 2) continue
       const bot = await randomBot()
       if (!bot) continue
+      // игрок заблокировал этого бота — продавец не обязан его слушать
+      if (await isBlocked(pl.sellerId, bot.id)) continue
       const meta = { botRole: 'buyer' as const, botLimit: Math.round(pl.price * (1 - 0.05 - Math.random() * 0.12)), rounds: 0 }
       const chat = await db.chat.create({
         data: { listingId: pl.id, buyerId: bot.id, sellerId: pl.sellerId, meta: JSON.stringify(meta) },

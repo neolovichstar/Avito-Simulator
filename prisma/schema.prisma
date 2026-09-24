@@ -51,6 +51,8 @@ model User {
   savedSearches SavedSearch[]
   complaints    Complaint[] @relation("complaintFrom")
   favorites     Favorite[]
+  blocked       BlockedSeller[] @relation("blocker")
+  blockedMe     BlockedSeller[] @relation("blockedOne")
 }
 
 model Listing {
@@ -325,4 +327,17 @@ model Favorite {
   createdAt DateTime @default(now())
 
   @@unique([userId, listingId])
+}
+
+// Чёрный список: игрок скрывает продавца из ленты, боты-продавцы ему больше не пишут
+model BlockedSeller {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation("blocker", fields: [userId], references: [id])
+  sellerId  String
+  seller    User     @relation("blockedOne", fields: [sellerId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, sellerId])
+  @@index([userId])
 }
