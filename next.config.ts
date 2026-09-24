@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
+  // убрать плавающую кнопку dev-tools («N») — она портила скриншоты ОС
+  devIndicators: false,
 };
 
 export default nextConfig;

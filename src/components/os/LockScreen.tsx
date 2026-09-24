@@ -1,12 +1,16 @@
 'use client'
 
+// Экран блокировки «Сделка OS» — по макету банковского приложения:
+// тёмная премиальная сцена (свой фон, не зависит от обоев), лого + «Обновить
+// приложение», дата и время, приветствие, ПИН 4 ячейки, нумпад 3×4 с буквами.
+
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { Delete, Loader2, ShoppingBag } from 'lucide-react'
+import { Delete, Loader2, MoonStar } from 'lucide-react'
 import { useOS } from '@/lib/store'
 import { api } from '@/lib/api'
 import { fmtMoney } from '@/lib/format'
 import { playSound } from '@/lib/sounds'
-import { wallpaperClass } from '@/lib/wallpapers'
+import { DealLogo } from '@/components/os/app-logos'
 
 // Живые тики каждые 1000 мс без setState в эффекте (useSyncExternalStore).
 function useClock(): Date | null {
@@ -48,12 +52,9 @@ const LEAVE_ANIMATION_MS = 400
 const REFRESH_SPIN_MS = 1500
 
 export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
-  const battery = useOS((s) => s.battery)
-  const online = useOS((s) => s.online)
   const dnd = useOS((s) => s.dnd)
   const pushToast = useOS((s) => s.pushToast)
   const notifications = useOS((s) => s.notifications)
-  const wallpaper = useOS((s) => s.wallpaper)
   const session = useOS((s) => s.session)
 
   const now = useClock()
@@ -90,7 +91,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   const hour = now ? now.getHours() : 19
   const greeting = greetingFor(hour)
 
-  // Уход с экрана: текущая анимация подъёма вверх сохранена
+  // Уход с экрана: анимация подъёма вверх
   const finishUnlock = () => {
     if (leavingRef.current) return
     leavingRef.current = true
@@ -135,7 +136,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     timersRef.current.push(window.setTimeout(() => setRefreshing(false), REFRESH_SPIN_MS))
   }
 
-  const previews = notifications.filter((n) => !n.readAt).slice(0, 3)
+  const previews = notifications.filter((n) => !n.readAt).slice(0, 2)
   const dealsLabel =
     day && (day.deals === 1 ? 'сделка' : day.deals < 5 ? 'сделки' : 'сделок')
 
@@ -143,26 +144,34 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     <div
       className={`absolute inset-0 z-50 overflow-hidden transition-transform duration-[400ms] ease-out ${
         leaving ? '-translate-y-full' : 'translate-y-0'
-      } ${wallpaperClass(wallpaper)}`}
+      }`}
       role="dialog"
       aria-label="Экран блокировки"
     >
-      {/* Затемняющий blur-оверлей: тёмные размытые обои, как на макете */}
-      <div aria-hidden="true" className="absolute inset-0 bg-black/45 backdrop-blur-2xl" />
+      {/* ─── Собственная премиальная сцена: глубокий тёмный фон с мягкими бликами ─── */}
+      <div aria-hidden="true" className="absolute inset-0 bg-[#0b0812]" />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(120% 55% at 50% -8%, rgba(124,58,237,0.42) 0%, rgba(124,58,237,0.12) 42%, transparent 68%), radial-gradient(90% 40% at 88% 108%, rgba(236,72,153,0.16) 0%, transparent 60%), radial-gradient(80% 36% at 6% 96%, rgba(59,130,246,0.12) 0%, transparent 62%)',
+        }}
+      />
 
-      <div className="relative z-10 flex h-full flex-col px-6 pb-5 pt-9">
+      <div className="relative z-10 flex h-full flex-col px-6 pb-6 pt-8">
         {/* Верхняя панель: логотип Сделки + «Обновить приложение» */}
         <div className="flex shrink-0 items-center justify-between">
           <div
-            className="flex size-11 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/30 backdrop-blur-md"
+            className="flex size-12 items-center justify-center rounded-full bg-white shadow-lg shadow-black/30"
             title="Сделка OS"
           >
-            <ShoppingBag className="size-5 text-white" aria-hidden="true" />
+            <DealLogo />
           </div>
           <button
             type="button"
             onClick={handleRefresh}
-            className="flex items-center gap-1.5 rounded-full border border-white/40 bg-white/10 px-3.5 py-1.5 text-[11px] font-medium text-white/90 backdrop-blur-md outline-none transition active:scale-95 active:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/70"
+            className="flex items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-3.5 py-2 text-[12px] font-medium text-white/95 backdrop-blur-md outline-none transition active:scale-95 active:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/70"
           >
             <Loader2
               aria-hidden="true"
@@ -172,9 +181,9 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
           </button>
         </div>
 
-        {/* Часы и дата */}
-        <div className="mt-5 shrink-0 text-center">
-          <p className="text-xs text-white/70" suppressHydrationWarning>
+        {/* Дата и время — компактно, по центру */}
+        <div className="mt-5 shrink-0 text-center" suppressHydrationWarning>
+          <p className="text-[13px] font-medium tracking-wide text-white/70">
             {now
               ? now.toLocaleDateString('ru-RU', {
                   weekday: 'long',
@@ -184,8 +193,8 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
               : '\u00A0'}
           </p>
           <p
-            className="mt-0.5 text-6xl font-extralight tabular-nums text-white"
-            suppressHydrationWarning
+            className="mt-1 text-[44px] font-light leading-none tabular-nums tracking-tight text-white"
+            style={{ textShadow: '0 2px 24px rgba(0,0,0,0.45)' }}
           >
             {now
               ? now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
@@ -193,19 +202,19 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
           </p>
         </div>
 
-        {/* Приветствие по времени суток */}
-        <div className="mt-5 shrink-0" suppressHydrationWarning>
-          <p className="text-[26px] font-semibold leading-8 text-white">
+        {/* Приветствие — крупно, слева (как в макете) */}
+        <div className="mt-6 shrink-0" suppressHydrationWarning>
+          <p className="text-[28px] font-bold leading-9 text-white">
             {greeting},
             <span className="block">{displayName}</span>
           </p>
         </div>
 
         {/* Ввод ПИН-кода */}
-        <div className="mt-4 shrink-0 text-center">
-          <p className="text-[13px] text-white">Введите пароль</p>
+        <div className="mt-5 shrink-0 text-center">
+          <p className="text-[13px] font-medium text-white/90">Введите пароль</p>
           <div
-            className="mt-2.5 flex items-center justify-center gap-2.5"
+            className="mt-3 flex items-center justify-center gap-3"
             role="group"
             aria-label="ПИН-код из 4 цифр"
           >
@@ -215,8 +224,10 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
                 <span
                   key={i}
                   aria-hidden="true"
-                  className={`flex size-11 items-center justify-center rounded-lg text-lg font-semibold tabular-nums transition-colors duration-150 ${
-                    digit ? 'bg-white/85 text-neutral-900' : 'bg-white/40 text-white'
+                  className={`flex size-12 items-center justify-center rounded-xl text-lg font-semibold tabular-nums transition-all duration-150 ${
+                    digit
+                      ? 'scale-105 bg-white text-neutral-900 shadow-lg shadow-black/25'
+                      : 'bg-white/20 text-white ring-1 ring-inset ring-white/25'
                   }`}
                 >
                   {digit ?? ''}
@@ -229,30 +240,41 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
           </p>
         </div>
 
-        {/* Превью уведомлений + итоги дня (между паролем и клавиатурой) */}
+        {/* Превью уведомлений + итоги дня */}
         <div className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto [scrollbar-width:none]">
-          {previews.length > 0 && (
-            <div className="space-y-1.5">
-              {previews.map((n) => (
-                <div
-                  key={n.id}
-                  className="rounded-xl bg-white/12 px-3 py-1.5 backdrop-blur-md"
-                >
-                  <p className="text-[11px] font-semibold text-white">{n.title}</p>
-                  <p className="mt-0.5 line-clamp-1 text-[10px] text-white/70">{n.body}</p>
-                </div>
-              ))}
+          {dnd && (
+            <div className="flex items-center justify-center gap-1.5 text-[11px] text-white/70">
+              <MoonStar className="size-3.5" aria-hidden="true" />
+              Не беспокоить включён — уведомления копятся в центре
             </div>
           )}
+          {previews.map((n) => (
+            <div
+              key={n.id}
+              className="rounded-2xl border border-white/10 bg-white/10 px-3.5 py-2 backdrop-blur-md"
+            >
+              <p className="text-[11px] font-semibold text-white">{n.title}</p>
+              <p className="mt-0.5 line-clamp-1 text-[11px] text-white/70">{n.body}</p>
+            </div>
+          ))}
 
           {/* Итоги дня (если сегодня были сделки) */}
           {day && dealsLabel && (
-            <div className="flex items-center gap-2.5 rounded-2xl bg-white/12 px-3.5 py-2.5 backdrop-blur-md">
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-violet-500/80">
-                <ShoppingBag className="size-4 text-white" aria-hidden="true" />
+            <div className="flex items-center gap-2.5 rounded-2xl border border-white/10 bg-white/10 px-3.5 py-2.5 backdrop-blur-md">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-violet-500 shadow-md shadow-violet-900/40">
+                <svg viewBox="0 0 48 48" className="size-5" aria-hidden="true">
+                  <path
+                    d="M14.5 26.5 l5.5 5.5 L30 21.5"
+                    stroke="#ffffff"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                  />
+                </svg>
               </span>
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold text-white">Сегодня на Сделке</p>
+                <p className="text-[12px] font-semibold text-white">Сегодня на Сделке</p>
                 <p className="text-[11px] text-white/70">
                   {day.deals} {dealsLabel} ·{' '}
                   <span
@@ -271,38 +293,25 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
           )}
         </div>
 
-        {/* Батарея, «Не беспокоить» и онлайн — мелко над клавиатурой */}
-        <div className="mb-3 flex shrink-0 items-center justify-center gap-3 text-[11px] text-white/70">
-          <span className="flex items-center gap-1.5 tabular-nums">
-            <span
-              aria-hidden="true"
-              className={`h-1.5 w-1.5 rounded-full ${
-                battery <= 15 ? 'bg-red-400' : 'bg-emerald-400'
-              }`}
-            />
-            {battery}%
-          </span>
-          <span aria-hidden="true" className="h-1 w-1 rounded-full bg-white/40" />
-          {dnd && <span title="Не беспокоить">Не беспокоить</span>}
-          {dnd && <span aria-hidden="true" className="h-1 w-1 rounded-full bg-white/40" />}
-          <span className="tabular-nums">Онлайн: {online}</span>
-        </div>
-
         {/* Номерная клавиатура 3x4 */}
-        <div className="mx-auto grid w-fit shrink-0 grid-cols-3 gap-3" role="group" aria-label="Клавиатура для ввода пароля">
+        <div
+          className="mx-auto grid w-fit shrink-0 grid-cols-3 gap-2.5"
+          role="group"
+          aria-label="Клавиатура для ввода пароля"
+        >
           {KEYPAD.map((key) => (
             <button
               key={key.digit}
               type="button"
               aria-label={`Цифра ${key.digit}`}
               onClick={() => pressDigit(key.digit)}
-              className="flex size-[68px] flex-col items-center justify-center rounded-[14px] bg-white/25 backdrop-blur-md outline-none transition active:scale-95 active:bg-white/40 focus-visible:ring-2 focus-visible:ring-white/70"
+              className="flex h-[58px] w-[68px] flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/[0.13] backdrop-blur-md outline-none transition active:scale-95 active:bg-white/30 focus-visible:ring-2 focus-visible:ring-white/70"
             >
-              <span className="text-[22px] font-medium leading-none text-white">
+              <span className="text-[21px] font-medium leading-none text-white">
                 {key.digit}
               </span>
               {key.letters ? (
-                <span className="mt-1 text-[9px] leading-none tracking-wide text-white/70">
+                <span className="mt-1 text-[9px] leading-none tracking-[0.08em] text-white/60">
                   {key.letters}
                 </span>
               ) : null}
@@ -313,25 +322,27 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
           <button
             type="button"
             onClick={handleSupport}
-            className="flex size-[68px] items-center justify-center rounded-[14px] px-1 text-center text-[10px] leading-tight text-white/85 outline-none transition active:scale-95 active:text-white focus-visible:ring-2 focus-visible:ring-white/70"
+            className="flex h-[58px] w-[68px] items-center justify-center rounded-2xl px-1.5 text-center text-[10.5px] font-medium leading-tight text-white/85 outline-none transition active:scale-95 active:text-white focus-visible:ring-2 focus-visible:ring-white/70"
           >
-            Не могу войти
+            Не могу
+            <br />
+            войти
           </button>
           <button
             type="button"
             aria-label="Цифра 0"
             onClick={() => pressDigit('0')}
-            className="flex size-[68px] flex-col items-center justify-center rounded-[14px] bg-white/25 backdrop-blur-md outline-none transition active:scale-95 active:bg-white/40 focus-visible:ring-2 focus-visible:ring-white/70"
+            className="flex h-[58px] w-[68px] items-center justify-center rounded-2xl border border-white/10 bg-white/[0.13] backdrop-blur-md outline-none transition active:scale-95 active:bg-white/30 focus-visible:ring-2 focus-visible:ring-white/70"
           >
-            <span className="text-[22px] font-medium leading-none text-white">0</span>
+            <span className="text-[21px] font-medium leading-none text-white">0</span>
           </button>
           <button
             type="button"
             aria-label="Стереть последнюю цифру"
             onClick={backspace}
-            className="flex size-[68px] items-center justify-center rounded-[14px] text-white/90 outline-none transition active:scale-95 active:text-white focus-visible:ring-2 focus-visible:ring-white/70"
+            className="flex h-[58px] w-[68px] items-center justify-center rounded-2xl text-white/90 outline-none transition active:scale-95 active:bg-white/20 active:text-white focus-visible:ring-2 focus-visible:ring-white/70"
           >
-            <Delete className="size-6" aria-hidden="true" />
+            <Delete className="size-5" aria-hidden="true" />
           </button>
         </div>
       </div>
