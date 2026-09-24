@@ -78,7 +78,13 @@ export async function POST(req: Request) {
     const mult = await getCategoryMult(listing.category)
     const est = listing.baseValue * (CONDITION_MULT[listing.condition] ?? 0.8) * mult
     const personaTrust = 0.5
-    const limit = Math.max(Math.round(est * 0.35), Math.round(listing.price * (0.86 + Math.random() * 0.08)))
+    // Сложность ботов растёт с уровнем игрока: опытному торговцу бот уступает меньше.
+    // Ур. 1 — базовая жадность, ур. 15+ — +5 п.п. к скрытому минимуму (но не дороже 97% цены).
+    const levelFactor = Math.min(0.05, Math.max(0, (user.level - 1) * 0.0035))
+    const limit = Math.max(
+      Math.round(est * 0.35),
+      Math.min(Math.round(listing.price * 0.97), Math.round(listing.price * (0.86 + Math.random() * 0.08 + levelFactor))),
+    )
     chat = await db.chat.create({
       data: {
         listingId: listing.id, buyerId: user.id, sellerId: listing.sellerId,

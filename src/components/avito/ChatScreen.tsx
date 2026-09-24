@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
+import { sound } from '@/lib/sound'
 import { getSocket } from '@/lib/use-realtime'
 import { fmtMoney, fmtTime } from '@/lib/format'
 import { CONDITION_LABEL } from '@/lib/catalog-types'
@@ -135,6 +136,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
     try {
       const res = await api.payInvoice(id, invoiceId)
       refreshSession({ balance: res.balance, xp: res.xp, level: res.level })
+      sound.success()
       pushToast('Сделка', 'Счёт оплачен. Товар ваш!')
       await load()
     } catch (e) {

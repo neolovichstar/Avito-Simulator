@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { ChevronUp, Lock, MoonStar } from 'lucide-react'
 import { useOS } from '@/lib/store'
+import { sound } from '@/lib/sound'
 import { api } from '@/lib/api'
 import { fmtMoney } from '@/lib/format'
 import { useDrag } from '@/lib/use-swipe'
@@ -65,6 +66,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   // Разблокировка: свайп / тап / клавиша — никаких паролей, это смартфон в игре
   const unlock = useCallback(() => {
     if (leavingRef.current) return
+    sound.unlock()
     leavingRef.current = true
     setLeaving(true)
     timerRef.current = window.setTimeout(onUnlock, LEAVE_ANIMATION_MS)

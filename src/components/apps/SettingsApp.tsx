@@ -4,13 +4,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   BatteryCharging, Ban, Bot, CheckCircle2, Database, Handshake, Info, Loader2, MapPin, Moon, MoonStar, NotebookText, RefreshCw,
-  Send, Server, Settings as SettingsIcon, Shield, Star, Wallet, Zap,
+  Send, Server, Settings as SettingsIcon, Shield, Star, Volume2, Wallet, Zap,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS, ALL_WIDGETS, WIDGET_LABEL, type WidgetKey } from '@/lib/store'
 import { levelProgress, xpForLevel } from '@/lib/economy'
 import { WALLPAPERS, wallpaperPreviewStyle } from '@/lib/wallpapers'
 import { fmtMoney, initials, hueColor, timeAgo } from '@/lib/format'
+import { sound } from '@/lib/sound'
 import type { ProfileData, BlockedSellerDTO } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -55,6 +56,9 @@ export default function SettingsApp() {
   const setWallpaper = useOS((s) => s.setWallpaper)
   const widgets = useOS((s) => s.widgets)
   const setWidgets = useOS((s) => s.setWidgets)
+  // звук интерфейса (WebAudio-синтез + вибрация)
+  const [soundOn, setSoundOn] = useState(sound.isEnabled())
+  useEffect(() => sound.subscribe(setSoundOn), [])
 
   const [profile, setProfile] = useState<ProfileData | null>(null)
   const [sys, setSys] = useState<SystemStatus | null>(null)
@@ -280,6 +284,20 @@ export default function SettingsApp() {
                   <div className="text-xs text-neutral-500">{dnd ? 'Тосты скрыты — всё копится в шторке' : 'Уведомления всплывают поверх экрана'}</div>
                 </div>
                 <Switch checked={dnd} onCheckedChange={setDnd} aria-label="Не беспокоить" />
+              </div>
+              <div className="flex items-center gap-3 border-t border-neutral-100 px-4 py-3">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
+                  <Volume2 className="size-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium text-neutral-800">Звук и вибрация</div>
+                  <div className="text-xs text-neutral-500">{soundOn ? 'Системные звуки интерфейса включены' : 'Тихий режим: без звуков и вибрации'}</div>
+                </div>
+                <Switch
+                  checked={soundOn}
+                  onCheckedChange={(v) => sound.setEnabled(v)}
+                  aria-label="Звук и вибрация"
+                />
               </div>
             </SectionCard>
 

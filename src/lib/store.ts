@@ -3,6 +3,7 @@
 import { create } from 'zustand'
 import type { SessionUser, NotificationDTO } from '@/lib/types'
 import { levelFromXp } from '@/lib/economy'
+import { sound } from '@/lib/sound'
 
 export type AppKey = 'avito' | 'bank' | 'taxes' | 'browser' | 'settings' | 'repair' | 'auction' | 'career' | 'delivery' | 'leaderboard'
 
@@ -93,6 +94,7 @@ export const useOS = create<OSState>((set, get) => ({
   setSession: (u) => set({ session: u }),
   setSessionLoading: (v) => set({ sessionLoading: v }),
   openApp: (app) => {
+    sound.tap()
     set((s) => ({
       currentApp: app,
       openApps: s.openApps[0] === app ? s.openApps : [app, ...s.openApps.filter((a) => a !== app)].slice(0, 6),
@@ -118,6 +120,7 @@ export const useOS = create<OSState>((set, get) => ({
   pushToast: (title, body) => {
     // «Не беспокоить»: уведомление всё равно попадает в центр, но не всплывает поверх экрана
     if (get().dnd) return
+    sound.pop()
     g.__osToastId = (g.__osToastId ?? 0) + 1
     const id = g.__osToastId
     set((s) => ({ toastQueue: [...s.toastQueue, { id, title, body }].slice(-3) }))
@@ -142,6 +145,7 @@ export const useOS = create<OSState>((set, get) => ({
     // Если бэк не прислал level, но прислал xp — считаем по единой формуле.
     const nextLevel = u.level ?? (u.xp != null ? levelFromXp(u.xp) : prevLevel)
     if (nextLevel > prevLevel) {
+      sound.levelup()
       s.pushToast(
         `Новый уровень ${nextLevel}!`,
         'Опыт вырос: лимит кредита повышен, а задания стали щедрее.',

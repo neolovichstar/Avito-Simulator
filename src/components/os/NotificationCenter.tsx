@@ -12,6 +12,7 @@ import { useOS, type AppKey } from '@/lib/store'
 import { api } from '@/lib/api'
 import { timeAgo } from '@/lib/format'
 import { useDrag } from '@/lib/use-swipe'
+import { sound } from '@/lib/sound'
 
 interface NotifApp {
   app: string
@@ -61,6 +62,7 @@ export default function NotificationCenter({
   }
 
   const clearAll = () => {
+    if (notifications.length > 0) sound.swipe()
     clearNotifications()
     setExpandedId(null)
     api.clearNotifications().catch(() => {})
@@ -68,6 +70,7 @@ export default function NotificationCenter({
 
   const dismiss = (id: string) => {
     if (expandedId === id) setExpandedId(null)
+    sound.swipe()
     removeNotification(id)
     api.deleteNotification(id).catch(() => {})
   }

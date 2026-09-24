@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
+import { sound } from '@/lib/sound'
 import { fmtMoney } from '@/lib/format'
 import type { AchievementDTO, CareerData, QuestDTO, BonusState } from '@/lib/types'
 import { Button } from '@/components/ui/button'
@@ -141,6 +142,7 @@ export default function CareerApp() {
       const res = await api.claimQuest(quest.questId)
       const os = useOS.getState()
       os.refreshSession({ balance: res.balance, xp: res.xp })
+      sound.success()
       os.pushToast('Карьера', `Награда получена: +${fmtMoney(quest.reward)} и +${quest.xpReward} XP`)
       await load()
     } catch (e) {
