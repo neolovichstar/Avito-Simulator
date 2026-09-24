@@ -1,17 +1,18 @@
 'use client'
 
 // Страница объявления: большое фото, продавец, покупка (самовывоз/курьер — радио-карточки)
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useId, useState } from 'react'
 import {
   ChevronLeft, MapPin, Eye, Star, Truck, HandCoins, MessageSquare, ShoppingBag,
   TrendingDown, Zap, Loader2, PackageCheck, AlertTriangle, Clock, BadgeCheck, PenLine,
+  Flag, LineChart, ShieldCheck,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
 import { fmtNum, fmtMoney, timeAgo, initials, hueColor } from '@/lib/format'
 import { CATEGORY_LABEL } from '@/lib/catalog-types'
 import { DELIVERY_FEE } from '@/lib/economy'
-import type { ListingDetailData } from '@/lib/types'
+import type { ListingDetailData, PricePointDTO } from '@/lib/types'
 import type { SpecItem } from '@/lib/specs'
 import { ConditionBadge } from './AvitoApp'
 
@@ -35,7 +36,12 @@ export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
   const [revText, setRevText] = useState('')
   const [revSent, setRevSent] = useState(false)
   const [sellerReviews, setSellerReviews] = useState<{ id: string; from: string; rating: number; text: string; listing: string; createdAt: string }[] | null>(null)
+  const [complaintOpen, setComplaintOpen] = useState(false)
+  const [complaintReason, setComplaintReason] = useState('spam')
+  const [complaintSent, setComplaintSent] = useState(false)
+  const [complaintBusy, setComplaintBusy] = useState(false)
   const session = useOS((s) => s.session)
+  const pushToast = useOS((s) => s.pushToast)
   const refreshSession = useOS((s) => s.refreshSession)
 
   const load = useCallback(async () => {
@@ -109,6 +115,27 @@ export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
       setMsg(e instanceof ApiError ? e.message : 'Ошибка')
     } finally {
       setBusy(false)
+    }
+  }
+
+  const openComplaint = () => {
+    setComplaintOpen(true)
+    api.complaintState(id).then((st) => {
+      if (st.complainedByMe) setComplaintSent(true)
+    }).catch(() => {})
+  }
+
+  const sendComplaint = async () => {
+    setComplaintBusy(true)
+    try {
+      await api.addComplaint(id, complaintReason)
+      setComplaintSent(true)
+      pushToast('Avito', 'Жалоба отправлена модератору')
+      setTimeout(() => setComplaintOpen(false), 900)
+    } catch (e) {
+      pushToast('Avito', e instanceof ApiError ? e.message : 'Не удалось отправить жалобу')
+    } finally {
+      setComplaintBusy(false)
     }
   }
 
@@ -260,6 +287,11 @@ export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
             </div>
           )}
 
+          {/* динамика цен на этот товар */}
+          {data.priceHistory && data.priceHistory.filter((p) => p.price > 0).length >= 2 && (
+            <PriceHistoryCard points={data.priceHistory} />
+          )}
+
           {/* характеристики */}
           {data.specs && data.specs.length > 0 && (
             <div>
@@ -351,6 +383,25 @@ export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
                     <span className="text-[11px] text-neutral-400">+20 XP за отзыв</span>
                   </div>
                 </>
+              )}
+            </div>
+          )}
+
+          {/* жалоба на объявление */}
+          {!isMine && !sold && (
+            <div className="pt-1">
+              {complaintSent ? (
+                <p className="text-xs text-neutral-400 flex items-center gap-1.5 px-1">
+                  <ShieldCheck size={13} className="text-green-600" aria-hidden />
+                  Жалоба отправлена. Модератор проверит объявление
+                </p>
+              ) : (
+                <button
+                  onClick={openComplaint}
+                  className="h-11 px-3 text-xs text-neutral-400 font-medium flex items-center gap-1.5 rounded-2xl active:bg-neutral-100"
+                >
+                  <Flag size={13} aria-hidden /> Пожаловаться на объявление
+                </button>
               )}
             </div>
           )}
@@ -481,6 +532,119 @@ export default function ListingScreen({ id, onBack, onOpenChat, onGoSell }: {
           </div>
         </div>
       )}
+
+      {/* жалоба — bottom sheet */}
+      {complaintOpen && (
+        <div className="absolute inset-0 z-40 bg-black/40 flex items-end" onClick={() => { if (!complaintBusy) setComplaintOpen(false) }}>
+          <div className="bg-white w-full rounded-t-3xl animate-in slide-in-from-bottom-4" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Жалоба на объявление">
+            <div className="pt-3 flex justify-center">
+              <span className="w-10 h-1 rounded-full bg-neutral-200" aria-hidden />
+            </div>
+            <h3 className="text-base font-bold text-neutral-900 px-4 pt-2">Причина жалобы</h3>
+            <p className="text-xs text-neutral-400 px-4 pt-1">Модератор проверит объявление и примет решение</p>
+            <div role="radiogroup" aria-label="Причина жалобы" className="p-3 space-y-2">
+              {([
+                ['spam', 'Реклама или спам'],
+                ['fake', 'Товар не существует'],
+                ['scam', 'Похоже на обман'],
+                ['wrong', 'Неверное описание или цена'],
+                ['other', 'Другое'],
+              ] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  role="radio"
+                  aria-checked={complaintReason === key}
+                  onClick={() => setComplaintReason(key)}
+                  disabled={complaintBusy}
+                  className={`w-full text-left rounded-2xl border-2 p-3 flex items-center gap-3 transition-colors disabled:opacity-50 ${
+                    complaintReason === key ? 'border-[#00AAFF] bg-[#00AAFF]/5' : 'border-neutral-200'
+                  }`}
+                >
+                  <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${complaintReason === key ? 'border-[#00AAFF]' : 'border-neutral-300'}`} aria-hidden>
+                    {complaintReason === key && <span className="w-2.5 h-2.5 rounded-full bg-[#00AAFF]" />}
+                  </span>
+                  <span className="text-sm font-medium text-neutral-800">{label}</span>
+                </button>
+              ))}
+            </div>
+            {complaintSent ? (
+              <div className="p-3 border-t border-black/5 text-sm text-green-600 font-semibold flex items-center gap-2">
+                <ShieldCheck size={16} aria-hidden /> Жалоба отправлена
+              </div>
+            ) : (
+              <div className="p-3 border-t border-black/5">
+                <button
+                  onClick={sendComplaint}
+                  disabled={complaintBusy}
+                  className="w-full h-11 rounded-2xl bg-[#00AAFF] text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-40"
+                >
+                  {complaintBusy ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Flag size={16} aria-hidden />}
+                  Отправить жалобу
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Динамика цен на этот товар: спарклайн по точкам рынка (PricePoint)
+function PriceHistoryCard({ points }: { points: PricePointDTO[] }) {
+  const gid = useId()
+  const ps = points.filter((p) => p.price > 0)
+  if (ps.length < 2) return null
+  const w = 320
+  const h = 72
+  const padX = 4
+  const padY = 8
+  const min = Math.min(...ps.map((p) => p.price))
+  const max = Math.max(...ps.map((p) => p.price))
+  const span = max - min || 1
+  const x = (i: number) => padX + (i / (ps.length - 1)) * (w - padX * 2)
+  const y = (v: number) => h - padY - ((v - min) / span) * (h - padY * 2)
+  const line = ps.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(p.price).toFixed(1)}`).join(' ')
+  const area = `${line} L${x(ps.length - 1).toFixed(1)},${h} L${x(0).toFixed(1)},${h} Z`
+  const firstPoint = ps[0]
+  const lastPoint = ps[ps.length - 1]
+  const first = firstPoint.price
+  const last = lastPoint.price
+  const delta = Math.round(((last - first) / first) * 100)
+  const up = delta > 0
+  const days = Math.max(1, Math.round((new Date(lastPoint.at).getTime() - new Date(firstPoint.at).getTime()) / 86_400_000))
+  const period = days >= 25 ? 'за месяц' : days >= 5 ? `за ${days} дн.` : 'за неделю'
+
+  return (
+    <div className="rounded-2xl border border-neutral-100 p-3">
+      <div className="flex items-center gap-1.5 mb-1">
+        <LineChart size={14} className="text-[#00AAFF]" aria-hidden />
+        <h2 className="text-sm font-semibold text-neutral-900">Динамика цен</h2>
+        <span
+          className={`ml-auto text-[11px] font-bold px-2 py-0.5 rounded-lg ${
+            up ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'
+          }`}
+        >
+          {up ? '+' : ''}
+          {delta}% {period}
+        </span>
+      </div>
+      <p className="text-[11px] text-neutral-400 mb-2">
+        По {ps.length} объявлениям на рынке · min {fmtNum(min)} ₽ / max {fmtNum(max)} ₽
+      </p>
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-[72px]" role="img" aria-label={`График цен от ${fmtNum(min)} до ${fmtNum(max)} рублей`}>
+        <defs>
+          <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#00AAFF" stopOpacity="0.25" />
+            <stop offset="100%" stopColor="#00AAFF" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <line x1={padX} y1={padY} x2={w - padX} y2={padY} stroke="#f0f1f3" strokeWidth="1" strokeDasharray="3 4" />
+        <line x1={padX} y1={h - padY} x2={w - padX} y2={h - padY} stroke="#f0f1f3" strokeWidth="1" strokeDasharray="3 4" />
+        <path d={area} fill={`url(#${gid})`} />
+        <path d={line} fill="none" stroke="#00AAFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx={x(ps.length - 1)} cy={y(last)} r="3.5" fill="#00AAFF" stroke="white" strokeWidth="1.5" />
+      </svg>
     </div>
   )
 }

@@ -2,12 +2,13 @@
 
 // Лента объявлений: крупные фотокарточки 16:10, поиск, категории, сортировка, избранное
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Search, SlidersHorizontal, Heart, MapPin, Star, Zap } from 'lucide-react'
+import { Search, SlidersHorizontal, Heart, MapPin, Star, Zap, BellPlus, X, SearchX } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
-import { CATEGORIES, CONDITION_MULT } from '@/lib/catalog-types'
+import { CATEGORIES, CATEGORY_LABEL, CONDITION_MULT } from '@/lib/catalog-types'
 import type { CategoryKey } from '@/lib/catalog-types'
 import { fmtNum, initials, hueColor } from '@/lib/format'
-import type { FeedListing } from '@/lib/types'
+import { useOS } from '@/lib/store'
+import type { FeedListing, SavedSearchDTO } from '@/lib/types'
 
 const FAV_KEY = 'avito_sim_favs'
 
@@ -57,10 +58,39 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [favs, setFavs] = useState<string[]>([])
+  const [saved, setSaved] = useState<SavedSearchDTO[]>([])
+  const pushToast = useOS((s) => s.pushToast)
   const scrollRef = useRef<HTMLDivElement>(null)
   const pageRef = useRef(1)
 
   useEffect(() => { setFavs(getFavs()) }, [])
+
+  const loadSaved = useCallback(() => {
+    api.savedSearches().then((r) => setSaved(r.searches)).catch(() => {})
+  }, [])
+  useEffect(() => { loadSaved() }, [loadSaved])
+
+  const saveCurrent = async () => {
+    if (!query && category === 'all') return
+    try {
+      await api.createSavedSearch(query, category === 'all' ? null : category)
+      loadSaved()
+      pushToast('Avito', 'Поиск сохранён — будем сообщать о новых объявлениях')
+    } catch (e) {
+      pushToast('Avito', e instanceof ApiError ? e.message : 'Не удалось сохранить поиск')
+    }
+  }
+
+  const applySaved = (s: SavedSearchDTO) => {
+    setQ(s.query)
+    setQuery(s.query)
+    setCategory((s.category as CategoryKey | null) ?? 'all')
+  }
+
+  const removeSaved = async (id: string) => {
+    setSaved((prev) => prev.filter((s) => s.id !== id))
+    try { await api.deleteSavedSearch(id) } catch { loadSaved() }
+  }
 
   const load = useCallback(async (page = 1) => {
     setLoading(true)
@@ -108,6 +138,16 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
               className="bg-transparent outline-none text-sm w-full placeholder:text-neutral-400"
             />
           </div>
+          {(query || category !== 'all') && (
+            <button
+              type="button"
+              onClick={saveCurrent}
+              aria-label="Сохранить поиск"
+              className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 bg-[#e7f6ff] text-[#0098e8] active:scale-95 transition-transform"
+            >
+              <BellPlus size={18} aria-hidden />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setShowSort((s) => !s)}
@@ -142,6 +182,33 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
             <CatChip key={c.key} active={category === c.key} onClick={() => setCategory(c.key)} label={c.label} />
           ))}
         </div>
+        {/* сохранённые поиски */}
+        {saved.length > 0 && (
+          <div className="flex gap-2 mt-2 overflow-x-auto [scrollbar-width:none]" aria-label="Сохранённые поиски">
+            {saved.map((s) => (
+              <span
+                key={s.id}
+                className="shrink-0 flex items-center gap-1.5 h-9 pl-3 pr-1.5 rounded-full border border-[#00AAFF]/40 bg-[#f5fbff] text-xs font-medium text-[#0084c9]"
+              >
+                <button
+                  onClick={() => applySaved(s)}
+                  className="flex items-center gap-1.5 active:opacity-70"
+                  aria-label={`Применить поиск ${s.query || CATEGORY_LABEL[s.category ?? ''] || ''}`}
+                >
+                  <Search size={12} aria-hidden />
+                  {s.query || CATEGORY_LABEL[s.category ?? ''] || 'Все категории'}
+                </button>
+                <button
+                  onClick={() => removeSaved(s.id)}
+                  aria-label="Удалить поиск"
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-[#0084c9]/60 active:bg-black/5"
+                >
+                  <X size={13} aria-hidden />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* лента */}
@@ -157,8 +224,18 @@ export default function FeedScreen({ onOpenListing, favoritesMode }: {
             {Array.from({ length: 3 }).map((_, i) => <CardSkeleton key={i} />)}
           </>
         ) : items.length === 0 ? (
-          <div className="shrink-0 text-center text-sm text-neutral-400 pt-16 px-8">
-            {favoritesMode ? 'В избранном пусто. Жмите на сердечко у объявлений' : 'Ничего не нашлось. Попробуйте другой запрос'}
+          <div className="shrink-0 text-center pt-14 px-8 space-y-3">
+            <div className="mx-auto w-16 h-16 rounded-3xl bg-neutral-100 flex items-center justify-center" aria-hidden>
+              <SearchX size={28} className="text-neutral-300" />
+            </div>
+            <p className="text-sm text-neutral-500 font-medium">
+              {favoritesMode ? 'В избранном пусто' : 'Ничего не нашлось'}
+            </p>
+            <p className="text-xs text-neutral-400 leading-relaxed">
+              {favoritesMode
+                ? 'Нажимайте на сердечко у объявлений — они появятся здесь'
+                : 'Попробуйте другой запрос или сохраните поиск — сообщим, когда товар появится'}
+            </p>
           </div>
         ) : (
           <>

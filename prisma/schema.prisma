@@ -46,6 +46,8 @@ model User {
   repairs      RepairOrder[]
   deliveries   Delivery[]
   auctionBids  AuctionBid[]
+  savedSearches SavedSearch[]
+  complaints    Complaint[] @relation("complaintFrom")
 }
 
 model Listing {
@@ -64,12 +66,14 @@ model Listing {
   city        String
   status      String    @default("active") // active | sold | removed
   views       Int       @default(0)
+  complaintCount Int    @default(0)
   boostedUntil DateTime?
   createdAt   DateTime  @default(now())
   soldAt      DateTime?
 
   chats     Chat[]
   reviews   Review[]
+  complaints Complaint[]
 }
 
 model Item {
@@ -259,6 +263,36 @@ model AuctionBid {
   userName  String
   amount    Int
   createdAt DateTime @default(now())
+}
+
+model PricePoint {
+  id        String   @id @default(cuid())
+  itemKey   String
+  price     Int
+  createdAt DateTime @default(now())
+
+  @@index([itemKey, createdAt])
+}
+
+model SavedSearch {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  query     String
+  category  String?
+  createdAt DateTime @default(now())
+}
+
+model Complaint {
+  id        String   @id @default(cuid())
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id])
+  fromUserId String
+  from      User     @relation("complaintFrom", fields: [fromUserId], references: [id])
+  reason    String
+  createdAt DateTime @default(now())
+
+  @@unique([listingId, fromUserId])
 }
 
 model Quest {

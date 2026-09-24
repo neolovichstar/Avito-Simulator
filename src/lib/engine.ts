@@ -9,6 +9,7 @@ import { ensureDailyQuests } from '@/lib/quest-engine'
 import { botOpener } from '@/lib/chat-engine'
 import { auctionStep } from '@/lib/economy'
 import { emitTo } from '@/lib/realtime-emit'
+import { onListingCreated } from '@/lib/market-hooks'
 import { fmtMoney } from '@/lib/format'
 import { cache } from '@/lib/cache'
 
@@ -218,7 +219,7 @@ export async function spawnGarageSale() {
       const full = item.basePrice * (CONDITION_MULT[cond] ?? 0.8) * mult
       const price = Math.max(50, Math.round(full * (0.5 + Math.random() * 0.22)))
       const bot = rnd(botsAll)
-      await db.listing.create({
+      const created = await db.listing.create({
         data: {
           sellerId: bot.id, itemKey: item.key, title: item.title,
           description: `Гаражная распродажа, всё за полцены. ${rnd(item.desc)}`,
@@ -227,6 +228,7 @@ export async function spawnGarageSale() {
           city: bot.city, createdAt: new Date(),
         },
       })
+      await onListingCreated(created)
       spawned++
     }
   }
@@ -272,7 +274,7 @@ async function botsTick(tick: number) {
       price = 0
     }
     if (!isJunk && price < 100) price = 100
-    await db.listing.create({
+    const created = await db.listing.create({
       data: {
         sellerId: bot.id, itemKey: item.key, title: item.title,
         description: rnd(item.desc), category: item.category, condition: cond,
@@ -281,6 +283,7 @@ async function botsTick(tick: number) {
         createdAt: new Date(Date.now() - randInt(0, 90) * 60_000),
       },
     })
+    await onListingCreated(created)
   }
 
   // 2. Конкуренция: продавцы одного товара сбивают цену друг другу

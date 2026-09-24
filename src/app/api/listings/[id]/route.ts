@@ -18,12 +18,18 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     await db.listing.update({ where: { id }, data: { views: { increment: 1 } } }).catch(() => {})
   }
 
-  const [mult, purchase, review] = await Promise.all([
+  const [mult, purchase, review, history] = await Promise.all([
     getCategoryMult(listing.category),
     user
       ? db.transaction.findFirst({ where: { listingId: id, userId: user.id, type: 'purchase', amount: { lt: 0 } } })
       : Promise.resolve(null),
     user ? db.review.findFirst({ where: { listingId: id, fromUserId: user.id } }) : Promise.resolve(null),
+    db.pricePoint.findMany({
+      where: { itemKey: listing.itemKey },
+      orderBy: { createdAt: 'asc' },
+      take: 40,
+      select: { price: true, createdAt: true },
+    }),
   ])
   const est = Math.round(listing.baseValue * (CONDITION_MULT[listing.condition] ?? 0.8) * mult)
   const raw = listing.price > 0 ? Math.round(((est - listing.price) / listing.price) * 100) : 100
@@ -38,6 +44,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     sellerOnline: isOnline(listing.seller),
     sellerRating: ratingOf(listing.seller),
     specs: specsFor(listing.itemKey, listing.category, listing.id),
+    priceHistory: history.map((h) => ({
+      price: h.price,
+      at: h.createdAt.toISOString(),
+    })),
     purchasedByMe: !!purchase,
     reviewedByMe: !!review,
   })

@@ -3,6 +3,7 @@ import { getSessionUser, unauthorized } from '@/lib/session'
 import { listingDTO } from '@/lib/dto'
 import { cache } from '@/lib/cache'
 import { rateLimit } from '@/lib/ratelimit'
+import { onListingCreated } from '@/lib/market-hooks'
 import { CATEGORY_LABEL } from '@/lib/catalog-types'
 import type { CategoryKey } from '@/lib/catalog-types'
 
@@ -101,5 +102,6 @@ export async function POST(req: Request) {
     include: { seller: true },
   })
   cache.invalidate('feed')
+  void onListingCreated(listing)
   return Response.json({ listing: listingDTO(listing, user.id) })
 }

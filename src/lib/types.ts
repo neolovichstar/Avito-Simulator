@@ -44,13 +44,26 @@ export interface FeedListing {
   mine: boolean
 }
 
+export interface PricePointDTO {
+  price: number
+  at: string
+}
+
 export interface ListingDetailData extends FeedListing {
   description: string
   itemKey: string
   marginHint: number // сколько можно заработать %, ориентировочно
   sellerJoined: string
+  priceHistory?: PricePointDTO[]
   purchasedByMe?: boolean // текущий пользователь покупал этот товар
   reviewedByMe?: boolean // и уже оставил отзыв
+}
+
+export interface SavedSearchDTO {
+  id: string
+  query: string
+  category: string | null
+  createdAt: string
 }
 
 export interface ReviewDTO {

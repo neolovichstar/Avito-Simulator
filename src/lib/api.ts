@@ -5,6 +5,7 @@ import type {
   SessionUser, FeedListing, ListingDetailData, ChatListItem, ChatDetailData, ChatMessageDTO,
   BankData, TaxData, MarketStats, NotificationDTO, InventoryItemDTO, ProfileData,
   RepairOrderDTO, RepairQuoteDTO, DeliveryDTO, AuctionData, AuctionLotDTO, CareerData,
+  SavedSearchDTO,
 } from '@/lib/types'
 import type { CatalogItem, CategoryKey } from '@/lib/catalog-types'
 
@@ -45,6 +46,8 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 const post = <T,>(path: string, body?: unknown) =>
   req<T>(path, { method: 'POST', body: body !== undefined ? JSON.stringify(body) : undefined })
 
+const del = <T,>(path: string) => req<T>(path, { method: 'DELETE' })
+
 export const api = {
   // auth
   auth: (initData: string | null) =>
@@ -72,6 +75,14 @@ export const api = {
     post<{ ok: boolean; xp: number }>(`/api/listings/${id}/review`, { rating, text }),
   userReviews: (userId: string) =>
     req<{ rating: number; count: number; items: { id: string; from: string; rating: number; text: string; listing: string; createdAt: string }[] }>(`/api/users/${userId}/reviews`),
+  addComplaint: (id: string, reason: string) =>
+    post<{ ok: boolean; complaints: number }>(`/api/listings/${id}/complaint`, { reason }),
+  complaintState: (id: string) =>
+    req<{ complainedByMe: boolean; reason: string | null; complaints: number }>(`/api/listings/${id}/complaint`),
+  savedSearches: () => req<{ searches: SavedSearchDTO[] }>('/api/searches'),
+  createSavedSearch: (query: string, category: string | null) =>
+    post<{ search: SavedSearchDTO }>('/api/searches', { query, category }),
+  deleteSavedSearch: (id: string) => del<{ ok: boolean }>(`/api/searches/${id}`),
 
   // каталог и инвентарь
   catalog: () => req<{ items: CatalogItem[] }>('/api/catalog'),
