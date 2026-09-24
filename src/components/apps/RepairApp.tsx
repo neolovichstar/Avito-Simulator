@@ -1,6 +1,7 @@
 'use client'
 
-// Приложение «Сервисный центр» — тёмная тех-мастерская: фон #111827, акцент #f59e0b.
+// Приложение «Сервисный центр» — светлая мастерская: тёплый бежевый фон,
+// оранжевый акцент, живой прогресс работ, оценка мастера.
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import {
   ArrowRight, CheckCircle2, ChevronDown, Coins, Hammer, Loader2, PackageOpen, Timer, Wrench,
@@ -12,7 +13,7 @@ import { CONDITION_LABEL } from '@/lib/catalog-types'
 import type { InventoryItemDTO, RepairOrderDTO } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 
-const ORANGE = '#f59e0b'
+const ORANGE = '#ea580c'
 
 // Тик раз в секунду через useSyncExternalStore — прогресс-бары живые, без setState внутри эффектов
 function useTick(intervalMs = 1000): number {
@@ -38,12 +39,12 @@ function fmtRemain(ms: number): string {
 
 function conditionClass(c: string): string {
   switch (c) {
-    case 'new': return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-    case 'excellent': return 'bg-lime-500/15 text-lime-300 border-lime-500/30'
-    case 'good': return 'bg-sky-500/15 text-sky-300 border-sky-500/30'
-    case 'used': return 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-    case 'parts': return 'bg-red-500/15 text-red-300 border-red-500/30'
-    default: return 'bg-gray-500/15 text-gray-300 border-gray-500/30'
+    case 'new': return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+    case 'excellent': return 'bg-lime-50 text-lime-700 border-lime-200'
+    case 'good': return 'bg-sky-50 text-sky-700 border-sky-200'
+    case 'used': return 'bg-amber-50 text-amber-700 border-amber-200'
+    case 'parts': return 'bg-red-50 text-red-700 border-red-200'
+    default: return 'bg-neutral-50 text-neutral-600 border-neutral-200'
   }
 }
 
@@ -62,10 +63,12 @@ function ConditionBadge({ value }: { value: string }) {
 
 function EmptyState({ icon: Icon, title, text }: { icon: typeof Wrench; title: string; text: string }) {
   return (
-    <div className="flex flex-col items-center rounded-2xl border border-dashed border-gray-700 px-4 py-8 text-center">
-      <Icon className="size-8 text-gray-600" />
-      <div className="mt-2 text-sm font-medium text-gray-300">{title}</div>
-      <div className="mt-1 max-w-60 text-xs leading-relaxed text-gray-500">{text}</div>
+    <div className="flex flex-col items-center rounded-2xl border border-dashed border-neutral-300 bg-white/70 px-4 py-8 text-center">
+      <div className="flex size-12 items-center justify-center rounded-2xl bg-orange-50">
+        <Icon className="size-6 text-orange-500" />
+      </div>
+      <div className="mt-2.5 text-sm font-semibold text-neutral-800">{title}</div>
+      <div className="mt-1 max-w-64 text-xs leading-relaxed text-neutral-400">{text}</div>
     </div>
   )
 }
@@ -143,35 +146,55 @@ export default function RepairApp() {
   const repairable = data?.repairable ?? []
 
   return (
-    <div className="flex h-full flex-col bg-[#111827] text-gray-100">
-      {/* Шапка */}
-      <div className="flex items-center gap-3 px-4 pb-3 pt-4">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-[#f59e0b]/30 bg-[#f59e0b]/15">
-          <Wrench className="size-5 text-[#f59e0b]" aria-hidden />
+    <div className="flex h-full flex-col bg-[#faf9f7] text-neutral-900">
+      {/* ---------- герой-шапка ---------- */}
+      <div className="shrink-0 bg-gradient-to-br from-[#f59e0b] via-[#ea7c0c] to-[#d9560b] px-4 pb-5 pt-4 text-white">
+        <div className="flex items-center gap-3">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-white/20 backdrop-blur">
+            <Wrench className="size-5.5" aria-hidden />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-base font-bold">Сервисный центр</div>
+            <div className="mt-0.5 text-[11px] text-white/80">Ремонт и восстановление товаров</div>
+          </div>
+          <div className="flex shrink-0 flex-col items-end rounded-xl bg-white/15 px-3 py-1.5 backdrop-blur">
+            <span className="text-[9px] uppercase tracking-widest text-white/70">Баланс</span>
+            <span className="text-xs font-bold tabular-nums">{fmtMoney(session?.balance ?? 0)}</span>
+          </div>
         </div>
-        <div className="min-w-0">
-          <div className="text-base font-bold text-white">Сервисный центр</div>
-          <div className="text-xs text-gray-400">Ремонт и восстановление товаров</div>
+
+        {/* шаги работы */}
+        <div className="mt-4 flex items-center gap-2 text-[10px] font-medium text-white/85">
+          <span className="flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 backdrop-blur">
+            <PackageOpen className="size-3" aria-hidden /> Приёмка
+          </span>
+          <span className="h-px flex-1 bg-white/30" aria-hidden />
+          <span className="flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 backdrop-blur">
+            <Hammer className="size-3" aria-hidden /> Ремонт
+          </span>
+          <span className="h-px flex-1 bg-white/30" aria-hidden />
+          <span className="flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 backdrop-blur">
+            <CheckCircle2 className="size-3" aria-hidden /> Выдача
+          </span>
         </div>
       </div>
 
-      {/* Контент */}
-      <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4 [scrollbar-width:thin]">
+      {/* ---------- контент ---------- */}
+      <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-4 [scrollbar-width:thin]">
         {loading && !data ? (
           <div className="flex flex-col gap-3">
-            <div className="h-24 animate-pulse rounded-2xl bg-gray-800" />
-            <div className="h-24 animate-pulse rounded-2xl bg-gray-800" />
-            <div className="h-10 animate-pulse rounded-2xl bg-gray-800" />
-            <div className="h-20 animate-pulse rounded-2xl bg-gray-800" />
-            <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+            <div className="h-28 animate-pulse rounded-2xl bg-neutral-200" />
+            <div className="h-28 animate-pulse rounded-2xl bg-neutral-200" />
+            <div className="h-20 animate-pulse rounded-2xl bg-neutral-200" />
+            <div className="flex items-center justify-center gap-2 text-sm text-neutral-400">
               <Loader2 className="size-4 animate-spin" /> Мастерская открывается…
             </div>
           </div>
         ) : error && !data ? (
-          <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-6 text-center">
-            <p className="text-sm text-red-300">{error}</p>
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
+            <p className="text-sm font-medium text-red-700">{error}</p>
             <Button
-              className="mt-4 h-11 rounded-xl px-6 text-sm font-semibold text-gray-900"
+              className="mt-4 h-11 rounded-xl px-6 text-sm font-semibold text-white"
               style={{ backgroundColor: ORANGE }}
               onClick={() => void load()}
             >
@@ -182,10 +205,12 @@ export default function RepairApp() {
           <>
             {/* В ремонте */}
             <section className="flex flex-col gap-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-gray-200">
-                <Hammer className="size-4 text-[#f59e0b]" aria-hidden />
-                В ремонте
-                <span className="ml-auto rounded-full bg-gray-800 px-2 py-0.5 text-xs font-normal text-gray-400">
+              <div className="flex items-center gap-2">
+                <div className="flex size-7 items-center justify-center rounded-lg bg-orange-100">
+                  <Hammer className="size-3.5 text-orange-600" aria-hidden />
+                </div>
+                <div className="text-sm font-bold text-neutral-800">В ремонте</div>
+                <span className="ml-auto rounded-full bg-neutral-200/80 px-2 py-0.5 text-[11px] font-semibold text-neutral-600">
                   {orders.length}
                 </span>
               </div>
@@ -211,63 +236,69 @@ export default function RepairApp() {
                         ? 'Завершается…'
                         : `Осталось ${fmtRemain(remain)}`
                   return (
-                    <div key={order.id} className="rounded-2xl border border-gray-700/60 bg-gray-800/60 p-3.5">
-                      <div className="flex gap-3">
-                        <img
-                          src={order.itemImage}
-                          alt={order.itemTitle}
-                          className="size-20 shrink-0 rounded-xl border border-gray-700 object-cover"
-                        />
+                    <div key={order.id} className="shrink-0 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
+                      <div className="flex gap-3 p-4">
+                        <div className="relative">
+                          <img
+                            src={order.itemImage}
+                            alt={order.itemTitle}
+                            className="size-20 shrink-0 rounded-xl border border-neutral-200 object-cover"
+                          />
+                          {order.status === 'ready' && (
+                            <span className="absolute -right-1.5 -top-1.5 flex size-6 items-center justify-center rounded-full bg-emerald-500 text-white shadow">
+                              <CheckCircle2 className="size-3.5" aria-hidden />
+                            </span>
+                          )}
+                        </div>
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="truncate text-sm font-semibold text-gray-100">{order.itemTitle}</div>
-                            {order.status === 'ready' ? (
-                              <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
-                                <CheckCircle2 className="size-3" aria-hidden /> Готов
-                              </span>
-                            ) : (
-                              <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-300">
-                                <Timer className="size-3" aria-hidden /> В работе
-                              </span>
-                            )}
-                          </div>
-                          <div className="mt-1 flex items-center gap-1.5 text-xs text-gray-400">
+                          <div className="truncate text-sm font-semibold text-neutral-900">{order.itemTitle}</div>
+                          <div className="mt-1.5 flex items-center gap-1.5">
                             <ConditionBadge value={order.fromCondition} />
-                            <ArrowRight className="size-3.5 shrink-0 text-[#f59e0b]" aria-hidden />
+                            <ArrowRight className="size-3.5 shrink-0 text-orange-500" aria-hidden />
                             <ConditionBadge value={order.toCondition} />
                           </div>
-                          <div className="mt-1.5 flex items-center gap-1 text-xs text-gray-400">
-                            <Coins className="size-3.5 shrink-0 text-[#f59e0b]" aria-hidden />
-                            Стоимость:{' '}
-                            <span className="font-medium text-gray-200">{fmtMoney(order.cost)}</span>
+                          <div className="mt-1.5 flex items-center gap-1 text-xs text-neutral-500">
+                            <Coins className="size-3.5 shrink-0 text-orange-500" aria-hidden />
+                            Стоимость: <span className="font-semibold text-neutral-800">{fmtMoney(order.cost)}</span>
                           </div>
                         </div>
                       </div>
 
                       {order.status === 'ready' ? (
-                        <Button
-                          className="mt-3 h-11 w-full rounded-xl text-sm font-semibold text-gray-900"
-                          style={{ backgroundColor: ORANGE }}
-                          disabled={pickupBusy === order.id}
-                          onClick={() => void pickup(order)}
-                        >
-                          {pickupBusy === order.id ? (
-                            <Loader2 className="size-4 animate-spin" aria-hidden />
-                          ) : (
-                            'Забрать'
-                          )}
-                        </Button>
+                        <div className="px-4 pb-4">
+                          <Button
+                            className="h-11 w-full rounded-xl text-sm font-semibold text-white shadow-[0_6px_18px_-6px_rgba(234,88,12,0.6)]"
+                            style={{ backgroundColor: ORANGE }}
+                            disabled={pickupBusy === order.id}
+                            onClick={() => void pickup(order)}
+                          >
+                            {pickupBusy === order.id ? (
+                              <Loader2 className="size-4 animate-spin" aria-hidden />
+                            ) : (
+                              'Забрать из мастерской'
+                            )}
+                          </Button>
+                        </div>
                       ) : (
-                        <div className="mt-3">
-                          <div className="h-2 overflow-hidden rounded-full bg-gray-700">
+                        <div className="px-4 pb-4">
+                          {/* полоса прогресса работ */}
+                          <div className="relative h-2.5 overflow-hidden rounded-full bg-neutral-100">
                             <div
-                              className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-400 transition-[width] duration-1000 ease-linear"
+                              className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500 transition-[width] duration-1000 ease-linear"
                               style={{ width: `${pct}%` }}
                             />
+                            <span
+                              className="absolute top-0 h-full w-0.5 bg-white/90 shadow"
+                              style={{ left: `calc(${pct}% - 1px)` }}
+                              aria-hidden
+                            />
                           </div>
-                          <div className="mt-1.5 flex justify-between text-[11px] text-gray-400">
-                            <span>{pct}% выполнено</span>
-                            <span className="tabular-nums">{remainLabel}</span>
+                          <div className="mt-1.5 flex items-center justify-between text-[11px]">
+                            <span className="flex items-center gap-1 text-neutral-400">
+                              <Timer className="size-3" aria-hidden />
+                              {pct}% выполнено
+                            </span>
+                            <span className="font-semibold tabular-nums text-orange-600">{remainLabel}</span>
                           </div>
                         </div>
                       )}
@@ -279,10 +310,12 @@ export default function RepairApp() {
 
             {/* Доступно для ремонта */}
             <section className="flex flex-col gap-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-gray-200">
-                <PackageOpen className="size-4 text-[#f59e0b]" aria-hidden />
-                Доступно для ремонта
-                <span className="ml-auto rounded-full bg-gray-800 px-2 py-0.5 text-xs font-normal text-gray-400">
+              <div className="flex items-center gap-2">
+                <div className="flex size-7 items-center justify-center rounded-lg bg-orange-100">
+                  <PackageOpen className="size-3.5 text-orange-600" aria-hidden />
+                </div>
+                <div className="text-sm font-bold text-neutral-800">Доступно для ремонта</div>
+                <span className="ml-auto rounded-full bg-neutral-200/80 px-2 py-0.5 text-[11px] font-semibold text-neutral-600">
                   {repairable.length}
                 </span>
               </div>
@@ -295,19 +328,19 @@ export default function RepairApp() {
                 />
               ) : (
                 repairable.map((item) => (
-                  <div key={item.id} className="rounded-2xl border border-gray-700/60 bg-gray-800/60 p-3.5">
-                    <div className="flex gap-3">
+                  <div key={item.id} className="shrink-0 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
+                    <div className="flex gap-3 p-4">
                       <img
                         src={item.image}
                         alt={item.title}
-                        className="size-16 shrink-0 rounded-xl border border-gray-700 object-cover"
+                        className="size-16 shrink-0 rounded-xl border border-neutral-200 object-cover"
                       />
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-semibold text-gray-100">{item.title}</div>
+                        <div className="truncate text-sm font-semibold text-neutral-900">{item.title}</div>
                         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                           <ConditionBadge value={item.condition} />
-                          <span className="text-[11px] text-gray-400">
-                            Оценка: <span className="font-medium text-gray-200">{fmtMoney(item.estValue)}</span>
+                          <span className="text-[11px] text-neutral-500">
+                            Оценка после ремонта: <span className="font-semibold text-neutral-800">{fmtMoney(item.estValue)}</span>
                           </span>
                         </div>
                       </div>
@@ -315,7 +348,7 @@ export default function RepairApp() {
                         onClick={() => toggleOpen(item.id)}
                         aria-expanded={openItem === item.id}
                         aria-label={`Ремонт: ${item.title}`}
-                        className="inline-flex h-11 shrink-0 items-center gap-1 self-center rounded-xl border border-[#f59e0b]/40 px-3.5 text-sm font-medium text-[#f59e0b] transition active:scale-95"
+                        className="inline-flex h-10 shrink-0 items-center gap-1 self-center rounded-xl border border-orange-200 bg-orange-50 px-3.5 text-sm font-semibold text-orange-700 transition active:scale-95"
                       >
                         Ремонт
                         <ChevronDown
@@ -326,21 +359,21 @@ export default function RepairApp() {
                     </div>
 
                     {openItem === item.id && (
-                      <div className="mt-3 rounded-xl border border-gray-700 bg-gray-900/70 p-3">
-                        <p className="text-[11px] leading-relaxed text-gray-400">
+                      <div className="border-t border-dashed border-neutral-200 bg-neutral-50/70 p-4">
+                        <p className="text-[11px] leading-relaxed text-neutral-500">
                           Мастер оценит работу при приёмке: цену и срок назовём в уведомлении сразу после отправки.
                         </p>
                         <div className="mt-2 flex items-center justify-between text-xs">
-                          <span className="text-gray-400">Ваш баланс</span>
-                          <span className="font-semibold text-gray-200">{fmtMoney(session?.balance ?? 0)}</span>
+                          <span className="text-neutral-500">Ваш баланс</span>
+                          <span className="font-semibold text-neutral-900">{fmtMoney(session?.balance ?? 0)}</span>
                         </div>
                         {itemError?.id === item.id && (
-                          <div className="mt-2 rounded-lg border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 text-[11px] text-red-300">
+                          <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11px] text-red-600">
                             {itemError.msg}
                           </div>
                         )}
                         <Button
-                          className="mt-3 h-11 w-full rounded-xl text-sm font-semibold text-gray-900"
+                          className="mt-3 h-11 w-full rounded-xl text-sm font-semibold text-white"
                           style={{ backgroundColor: ORANGE }}
                           disabled={busyItem === item.id}
                           onClick={() => void sendToRepair(item)}
@@ -358,7 +391,7 @@ export default function RepairApp() {
               )}
             </section>
 
-            <div className="pb-2 text-center text-[10px] text-gray-600">
+            <div className="pb-2 text-center text-[10px] text-neutral-400">
               Сервисный центр · гарантия мастера, это игра
             </div>
           </>

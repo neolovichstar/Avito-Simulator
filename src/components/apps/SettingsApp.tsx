@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   BatteryCharging, Ban, Bot, CheckCircle2, Database, Handshake, Info, Loader2, MapPin, Moon, MoonStar, NotebookText, RefreshCw,
-  Send, Server, Shield, Star, Wallet, Zap,
+  Send, Server, Settings as SettingsIcon, Shield, Star, Wallet, Zap,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS, ALL_WIDGETS, WIDGET_LABEL, type WidgetKey } from '@/lib/store'
@@ -154,6 +154,13 @@ export default function SettingsApp() {
 
   return (
     <div className="h-full flex flex-col bg-white text-neutral-900">
+      {/* шапка приложения */}
+      <div className="flex shrink-0 items-center gap-3 border-b border-neutral-100 px-4 py-3.5">
+        <div className="flex size-9 items-center justify-center rounded-xl bg-neutral-900">
+          <SettingsIcon className="size-4.5 text-white" aria-hidden />
+        </div>
+        <div className="text-[15px] font-bold">Настройки</div>
+      </div>
       <div className="flex-1 space-y-5 overflow-y-auto p-4 [scrollbar-width:thin]">
         {error && !profile ? (
           <div className="rounded-2xl border border-red-100 bg-red-50 p-6 text-center">
@@ -179,56 +186,59 @@ export default function SettingsApp() {
           </div>
         ) : (
           <>
-            {/* Профиль */}
-            <div className="rounded-2xl border border-neutral-200/80 bg-white p-4 shadow-sm">
-              <div className="flex items-center gap-4">
-                {session?.photoUrl ? (
-                  <img src={session.photoUrl} alt={name} className="size-16 shrink-0 rounded-full object-cover" />
-                ) : (
-                  <div
-                    className="flex size-16 shrink-0 items-center justify-center rounded-full text-xl font-semibold text-white"
-                    style={{ backgroundColor: hueColor(210) }}
-                  >
-                    {initials(name)}
-                  </div>
-                )}
-                <div className="min-w-0">
-                  <div className="truncate text-lg font-bold">{name}</div>
-                  <div className="truncate text-xs text-neutral-500">@{session?.username ?? 'player'}</div>
-                  <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">
-                    Уровень {session?.level ?? 1}
+            {/* Профиль — hero-карточка */}
+            <div className="overflow-hidden rounded-2xl shadow-sm ring-1 ring-black/5">
+              <div className="bg-gradient-to-br from-[#231a33] via-[#1a1426] to-[#120e1a] p-4 text-white">
+                <div className="flex items-center gap-4">
+                  {session?.photoUrl ? (
+                    <img src={session.photoUrl} alt={name} className="size-16 shrink-0 rounded-full object-cover ring-2 ring-white/20" />
+                  ) : (
+                    <div
+                      className="flex size-16 shrink-0 items-center justify-center rounded-full text-xl font-semibold text-white ring-2 ring-white/20"
+                      style={{ backgroundColor: hueColor(210) }}
+                    >
+                      {initials(name)}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="truncate text-lg font-bold">{name}</div>
+                    <div className="truncate text-xs text-white/50">@{session?.username ?? 'player'}</div>
+                    <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-[#a78bfa]/20 px-2.5 py-0.5 text-[11px] font-semibold text-[#c4b5fd]">
+                      <Zap className="size-3" aria-hidden />
+                      Уровень {session?.level ?? 1}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Прогресс XP (хардкорная кривая) */}
-              <div className="mt-4">
-                <div className="flex justify-between text-[11px] text-neutral-500">
-                  <span>Опыт</span>
-                  <span>
-                    {xpInLevel} / {xpNeed} XP
-                  </span>
+                {/* Прогресс XP (хардкорная кривая) */}
+                <div className="mt-4">
+                  <div className="flex justify-between text-[11px] text-white/50">
+                    <span>Опыт</span>
+                    <span className="tabular-nums">
+                      {xpInLevel} / {xpNeed} XP
+                    </span>
+                  </div>
+                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full rounded-full bg-gradient-to-r from-[#a78bfa] to-[#c4b5fd] transition-all" style={{ width: `${xpPct}%` }} />
+                  </div>
+                  <p className="mt-1 text-[10px] text-white/40">Прогресс хардкорный: на высоких уровнях XP нужен в разы больше</p>
                 </div>
-                <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-neutral-100">
-                  <div className="h-full rounded-full bg-[#21A038] transition-all" style={{ width: `${xpPct}%` }} />
-                </div>
-                <p className="mt-1 text-[10px] text-neutral-400">Прогресс хардкорный: на высоких уровнях XP нужен в разы больше</p>
               </div>
 
               {/* Рейтинг и баланс */}
-              <div className="mt-4 grid grid-cols-2 gap-3 border-t border-neutral-100 pt-3.5">
-                <div>
-                  <div className="text-[11px] text-neutral-500">Рейтинг</div>
+              <div className="grid grid-cols-2 gap-3 border-t border-neutral-100 bg-white p-3.5">
+                <div className="rounded-xl bg-amber-50 px-3 py-2">
+                  <div className="text-[10px] text-neutral-500">Рейтинг</div>
                   <div className="mt-0.5 flex items-center gap-1 text-sm font-semibold">
                     <Star className="size-4 fill-yellow-400 text-yellow-400" />
                     {rating.toFixed(1)}
                     <span className="text-[11px] font-normal text-neutral-400">({ratingCount})</span>
                   </div>
                 </div>
-                <div>
-                  <div className="text-[11px] text-neutral-500">Баланс</div>
+                <div className="rounded-xl bg-emerald-50 px-3 py-2">
+                  <div className="text-[10px] text-neutral-500">Баланс</div>
                   <div className="mt-0.5 flex items-center gap-1 text-sm font-semibold">
-                    <Wallet className="size-4 text-neutral-400" />
+                    <Wallet className="size-4 text-emerald-600" />
                     {fmtMoney(session?.balance ?? 0)}
                   </div>
                 </div>
@@ -565,7 +575,7 @@ export default function SettingsApp() {
                   <Info className="size-4 text-neutral-400" />
                   <span className="text-sm font-medium text-neutral-800">Сделка</span>
                   <span className="ml-auto rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-500">
-                    версия 2.2.0
+                    версия 2.4.0
                   </span>
                 </div>
                 <p className="mt-2 text-xs leading-relaxed text-neutral-500">

@@ -1,6 +1,7 @@
 'use client'
 
-// Приложение «Карьера» — игровой профиль: градиент #1e1b4b → #312e81, акцент #a78bfa.
+// Приложение «Карьера» — игровой профиль: кольцо уровня, серия входов,
+// задания с прогрессом и достижения с медалями трёх достоинств.
 import { useCallback, useEffect, useState } from 'react'
 import {
   CalendarClock, CheckCircle2, Coins, Flame, Loader2, Lock, Medal, Trophy, Zap,
@@ -8,10 +9,94 @@ import {
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
 import { fmtMoney } from '@/lib/format'
-import type { CareerData, QuestDTO, BonusState } from '@/lib/types'
+import type { AchievementDTO, CareerData, QuestDTO, BonusState } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 
-const VIOLET = '#a78bfa'
+const VIOLET = '#7c5cff'
+
+function LevelRing({ level, progress }: { level: number; progress: number }) {
+  const r = 30
+  const c = 2 * Math.PI * r
+  const offset = c * (1 - Math.min(100, Math.max(0, progress)) / 100)
+  return (
+    <div className="relative size-[76px] shrink-0">
+      <svg viewBox="0 0 76 76" className="size-full -rotate-90">
+        <circle cx="38" cy="38" r={r} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="7" />
+        <circle
+          cx="38"
+          cy="38"
+          r={r}
+          fill="none"
+          stroke="url(#ringGrad)"
+          strokeWidth="7"
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={offset}
+          style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+        />
+        <defs>
+          <linearGradient id="ringGrad" x1="0" y1="0" x2="76" y2="76">
+            <stop offset="0%" stopColor="#a78bfa" />
+            <stop offset="100%" stopColor="#c4b5fd" />
+          </linearGradient>
+        </defs>
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-xl font-extrabold leading-none text-white tabular-nums">{level}</span>
+        <span className="text-[8px] uppercase tracking-widest text-violet-200/70">ур.</span>
+      </div>
+    </div>
+  )
+}
+
+// медаль достижения по величине награды
+function medalTier(reward: number): { ring: string; chip: string; icon: string; label: string } {
+  if (reward >= 50000) return { ring: 'bg-amber-400/20', chip: 'border-amber-400/40 bg-amber-400/15 text-amber-300', icon: 'text-amber-300', label: 'Золото' }
+  if (reward >= 15000) return { ring: 'bg-slate-300/15', chip: 'border-slate-300/30 bg-slate-300/10 text-slate-200', icon: 'text-slate-200', label: 'Серебро' }
+  return { ring: 'bg-orange-800/30', chip: 'border-orange-700/50 bg-orange-800/25 text-orange-200', icon: 'text-orange-300', label: 'Бронза' }
+}
+
+function AchievementCard({ a }: { a: AchievementDTO }) {
+  const tier = medalTier(a.reward)
+  return (
+    <div
+      className={
+        'relative flex flex-col overflow-hidden rounded-2xl border p-3.5 ' +
+        (a.unlocked ? 'border-white/15 bg-white/[0.07]' : 'border-white/5 bg-white/[0.03]')
+      }
+    >
+      {/* декоративная полоса для открытых */}
+      {a.unlocked && <span className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-[#a78bfa] to-transparent" aria-hidden />}
+      <div className="flex items-start justify-between">
+        <div className={'relative flex size-11 items-center justify-center rounded-2xl ' + (a.unlocked ? tier.ring : 'bg-white/5')}>
+          <Medal className={'size-5.5 ' + (a.unlocked ? tier.icon : 'text-stone-600')} aria-hidden />
+          {!a.unlocked && (
+            <span className="absolute -bottom-1 -right-1 flex size-5 items-center justify-center rounded-full border border-white/10 bg-[#17123a]">
+              <Lock className="size-2.5 text-stone-400" aria-hidden />
+            </span>
+          )}
+        </div>
+        <span className={'rounded-full border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider ' + (a.unlocked ? tier.chip : 'border-white/5 bg-white/5 text-stone-600')}>
+          {tier.label}
+        </span>
+      </div>
+      <div className={'mt-2.5 text-[13px] font-semibold leading-snug ' + (a.unlocked ? 'text-white' : 'text-violet-200/40')}>
+        {a.title}
+      </div>
+      <div className={'mt-0.5 flex-1 text-[11px] leading-relaxed ' + (a.unlocked ? 'text-violet-200/60' : 'text-violet-200/35')}>
+        {a.desc}
+      </div>
+      <div className="mt-2.5 flex items-center justify-between gap-1">
+        <span className="text-[11px] font-semibold text-emerald-300">+{fmtMoney(a.reward)}</span>
+        {a.unlocked && (
+          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-1.5 py-0.5 text-[9px] font-medium text-emerald-300">
+            <CheckCircle2 className="size-2.5" aria-hidden /> Открыто
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
 
 type Tab = 'quests' | 'achievements'
 
@@ -62,28 +147,70 @@ export default function CareerApp() {
     { key: 'achievements', label: 'Достижения' },
   ]
 
+  const unlocked = data?.unlockedCount ?? 0
+  const total = data?.totalCount ?? 0
+
   return (
-    <div className="flex h-full flex-col bg-gradient-to-b from-[#1e1b4b] to-[#312e81] text-white">
-      {/* Шапка */}
-      <div className="flex items-center gap-3 px-4 pb-3 pt-4">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-[#a78bfa]/30 bg-[#a78bfa]/15">
-          <Trophy className="size-5 text-[#a78bfa]" aria-hidden />
+    <div className="flex h-full flex-col bg-[#120e2e] text-white">
+      {/* ---------- герой: кольцо уровня + профиль ---------- */}
+      <div className="relative shrink-0 overflow-hidden px-4 pb-5 pt-4">
+        <div
+          className="absolute inset-0"
+          style={{ background: 'radial-gradient(120% 100% at 20% 0%, #2b1d6e 0%, #120e2e 62%), linear-gradient(180deg, #17114a 0%, #120e2e 100%)' }}
+          aria-hidden
+        />
+        <div className="relative flex items-center gap-4">
+          {data ? <LevelRing level={data.level} progress={data.levelProgress} /> : <div className="size-[76px] animate-pulse rounded-full bg-white/10" />}
+          <div className="min-w-0 flex-1">
+            <div className="text-base font-bold">Карьера</div>
+            <div className="mt-0.5 text-[11px] leading-relaxed text-violet-200/60">
+              Прогресс хардкорный: опыт растёт только за сделки
+            </div>
+            {/* XP-полоса */}
+            <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[#a78bfa] to-[#c4b5fd] transition-[width]"
+                style={{ width: `${Math.min(100, Math.max(0, data?.levelProgress ?? 0))}%` }}
+              />
+            </div>
+            <div className="mt-1 flex items-center justify-between text-[10px] text-violet-200/60">
+              <span>Прогресс уровня</span>
+              <span className="tabular-nums">{data?.levelProgress ?? 0}%</span>
+            </div>
+          </div>
         </div>
-        <div className="min-w-0">
-          <div className="text-base font-bold text-white">Карьера</div>
-          <div className="text-xs text-indigo-200/60">Уровни, задания и достижения</div>
+
+        {/* мини-статы */}
+        <div className="relative mt-4 grid grid-cols-2 gap-2">
+          <div className="flex items-center gap-2.5 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-[#a78bfa]/15">
+              <Medal className="size-4 text-[#c4b5fd]" aria-hidden />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] text-violet-200/60">Достижения</div>
+              <div className="text-sm font-bold tabular-nums">{unlocked}/{total}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2.5 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-[#a78bfa]/15">
+              <Trophy className="size-4 text-[#c4b5fd]" aria-hidden />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] text-violet-200/60">Заданий сегодня</div>
+              <div className="text-sm font-bold tabular-nums">{data?.quests.length ?? 0}</div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Контент */}
-      <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4 [scrollbar-width:thin]">
+      {/* ---------- контент ---------- */}
+      <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4 pt-0 [scrollbar-width:thin]">
         {loading && !data ? (
-          <div className="flex flex-col gap-3">
-            <div className="h-28 animate-pulse rounded-2xl bg-white/10" />
+          <div className="flex flex-col gap-3 pt-4">
             <div className="h-11 animate-pulse rounded-2xl bg-white/10" />
             <div className="h-28 animate-pulse rounded-2xl bg-white/10" />
             <div className="h-28 animate-pulse rounded-2xl bg-white/10" />
-            <div className="flex items-center justify-center gap-2 text-sm text-indigo-200/50">
+            <div className="flex items-center justify-center gap-2 text-sm text-violet-200/50">
               <Loader2 className="size-4 animate-spin" /> Загрузка профиля…
             </div>
           </div>
@@ -91,7 +218,7 @@ export default function CareerApp() {
           <div className="rounded-2xl border border-red-400/30 bg-red-500/10 p-6 text-center">
             <p className="text-sm text-red-300">{error}</p>
             <Button
-              className="mt-4 h-11 rounded-xl px-6 text-sm font-semibold text-[#1e1b4b]"
+              className="mt-4 h-11 rounded-xl px-6 text-sm font-semibold text-[#120e2e]"
               style={{ backgroundColor: VIOLET }}
               onClick={() => void load()}
             >
@@ -100,73 +227,59 @@ export default function CareerApp() {
           </div>
         ) : data ? (
           <>
-            {/* Уровень и XP */}
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="text-4xl font-extrabold leading-none text-[#a78bfa] tabular-nums">
-                    {data.level}
-                  </div>
-                  <div>
-                    <div className="text-sm font-semibold text-white">Уровень</div>
-                    <div className="text-[11px] text-indigo-200/60">опыт растёт за сделки</div>
-                  </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-[#a78bfa]/30 bg-[#a78bfa]/10 px-3 py-1.5 text-xs font-medium text-[#c4b5fd]">
-                  <Medal className="size-3.5" aria-hidden />
-                  Достижения: {data.unlockedCount}/{data.totalCount}
-                </div>
-              </div>
-              <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-white/10">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-[#a78bfa] to-[#c4b5fd] transition-[width]"
-                  style={{ width: `${Math.min(100, Math.max(0, data.levelProgress))}%` }}
-                />
-              </div>
-              <div className="mt-1.5 flex justify-between text-[11px] text-indigo-200/60">
-                <span>Прогресс уровня</span>
-                <span className="tabular-nums">{data.levelProgress}%</span>
-              </div>
-            </div>
-
-            {/* Ежедневный бонус за вход */}
+            {/* Ежедневный бонус за вход + серия */}
             {bonus && (
-              <div className="flex items-center gap-3 rounded-2xl border border-[#a78bfa]/25 bg-[#a78bfa]/10 p-3.5">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#a78bfa]/20">
-                  <Flame className="size-5 text-[#fbbf24]" aria-hidden />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-white">Бонус за вход</div>
-                  <div className="text-[11px] text-indigo-200/60">
-                    {bonus.claimedToday
-                      ? `Серия ${bonus.streak} дн. · получено сегодня`
-                      : `Серия ${bonus.streak} дн. · заходите завтра: ${fmtMoney(bonus.nextReward)}`}
+              <div className="rounded-2xl border border-[#fbbf24]/25 bg-gradient-to-br from-[#fbbf24]/12 to-transparent p-3.5">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#fbbf24]/15">
+                    <Flame className="size-5 text-[#fbbf24]" aria-hidden />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold">Бонус за вход</div>
+                    <div className="text-[11px] text-violet-200/60">
+                      {bonus.claimedToday
+                        ? `Серия ${bonus.streak} дн. · получено сегодня`
+                        : `Серия ${bonus.streak} дн. · завтра +${fmtMoney(bonus.nextReward)}`}
+                    </div>
+                  </div>
+                  <div
+                    className={
+                      'shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold ' +
+                      (bonus.claimedToday ? 'bg-white/10 text-violet-200/70' : 'bg-[#fbbf24] text-[#120e2e]')
+                    }
+                  >
+                    {bonus.claimedToday ? 'Завтра' : fmtMoney(bonus.nextReward)}
                   </div>
                 </div>
-                <div
-                  className={
-                    'shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold ' +
-                    (bonus.claimedToday
-                      ? 'bg-white/10 text-indigo-200/70'
-                      : 'bg-[#fbbf24] text-[#1e1b4b]')
-                  }
-                >
-                  {bonus.claimedToday ? 'Завтра' : fmtMoney(bonus.nextReward)}
+                {/* календарь серии: 7 точек */}
+                <div className="mt-3 flex items-center gap-1.5">
+                  {Array.from({ length: 7 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={
+                        'flex-1 rounded-full py-1 text-center text-[9px] font-bold ' +
+                        (i < bonus.streak % 7 || (bonus.streak > 0 && bonus.streak % 7 === 0)
+                          ? 'bg-[#fbbf24]/85 text-[#120e2e]'
+                          : 'bg-white/8 text-violet-200/40')
+                      }
+                    >
+                      {i + 1}
+                    </div>
+                  ))}
                 </div>
+                <div className="mt-1.5 text-[9px] text-violet-200/40">Неделя входов подряд — максимальный множитель</div>
               </div>
             )}
 
             {/* Табы */}
-            <div className="grid grid-cols-2 rounded-2xl bg-black/25 p-1">
+            <div className="grid grid-cols-2 rounded-2xl bg-black/30 p-1">
               {tabs.map((t) => (
                 <button
                   key={t.key}
                   onClick={() => setTab(t.key)}
                   className={
                     'h-11 rounded-xl text-sm transition ' +
-                    (tab === t.key
-                      ? 'font-semibold text-[#1e1b4b]'
-                      : 'font-medium text-indigo-200/70')
+                    (tab === t.key ? 'font-semibold text-white' : 'font-medium text-violet-200/60 hover:text-violet-200/90')
                   }
                   style={tab === t.key ? { backgroundColor: VIOLET } : undefined}
                 >
@@ -186,9 +299,9 @@ export default function CareerApp() {
 
                 {data.quests.length === 0 ? (
                   <div className="flex flex-col items-center rounded-2xl border border-dashed border-white/15 px-4 py-10 text-center">
-                    <CalendarClock className="size-8 text-indigo-300/40" aria-hidden />
-                    <div className="mt-2 text-sm font-medium text-indigo-100">Заданий пока нет</div>
-                    <div className="mt-1 max-w-60 text-xs leading-relaxed text-indigo-200/50">
+                    <CalendarClock className="size-8 text-violet-300/40" aria-hidden />
+                    <div className="mt-2 text-sm font-medium text-violet-100">Заданий пока нет</div>
+                    <div className="mt-1 max-w-60 text-xs leading-relaxed text-violet-200/50">
                       Заходите завтра — список обновляется ежедневно.
                     </div>
                   </div>
@@ -202,42 +315,53 @@ export default function CareerApp() {
                         className={
                           'rounded-2xl border p-4 ' +
                           (done && !q.claimed
-                            ? 'border-[#a78bfa]/50 bg-[#a78bfa]/10'
+                            ? 'border-[#a78bfa]/60 bg-[#a78bfa]/12 shadow-[0_0_24px_-8px_rgba(167,139,250,0.5)]'
                             : 'border-white/10 bg-white/5')
                         }
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <div className="text-sm font-semibold text-white">{q.title}</div>
-                            <div className="mt-0.5 text-xs leading-relaxed text-indigo-200/60">{q.desc}</div>
+                            <div className="mt-0.5 text-xs leading-relaxed text-violet-200/60">{q.desc}</div>
                           </div>
                           {q.claimed && (
                             <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
                               <CheckCircle2 className="size-3" aria-hidden /> Получено
                             </span>
                           )}
+                          {done && !q.claimed && (
+                            <span className="shrink-0 rounded-full bg-[#fbbf24] px-2 py-0.5 text-[9px] font-bold text-[#120e2e]">
+                              ГОТОВО
+                            </span>
+                          )}
                         </div>
 
-                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
-                          <div
-                            className="h-full rounded-full bg-[#a78bfa] transition-[width]"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                        <div className="mt-2 flex items-center justify-between gap-2">
-                          <span className="text-[11px] tabular-nums text-indigo-200/60">
+                        <div className="mt-3 flex items-center gap-2">
+                          <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-[#a78bfa] to-[#c4b5fd] transition-[width]"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <span className="shrink-0 text-[10px] tabular-nums text-violet-200/60">
                             {q.progress}/{q.target}
                           </span>
-                          <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-300">
-                            <Coins className="size-3.5" aria-hidden />+{fmtMoney(q.reward)}
-                            <span className="text-indigo-200/40">и</span>
-                            <Zap className="size-3.5 text-[#a78bfa]" aria-hidden />+{q.xpReward} XP
+                        </div>
+
+                        <div className="mt-2.5 flex items-center justify-between gap-2">
+                          <span className="flex items-center gap-2 text-[11px] font-medium">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-400/10 px-2 py-1 text-emerald-300">
+                              <Coins className="size-3" aria-hidden />+{fmtMoney(q.reward)}
+                            </span>
+                            <span className="inline-flex items-center gap-1 rounded-full bg-[#a78bfa]/12 px-2 py-1 text-[#c4b5fd]">
+                              <Zap className="size-3" aria-hidden />+{q.xpReward} XP
+                            </span>
                           </span>
                         </div>
 
                         {done && !q.claimed && (
                           <Button
-                            className="mt-3 h-11 w-full rounded-xl text-sm font-semibold text-[#1e1b4b]"
+                            className="cta-glow mt-3 h-11 w-full rounded-xl text-sm font-semibold text-white"
                             style={{ backgroundColor: VIOLET }}
                             disabled={claimBusy === q.id}
                             onClick={() => void claim(q)}
@@ -245,7 +369,7 @@ export default function CareerApp() {
                             {claimBusy === q.id ? (
                               <Loader2 className="size-4 animate-spin" aria-hidden />
                             ) : (
-                              'Забрать'
+                              'Забрать награду'
                             )}
                           </Button>
                         )}
@@ -254,7 +378,7 @@ export default function CareerApp() {
                   })
                 )}
 
-                <div className="flex items-center justify-center gap-1.5 text-[11px] text-indigo-300/50">
+                <div className="flex items-center justify-center gap-1.5 text-[11px] text-violet-300/50">
                   <CalendarClock className="size-3.5" aria-hidden /> Новые задания каждый день
                 </div>
               </div>
@@ -265,68 +389,19 @@ export default function CareerApp() {
               <div className="grid grid-cols-2 gap-3">
                 {data.achievements.length === 0 ? (
                   <div className="col-span-2 flex flex-col items-center rounded-2xl border border-dashed border-white/15 px-4 py-10 text-center">
-                    <Medal className="size-8 text-indigo-300/40" aria-hidden />
-                    <div className="mt-2 text-sm font-medium text-indigo-100">Достижений пока нет</div>
-                    <div className="mt-1 max-w-60 text-xs leading-relaxed text-indigo-200/50">
+                    <Medal className="size-8 text-violet-300/40" aria-hidden />
+                    <div className="mt-2 text-sm font-medium text-violet-100">Достижений пока нет</div>
+                    <div className="mt-1 max-w-60 text-xs leading-relaxed text-violet-200/50">
                       Они появятся по мере игры.
                     </div>
                   </div>
                 ) : (
-                  data.achievements.map((a) => (
-                    <div
-                      key={a.id}
-                      className={
-                        'flex flex-col rounded-2xl border p-3.5 ' +
-                        (a.unlocked ? 'border-[#a78bfa]/30 bg-white/5' : 'border-white/5 bg-white/[0.03]')
-                      }
-                    >
-                      <div
-                        className={
-                          'relative flex size-10 items-center justify-center rounded-xl ' +
-                          (a.unlocked ? 'bg-amber-400/15' : 'bg-white/5')
-                        }
-                      >
-                        <Medal
-                          className={'size-5 ' + (a.unlocked ? 'text-amber-400' : 'text-stone-500')}
-                          aria-hidden
-                        />
-                        {!a.unlocked && (
-                          <span className="absolute -bottom-1 -right-1 flex size-5 items-center justify-center rounded-full border border-white/10 bg-[#1e1b4b]">
-                            <Lock className="size-3 text-stone-400" aria-hidden />
-                          </span>
-                        )}
-                      </div>
-                      <div
-                        className={
-                          'mt-2 text-sm font-semibold leading-snug ' +
-                          (a.unlocked ? 'text-white' : 'text-indigo-200/40')
-                        }
-                      >
-                        {a.title}
-                      </div>
-                      <div
-                        className={
-                          'mt-0.5 flex-1 text-[11px] leading-relaxed ' +
-                          (a.unlocked ? 'text-indigo-200/60' : 'text-indigo-200/35')
-                        }
-                      >
-                        {a.desc}
-                      </div>
-                      <div className="mt-2 flex items-center justify-between gap-1">
-                        <span className="text-[11px] font-medium text-emerald-300">+{fmtMoney(a.reward)}</span>
-                        {a.unlocked && (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-1.5 py-0.5 text-[9px] font-medium text-emerald-300">
-                            <CheckCircle2 className="size-2.5" aria-hidden /> Открыто
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))
+                  data.achievements.map((a) => <AchievementCard key={a.id} a={a} />)
                 )}
               </div>
             )}
 
-            <div className="pb-2 text-center text-[10px] text-indigo-300/40">
+            <div className="pb-2 pt-1 text-center text-[10px] text-violet-300/40">
               Карьера · опыт и награды за активность
             </div>
           </>
