@@ -14,6 +14,22 @@ import { CONDITION_LABEL } from '@/lib/catalog-types'
 import { useDrag } from '@/lib/use-swipe'
 import type { ChatDetailData, ChatMessageDTO } from '@/lib/types'
 
+// контекстные быстрые ответы: свои для покупки, свои для продажи
+const QUICK = {
+  buy: (price: number) => [
+    { label: 'Ещё актуально?', text: 'Здравствуйте! Ещё актуально?' },
+    { label: 'Последняя цена?', text: 'Какая ваша последняя цена?' },
+    { label: `Отдам за ${fmtMoney(Math.round(price * 0.9))}`, text: `Готов забрать за ${fmtMoney(Math.round(price * 0.9))} — самовывоз, сегодня` },
+    { label: 'Торг уместен?', text: 'Торг уместен? Реально заинтересован, приеду и посмотрю' },
+  ],
+  sell: (price: number) => [
+    { label: 'Да, продаётся', text: 'Да, ещё продаётся' },
+    { label: 'Цена окончательна', text: 'Цена окончательная, торг минимальный' },
+    { label: `Скидка до ${fmtMoney(Math.round(price * 0.95))}`, text: `За быстрый выход готов отдать за ${fmtMoney(Math.round(price * 0.95))}` },
+    { label: 'Самовывоз сегодня', text: 'Самовывоз сегодня — забирайте' },
+  ],
+}
+
 export default function ChatScreen({ id, onBack }: { id: string; onBack: () => void }) {
   // страховка отображения: старые сообщения могли содержать палки-перечисления
   const pretty = (t: string) => t.replace(/\s*\|\s*/g, '. ').replace(/\.{2,}/g, '.')
@@ -27,6 +43,15 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
   const [invoiceOpen, setInvoiceOpen] = useState(false)
   const [invoiceAmount, setInvoiceAmount] = useState('')
   const [msg, setMsg] = useState('')
+  // черновик сообщения: пишем в localStorage на каждое нажатие — ничего не теряется
+  const draftKey = `avito_draft_${id}`
+  const setDraft = useCallback((v: string) => {
+    setText(v)
+    try {
+      if (v.trim()) localStorage.setItem(draftKey, v)
+      else localStorage.removeItem(draftKey)
+    } catch { /* приватный режим — просто без черновика */ }
+  }, [draftKey])
   const bottomRef = useRef<HTMLDivElement>(null)
   const refreshSession = useOS((s) => s.refreshSession)
   const pushToast = useOS((s) => s.pushToast)
@@ -59,6 +84,11 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
       setLoading(false)
     }
   }, [id])
+
+  // восстановить черновик этого чата (после загрузки — сбрасываем при смене чата)
+  useEffect(() => {
+    try { setText(localStorage.getItem(draftKey) ?? '') } catch { setText('') }
+  }, [draftKey])
 
   useEffect(() => { load() }, [load])
 
@@ -105,10 +135,11 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
     setText('')
     try {
       await api.sendMessage(id, t)
+      setDraft('') // улетело — черновик больше не нужен
       await load()
     } catch (e) {
       setMsg(e instanceof ApiError ? e.message : 'Не отправилось')
-      setText(t)
+      setDraft(t)
     } finally {
       setSending(false)
     }
@@ -293,6 +324,21 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
 
       {msg && <div className="shrink-0 px-4 pb-1 text-xs text-red-500">{msg}</div>}
 
+      {/* быстрые ответы: подсказки-чипсы, пока поле ввода пустое */}
+      {!text.trim() && (
+        <div className="shrink-0 flex gap-1.5 overflow-x-auto px-2.5 pb-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {QUICK[chat.role === 'buyer' ? 'buy' : 'sell'](chat.listing.price).map((q) => (
+            <button
+              key={q.label}
+              onClick={() => { setDraft(q.text); sound.tap() }}
+              className="shrink-0 whitespace-nowrap rounded-full border border-[#965EEB]/25 bg-[#965EEB]/[0.07] px-3 py-1.5 text-xs font-medium text-[#7d47c6] active:scale-95 transition-transform"
+            >
+              {q.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* ввод */}
       <div className="shrink-0 bg-white border-t border-black/5 p-2.5 flex items-center gap-2">
         <button
@@ -304,7 +350,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
         </button>
         <input
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
           placeholder="Сообщение..."
           aria-label="Сообщение"

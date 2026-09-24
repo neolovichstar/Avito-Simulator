@@ -83,8 +83,29 @@ async function historyOf(chatId: string, viewerBotId: string): Promise<AiHistory
   }))
 }
 
-// Основной ответ бота на сообщение/счёт игрока
+// Основной ответ бота на сообщение/счёт игрока.
+// Обёртка: пока бот «думает», событие typing повторяется каждые 2.5с —
+// индикатор поймают и открытый чат, и список чатов, даже подписавшись посреди размышления
 export async function botReply(chatId: string, playerMsg: { text?: string; invoice?: number }): Promise<void> {
+  let typingName: string | null = null
+  let finished = false
+  const loop = (async () => {
+    while (typingName === null && !finished) await new Promise((r) => setTimeout(r, 120))
+    while (typingName !== null && typingName !== '' && !finished) {
+      await emitTo(`chat:${chatId}`, 'typing', { chatId, name: typingName })
+      // короткий интервал: закрывает брешь, пока слушатели (список чатов) ещё подписываются
+      await new Promise((r) => setTimeout(r, 1_200))
+    }
+  })().catch(() => {})
+  try {
+    await botReplyCore(chatId, playerMsg, (n) => { typingName = n })
+  } finally {
+    finished = true
+    await loop
+  }
+}
+
+async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?: number }, setTypingName: (n: string) => void): Promise<void> {
   const chat = await db.chat.findUnique({ where: { id: chatId } })
   if (!chat) return
   const listing = await db.listing.findUnique({ where: { id: chat.listingId } })
@@ -108,8 +129,8 @@ export async function botReply(chatId: string, playerMsg: { text?: string; invoi
     return
   }
 
-  // печатает...
-  await emitTo(`chat:${chat.id}`, 'typing', { chatId: chat.id, name: bot.displayName })
+  // печатает... (дальше событие повторяется keepalive-циклом обёртки)
+  setTypingName(bot.displayName)
   await new Promise((r) => setTimeout(r, 600 + Math.random() * 900))
 
   const history = await historyOf(chat.id, bot.id)
