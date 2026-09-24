@@ -42,6 +42,7 @@ export interface FeedListing {
   boosted: boolean
   seller: FeedSeller
   mine: boolean
+  negotiable?: boolean // «Торг уместен»: продавец-бот открыт к снижению цены
 }
 
 export interface PricePointDTO {
@@ -78,6 +79,18 @@ export interface SavedSearchDTO {
   query: string
   category: string | null
   createdAt: string
+}
+
+// Чёрный список: продавец, которого заблокировал игрок
+export interface BlockedSellerDTO {
+  sellerId: string
+  name: string
+  photoUrl: string | null
+  city: string
+  rating: number
+  ratingCount: number
+  isBot: boolean
+  blockedAt: string
 }
 
 // Пульс рынка: заметное движение цены на конкретный товар за последний час
@@ -273,6 +286,7 @@ export interface AuctionLotDTO {
   bidCount: number
   endsAt: string
   myBid: number
+  myAutoBid: number // потолок автоставки игрока на этом лоте (0 — нет)
   isMine: boolean
 }
 

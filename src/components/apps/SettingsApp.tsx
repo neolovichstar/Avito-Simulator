@@ -3,13 +3,13 @@
 // Приложение «Настройки» — стиль Android-настроек: белый фон, секции-карточки.
 import { useCallback, useEffect, useState } from 'react'
 import {
-  BatteryCharging, Handshake, Info, Loader2, MapPin, Moon, NotebookText, RefreshCw,
-  Star, Volume2, Wallet,
+  BatteryCharging, Ban, Handshake, Info, Loader2, MapPin, Moon, NotebookText, RefreshCw,
+  Shield, Star, Volume2, Wallet,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
-import { fmtMoney, initials, hueColor } from '@/lib/format'
-import type { ProfileData } from '@/lib/types'
+import { fmtMoney, initials, hueColor, timeAgo } from '@/lib/format'
+import type { ProfileData, BlockedSellerDTO } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 
@@ -54,6 +54,9 @@ export default function SettingsApp() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  // чёрный список продавцов
+  const [blocked, setBlocked] = useState<BlockedSellerDTO[] | null>(null)
+  const [unblocking, setUnblocking] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -69,7 +72,23 @@ export default function SettingsApp() {
 
   useEffect(() => {
     load()
+    api.blockedList()
+      .then((r) => setBlocked(r.items))
+      .catch(() => setBlocked([]))
   }, [load])
+
+  const unblock = async (b: BlockedSellerDTO) => {
+    setUnblocking(b.sellerId)
+    try {
+      await api.toggleBlock(b.sellerId)
+      setBlocked((prev) => (prev ? prev.filter((x) => x.sellerId !== b.sellerId) : prev))
+      useOS.getState().pushToast('Чёрный список', `${b.name} разблокирован — объявления снова в ленте`)
+    } catch {
+      useOS.getState().pushToast('Чёрный список', 'Не удалось разблокировать')
+    } finally {
+      setUnblocking(null)
+    }
+  }
 
   const refreshProfile = async () => {
     setRefreshing(true)
@@ -212,6 +231,65 @@ export default function SettingsApp() {
               <Row icon={<NotebookText className="size-4" />} label="О себе" value={session?.bio ?? 'Не указано'} />
               <div className="border-t border-neutral-100" />
               <Row icon={<Handshake className="size-4" />} label="Сделок" value={dealsCount !== null ? String(dealsCount) : null} />
+            </SectionCard>
+
+            {/* Безопасность: чёрный список продавцов */}
+            <SectionCard title={`Безопасность · чёрный список${blocked?.length ? ` (${blocked.length})` : ''}`}>
+              {blocked === null ? (
+                <div className="flex items-center justify-center gap-2 px-4 py-4 text-xs text-neutral-400">
+                  <Loader2 className="size-3.5 animate-spin" /> Загружаем…
+                </div>
+              ) : blocked.length === 0 ? (
+                <div className="flex items-start gap-3 px-4 py-3.5">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
+                    <Shield className="size-4" />
+                  </div>
+                  <p className="text-xs leading-relaxed text-neutral-500">
+                    Список пуст. Заблокированные продавцы исчезнут из ленты и перестанут писать вам первыми.
+                    Заблокировать можно в шите «Пожаловаться» на карточке любого объявления.
+                  </p>
+                </div>
+              ) : (
+                blocked.map((b, i) => (
+                  <div key={b.sellerId} className={i > 0 ? 'border-t border-neutral-100' : ''}>
+                    <div className="flex items-center gap-3 px-4 py-3">
+                      {b.photoUrl ? (
+                        <img src={b.photoUrl} alt="" className="size-10 shrink-0 rounded-full object-cover" />
+                      ) : (
+                        <span
+                          className="flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
+                          style={{ backgroundColor: hueColor(b.sellerId.length * 47 % 360) }}
+                          aria-hidden
+                        >
+                          {initials(b.name)}
+                        </span>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium text-neutral-800">{b.name}</div>
+                        <div className="flex items-center gap-1 text-[11px] text-neutral-500">
+                          <Star className="size-3 fill-amber-400 text-amber-400" aria-hidden />
+                          {b.rating > 0 ? b.rating.toFixed(1) : 'новый'}
+                          {b.ratingCount > 0 && <span className="text-neutral-400">({b.ratingCount})</span>}
+                          <span aria-hidden>·</span>
+                          <MapPin className="size-3" aria-hidden /> {b.city}
+                        </div>
+                        <div className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-neutral-400">
+                          <Ban className="size-3" aria-hidden /> заблокирован {timeAgo(b.blockedAt)}
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-9 shrink-0 rounded-lg border-red-200 px-3 text-[11px] font-semibold text-red-600 hover:bg-red-50 hover:text-red-700"
+                        disabled={unblocking === b.sellerId}
+                        onClick={() => void unblock(b)}
+                      >
+                        {unblocking === b.sellerId ? <Loader2 className="size-3.5 animate-spin" /> : 'Разблокировать'}
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
             </SectionCard>
 
             {/* Об игре */}

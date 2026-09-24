@@ -6,16 +6,32 @@ import { invalidateBlocked } from '@/lib/blocked'
 
 export const dynamic = 'force-dynamic'
 
-// Чёрный список продавцов: GET — кого заблокировал игрок,
+// Чёрный список продавцов: GET — кого заблокировал игрок (с данными продавца),
 // POST { sellerId } — переключить блокировку.
 export async function GET(req: Request) {
   const user = await getSessionUser(req)
   if (!user) return unauthorized()
   const rows = await db.blockedSeller.findMany({
     where: { userId: user.id },
-    select: { sellerId: true, createdAt: true },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      seller: {
+        select: { id: true, displayName: true, photoUrl: true, city: true, ratingSum: true, ratingCount: true, isBot: true },
+      },
+    },
   })
-  return Response.json({ ids: rows.map((r) => r.sellerId) })
+  return Response.json({
+    items: rows.map((r) => ({
+      sellerId: r.sellerId,
+      name: r.seller.displayName,
+      photoUrl: r.seller.photoUrl,
+      city: r.seller.city,
+      rating: r.seller.ratingCount > 0 ? r.seller.ratingSum / r.seller.ratingCount : 0,
+      ratingCount: r.seller.ratingCount,
+      isBot: r.seller.isBot,
+      blockedAt: r.createdAt.toISOString(),
+    })),
+  })
 }
 
 export async function POST(req: Request) {

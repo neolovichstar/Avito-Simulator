@@ -1,0 +1,380 @@
+     1→# Avito — Симулятор ресейла (Telegram Mini App)
+     2→
+     3→Игра: фейковая смартфон-ОС с приложениями (Avito, Банк, Налоги, Браузер, Настройки).
+     4→ИИ-боты с личностями торгуются на OpenRouter, управляют рынком, общаются в чатах.
+     5→Стек: Next.js 16 + TS + Tailwind 4 + shadcn/ui + Prisma/SQLite + socket.io (mini-service :3003).
+     6→
+     7→---
+     8→Task ID: 1
+     9→Agent: main (Z.ai Code)
+    10→Task: Инициализация проекта, схема БД, ядро
+    11→
+    12→Work Log:
+    13→- Спроектирована и применена схема Prisma: User, Listing, Item, Chat, Message, Transaction, Review, TaxBill, Loan, Notification, MarketIndex, MarketEvent
+    14→- .env: OPENROUTER_API_KEY, OPENROUTER_MODEL=openai/gpt-4o-mini, REALTIME_SECRET, BOT_TOKEN (пока пуст)
+    15→- Ядро написано: src/lib/types.ts (DTO), catalog-types.ts, personas-types.ts, cache.ts (TTL), ratelimit.ts, format.ts (деньги/время, stripEmoji), telegram.ts (валидация initData + HMAC-сессии), session.ts, realtime-emit.ts (мост к :3003), ai.ts (OpenRouter переговоры + fallback-правила), store.ts (zustand OS), api.ts (клиент), use-realtime.ts
+    16→- Запущена фоновая генерация картинок категорий в public/img/ (13 шт)
+    17→
+    18→Stage Summary:
+    19→- Контракты зафиксированы: api.ts (клиент), types.ts (DTO), store.ts (useOS: booted, locked, session, currentApp: AppKey 'avito'|'bank'|'taxes'|'browser'|'settings', battery, charging, online, notifications, unreadChats, pushToast, refreshSession)
+    20→- Каталог/личности придут из catalog-data.ts и personas-data.ts (Task 2-a)
+    21→- Realtime-сервис :3003 (Task 2-b), OS-оболочка (Task 4-a), приложения Bank/Taxes/Browser/Settings (Task 4-c)
+    22→- Avito-приложение, API-роуты, движок ботов, seed — main agent (Tasks 3, 5, 6)
+    23→
+    24→---
+    25→Task ID: 2-b
+    26→Agent: general-purpose
+    27→Task: realtime socket.io сервис :3003
+    28→
+    29→Work Log:
+    30→- Прочитан worklog.md, изучен пример examples/websocket/server.ts и контракты src/lib/use-realtime.ts + src/lib/realtime-emit.ts (query.uid, каналы 'global'/'user:<uid>'/'chat:<id>', POST /emit с secret, GET /presence → {online})
+    31→- Создан mini-services/realtime/{package.json,index.ts}; bun install → socket.io@4.8.3 (^4.7.5)
+    32→- Важный нюанс реализации: engine.io с path '/' перехватывает ЛЮБОЙ URL, начинающийся с '/' (check(): path === req.url.slice(0, path.length)), поэтому HTTP-роутер (/health, /presence, /emit) добавлен через httpServer.prependListener ПОСЛЕ создания io, а обслуженные запросы «клеймятся» переписыванием req.url, чтобы engine.io не отвечал второй раз; handshake-запросы вида /?EIO=... пропускаются в engine.io как есть
+    33→- Handshake: query.uid → socket.join(`user:${uid}`) автоматически; presence Map<uid, count> (несколько вкладок); broadcast 'online' {online} на connect/disconnect; события 'subscribe'/'unsubscribe' { channels: string[] }
+    34→- /health → {ok:true,online:<уникальных uid>}; /presence → {online} + CORS; POST /emit {secret,channel,event,payload}: неверный secret → 403 {error:'forbidden'}, channel='global' → io.emit, иначе io.to(channel).emit, ответ {ok:true}; CORS-заголовки и OPTIONS preflight (204) на всё; 404 JSON на остальные пути; лимит тела 1MB → 413
+    35→- SECRET = process.env.REALTIME_SECRET ?? 'avito-sim-rt-2024-secret'; PORT=3003 захардкожен; SIGTERM/SIGINT → io.close() + httpServer.close() → exit(0)
+    36→- Порт 3003 перед стартом проверен (свободен, других процессов нет); bun install ok; запуск nohup bun --hot index.ts > dev.log 2>&1 &
+    37→- Проверка HTTP: GET /health → 200 {"ok":true,"online":0}; POST /emit (верный secret) → 200 {"ok":true}; неверный secret → 403; OPTIONS → 204; /presence → {"online":N}
+    38→- E2E-проверка socket.io через raw engine.io polling (curl): handshake с uid=test-uid → sid; пакеты 40 (connect) и 42["subscribe",{"channels":["global","chat:1"]}]; POST /emit в канал user:test-uid → клиент получил 42["hello",{...}]; emit в chat:1 → клиент получил 42["chat:message",{...}]; /health=/presence → online:1
+    39→- Мульти-вкладки: 2 подключения с одним uid → в логе tabs=1 → tabs=2, online остаётся 1; SIGTERM → graceful: "Received SIGTERM..." → disconnect всех → "Realtime server closed", порт освобождён
+    40→
+    41→Stage Summary:
+    42→- Сервис: mini-services/realtime (bun + socket.io 4.8.3), порт 3003, path '/' не менялся (Caddy шлёт через XTransformPort=3003)
+    43→- Запуск: cd /home/z/my-project/mini-services/realtime && nohup bun --hot index.ts > dev.log 2>&1 & (логи в dev.log; ВАЖНО: в сессии суб-агента фоновые процессы прибиваются между командами — main-агенту нужно перезапустить/держать процесс у себя, порт 3003 свободен)
+    44→- Endpoints: GET /health {ok,online}; GET /presence {online} (CORS); POST /emit {secret,channel,event,payload} → {ok:true} | 403 {error:'forbidden'}; OPTIONS → 204; всё с Access-Control-Allow-Origin:*
+    45→- Socket-контракт: подключение io('/?XTransformPort=3003', {query:{uid}}); авто-join `user:${uid}`; 'subscribe'/'unsubscribe' {channels}; сервер шлёт 'online' {online} при connect/disconnect; доставка событий в комнаты через POST /emit (мост src/lib/realtime-emit.ts совместим)
+    46→- Проверено: оба требуемых curl ответили ок + полный e2e (handshake → subscribe → emit в user:/chat: комнаты → получение событий), graceful shutdown работает
+    47→
+    48→---
+    49→Task ID: 4-a
+    50→Agent: frontend-styling-expert
+    51→Task: OS-оболочка смартфона — 9 компонентов в src/components/os/
+    52→
+    53→Work Log:
+    54→- PhoneFrame.tsx: десктоп — чёрный бевел по центру (rounded-[3rem], p-3, тень, экран 390x844, overflow hidden), мобайл (max-[500px]) — w-full h-[100dvh] без рамки; punch-hole камера (w-3 h-3, absolute, z-50); фон вокруг — тёмный multi-layer градиент
+    55→- StatusBar.tsx: variant 'light'|'dark' (светлый = тёмный текст), живые часы HH:MM (ru) через useSyncExternalStore-тик 1000 мс (без setState в эффекте — правило react-hooks/set-state-in-effect в next-16 eslint), Signal/Wifi, батарея BatteryCharging/Full/Medium/Low/Warning по уровню + число %, зелёный кружок + online из useOS
+    56→- LockScreen.tsx: тёмные фиолетово-синие radial-обои, часы text-7xl font-extralight, дата ru-RU (weekday long/day/month long), превью до 3 непрочитанных уведомлений (bg-white/10 blur), батарея + «Онлайн: N», кнопка ChevronUp (animate-pulse) «Проведите вверх»: клик + свайп вверх (touchstart/touchend > 60px), уход translateY(-100%) 400ms, затем onUnlock
+    57→- AppIcon.tsx: squircle rounded-[1.4rem] w-full aspect-square, градиент из hex (inline linear-gradient(145deg, lighten, darken) — свой shade() с parse hex), иконка белая 28px, badge — красный кружок (>99 → «99+»), label text-xs text-white/90 w-20, active:scale-90, aria-label
+    58→- HomeScreen.tsx: те же обои, виджет времени (крупные часы + дата) и виджет «Кошелёк» (fmtMoney(session.balance), bg-white/10 blur, клик открывает Банк), сетка grid-cols-4 gap-5 px-6: Avito (белая плитка + SVG лого из кружков #00AAFF/#04E061, badge=unreadChats), Банк #21A038 CreditCard, Налоги #2D3748 Receipt, Браузер #0EA5E9 Globe, Настройки #6B7280 Settings; page-dots, док (bg-white/10 rounded-3xl mx-4 mb-2 p-3): Avito + Банк + 2 заглушки bg-white/15; все тач-таргеты 44px+
+    59→- NavBar.tsx: h-12 bg-black/85 blur, назад — CSS-треугольник (clip-path polygon), домой — круг (border), недавние — квадрат; recentsActive — синяя подсветка; aria-label на всё
+    60→- NotificationCenter.tsx: z-45 панель сверху, translate-y transition, тёмная blur; «Прочитать всё» → useOS.markNotificationsRead() + api.readNotifications() fire-and-forget; список max 75% панели c overflow-y-auto, иконки по kind (deal/message/tax/market/system), timeAgo, непрочитанные — синяя полоска слева; пусто — «Пока пусто»; закрытие: фон-кнопка или ChevronUp
+    61→- ToastStack.tsx: toastQueue из useOS, absolute bottom-20 inset-x-4 z-50, bg-gray-900/95 rounded-xl, animate-in slide-in-from-bottom-2 fade-in (tw-animate-css), X → dropToast(id), aria-live
+    62→- RecentsOverlay.tsx: z-40 fullscreen blur, горизонтальный скролл карточек 120x220 из openApps с градиентами и крупными иконками (ShoppingBag/CreditCard/Receipt/Globe/Settings), клик = onResume, пусто — «Нет недавних приложений»
+    63→- Часы везде через useSyncExternalStore (SSR-снапшот 0 → плейсхолдер, нет hydration mismatch, нет setState-в-эффекте); эмодзи не использованы, иконки только lucide-react + чистый SVG; существующие файлы (globals.css, layout.tsx, page.tsx, store/api/types/format) не тронуты
+    64→
+    65→Stage Summary:
+    66→- OS-оболочка готова к сборке: PhoneFrame → (StatusBar, LockScreen|HomeScreen, NavBar, NotificationCenter, ToastStack, RecentsOverlay) — компоновка под Task main agent'а
+    67→- Контракт не изменён: использую только useOS (store.ts), api.readNotifications, fmtMoney/timeAgo из format.ts, AppKey из store
+    68→- bunx tsc --noEmit: ошибок в src/components/os нет (остальные — pre-existing); eslint src/components/os — чисто
+    69→- Все тексты на русском, иконки aria-hidden, кнопки имеют aria-label и focus-visible кольца
+    70→
+    71→---
+    72→Task ID: 4-c
+    73→Agent: frontend-styling-expert
+    74→Task: Приложения Банк, Налоги, Браузер, Настройки
+    75→
+    76→Work Log:
+    77→- Создан src/components/apps/BankApp.tsx (Sber-стайл): градиентная банковская карта (чип из div-ов, полный cardNumber, держатель из session.displayName, баланс fmtMoney), кнопки-чипы со scrollIntoView к вкладкам, табы Главная/История/Кредит/Вклад; история транзакций через TX_TYPE_LABEL с цветным знаком и timeAgo (max-h-96); кредит: активный займ (owed/rate/dueAt, инпут+Slider+Погасить api.repayLoan) или слайдер 1000..loanLimit шаг 500 + api.takeLoan с текстом про 15%/7 дней; вклад: api.depositOp('top'|'withdraw'), пояснение 0.1% в час; после мутаций refreshSession({balance,debt,deposit}) + pushToast('Банк','Операция выполнена'), ошибки ApiError выводятся в форме
+    78→- Создан src/components/apps/TaxesApp.tsx (ФНС-стайл): тёмно-slate шапка #1e293b с круглым гербом-Landmark, карточка статуса «Самозанятый»/4%/задолженность (красная или зелёное «Задолженности нет»), красный баннер при blocked, кнопка «Оплатить всё» (api.payTaxes → refreshSession({balance,taxDebt})), список bills с бейджами Оплачен/Не оплачен и fmtDateTime, статистика totalPaid/totalEarned, блок «Справка» (4%, пеня 10%/сутки, лимит 10 000)
+    79→- Создан src/components/apps/BrowserApp.tsx: адресная строка (назад/вперёд/обновить, Input URL с нормализацией протокола, Enter/Go), история nav {items, idx}; сайты: start (5 плиток-закладок), avito.ru (лендинг в макете телефона-рамки + onOpenApp('avito')), news.market (api.market: индексные плашки CATEGORY_LABEL + множитель со стрелкой/цветом, события с бейджами kind demand_up/demand_down/fashion/crisis), forum.market (6 статичных тем с никами/датами: недооценённые товары, торг с ботами, налоги, кредиты, буст, вклад), banki.ru (Альфа-Банк + onOpenApp('bank')), help.guide (гайд из 6 пунктов), неизвестный адрес → «Сайт недоступен» с возвратом на start
+    80→- Создан src/components/apps/SettingsApp.tsx (Android-стайл): профиль (аватар photoUrl или кружок initials на hueColor(210), displayName, @username, уровень, XP-прогресс xp%500/500, рейтинг Star + rating.toFixed(1) + количество, баланс), секция «Устройство» (Switch зарядки → useOS.charging/setCharging с текстом battery%, Switch звука → soundOn/setSound), секция «Игрок» (город, bio ?? 'Не указано', сделок из api.profile), секция «Об игре» (1.0.0 + описание), кнопка «Обновить профиль» → api.profile()
+    81→- Общее для всех четырёх: 'use client', дефолтный экспорт, Tailwind 4, lucide-react, без эмодзи, свой useEffect+api загрузчик, скелетоны/Loader2, ошибка + кнопка «Повторить», root h-full flex flex-col, контент flex-1 overflow-y-auto [scrollbar-width:thin], p-4/gap-4, карточки rounded-2xl, без статус-бара/навбара
+    82→
+    83→Stage Summary:
+    84→- 4 файла добавлены: src/components/apps/{BankApp,TaxesApp,BrowserApp,SettingsApp}.tsx; существующие файлы не тронуты
+    85→- Контракт соблюдён: данные только через api.* (bank/takeLoan/repayLoan/depositOp/taxes/payTaxes/market/profile), store через useOS (session, charging, battery, soundOn, pushToast, refreshSession через useOS.getState()); BrowserApp получает onOpenApp('avito'|'bank') от родителя-оболочки
+    86→- Мутации банка/налогов обновляют данные приложения и глобальную сессию (balance/debt/deposit/taxDebt) + тосты
+    87→- bunx tsc --noEmit: ошибок в src/components/apps нет (остальные — pre-existing); bunx eslint src/components/apps — 0 проблем
+    88→
+    89→---
+    90→Task ID: 2-a
+    91→Agent: general-purpose
+    92→Task: каталог 95+ товаров и 24 ИИ-личности
+    93→
+    94→Work Log:
+    95→- Прочитан worklog.md и контракты src/lib/catalog-types.ts (CatalogItem, CategoryKey, CATEGORIES) и src/lib/personas-types.ts (Persona); чужие записи и файлы не тронуты
+    96→- Создан src/lib/catalog-data.ts: import type { CatalogItem } + export const CATALOG: CatalogItem[] — 132 товара (124 обычных + 8 «МУСОР: Отдам даром» в конце массива, keys trash-*)
+    97→- Состав по категориям: phones 13, laptops 13, electronics 15 (12+3 мусор), clothes 11, sneakers 9, furniture 11 (9+2), appliances 10 (9+1), hobby 11 (9+2), sport 9, music 8, auto 8, kids 7, books 7 — все минимумы перекрыты
+    98→- Реальные модели и б/у-цены РФ: iPhone 12 — 28000, iPhone 13 — 40000, Galaxy S22 — 35000, Redmi Note 12 — 8500, MacBook Air 2020 M1 — 55000, ThinkPad T480 — 18000, TUF F15 RTX3060 — 58000, PS5 — 42000, AirPods Pro 2 — 12000, Nike AF1 — 6000, Samba OG — 8000, робот-пылесос Xiaomi — 9000, Dyson V8 — 12000, книги 380-3200; диапазон обычных 380-58000₽ (в заданных рамках 300-90000)
+    99→- Мусор: сломанный стул 150, битый монитор 300, ржавый велосипед без цепи 400, микроволновка не работает 200, порванный диван 450, старый принтер 250, наушники без левого канала 150, RC-машина не едет 200 — все basePrice 100-450, weight 0.8, в desc упомянут дефект (не работает/сломано/порван), категории логичные (furniture/electronics/hobby/appliances)
+   100→- jitter у всех 0.12-0.45; weight только у полярных: популярные 1.5-2.5 (iPhone 12 2.5, PS5 2.5, AF1 2.5, Redmi 2.5 и т.д.), редкие 0.4-0.8 (Pixel 6a 0.5, металлоискатель 0.4, Burton 0.5...), у остальных не указан
+   101→- desc: 3-4 коротких живых авито-описания на русском без эмодзи («Аккум 85%, всё работает как надо», «За такую цену на авито уже уехали»-стиль вынесен в personas)
+   102→- Создан src/lib/personas-data.ts: import type { Persona } + export const PERSONAS: Persona[] — 24 личности p01..p24, hue = i*15 (15..360)
+   103→- Все персонажи по ТЗ: перекуп Артём (greed .9, knowledge .9, patience 5, «братан/ценник рыночный»), бабушка Зинаида (trust .9, greed .2, patience 2, typo .12), студент Дима (typo .25, «стипуха только 5-го»), мама Оля (trust .92), мужик Сергей с гаража («ну чё, забирай да», typo .2), айтишник Павел (knowledge .95, «по рынку сейчас 28-32»), модная Катя (typo .08), коллекционер Виктор (patience 6, «не в курсе расценок»), срочный Игорь (patience 1, trust .8), жадина Руслан (greed .96, patience 6), таксист Гена (typo .28, «у меня их три таких»), вахтёр Люда, дизайнер Марк, качок Виталий (typo .18), военный Николай (trust .5, «товар как на фото»), меломан Слава, школьник Тёма (typo .3, greed .4), пенсионерка Тамара (trust .3, «а вы не обманете?»), бухгалтер Оксана (knowledge .75), мебельщик Антон, рыбак Миша, ночной продавец Кристина («отдаю почти в ноль»), дачник Пал Палыч («сам привезу на газельке»), селяночка Анюта (стилистика «отдат/сделат», «прянички»)
+   104→- У каждого: name/age/city/job/character/style, greed 0.2-0.96, patience 1-6, trust 0.25-0.92, knowledge 0.3-0.95, typoRate 0.01-0.3 (молодые 0.15-0.3, аккуратные 0.01-0.08), greetings 2-3 универсальных («Здравствуйте, товар актуален?»-стиль), phrases 4-6 с жаргоном
+   105→- Самопроверка bun-скриптом: total 132, дублей key нет, мусор 8 шт (100-450, weight .8), jitter в [0.12;0.45], desc 3-4, weights только 0.4-0.8/1.5-2.5, 24 персоны с верными id/hue/диапазонами и 2-3+4-6 полями
+   106→- bunx tsc --noEmit | grep "catalog-data|personas-data" — пусто, ошибок в моих файлах нет (остальные 9 ошибок — pre-existing в examples/, skills/, RecentsOverlay.tsx)
+   107→
+   108→Stage Summary:
+   109→- Готовы оба дата-файла: src/lib/catalog-data.ts (CATALOG, 132 items, 13 категорий + 8 «Отдам даром») и src/lib/personas-data.ts (PERSONAS, 24 ИИ-личности с расширенным разбросом greed/patience/trust/knowledge/typoRate)
+   110→- Контракты соблюдены ровно по catalog-types.ts и personas-types.ts, лишних полей и дефолтных экспортов нет
+   111→- Обещанные якорные цены в месте: iPhone 12 28000, PS5 42000, MacBook Air 2020 55000, AF1 6000, Galaxy S22 35000, T480 18000, робот-пылесос 9000, книги 380-3200
+   112→- Для движка ботов (Task 3/5): персонажи покрывают сценарии продавца/покупателя, жаргон и параметры торга пригодны для переговоров через ai.ts без правок типов
+   113→- tsc по моим файлам чист; существующие файлы (включая worklog других агентов) не изменены
+   114→
+   115→---
+   116→Task ID: 4-d
+   117→Agent: frontend-styling-expert
+   118→Task: Приложения Ремонт, Аукцион, Карьера, Доставки
+   119→
+   120→Work Log:
+   121→- Создан src/components/apps/RepairApp.tsx (тёмная тех-мастерская #111827, акцент #f59e0b, Wrench): секция «В ремонте» (api.repair → orders): карточка img+title, переход fromCondition → toCondition через CONDITION_LABEL и ArrowRight, стоимость; status='ready' → зелёный бейдж «Готов» + большая кнопка «Забрать» (api.repairPickup → тост «Товар готов», refreshSession({}) + reload), иначе живой прогресс: useSyncExternalStore-тик 1000 мс, % от startedAt→readyAt, бар + «Осталось X мин Y с»; секция «Доступно для ремонта» (repairable): condition-бейджи с цветовой картой, estValue, кнопка «Ремонт» раскрывает панель (баланс + «Отправить в ремонт» → api.repairStart(itemId), тост «Ремонт: цена X, срок Y мин» из ответа order+quote, refreshSession({balance}); ошибки бэка (мало денег) — красный текст в панели); пустые состояния для обеих секций
+   122→- Создан src/components/apps/AuctionApp.tsx (роскошный тёмный #0c0a09, золото #d4a017, Gavel): статы activeCount/wonCount, лоты (api.auction) отсортированы активные-first по endsAt; карточка: image, title, condition-бейдж, «Рынок: X · Старт: Y», текущая ставка крупно золотом или «Ставок нет», «Лидер: Имя», myBid «Ваша ставка: N», bidCount с русскими склонениями, таймер до endsAt («2ч 14м 03с», <1 мин — text-red-400 animate-pulse), isMine → зелёный бейдж «Ваша ставка лидирует», завершённые — «Завершён»/«Победа»; панель ставки: мин = (currentBid ?? startPrice) + шаг max(100, round(цена*0.02)), Input + быстрые кнопки «+мин»/«+5%»/«+10%» (h-11), api.auctionBid → тост «Ставка принята» + refreshSession({balance}) + reload, ошибки (мало денег/перебита ставка) — текст в панели; блок «Как это работает» (дом выставляет лоты, боты торгуются живьём, победитель платит свою ставку); тихий refetch каждые 10с
+   123→- Создан src/components/apps/CareerApp.tsx (градиент #1e1b4b → #312e81, акцент #a78bfa, Trophy): карточка уровня (крупная цифра, XP-бар levelProgress%, счётчик «Достижения: X/Y»); табы «Задания»/«Достижения» (h-11, активный фиолетовый); задания (api.career → quests): title/desc, прогресс-бар progress/target, «+X ₽ и +Y XP» (Coins+Zap), кнопка «Забрать» при progress>=target && !claimed (api.claimQuest(quest.questId) → refreshSession({balance, xp}) + тост + reload, ошибки — баннер), бейдж «Получено», готовые к забору подсвечены фиолетовой рамкой, сноска «Новые задания каждый день»; достижения: сетка 2 колонки, Medal (unlocked — янтарная, locked — серая + Lock-мини-бейдж), title/desc приглушены для locked, «+X ₽», бейдж «Открыто»
+   124→- Создан src/components/apps/DeliveryApp.tsx (белый фон, тёмно-зелёный #065f46, Truck): карточки api.deliveries отсортированы новые-сверху; in_transit: жёлтый бейдж «В пути», «Курьер: имя», img/title/price, listedCondition через CONDITION_LABEL, живой ETA-таймер «Осталось 1м 24с» (тик 1000 мс, просрочено → «Курьер уже близко»), amber-блок с AlertTriangle «Осмотр при получении невозможен…»; delivered: зелёный «Доставлено», сравнение realCondition vs listedCondition по CONDITION_MULT (хуже → красный бейдж «Есть дефекты» + «Продавец приукрасил состояние», иначе «Как в описании»), «Фактическое состояние: …», deliveredAt через timeAgo; пусто — подсказка про покупку курьером; тихий refetch каждые 5с
+   125→- Общее для всех четырёх: 'use client', дефолтный экспорт, Tailwind 4, lucide-react, эмодзи не использованы; каркас: h-full flex flex-col + шапка (иконка-плитка, title, subtitle) + контент flex-1 overflow-y-auto [scrollbar-width:thin] p-4 flex flex-col gap-4; скелетоны + Loader2 при загрузке, ошибка + кнопка «Повторить»; все тач-таргеты h-11 (44px+), aria-hidden на декоративные иконки, aria-label/aria-expanded на кнопках-иконках/раскрывашках; таймеры через useSyncExternalStore-тик (без setState в эффектах — правило react-hooks/set-state-in-effect); статус-бар/навбар не рисуются; существующие файлы не изменялись
+   126→
+   127→Stage Summary:
+   128→- 4 файла добавлены: src/components/apps/{RepairApp,AuctionApp,CareerApp,DeliveryApp}.tsx — компоновка в оболочке под AppKey 'repair'|'auction'|'career'|'delivery' (main agent)
+   129→- Контракт соблюдён: данные только api.repair/repairStart/repairPickup, api.auction/auctionBid, api.career/claimQuest, api.deliveries; store через useOS (session для баланса, pushToast, refreshSession({balance}/{xp}) после мутаций через useOS.getState()); CONDITION_LABEL/CATEGORY_LABEL из '@/lib/catalog-types', fmtMoney/fmtDateTime/timeAgo из '@/lib/format'
+   130→- claimQuest вызывается с quest.questId (тело { questId }); ожидание от бэка Task 5 — принять questId задания
+   131→- bunx tsc --noEmit: в 4 новых файлах ошибок нет (pre-existing: examples/, skills/, src/lib/api.ts ChatMessageDTO import, os/RecentsOverlay.tsx без новых AppKey — вне моей зоны); bunx eslint src/components/apps — 0 проблем
+   132→
+   133→---
+   134→Task ID: 5-6-7
+   135→Agent: main (Z.ai Code)
+   136→Task: Полная сборка игры: API, движок, Avito-приложение, новые фичи (ремонт/курьер/аукцион/квесты/события), QA
+   137→
+   138→Work Log:
+   139→- API-роуты (25 шт): auth (Telegram initData + HMAC-сессии), listings (лента с кешем TTL 15с, boost, remove, buy с курьером), chats (создание, сообщения, оплата счетов), bank (карта/кредит/вклад), taxes (4% самозанятый, пеня), repair, deliveries, auction (анти-снайпинг 60с, резерв денег), career (квесты+достижения), notifications, profile, market, stats, catalog, inventory
+   140→- lib/deals.ts — ядро сделок: перевод денег, налог 4% продавцу, инвентарь/доставка, XP, статистика, авто-отзывы ботов, квесты/ачивки, уведомления + realtime
+   141→- lib/chat-engine.ts — переговоры ботов: persona-лимиты, OpenRouter (DeepSeek V3 + Mistral fallback), парсинг TEXT/ACTION (accept/invoice/reject), typing-индикатор, системные сообщения
+   142→- lib/engine.ts + instrumentation.ts — живой рынок каждые 15с: боты выставляют/дешевят/скупают товар, КОНКУРЕНЦИЯ (одинаковые товары сбивают цены друг друга, игроку — уведомление), халява «Отдам даром» (макс 3, боты мгновенно забирают), аукцион-боты, доставки, ремонты, проценты по вкладам, пеня, СОБЫТИЯ ДНЯ: «нейросети скупили всю ОПУ» (+30-55% laptops/electronics 12ч), налоговая проверка (пеня должникам / премия 1000₽ честным), кризис, тренды, поставки
+   143→- lib/quests.ts — 13 квестов в пуле (3 в день) + 18 достижений с наградами
+   144→- Avito UI (5 экранов): лента с поиском/категориями/сортировкой/избранным, карточка товара с «дешевле рынка N%», покупка (Самовывоз с осмотром / Курьер +350₽ со скрытыми дефектами 8-38%), продажа из инвентаря с ценами рынка, чаты с ИИ + счета как в жизни, профиль с отзывами
+   145→- Новые приложения ОС: Сервис (ремонт: состояния parts→used→good→excellent, цена/срок), Аукцион (лоты, ставки, таймеры), Карьера (задания/достижения), Доставки (трекинг, «продавец приукрасил состояние»)
+   146→- Генерация 13 фото категорий через image-gen
+   147→- QA через agent-browser: исправлены бесконечный цикл часов (unstable getSnapshot), коллизия username у кириллицы (hash), перекрытие чата листингом, дубль иконки, задвоение цены в фоллбеке, ретрай LLM + fallback-модель (gpt-4o-mini 403 в регионе → deepseek/deepseek-chat + mistral fallback), чистка «|» из речи ИИ
+   148→- Проверено браузером: лок-скрин, home, лента, объявление, покупка с курьером, доставка «delivered», торг с Тамарой Жуковой (3 раунда, счёт 11068, оплата, «ПРОДАНО»), ставка на аукционе (лидируем), квест 2/2 забран, уровень 2, ачивка «Первый рубль»
+   149→
+   150→Stage Summary:
+   151→- Игра полностью играбельна: покупка → осмотр/доставка → ремонт → продажа → налог → банк/вклад → аукцион → квесты/ачивки
+   152→- Экономика живая: 24 бота с личностями торгуют сами, конкурируют, пишут в чаты, скупают халяву
+   153→- OpenRouter: основная модель deepseek/deepseek-chat, запасная mistral-small-3.2 (gpt-4o-mini заблокирован в регионе)
+   154→- Realtime :3003 работает (онлайн 24-25), тосты/уведомления/typing — живые
+   155→
+   156→---
+   157→Task ID: 6-a
+   158→Agent: frontend-styling-expert
+   159→Task: Полировка иконок ОС — кастомные SVG-логотипы «как в реальности» + компактные виджеты HomeScreen
+   160→
+   161→Work Log:
+   162→- Создан src/components/os/app-logos.tsx ('use client'): 9 чистых SVG-логотипов вместо lucide-иконок — AvitoLogo (два кружка #00AAFF/#04E061, сохранён 1:1), BankLogo (Сбер-стайл: разомкнутое кольцо-дуга 315° + белая галочка-прутик со скруглениями), TaxesLogo (гербовый щит с тремя белыми полосами, strokeLinejoin round), BrowserLogo (компас-роза в круге: двухтоновая стрелка белый/белый-45% + 4 риски-градуса), SettingsLogo (настоящая шестерёнка: 8 зубьев-rect с rotate(45°i) + кольцо stroke 6.4 с отверстием), RepairLogo (гаечный ключ + молоток крестом, силуэт «build»), AuctionLogo (гавел судьи с подставкой), CareerLogo (кубок-трофей), DeliveryLogo (фургон) — последние четыре на базе Material Design path 24x24 через transform="translate(3.6 3.6) scale(1.7)", все aria-hidden + focusable=false, размер h-9 w-9
+   163→- В app-logos.tsx реестр APP_TILE: Record<AppKey, {label, background, icon}> — градиенты плиток: Avito белый 3-стоп (FFFFFF→EEF1F4→DCE1E7), Банк #2FBE51→#21A038→#157F2A (вокруг фирменного #21A038), Налоги #4A5568→#2D3748→#1A202C (вокруг #2D3748), Браузер #0EA5E9→#0284C7, Настройки #6B7280→#4B5563, Сервис #F59E0B→#D97706, Аукцион #D4A017→#B45309, Задания #7C3AED→#6D28D9, Доставки #065F46→#064E3B (точные пары из ТЗ); плюс списки HOME_GRID (порядок сетки) и DOCK_APPS — эмодзи не использованы
+   164→- AppIcon.tsx: новый опциональный prop background (готовый CSS-градиент, перекрывает color; color теперь optional с fallback #4B5563 — обратная совместимость); плитка «богаче»: многослойная тень shadow-[0_12px_26px_-6px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.35),inset_0_-10px_16px_-10px_rgba(0,0,0,0.35)] (внешняя + белая линия-кант сверху + внутренняя тень снизу) и стеклянный блик — абсолютный span h-[46%] rounded-t-[1.4rem] bg-gradient-to-b from-white/25 via-white/5 to-transparent; badge/label/active:scale-90/aria-label не тронуты
+   165→- HomeScreen.tsx: сетка и док переведены на map по HOME_GRID/DOCK_APPS с APP_TILE (контракты сохранены: grid-cols-4, badge=unreadChats только у Avito в сетке и доке, все onOpenApp('avito'|'bank'|'taxes'|'browser'|'settings'|'repair'|'auction'|'career'|'delivery') идентичны); виджет времени компактнее — стеклянная пилюля bg-white/10 backdrop-blur с часами text-2xl font-light вместо text-5xl на весь угол, дата сокращена до «пн, 3 февраля» (weekday short + day + month long); добавлен виджет «Онлайн N» рядом с кошельком: green dot (bg-emerald-400 + animate-ping ореол opacity-60, aria-hidden) + число из useOS online, aria-label «Онлайн: N»; пилюли в ряду items-stretch (одинаковая высота), кошелёк ужат до text-base/text-[10px] при min-h-11; useClock на useSyncExternalStore без setState в эффектах — сохранён
+   166→- Не тронуты: store.ts (AppKey только импортирован как type), ControlCenter.tsx, StatusBar.tsx, AvitoApp.tsx (там свой AvitoLogo), остальные файлы; lucide-импорты из HomeScreen удалены (не используются)
+   167→
+   168→Stage Summary:
+   169→- Иконки ОС теперь «как в реальности»: у каждого приложения собственный отрисованный SVG-силуэт на градиентной плитке с бликом, внутренними тенями и кантом — вместо голых lucide-глифов
+   170→- Новые файлы/изменения: + src/components/os/app-logos.tsx, ~ src/components/os/AppIcon.tsx (background prop + gloss), ~ src/components/os/HomeScreen.tsx (виджеты время/онлайн/кошелёк + map по реестру)
+   171→- Контракт не изменён: только useOS (session.balance, unreadChats, online), onOpenApp(AppKey) от родителя, сетка 4 колонки, док, page-dots и бейдж unreadChats работают как раньше
+   172→- bunx tsc --noEmit: ошибок в src/components/os нет (4 pre-existing: examples/, skills/, api/repair/route.ts); bunx eslint src/components/os — 0 проблем (exit 0)
+   173→- Тач-таргеты 44px+ (пилюли min-h-11, плитки ~70px), aria-label на всех кнопках и виджетах, без setState в эффектах, без эмодзи
+   174→
+   175→---
+   176→Task ID: 6-b
+   177→Agent: frontend-styling-expert
+   178→Task: Полировка Avito UI — FeedScreen и ListingScreen (больше изображений, меньше текста)
+   179→
+   180→Work Log:
+   181→- FeedScreen.tsx переписан: лента стала одноколоночной из крупных фотокарточек — фото aspect-[16/10] на всю ширину (390x244, object-cover), карточка rounded-2xl/overflow-hidden/shadow-sm; цена крупно (text-xl font-extrabold) поверх фото на градиенте снизу (для price=0 — «Даром» зелёным); бейдж «ТОП» (фиолетовый, Zap) для boosted; зелёный чип «Дешевле рынка N%» на фото (локальная cheaperPercent(): est = baseValue * CONDITION_MULT[condition], как marginHint на бэке, показ при >=10%, cap 90); название — 1 строка truncate; строка продавца: аватар-кружок 20px (hueColor(id.length*47%360) + initials) + имя + зелёная точка онлайн + рейтинг звездой (Star, clamp до 5.0 — данные ботов превышают 5); строка «Город · 2 ч» (локальный shortAgo(), MapPin)
+   182→- Меньше текста: убраны ConditionBadge из карточки, лишний скрытый heart-хак и отдельная кнопка избранного под карточкой; сердечко теперь плавающая кнопка 44x44 (bg-black/30 backdrop-blur) поверх фото с aria-label «В избранное/Убрать из избранного» (кликабельная зона, а не 16px иконка)
+   183→- Логика сохранена целиком: api.feed({q,category,sort,page,limit}), поиск (форма+Enter), чипы категорий (горизонтальный скролл), сортировка (Свежие/Дешевле/Дороже), favoritesMode (загрузка через api.listing по getFavs), loading/error/empty; добавлена пагинация «Показать ещё» (h-11, pageRef + load(page+1), только когда items.length < total); скелетоны — 3 карточки animate-pulse (фото 16:10 + 2 строки); export ListingCard и getFavs сохранены (ProfileScreen импортирует)
+   184→- ВАЖНО найдено и исправлено в браузере: контейнер ленты «flex flex-col gap-3» сжимал карточки до 13px (flex-shrink) — из-за этого клики по сердечку/фото промахивались; добавлен shrink-0 карточкам/скелетонам/состояниям — проверено elementsFromPoint и реальными кликами
+   185→- ListingScreen.tsx переработан: фото aspect-[4/3] rounded-2xl (бейджи «Отдам даром»/«ТОП» на фото), цена text-3xl font-extrabold + зелёная пилюля «Дешевле рынка на N%» по data.marginHint (поле из ListingDetailData; вместо старого ручного potential), название, ConditionBadge ОДИН раз (дубль убран), метрики в одну строку иконок: MapPin город · Eye просмотры · Clock времяAgo
+   186→- Продавец: аватар 44px (hueColor+initials), имя + онлайн-точка, рейтинг Star (clamp 5.0) + (кол-во), кнопка «Написать» (h-11, bg-[#00AAFF]/10) в той же карточке — логика openChat сохранена; блок «на Авито X» убран (меньше текста)
+   187→- Описание: line-clamp-4 + «Показать полностью»/«Свернуть» (локальный useState, aria-expanded, тумба только для длинных текстов >120 символов)
+   188→- Покупка: вместо двух кнопок в футере — одна sticky-кнопка «Купить за N ₽» (h-11, bg-[#00AAFF], disabled при балансе < цены) → нижний шит «Как получите товар?» с ДВУМЯ радио-карточками (role=radiogroup/radio, aria-checked, индикатор-кружок): «Самовывоз N ₽ — осмотр и торг при встрече» (HandCoins) и «Курьер +350 ₽ — без осмотра и торга» (Truck, AlertTriangle, disabled при price=0); подтверждение внизу шита пересчитывает итог (N+DELIVERY_FEE) и вызывает api.buyListing(id, {courier}) — проверено покупкой в браузере (баланс обновился, okMsg, шит закрылся)
+   189→- Мелочи: скелетон загрузки вместо спиннера (фото 4:3 + строки + блок продавца), кнопка «Назад» 44x44, error-экран с h-11 кнопкой, кнопки h-11 в isMine-блоке (Продвинуть/Снять/Продать ещё), gap-3/p-3, aria-hidden на декоративных иконках, без эмодзи
+   190→- НЕ тронуты: ChatScreen, ChatsScreen, ProfileScreen, SellScreen, AvitoApp (ConditionBadge/логотип импортируются как были), src/lib/* и все api-контракты
+   191→- Проверка браузером (agent-browser): локскрин → Avito → лента (20 карточек 16:10, сердечко 44px, «Показать ещё» 20→41), поиск «Гитара», фильтр «Книги», сортировка «Дешевле» (295→308→1014), карточка товара (фото 4:3, бейдж «Дешевле рынка на 19%»), шит покупки (радио-карточки, итог 3361→3711 при курьере), покупка самовывозом прошла; избранное (2 шт., таб «Избранное» показывает 2 карточки); ошибок в консоли нет
+   192→
+   193→Stage Summary:
+   194→- Изменены только 2 файла: src/components/avito/FeedScreen.tsx и src/components/avito/ListingScreen.tsx — лента и карточка товара теперь фото-первыми, текст минимизирован
+   195→- Контракты соблюдены: FeedListing (seller.rating/online, baseValue, boosted) и ListingDetailData (marginHint, sellerOnline, sellerRating, specs) использованы по фактическим полям types.ts; api.feed/listing/buyListing/openChat/boostListing/removeListing без изменений; export ListingCard/getFavs сохранены для ProfileScreen
+   196→- Рейтинг в UI клампится до 5.0 (в сид-данных ботов ratingSum завышен — сам бэк не трогал, это вне зоны задачи)
+   197→- bunx tsc --noEmit: 0 ошибок в components/avito (4 pre-existing ошибки вне зоны: examples/, skills/, src/app/api/repair/route.ts); bunx eslint src/components/avito — чисто
+   198→
+   199→---
+   200→Task ID: 7
+   201→Agent: main (Z.ai Code)
+   202→Task: Раунд улучшений UX: реальный интернет, центр управления, фонарик, уведомления, фото товаров, чистка "|", git push
+   203→
+   204→Work Log:
+   205→- Чистка "|" в речи ИИ: sanitize в chat-engine.saveAndEmit (палки -> ". "), чистка БД (1 сообщение + 1 уведомление), страховка pretty() на клиенте в ChatScreen (текст и системные)
+   206→- Центр управления: новый ControlCenter.tsx (z-55, blur, плитки Фонарик/Звук/Зарядка/Настройки, слайдер яркости, часы/онлайн/батарея); жест свайп сверху вниз + тап по верхней зоне (левая часть статус-бара, right-16 чтобы не перекрывать колокольчик); store: flashlight + brightness
+   207→- Фонарик РЕАЛЬНЫЙ: src/lib/torch.ts — getUserMedia(front camera) + track.applyConstraints({torch:true}); если устройства/разрешения нет — виртуальный режим со свечением на экране; индикатор в статус-баре
+   208→- Яркость: затемняющий overlay z-58 (opacity (1-brightness)*0.72), слайдер в центре управления
+   209→- Уведомления «как в жизни»: NotificationCenter переписан — squircle-иконка приложения с градиентом, ИМЯ ПРИЛОЖЕНИЯ (Avito/Налоги/Браузер/Система), заголовок, 2 строки текста, синяя точка непрочитанного, ТАП РАЗВОРАЧИВАЕТ: полный текст + кнопка «Открыть {приложение}» (переход в приложение); ToastStack теперь heads-up сверху с иконкой приложения + кнопкой «Открыть»
+   210→- НАСТОЯЩИЙ ИНТЕРНЕТ: /api/browse (сессия, rate limit 24/мин, TTL-кеш 5/10 мин); fetch через curl (child_process) — bun TLS-fingerprint блокируют Wikipedia/Cloudflare; чистка HTML -> текст + ссылки; Поиск: Bing News RSS (прямые ссылки из url=) + Wikipedia opensearch, фолбэк Google News RSS; BrowserApp: адресная строка с замком, настоящие страницы (title + текст + кликабельные ссылки), настоящие результаты поиска с бейджами источника, чипы wikipedia/habr/lenta/bbc/reddit/github; игровые сайты сохранены (avito.ru, news.market, forum.market, banki.ru, help.guide)
+   211→- Фото товаров: 46 изображений сгенерированы (public/img/p/, стиль любительских фото с Авито); src/lib/item-images.ts — itemImage(itemKey, category); перекрытие на сервере во ВСЕХ выдачах: feed/listing (dto), chats, chat/[id], auction, deliveries, inventory, repair; poco-x5-pro перегенерирован (был watermark)
+   212→- Полировка UI (подагенты): 6-a — кастомные SVG-логотипы 9 приложений (Сбер-галка, гербовый щит, компас, шестерня, гаечный ключ, гавел, кубок, фургон), объёмные плитки (блик + тени), компактный виджет времени + виджет «Онлайн N»; 6-b — лента Avito: крупные фотокарточки 16:10, цена поверх фото, сердце 44px на фото, минимум текста, скелетоны, пагинация; карточка товара: большое фото 4:3, sticky «Купить за N», описание clamp-4 + «Показать полностью», радио-карточки Самовывоз/Курьер
+   213→- Исправлено: tsc RepairOrderDTO itemImage; рейтинг ботов 43.5 -> кламп в ratingOf (max 5.0) + пересчёт в БД (3.4..4.9) + фикс seed.ts; react-hooks/set-state-in-effect в BrowserApp (remount по key + render-time adjust); белый экран при Fast Refresh был ложным
+   214→- git: remote origin https://github.com/neolovichstar/Avito-Simulator.git, .env/db/ вынесены из git (секреты), push ожидает токен пользователя (в сессии токен обрезан)
+   215→
+   216→Stage Summary:
+   217→- Проверено браузером: разблокировка, новые иконки, центр управления (открытие/фонарик/яркость), уведомления (иконки/разворачивание/«Открыть»), настоящий поиск (реальные новости), lenta.ru открывается с живыми заголовками, лента с фото товаров, карточка товара, чат с ботом: «не, 2000 это совсем мало... а то на айфон мечты коплю» — без палок
+   218→- tsc: 0 ошибок (кроме pre-existing examples/skills), eslint: 0 проблем
+   219→- Осталось: push в GitHub (нужен полный токен), cron webDevReview создан
+   220→
+   221→---
+   222→Task ID: 9
+   223→Agent: main (Z.ai Code)
+   224→Task: QA-раунд (agent-browser) + фича «Отзывы о сделках» + фикс статуса «Продано» + детали карточки
+   225→
+   226→Work Log:
+   227→- QA через agent-browser всех ключевых флоу (скриншоты /tmp/qa-*.png): локскрин+уведомления, лента (фото, категории), карточка товара, покупка с курьером (списание 350, доставка in_transit -> delivered с раскрытием «Есть дефекты: Продавец приукрасил состояние», реальное состояние Б/у против заявленного Хорошее), чат с ИИ (низболл 4500 -> отказ «новый вообще 10к в магазине», контр 7500 -> «давай 7900 и забирай сегодня» — живой торг), аукцион (ставка 7131 -> эскроу с баланса, бот Виталий Кабанов перебил -> возврат эскроу, лидер сменился), задания+достижения, банк, налоги — всё работает, ошибок в dev.log нет
+   228→- НАЙДЕН И ИСПРАВЛЕН БАГ: после покупки карточка товара продолжала показывать активную кнопку «Купить» (статус not exposed в DTO). listingDTO теперь отдаёт status; ListingScreen: если sold — оверлей «Продано» на фото (фото приглушено), вместо кнопки — плашка «Продано», повторная покупка невозможна
+   229→- НОВАЯ ФИЧА «Отзывы о сделках»: POST /api/listings/[id]/review (покупатель оценивает продавца 1-5 + текст, только после реальной покупки, 1 отзыв на сделку, rate limit, stripEmoji, +20 XP, bumpStats reviews, bumpQuests 'review', checkAchievements); бот-продавец через 4-12с отвечает встречным отзывом по личности (4-5 звезд за высокий рейтинг, 3-4 за низкий) + notify; рейтинг продавца (ratingSum/ratingCount) обновляется
+   230→- QuestKind + 'review', квест «Репутация решает» (2 отзыва, 700₽/50XP), достижение «Арбитр площадки» (10 отзывов, 2500₽), PlayerStats.reviews
+   231→- Путь до отзыва: Профиль -> вкладка «Покупки» (третий таб, из transactions type=purchase с дедупликацией по listingId) -> «Оценить сделку» -> карточка товара -> блок «Оцените сделку» (звёзды-радио с hover, textarea 300 симв, кнопка «Отправить», состояние «Отзыв отправлен»)
+   232→- Карточка продавца: строка «На Авито с {месяц год}» (BadgeCheck), блок «Отзывы о продавце» (GET /api/users/[id]/reviews — рейтинг, до 3 последних отзывов: кто, звёзды, текст, товар, время; скрывается если отзывов нет; грузится вторым запросом, не блокируя карточку)
+   233→- api.ts: leaveReview, userReviews; types.ts: PurchaseDTO, ListingDetailData.purchasedByMe/reviewedByMe, FeedListing.status
+   234→- Проверено браузером: покупка PS4 -> профиль «Покупки (4)» -> «Оценить сделку» -> 5 звёзд + текст -> «Отзыв отправлен» + toast «+20 XP»; в БД встречный отзыв бота «нормальный мужик, забрал PlayStation 4 Slim 500GB без проблем» (5 звезд), рейтинг игрока обновлён; sold-карточка: бейдж+плашка «Продано»
+   235→- tsc: 0 ошибок (кроме pre-existing examples/skills), eslint: чисто, dev.log без ошибок
+   236→
+   237→Stage Summary:
+   238→- Все флоу из списка «do not break» проверены живым браузером и работают: feed, listing, buy with courier, chat negotiation, auction bids (с эскроу и перебиванием ботами), quests, taxes, bank
+   239→- Репутационный цикл замкнут: покупка -> отзыв игрока -> встречный отзыв бота -> рейтинг в ленте/карточке -> квесты/достижения
+   240→- Риск: отзывы о продавце на карточке скрыты у продавцов без отзывов (сид даёт отзывы не всем ботам) — при желании можно досидить отзывы всем ботам
+   241→- Следующий шаг: досид ботам отзывов в seed, пуш в GitHub (нужен полный токен), далее — новые фичи (жалобы на объявления, сохранение поисков, история цен товара)
+   242→
+   243→---
+   244→Task ID: 10
+   245→Agent: main (Z.ai Code)
+   246→Task: QA-раунд 2 (agent-browser) + 3 новые фичи: жалобы на объявления, история цен (спарклайн), сохранённые поиски
+   247→
+   248→Work Log:
+   249→- QA через agent-browser: локскрин+уведомления, домашний экран, лента Avito (фото-карточки, поиск), карточка товара (продавец, характеристики, sticky-кнопка), аукцион (ставки ботов, эскроу, корректная ошибка «Недостаточно средств. Ставка резервирует деньги»), Сервис (ремонт: 4 предмета с оценками), Браузер (реальный поиск habr -> живые новости с tass.ru/habr.com/tadviser.ru). Ошибок в dev.log нет, tsc/eslint чистые, :3003 healthy. Багов не найдено — фаза стабильна, перешёл к развитию.
+   250→- Схема БД (+db:push): model PricePoint { itemKey, price, createdAt, index }, model SavedSearch { userId, user, query, category }, model Complaint { listingId, listing, fromUserId, from, reason, @@unique(listingId,fromUserId) }, Listing.complaintCount Int @default(0)
+   251→- src/lib/market-hooks.ts: onListingCreated() -> recordPricePoint (каждая цена бота/игрока в историю) + notifySavedSearches (матчинг по категории и подстроке заголовка, поиск должен существовать до объявления, своему продавцу не шлём); хук подключён в engine.ts (боты 2х мест) и POST /api/listings (игрок, fire-and-forget)
+   252→- POST/GET /api/listings/[id]/complaint: причины spam|fake|scam|wrong|other, 1 жалоба на юзера на объявление, rate limit 5/мин, счётчик в Listing; модерация: >=3 жалоб на объявление бота -> status=removed + уведомление всем пожаловавшимся «Жалоба удовлетворена»; первая жалоба -> «Жалоба принята»
+   253→- /api/searches GET/POST (лимит 10 на юзера, дедуп, stripEmoji), /api/searches/[id] DELETE; в GET /api/listings/[id] добавлено priceHistory (до 40 точек по itemKey)
+   254→- api.ts: addComplaint, complaintState, savedSearches, createSavedSearch, deleteSavedSearch (+ del helper); types.ts: PricePointDTO, SavedSearchDTO, ListingDetailData.priceHistory
+   255→- scripts/seed-extra.ts: сид истории цен за ~10 дней случайным блужданием к текущей цене (343 точки / 45 товаров); ботам отзывы не понадобились (уже >=3 с прошлого сида)
+   256→- FeedScreen: кнопка-колокольчик «Сохранить поиск» (появляется при активном запросе/категории), чипы сохранённых поисков с применением одним тапом и удалением (X), тосты; новый пустой стейт ленты (иконка SearchX в плашке + подсказка про сохранённые поиски)
+   257→- ListingScreen: карточка «Динамика цен» — SVG-спарклайн с градиентной заливкой, пунктирными уровнями min/max, бейджем дельты (+/-%, период вычисляется по факту: за неделю/за N дн./за месяц), строка «По N объявлениям на рынке · min/max»; кнопка «Пожаловаться на объявление» -> bottom sheet с 5 радио-причинами -> отправка -> тост + состояние «Жалоба отправлена»
+   258→- Инцидент: db:push при живом dev-сервере оставил старый Prisma-синглтон без новых моделей (500 на /api/searches). В db.ts добавлена проверка clientIsStale (пересоздание клиента при отсутствии новых моделей). Плюс сервер пришлось поднимать заново: (setsid bun run dev &) — теперь стабилен
+   259→- Проверено живым браузером: поиск iphone -> колокольчик -> тост «Поиск сохранён» -> чип «iphone»; карточка iPhone 12: спарклайн «-6% за 10 дн.», min/max, градиент; жалоба: sheet -> «Похоже на обман» -> отправка -> heads-up тост «Жалоба отправлена модератору» -> плашка «Жалоба отправлена»; пустой стейт с иконкой
+   260→
+   261→Stage Summary:
+   262→- Три новые фичи в прод-виде: жалобы с бот-модерацией, история цен со спарклайном, сохранённые поиски с уведомлениями при появлении товара у ботов
+   263→- Все «do not break» флоу перепроверены живым браузером: feed, listing, buy with courier, auction bids (+эскроу и ошибки), quests, taxes, bank, chat negotiation (проверено в Task 9), браузер с реальным интернетом
+   264→- Риски: (1) notifySavedSearches без троттлинга по времени — при бусте листингов возможны серии уведомлений (матчится только по заголовку/категории, объём мал); (2) при рестарте сэндбокса dev-сервер нужно поднимать вручную: cd /home/z/my-project && (setsid bun run dev &); (3) история цен для trash/даром (price=0) не пишется — спарклайн скрыт
+   265→- Следующий шаг: пуш в GitHub (нужен полный токен от пользователя), далее кандидаты: реакции продавцов на жалобы (боты в чате оправдываются), витрина «Сервис» со статистикой ремонта, тёмная тема ОС
+   266→---
+   267→Task ID: 11
+   268→Agent: main (Z.ai Code)
+   269→Task: QA-раунд 3 (agent-browser) + фичи: страница продавца, оповещения о снижении цены на избранное, ежедневный бонус за вход, починка realtime-доставки уведомлений
+   270→
+   271→Work Log:
+   272→- Статус-оценка: все ключевые флоу (лента, карточка, покупка с курьером, чат-торг, аукцион, задания, налоги, банк, сервис, доставки) перепроверены живым браузером — работают, ошибок в dev.log нет. Проект стабилен → перешёл к развитию
+   273→- НОВОЕ: избранное синхронизируется с сервером. Модель Favorite (userId+listingId, unique) + /api/favorites (GET список, POST одного переключения, PUT полной синхронизации localStorage→сервер при первой загрузке ленты, fire-and-forget)
+   274→- НОВОЕ: оповещения «Цена снизилась». market-hooks.notifyPriceDrop(listing, oldPrice) — вызывается в engine.ts из всех трёх мест снижения цены ботами (конкуренция/сбивание, реакция на игрока, скидка на залежалый товар). Каждому добавившему в избранное: уведомление «было → стало (−N%)» + realtime toast. Порог ≥3%, своему продавцу не шлём
+   275→- НОВОЕ: страница продавца. GET /api/users/[id] (шапка: аватар-hue, имя, онлайн, рейтинг-звёзды, город, «На Авито с», био; статистика: активных/сделок/рейтинг; отзывы) + GET /api/users/[id]/listings?offset= (активные объявления, boosted наверх, пагинация offset). Новый SellerScreen.tsx: скелетон загрузки, карточка профиля, сетка статистики, список объявлений (фото 80px, цена, бейдж состояния, просмотры, «Показать ещё»), отзывы покупателей
+   276→- НОВОЕ: ежедневный бонус за вход. Поля User.bonusStreak/lastBonusAt + /api/bonus (GET состояние, POST забрать: 250 ₽ база +150 за день серии, кап 1000; серия рвётся пропуском дня; дубль за день → 409). Начисление при разблокировке телефона (page.tsx unlock → claimDailyBonus → toast «Бонус за вход +N ₽ за M дней подряд») + уведомление + транзакция. Карточка «Бонус за вход» (иконка Flame, серия, «Завтра») в приложении Карьера между уровнем и табами
+   277→- НОВОЕ: внутренняя навигация Avito переписана со State-переменных на СТЕК экранов (View: listing|seller|chat). Теперь: объявление → продавец → объявление продавца → Назад → продавец → Назад → объявление. Тап по продавцу на карточке и ссылка «Все объявления продавца» на карточке товара
+   278→- ИСПРАВЛЕН КРИТИЧЕСКИЙ БАГ realtime: socket.io-клиент в браузере висел в reconnect-цикле (connected:false), тосты/notify не доходили. Причины: (1) мини-сервис :3003 своим роутером 404-ил polling-запросы /socket.io/?EIO=… (роутер «клеймил» всё кроме /health,/presence,/emit); (2) transports websocket-first через прокси ненадёжен. Фикс: роутер пропускает все EIO=/socket.io запросы в engine.io нетронутыми (polling теперь работает), клиент переключён на transports ['polling','websocket']. Проверено: connected:true, toast «Цена снизилась» и «Сделка» приходят живьём
+   279→- Мелкие фиксы стиля/логики: KIND_APP/APP_META market → приложение «Avito» (было «Браузер») с иконкой TrendingUp, в metaFor добавлен «аукцион»; в db.ts clientIsStale проверяет также favorite (защита от устаревшего Prisma-клиента при db:push на живом сервере); окно seller-мета (город/«На Авито с») разнесено на две строки — не ломается вёрстка; window.__avitoSocket для дебага
+   280→- Инцидент: db:push добавил поле User.bonusStreak, но живой dev-сервер держал старый синглтон Prisma → 500 на /api/bonus. Перезапуск dev-сервера (setsid bun run dev) решил проблему; db.ts дополнен проверкой favorite
+   281→- Проверено живым браузером (через шлюз :81, как в превью): разблокировка, лента с сердечком (синк избранного в БД), страница продавца из карточки (Сергей Дроздов: 4.0 (231), 3 объявления, 7 сделок, био), переход в его объявление и обратно по стеку, полный чат-торг с ИИ («ладно, 7900 по рукам» → бот выставил счёт 7 900 ₽ → оплата → «Сделка состоялась» + realtime toast AVITO «Счёт оплачен. Товар ваш!»), карточка бонуса в Карьере («Серия 1 дн. · получено сегодня»), симуляция снижения цены → уведомление и toast «Цена снизилась: 8 643 → 7 347 ₽ (−15%)»
+   282→- bunx tsc --noEmit: 0 ошибок проекта (только pre-existing examples/skills); eslint чист; dev.log без ошибок; :3003 healthy
+   283→
+   284→Stage Summary:
+   285→- Замкнут контур «живого рынка»: цены ботов движутся → игрок получает realtime-оповещение по избранному → заходит и покупает. Избранное теперь серверное (основа для будущих фич)
+   286→- Realtime-инфраструктура починена фундаментально (polling через шлюз), тосты/уведомления доставляются адресно; это был главный скрытый риск всей игры
+   287→- Навигация Avito — стек: подготовка к следующим фичам (вложенные экраны без потери контекста)
+   288→- Артефакты: src/app/api/{favorites,bonus}/route.ts, src/app/api/users/[id]/{route,listings}/route.ts, src/components/avito/SellerScreen.tsx, правки engine/market-hooks/deals, schema Favorite + User.bonusStreak/lastBonusAt
+   289→- Риски: (1) agent-browser напрямую на :3000 realtime не получает (только через шлюз :81/превью) — у реального пользователя путь через шлюз, polling там работает; (2) uid в handshake теряется на шлюзе — персональная комната всё равно джойнится через 'subscribe' на клиенте; (3) PUT /api/favorites стирает серверные избранного, которых нет в localStorage — при смене устройства лентаfav не перенесётся (localStorage источник истины)
+   290→- Следующий шаг: реакции ботов на жалобы в чате, «Вы смотрели» в ленте, тёмная тема ОС, пуш в GitHub (нужен полный токен от пользователя)
+   291→---
+   292→Task ID: 12
+   293→Agent: main (Z.ai Code)
+   294→Task: QA-раунд 4 (agent-browser) + фиксы и новые фичи: похожие объявления, «Вы смотрели», бот-оправдания при жалобе, фильтр по городу, догенерация фото товаров
+   295→
+   296→Work Log:
+   297→- Статус-оценка: инфра здорово (:3003 health ok, /api/stats 26 онлайн, dev.log без ошибок, tsc 0 ошибок). Пройден QA живым браузером: локскрин → разблокировка → лента (фото-карточки, сохранённый поиск «iphone») → карточка товара (продавец, динамика цен со спарклайном, характеристики) → аукцион (3 лота, 22 ставки, лидер-бот, таймер) → карьера (уровень 2, бонус за вход, задания, достижения 1/19) → банк (вклад, долги, кредитный рейтинг 500, операции). Все флоу живые
+   298→- НАЙДЕН И ИСПРАВЛЕН ДЕФЕКТ спецификаций: весь category=auto получал «Пробег/Двигатель/Год» — даже компрессор и шлем. specs.ts: авто-аксессуары (8 ключей) получили свои характеристики (Тип/Происхождение/Комплект; шины — Диаметр/Сезон/Протектор; диски — Диаметр/Крепёж/Состояние; шлем — Размер/Состояние)
+   299→- ФОТО ТОВАРОВ: 86 из 132 товаров не имели своего фото и получали категорийные картинки (компрессор — фото целой машины с ценником «$ 4 500 OBO»). Запущена фоновая генерация всех 86 фото (bun /tmp/genimg2.mjs, z-ai CLI, 1152x864, стиль любительских фото с Авито). После готовности — обновить PRODUCT_IMAGES в src/lib/item-images.ts
+   300→- ФИЧА «Похожие объявления» (видимая конкуренция продавцов): GET /api/listings/[id] отдаёт similar (тот же itemKey, активные, кроме себя, по цене asc, до 5); types.ts: SimilarListingDTO; ListingScreen: полоса SimilarStrip после «Динамики цен» — фото, цена, «дешевле/дороже на N%», продавец, город, бейджи ТОП/«Ваше»; клик — push в стек (AvitoApp передаёт onOpenListing). Проверено браузером: компрессор 1 477 ₽ показывает конкурента «1 017 ₽ дешевле на 31%»
+   301→- ФИЧА «Вы смотрели»: src/lib/viewed.ts (localStorage, макс 20); ListingScreen пишет просмотр; FeedScreen: полоса ViewedStrip в чистой ленте — миниатюры, цена, «Очистить». Проверено браузером
+   302→- ФИЧА «Бот-оправдание после жалобы»: POST complaint — если продавец бот, через 6-15с бот пишет жалобщику в чат (существующий или новый) по 5 вариантам причин, stripEmoji, emit в chat:/user: каналы + notify. Проверено: сообщение от «Антон Деревщиков» пришло в чаты и уведомления
+   303→- ФИЧА «Фильтр по городу»: GET /api/listings принял city (в ключе кеша), новый GET /api/cities (groupBy, кеш 60с), api.feed(city)+api.feedCities(); панель фильтра в ленте — чипы «Вся Россия / Москва · 9 / Тверь · 4 …». Проверено: Москва → 9, Астрахань → 3
+   304→- tsc: 0 ошибок (кроме pre-existing), eslint чист, dev.log без ошибок
+   305→
+   306→Stage Summary:
+   307→- Реализованы и проверены живым браузером 4 фичи: похожие объявления, «Вы смотрели», бот-оправдания при жалобе, фильтр по городу; плюс фикс авто-спеков
+   308→- Генерация 86 фото идёт фоном: лог /tmp/genimg2.log. ПОСЛЕ ЗАВЕРШЕНИЯ: перегенерировать monitor-lg-24 (ЭЛТ вместо IPS), salomon-xt6 (FAIL), cat-auto.jpg (без ценника) и ЗАПАТЧИТЬ PRODUCT_IMAGES в src/lib/item-images.ts по фактическим файлам /img/p/*.jpg
+   309→- Риски: item-images.ts пока не знает о новых файлах; cat-auto.jpg с «$ 4 500 OBO» остаётся фолбэком; пуш в GitHub ждёт полный токен от пользователя
+   310→- Следующий шаг: дождаться генерации → патч item-images.ts → визуальная проверка ленты → тёмная тема ОС (кандидат)
+   311→
+   312→---
+   313→Task ID: 12 (продолжение — завершение раунда)
+   314→Agent: main (Z.ai Code)
+   315→
+   316→Work Log:
+   317→- Генерация фото завершена: 85/86 новых фото товаров в public/img/p/ (1 FAIL salomon-xt6 — перегенерирован отдельно через /tmp/fiximg2.mjs, ok). Перегенерированы проблемные: monitor-lg-24.jpg (был ЭЛТ-монитор вместо IPS — теперь тонкий LG-плоский), cat-auto.jpg (была машина с ценником «$ 4 500 OBO» — теперь шины/компрессор/домкрат на асфальте без текста)
+   318→- PRODUCT_IMAGES в src/lib/item-images.ts расширен с 46 до 131 записей (все товары каталога теперь имеют собственное фото; фолбэк на категорийные остаётся для мусорных/прочих). Прогон через itemImage() на сервере — фото автоматически применились во всех выдачах (лента, карточка, чаты, аукцион, доставки, инвентарь, ремонт)
+   319→- Визуальная проверка браузером: лента показывает новые фото (гантель, кроватка, MacBook Pro 2015, компрессор), «Вы смотрели» с корректной миниатюрой компрессора; карточка компрессора — настоящее фото компрессора на столе, бейдж «Дешевле рынка на 33%», оверлей «Продано» на купленном ботом объявлении (рынок живёт: бот купил компрессор пока шло тестирование)
+   320→- Финальные проверки: tsc 0 ошибок (кроме pre-existing examples/skills), eslint 0 проблем, dev.log без ошибок, realtime :3003 healthy
+   321→
+   322→Stage Summary:
+   323→- Раунд закрыт: 4 новые фичи (похожие объявления с конкуренцией цен, «Вы смотрели», бот-оправдания при жалобе, фильтр по городу) + фикс авто-спеков + полное покрытие фото (131/132 товаров)
+   324→- Все «do not break» флоу перепроверены: feed, listing, buy with courier, chat negotiation (проверено в Task 9/11), auction bids, quests, taxes, bank
+   325→- Известные хвосты: (1) push в GitHub ждёт полный токен от пользователя; (2) «X Store amazon.com»-артефакт в одном из старых фото не воспроизвёлся повторно — при желании можно прогнать визуальный аудит всех 131 фото; (3) тёмная тема ОС — главный кандидат следующего раунда
+   326→---
+   327→Task ID: 13
+   328→Agent: main (Z.ai Code)
+   329→Task: QA-раунд 5 (agent-browser) + фикс спецификаций товаров + тёмная тема ОС
+   330→
+   331→Work Log:
+   332→- Статус-оценка: инфраздоровье подтверждено (/api/stats 25-26 онлайн, :3003 health ok, dev.log без ошибок, tsc 0). Пройден живой QA всех флоу через шлюз :81: локскрин → лента (поиск «iphone», чипы категорий) → карточка товара → аукцион (лидер-бот меняется в реальном времени, форма ставки, корректная ошибка «Недостаточно средств. Ставка резервирует деньги») → карьера (бонус за вход «Серия 1 дн», задания с прогрессом) → банк (карта, вклад/кредит/рейтинг 500) → доставки (PS4: «Есть дефекты — продавец приукрасил состояние», факт Б/у) → ремонт (4 предмета доступно) → браузер (настоящий интернет + сайты вселенной) → настройки
+   333→- ФИКС «железок» (аналог авто-фикса из Task 12): категория sport показывала всем товарам общий шаблон «Тип/Вес» — гантели 2х16 кг были «Вес 7 кг», «Тип Тур». specs.ts переписан на per-item переопределения для 40+ товаров: sport (гантели/штанга/дорожка/велотренажёр/сноуборд/коньки/ролики/ракетки/турник), electronics (PS5/PS4/Xbox/Switch/часы/наушники/ТВ/мониторы/станция/клавиатура), hobby (самокат/велосипед/палатка/аквариум/геймпад/GPS/телескоп/металлоискатель/Каркассон), music (гитары/синтезатор/винил/проигрыватель/комбо/укулеле), appliances (холодильник/стиралка/робот-пылесос/Дайсон/кофемашина/духовка и др.), kids (коляска/автокресло/кроватка/велосипед/LEGO/санки). Fallback на старые шаблоны сохранён. Проверено модулем и в UI (гантели: Тип «Разборные», Общий вес «32 кг», Блины «Блины в резине»)
+   334→- ФИЧА «Тёмная тема ОС»: state theme 'light'|'dark' в useOS (persist localStorage avito_sim_theme), тумблер «Тёмная тема» в Настройках (секция Устройство) и плитка «Тема» в центре управления (сетка 2x2 + Настройки во всю ширину; activе — violet-300). Реализация без правок 26 компонентов: scoped-переопределения утилит в globals.css под классом .theme-dark на корне контента (bg-white→#1c2025 с микро-ring, bg-neutral-50/100/200/300→тёмные поверхности, text-neutral-*→тёмные градации, границы, цветные бейджи→полупрозрачные тёмные с ярким текстом, bg-[#f4f5f7]/[#f0f1f3], СКРОЛЛБАРЫ)
+   335→- Тонкости, найденные и решённые при вёрстке: (1) стикер-бар карточки «Купить за …» — класс bg-white/95 (не .bg-white): добавлены [class*="bg-white/NN"]-правила для NN 25..95 (escaped-класс .bg-white\/95 не дошёл до браузера из-за компиляции — атрибутные селекторы надёжнее); (2) StatusBar: в тёмной теме над приложениями белые текст (variant dark); (3) исключения-правила для ярких кнопок [class*="bg-emerald-4"][class*="text-neutral-9"] и др. — контраст сохранён; (4) НЕ добавлял глобальный transition-property — сломал бы transition-transform кнопок
+   336→- Проверено браузером в тёмной теме: настройки, лента, карточка (включая спеки и синий бар), аукцион (живые ставки), банк, чаты + живой торг с ботом («Извиняюсь, товар уже не актуален, сделка закрыта» — бот в характере), налоги, центр управления; переключение в обе стороны тумблером и плиткой; светлая тема — без регрессий
+   337→- bunx tsc: 0 ошибок проекта; eslint чист; dev.log без ошибок; :3003 healthy
+   338→
+   339→Stage Summary:
+   340→- Раунд закрыт: QA всех приложений + пер-товарные характеристики (40+ правок) + полноценная тёмная тема всей ОС одним CSS-слоем (26 компонентов без единой правки вёрстки)
+   341→- Артефакты: src/lib/specs.ts (пер-товарные карты), src/app/globals.css (.theme-dark), src/lib/store.ts (theme), src/app/page.tsx (класс + persist + variant статус-бара), src/components/apps/SettingsApp.tsx (тумблер), src/components/os/ControlCenter.tsx (плитка «Тема», col-span Настройки)
+   342→- Риски: (1) редкие произвольные цвета (bg-[#a78bfa] и др.) не переопределялись сознательно — акценты; (2) push в GitHub всё ещё ждёт полный токен от пользователя; (3) сгенерированное фото cat-auto.jpg старого образца заменено ранее, но визуальный аудит всех 131 фото не проводился
+   343→- Следующий шаг (кандидаты): реакции соседних продавцов на снижение цены игрока (война цен), история ставок аукциона в карточке лота, звуковые подписи событий, пуш в GitHub
+   344→---
+   345→Task ID: 14
+   346→Agent: main (Z.ai Code)
+   347→Task: QA-раунд 6 (agent-browser) + фикс спама уведомлений + фичи: Пульс рынка в ленте, рынок конкурентов в шите цены, realtime-аукцион с антиснайпингом ботов
+   348→
+   349→Work Log:
+   350→- Статус-оценка: все ключевые флоу перепроверены живым браузером (лента, карточка, аукцион с историей ставок, профиль с редактором цены, война цен — бот-ответы с опечатками «жесткий демпинг пошел. я тоже цену среззл»). tsc 0, eslint 0, :3003 healthy. Обнаружен и починен 1 баг, добавлены 3 фичи
+   351→- БАГ-ФИКС «спам уведомлений на локскрине»: игрок получал серии одинаковых «Конкурент сбивает цену» по одному объявлению каждые 2 минуты (два дубликата подряд видны на скриншоте локскрина). Причина: блок конкуренции в engine.ts (tick % 4) уведомляет без кулдауна. Фикс: notifyCooldown(key, ms) — глобальная карта кулдаунов (макс 500 записей), уведомление о конкретном объявлении не чаще раза в 30 минут
+   352→- ФИЧА «Пульс рынка» в ленте: GET /api/market/pulse (кеш 45с) — группирует PricePoint за час, считает МИНИМАЛЬНУЮ цену товара в первой и второй половине часа (честная метрика «дешевеет/дорожает», устойчивая к множеству продавцов; первая версия с first/last миксовала цены разных продавцов — переписана). Топ-8 движений с |delta| >= 3%. FeedScreen: полоса «Пульс рынка» после «Вы смотрели» — фотокарточки 124px с бейджем дельты (зелёный минус/красный плюс), цена, «N изм.»; тап применяет поиск по товару (первые 2 слова заголовка); realtime: слушает market:pulse (emit уже был в price-war.ts) — дебаунс-рефетч 2.5с + flash-ring + метка «живое» с пульсирующей точкой. Проверено: PS4 «−8%» зелёным (после моего снижения), затем честные «+38%» красным (дешёвые PS4 ботов выкупили — самая низкая цена на рынке выросла)
+   353→- ФИЧА «Рынок этого товара» в шите цены (профиль): GET /api/listings/[id]/rivals (кеш 20с) — активные объявления того же itemKey: count, средняя, до 12 строк (цена, продавец, город, isMe/isMine). Шит цены: грузит рынок при открытии, рендерит строки с мини-барами (ширина = цена/макс), «Вы» синим, конкурент с минимальной ценой — бейдж «мин» и зелёный бар; если продавец один — «Вы единственный активный продавец»; живой подсказчик «С ценой N ₽ вы будете №K из M по цене» / «самый дешёвый» (пересчёт на каждый ввод). Шит получил max-h-[88%] overflow-y-auto. Проверено: для ps4-slim сейчас 1 продавец — фолбэк-сообщение; endpoint на товаре с 3 продавцами (divan-knizhka) отдаёт корректный сортированный список со средней
+   354→- ФИЧА «Realtime-аукцион»: AuctionApp слушает auction:update через window-socket (getSocket, attach-retry до 20с) — чужая ставка прилетает мгновенно, статус-строка «Ставки приходят в реальном времени · только что +N»; бейджи лотов: «Финал: таймер продлён» (анимированный, 9с) и «Последние торги» (<60с); пульсирующая точка у счётчика ставок. Антиснайпинг теперь и у ботов: в engine.ts бот может снайпить в последние 30с (25% шанс), при ставке в последнюю минуту endsAt продлевается до +30с (симметрично правилу игрока в POST /api/auction); POST игрока теперь тоже эмитит auction:update с extended
+   355→- Инфраструктурный инцидент: рестарт после правок engine.ts — pkill не убил старый next-server (EADDRINUSE у нового), старый процесс продолжал отдавать старый код. Решение: kill PID (next dev, next-server, postcss) → PORT_FREE → setsid bun run dev. Важно для будущих раундов: после правок engine.ts/instrumentation проверять реальный владелец порта, при рестарте убивать по PID
+   356→- Проверено живым браузером после рестарта: светлая/тёмная тема с новыми компонентами (пульс-карточки в обеих темах), лента, тап по пульсу → поиск «PlayStation 4» → 1 объявление с бейджем «Дешевле рынка 17%», аукцион с live-статусом, профиль, шит цены. tsc: 0 ошибок проекта, eslint: чисто, dev.log без ошибок
+   357→
+   358→Stage Summary:
+   359→- Раунд закрыт: 1 баг-фикс (кулдаун уведомлений конкуренции) + 3 фичи (Пульс рынка с честной мин-ценой и realtime-вспышкой, рынок конкурентов с бар-визуализацией в шите цены, живой аукцион с антиснайпингом ботов)
+   360→- Все «do not break» флоу целы: feed, listing, buy with courier, chat negotiation, auction bids, quests, taxes, bank
+   361→- Риски: (1) пульс показывает только товары с >= 3% движения — в тихие часы полоса скрыта (это норм, но QA может удивиться); (2) бейдж «мин» в шите цены не обновляется после сохранения цены (закрой/открой шит); (3) рестарт дев-сервера требует kill по PID — EADDRINUSE легко пропустить, т.к. старый сервер продолжает работать
+   362→- Следующий шаг (кандидаты): сравнение 2-3 объявлений между собой, чёрный список продавцов, промо-бейджи «Торг уместен» у ботов, пуш в GitHub (всё ещё ждёт полный токен от пользователя)
+   363→---
+   364→Task ID: 15
+   365→Agent: main (Z.ai Code)
+   366→Task: QA-раунд 7 (agent-browser) + фичи: сравнение объявлений (до 3, сводная таблица), чёрный список продавцов (schema/API/UI/гварды ботов)
+   367→
+   368→Work Log:
+   369→- Статус-оценка: инфра здорова (dev.log без ошибок, tsc 0, eslint 0, :3003 healthy, :3000 online 26). Живой QA: лента, аукцион (ThinkPad 23 744 ₽, 32 ставки, лидер меняется, realtime-статус), карточка товара. Все «do not break» флоу целы. Изменения Task 14 закоммичены системой
+   370→- ВАЖНОЕ ОТКРЫТИЕ ПО QA-ОКРУЖЕНИЮ: агент-браузер между сессиями сжал окно до 577px — телефон 844px перестал влезать, из-за чего шиты казались «обрезанными» (это был не баг приложения). Настройка: agent-browser set viewport 420 900 → телефон занимает весь экран как настоящий Telegram Mini App. Все последующие скриншоты полноразмерные. Для будущих раундов: сначала set viewport 420 900
+   371→- ФИЧА «Сравнение объявлений» (как на настоящем Авито): на фотокарточке ленты появилась круглая кнопка-весы (слева сверху; бейдж ТОП сдвигается right при наличии); selected — фиолетовое кольцо ring-[#965EEB]; до 3 товаров (тост-лимит), панель сравнения внизу (тёмная, счётчик, «Сравнить» активна от 2, очистка); CompareSheet: grid-таблица 76px + N колонок — фото 4:3, название, цена (минимальная зелёная с бейджем «лучшая цена»), строки Состояние/Город/Продавец (аватар+имя)/Рейтинг (звезда+кол-во)/К цене («Дешевле на N%»/«По рынку»)/Смотрели/Когда + кнопки «Открыть»; закрытие по фону, «Очистить всё». Исправлено при тестировании: контейнеру нужен класс grid (style gridTemplateColumns без display:grid не работает), бейдж «лучшая цена» перенесён под цену (не влезал в узкую колонку), длинный лейбл «ОПУБЛИКОВАНО» → «КОГДА». Проверено в светлой и тёмной теме: колонки ровные, данные корректные
+   372→- ФИЧА «Чёрный список продавцов»: модель BlockedSeller (userId+sellerId, unique, индекс) + db:push + clientIsStale проверка blockedSeller в db.ts + рестарт сервера по PID (по инструкции Task 14). API /api/blocked: GET ids, POST toggle (rate limit 10/мин, себя нельзя, уведомление «Чёрный список» через notifyUser); src/lib/blocked.ts — isBlocked/blockedIds/invalidateBlocked с TTL-кешем 30-60с. Фильтрация: GET /api/listings вырезает объявления заблокированных (после кеша, per-user), similar на карточке тоже. Гварды ботов: engine.ts (боты не стучатся в чат к игроку, который их заблокировал), price-war.ts (трэш-ток и comeback-офферы не пишут в ЧС), complaint route (бот не оправдывается перед заблокировавшим). UI: секция в шите жалобы на карточке товара — красная «Заблокировать {имя}» с пояснением, после — серая «Разблокировать»; шит жалобы получил max-h-[86%] overflow-y-auto (с новым блоком не влезал). Проверено живьём: тап → два тоста (система+Avito) → кнопка перевернулась; API-тест: лента без Ольги Егоровой (38 из 38 строк отфильтровано корректно), после разблокировки список пуст
+   373→- Финал: tsc 0 ошибок проекта, eslint чист, dev.log без ошибок, лента/карточка/чаты живые после всех правок
+   374→
+   375→Stage Summary:
+   376→- Раунд закрыт: 2 фичи (сравнение до 3 объявлений сводной таблицей + чёрный список продавцов со сквозной фильтрацией и гвардами ботов), 1 QA-инфра-фикс (viewport)
+   377→- Все «do not break» флоу перепроверены: feed, listing, buy with courier (не трогали), chat negotiation (не трогали), auction bids, quests, taxes, bank
+   378→- Риски: (1) blockedIds кешируется 30с — после блокировки новые ботовые сообщения в СУЩЕСТВУЮЩИХ чатах не блокируются (только инициативные), это осознанно: историю не прячем; (2) total в ленте не уменьшается на скрытые объявления (косметика); (3) сравнение не переживает перезагрузку страницы (state локальный) — осознанно
+   379→- Следующий шаг (кандидаты): раздел «Чёрный список» в Настройках с управлением списком, «Торг уместен» бейджи, аукцион: автоставка (макс. ставка игрока), пуш в GitHub (всё ещё ждёт полный токен от пользователя)
+   380→

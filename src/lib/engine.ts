@@ -12,6 +12,7 @@ import { emitTo } from '@/lib/realtime-emit'
 import { onListingCreated, notifyPriceDrop } from '@/lib/market-hooks'
 import { botComebackOffers } from '@/lib/price-war'
 import { isBlocked } from '@/lib/blocked'
+import { fireAutoBids, clearAutoBids } from '@/lib/autobid'
 import { fmtMoney } from '@/lib/format'
 import { cache } from '@/lib/cache'
 
@@ -508,6 +509,8 @@ async function auctionTick(tick: number) {
         }
       }
       await emitTo('global', 'auction:update', { lotId: lot.id, extended })
+      // автоставки игроков могут сразу перебить бота (прокси-торг)
+      await fireAutoBids(lot.id)
     }
   }
 
@@ -518,6 +521,7 @@ async function auctionTick(tick: number) {
   for (const lot of due) {
     if (!lot.currentBidderId || !lot.currentBid) {
       await db.auctionLot.update({ where: { id: lot.id }, data: { status: 'cancelled', finishedAt: new Date() } })
+      await clearAutoBids(lot.id)
       continue
     }
     const winner = await db.user.findUnique({ where: { id: lot.currentBidderId } })
@@ -538,6 +542,7 @@ async function auctionTick(tick: number) {
       },
     })
     await db.auctionLot.update({ where: { id: lot.id }, data: { status: 'finished', finishedAt: new Date() } })
+    await clearAutoBids(lot.id)
     await emitTo('global', 'auction:update', { lotId: lot.id, finished: true })
   }
 }

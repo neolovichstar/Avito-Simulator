@@ -2,7 +2,7 @@
 
 // Лента объявлений: крупные фотокарточки 16:10, поиск, категории, сортировка, избранное
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Search, SlidersHorizontal, Heart, MapPin, Star, Zap, BellPlus, X, SearchX, History, Activity, Scale } from 'lucide-react'
+import { Search, SlidersHorizontal, Heart, MapPin, Star, Zap, BellPlus, X, SearchX, History, Activity, Scale, Handshake } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { CATEGORIES, CATEGORY_LABEL, CONDITION_LABEL, CONDITION_MULT } from '@/lib/catalog-types'
 import type { CategoryKey } from '@/lib/catalog-types'
@@ -550,6 +550,11 @@ export function ListingCard({ listing: l, onOpen, onFav, fav, comparing, onCompa
         </div>
         <div className="text-[11px] text-neutral-400 flex items-center gap-1">
           <MapPin size={11} aria-hidden /> {l.city} · {shortAgo(l.createdAt)}
+          {l.negotiable && (
+            <span className="ml-auto flex items-center gap-0.5 font-medium text-[#965EEB]">
+              <Handshake size={11} aria-hidden /> Торг
+            </span>
+          )}
         </div>
       </button>
     </div>

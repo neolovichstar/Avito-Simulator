@@ -2,6 +2,7 @@
 import type { Listing, User } from '@prisma/client'
 import type { FeedListing } from '@/lib/types'
 import { itemImage } from '@/lib/item-images'
+import { negotiableFor } from '@/lib/negotiable'
 
 export function isOnline(user: Pick<User, 'isBot' | 'lastSeenAt'>): boolean {
   if (user.isBot) return Date.now() - user.lastSeenAt.getTime() < 15 * 60_000
@@ -38,5 +39,6 @@ export function listingDTO(l: Listing & { seller: User }, viewerId: string | nul
       online: isOnline(l.seller),
     },
     mine: viewerId === l.sellerId,
+    negotiable: l.seller.isBot && l.price > 0 && negotiableFor(l.id, l.sellerId),
   }
 }

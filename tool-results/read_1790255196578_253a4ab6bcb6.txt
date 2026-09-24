@@ -1,0 +1,581 @@
+     1→'use client'
+     2→
+     3→// Приложение «Аукцион» — роскошный тёмный аукционный дом: фон #0c0a09, золотой акцент #d4a017.
+     4→import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+     5→import { ChevronDown, ChevronUp, Gavel, History, Info, Loader2, Trophy } from 'lucide-react'
+     6→import { api, ApiError } from '@/lib/api'
+     7→import { useOS } from '@/lib/store'
+     8→import { fmtMoney, timeAgo } from '@/lib/format'
+     9→import { getSocket } from '@/lib/use-realtime'
+    10→import { CONDITION_LABEL } from '@/lib/catalog-types'
+    11→import type { AuctionData, AuctionLotDTO } from '@/lib/types'
+    12→import { Button } from '@/components/ui/button'
+    13→import { Input } from '@/components/ui/input'
+    14→
+    15→const GOLD = '#d4a017'
+    16→
+    17→// Тик раз в секунду через useSyncExternalStore — таймеры лотов живые, без setState внутри эффектов
+    18→function useTick(intervalMs = 1000): number {
+    19→  return useSyncExternalStore(
+    20→    (cb) => {
+    21→      const id = setInterval(cb, intervalMs)
+    22→      return () => clearInterval(id)
+    23→    },
+    24→    () => Math.floor(Date.now() / intervalMs),
+    25→    () => 0,
+    26→  )
+    27→}
+    28→
+    29→function bidStep(lot: AuctionLotDTO): number {
+    30→  return Math.max(100, Math.round((lot.currentBid ?? lot.startPrice) * 0.02))
+    31→}
+    32→
+    33→function minBid(lot: AuctionLotDTO): number {
+    34→  return (lot.currentBid ?? lot.startPrice) + bidStep(lot)
+    35→}
+    36→
+    37→function fmtTimer(ms: number): string {
+    38→  const s = Math.max(0, Math.floor(ms / 1000))
+    39→  const h = Math.floor(s / 3600)
+    40→  const m = Math.floor((s % 3600) / 60)
+    41→  const ss = s % 60
+    42→  if (h > 0) return `${h}ч ${m}м ${String(ss).padStart(2, '0')}с`
+    43→  if (m > 0) return `${m}м ${String(ss).padStart(2, '0')}с`
+    44→  return `${ss} с`
+    45→}
+    46→
+    47→function plural(n: number, one: string, few: string, many: string): string {
+    48→  const m10 = n % 10
+    49→  const m100 = n % 100
+    50→  if (m10 === 1 && m100 !== 11) return one
+    51→  if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return few
+    52→  return many
+    53→}
+    54→
+    55→function conditionClass(c: string): string {
+    56→  switch (c) {
+    57→    case 'new': return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+    58→    case 'excellent': return 'bg-lime-500/15 text-lime-300 border-lime-500/30'
+    59→    case 'good': return 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+    60→    case 'used': return 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+    61→    case 'parts': return 'bg-red-500/15 text-red-300 border-red-500/30'
+    62→    default: return 'bg-stone-500/15 text-stone-300 border-stone-500/30'
+    63→  }
+    64→}
+    65→
+    66→function ConditionBadge({ value }: { value: string }) {
+    67→  return (
+    68→    <span
+    69→      className={
+    70→        'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ' +
+    71→        conditionClass(value)
+    72→      }
+    73→    >
+    74→      {CONDITION_LABEL[value] ?? value}
+    75→    </span>
+    76→  )
+    77→}
+    78→
+    79→interface BidRow {
+    80→  id: string
+    81→  userName: string
+    82→  amount: number
+    83→  createdAt: string
+    84→  isMe: boolean
+    85→}
+    86→
+    87→export default function AuctionApp() {
+    88→  const session = useOS((s) => s.session)
+    89→  const [data, setData] = useState<AuctionData | null>(null)
+    90→  const [loading, setLoading] = useState(true)
+    91→  const [error, setError] = useState<string | null>(null)
+    92→  const [openBid, setOpenBid] = useState<string | null>(null)
+    93→  const [bidInput, setBidInput] = useState('')
+    94→  const [bidError, setBidError] = useState<string | null>(null)
+    95→  const [busy, setBusy] = useState(false)
+    96→  // история ставок
+    97→  const [openHist, setOpenHist] = useState<string | null>(null)
+    98→  const [histBids, setHistBids] = useState<Record<string, BidRow[]>>({})
+    99→  const [histLoading, setHistLoading] = useState(false)
+   100→  // лот, у которого только что продлили таймер (антиснайпинг)
+   101→  const [extendedLot, setExtendedLot] = useState<string | null>(null)
+   102→  const [liveBids, setLiveBids] = useState(0)
+   103→
+   104→  useTick(1000) // живые таймеры лотов
+   105→
+   106→  const load = useCallback(async (silent = false) => {
+   107→    try {
+   108→      const d = await api.auction()
+   109→      setData(d)
+   110→      setError(null)
+   111→    } catch (e) {
+   112→      if (!silent) setError(e instanceof ApiError ? e.message : 'Не удалось загрузить аукцион')
+   113→    } finally {
+   114→      if (!silent) setLoading(false)
+   115→    }
+   116→  }, [])
+   117→
+   118→  useEffect(() => {
+   119→    void load()
+   120→  }, [load])
+   121→
+   122→  const refreshHist = useCallback(async (lotId: string) => {
+   123→    try {
+   124→      const res = await api.auctionBids(lotId)
+   125→      setHistBids((prev) => ({ ...prev, [lotId]: res.bids }))
+   126→    } catch {
+   127→      /* не критично */
+   128→    }
+   129→  }, [])
+   130→
+   131→  // Тихий refetch каждые 10 секунд — боты торгуются живьём
+   132→  useEffect(() => {
+   133→    const id = setInterval(() => {
+   134→      void load(true)
+   135→      if (openHist) void refreshHist(openHist)
+   136→    }, 10000)
+   137→    return () => clearInterval(id)
+   138→  }, [load, openHist, refreshHist])
+   139→
+   140→  // realtime: чужая ставка прилетает мгновенно, без ожидания поллинга
+   141→  useEffect(() => {
+   142→    let tries = 0
+   143→    let retry: ReturnType<typeof setTimeout> | null = null
+   144→    let detach: (() => void) | null = null
+   145→    const attach = () => {
+   146→      const sock = getSocket()
+   147→      if (!sock) {
+   148→        if (tries++ < 20) retry = setTimeout(attach, 1000)
+   149→        return
+   150→      }
+   151→      const onUpdate = (p: { lotId?: string; extended?: boolean }) => {
+   152→        void load(true)
+   153→        if (p.lotId && openHist === p.lotId) void refreshHist(p.lotId)
+   154→        setLiveBids((n) => n + 1)
+   155→        if (p.extended && p.lotId) {
+   156→          setExtendedLot(p.lotId)
+   157→          setTimeout(() => setExtendedLot((cur) => (cur === p.lotId ? null : cur)), 9000)
+   158→        }
+   159→      }
+   160→      sock.on('auction:update', onUpdate)
+   161→      detach = () => { sock.off('auction:update', onUpdate) }
+   162→    }
+   163→    attach()
+   164→    return () => {
+   165→      if (retry) clearTimeout(retry)
+   166→      if (detach) detach()
+   167→    }
+   168→  }, [load, openHist, refreshHist])
+   169→
+   170→  const openPanel = (lot: AuctionLotDTO) => {
+   171→    setOpenBid(lot.id)
+   172→    setBidInput(String(minBid(lot)))
+   173→    setBidError(null)
+   174→  }
+   175→
+   176→  const closePanel = () => {
+   177→    setOpenBid(null)
+   178→    setBidError(null)
+   179→  }
+   180→
+   181→  const toggleHist = async (lotId: string) => {
+   182→    if (openHist === lotId) {
+   183→      setOpenHist(null)
+   184→      return
+   185→    }
+   186→    setOpenHist(lotId)
+   187→    if (!histBids[lotId]) {
+   188→      setHistLoading(true)
+   189→      try {
+   190→        const res = await api.auctionBids(lotId)
+   191→        setHistBids((prev) => ({ ...prev, [lotId]: res.bids }))
+   192→      } catch {
+   193→        setHistBids((prev) => ({ ...prev, [lotId]: [] }))
+   194→      } finally {
+   195→        setHistLoading(false)
+   196→      }
+   197→    }
+   198→  }
+   199→
+   200→  const placeBid = async (lot: AuctionLotDTO) => {
+   201→    const amount = Math.floor(Number(bidInput.replace(/[^\d]/g, '')) || 0)
+   202→    const min = minBid(lot)
+   203→    if (amount < min) {
+   204→      setBidError(`Минимальная ставка — ${fmtMoney(min)}`)
+   205→      return
+   206→    }
+   207→    setBusy(true)
+   208→    setBidError(null)
+   209→    try {
+   210→      const res = await api.auctionBid(lot.id, amount)
+   211→      const os = useOS.getState()
+   212→      os.refreshSession({ balance: res.balance })
+   213→      os.pushToast('Аукцион', 'Ставка принята')
+   214→      closePanel()
+   215→      await load()
+   216→    } catch (e) {
+   217→      setBidError(e instanceof ApiError ? e.message : 'Не удалось сделать ставку')
+   218→    } finally {
+   219→      setBusy(false)
+   220→    }
+   221→  }
+   222→
+   223→  const nowMs = Date.now()
+   224→  const lots = data?.lots ?? []
+   225→  // Активные лоты первыми, внутри — по времени окончания
+   226→  const sorted = [...lots].sort((a, b) => {
+   227→    const aEnd = new Date(a.endsAt).getTime()
+   228→    const bEnd = new Date(b.endsAt).getTime()
+   229→    const aActive = aEnd > nowMs ? 0 : 1
+   230→    const bActive = bEnd > nowMs ? 0 : 1
+   231→    if (aActive !== bActive) return aActive - bActive
+   232→    return aEnd - bEnd
+   233→  })
+   234→
+   235→  return (
+   236→    <div className="flex h-full flex-col bg-[#0c0a09] text-stone-100">
+   237→      {/* Шапка */}
+   238→      <div className="flex items-center gap-3 px-4 pb-3 pt-4">
+   239→        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-[#d4a017]/25 bg-[#d4a017]/10">
+   240→          <Gavel className="size-5 text-[#d4a017]" aria-hidden />
+   241→        </div>
+   242→        <div className="min-w-0">
+   243→          <div className="text-base font-bold text-amber-50">Аукцион</div>
+   244→          <div className="text-xs text-stone-400">Роскошные лоты и живые торги</div>
+   245→        </div>
+   246→      </div>
+   247→
+   248→      {/* Контент */}
+   249→      <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4 [scrollbar-width:thin]">
+   250→        {loading && !data ? (
+   251→          <div className="flex flex-col gap-3">
+   252→            <div className="grid grid-cols-2 gap-3">
+   253→              <div className="h-20 animate-pulse rounded-2xl bg-stone-900" />
+   254→              <div className="h-20 animate-pulse rounded-2xl bg-stone-900" />
+   255→            </div>
+   256→            <div className="h-44 animate-pulse rounded-2xl bg-stone-900" />
+   257→            <div className="h-44 animate-pulse rounded-2xl bg-stone-900" />
+   258→            <div className="flex items-center justify-center gap-2 text-sm text-stone-500">
+   259→              <Loader2 className="size-4 animate-spin" /> Аукционный дом открывается…
+   260→            </div>
+   261→          </div>
+   262→        ) : error && !data ? (
+   263→          <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-6 text-center">
+   264→            <p className="text-sm text-red-300">{error}</p>
+   265→            <Button
+   266→              className="mt-4 h-11 rounded-xl px-6 text-sm font-semibold text-stone-950"
+   267→              style={{ backgroundColor: GOLD }}
+   268→              onClick={() => void load()}
+   269→            >
+   270→              Повторить
+   271→            </Button>
+   272→          </div>
+   273→        ) : data ? (
+   274→          <>
+   275→            {/* Статы */}
+   276→            <div className="grid grid-cols-2 gap-3">
+   277→              <div className="rounded-2xl border border-[#d4a017]/15 bg-[#1c1917] p-3.5">
+   278→                <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
+   279→                  <Gavel className="size-3.5 text-[#d4a017]" aria-hidden /> Активных лотов
+   280→                </div>
+   281→                <div className="mt-1 text-xl font-bold text-amber-50 tabular-nums">{data.activeCount}</div>
+   282→              </div>
+   283→              <div className="rounded-2xl border border-[#d4a017]/15 bg-[#1c1917] p-3.5">
+   284→                <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
+   285→                  <Trophy className="size-3.5 text-[#d4a017]" aria-hidden /> Ваших побед
+   286→                </div>
+   287→                <div className="mt-1 text-xl font-bold text-amber-50 tabular-nums">{data.wonCount}</div>
+   288→              </div>
+   289→            </div>
+   290→
+   291→            <div className="flex items-center gap-1.5 text-[10px] text-stone-600">
+   292→              <span className="relative flex size-1.5" aria-hidden>
+   293→                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+   294→                <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+   295→              </span>
+   296→              {liveBids > 0
+   297→                ? `Ставки приходят в реальном времени · только что +${liveBids}`
+   298→                : 'Ставки ботов приходят в реальном времени'}
+   299→            </div>
+   300→
+   301→            {/* Лоты */}
+   302→            {sorted.length === 0 ? (
+   303→              <div className="flex flex-col items-center rounded-2xl border border-dashed border-stone-800 px-4 py-10 text-center">
+   304→                <Gavel className="size-8 text-stone-700" aria-hidden />
+   305→                <div className="mt-2 text-sm font-medium text-stone-300">Лотов пока нет</div>
+   306→                <div className="mt-1 max-w-60 text-xs leading-relaxed text-stone-500">
+   307→                  Аукционный дом скоро выставит новую распродажу — заглядывайте позже.
+   308→                </div>
+   309→              </div>
+   310→            ) : (
+   311→              sorted.map((lot) => {
+   312→                const endMs = new Date(lot.endsAt).getTime()
+   313→                const remainMs = endMs - nowMs
+   314→                const ended = remainMs <= 0
+   315→                const base = lot.currentBid ?? lot.startPrice
+   316→                const quick5 = Math.max(minBid(lot), Math.round(base * 1.05))
+   317→                const quick10 = Math.max(minBid(lot), Math.round(base * 1.1))
+   318→                return (
+   319→                  <div key={lot.id} className="rounded-2xl border border-[#d4a017]/15 bg-[#1c1917] p-3.5">
+   320→                    <div className="flex gap-3">
+   321→                      <img
+   322→                        src={lot.image}
+   323→                        alt={lot.title}
+   324→                        className="size-20 shrink-0 rounded-xl border border-[#d4a017]/20 object-cover"
+   325→                      />
+   326→                      <div className="min-w-0 flex-1">
+   327→                        <div className="truncate text-sm font-semibold text-amber-50">{lot.title}</div>
+   328→                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+   329→                          <ConditionBadge value={lot.condition} />
+   330→                          {ended ? (
+   331→                            lot.isMine ? (
+   332→                              <span className="inline-flex items-center rounded-full border border-[#d4a017]/40 bg-[#d4a017]/15 px-2 py-0.5 text-[10px] font-semibold text-[#d4a017]">
+   333→                                Победа
+   334→                              </span>
+   335→                            ) : (
+   336→                              <span className="inline-flex items-center rounded-full border border-stone-700 bg-stone-800/60 px-2 py-0.5 text-[10px] font-medium text-stone-400">
+   337→                                Завершён
+   338→                              </span>
+   339→                            )
+   340→                          ) : lot.isMine ? (
+   341→                            <span className="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+   342→                              Ваша ставка лидирует
+   343→                            </span>
+   344→                          ) : null}
+   345→                          {!ended && extendedLot === lot.id && (
+   346→                            <span className="inline-flex animate-pulse items-center gap-1 rounded-full border border-red-500/40 bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-300">
+   347→                              Финал: таймер продлён
+   348→                            </span>
+   349→                          )}
+   350→                          {!ended && remainMs < 60000 && extendedLot !== lot.id && (
+   351→                            <span className="inline-flex items-center rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-300">
+   352→                              Последние торги
+   353→                            </span>
+   354→                          )}
+   355→                        </div>
+   356→                        <div className="mt-1 text-[11px] text-stone-500">
+   357→                          Рынок: {fmtMoney(lot.baseValue)} · Старт: {fmtMoney(lot.startPrice)}
+   358→                        </div>
+   359→                      </div>
+   360→                    </div>
+   361→
+   362→                    <div className="mt-3 flex items-end justify-between gap-2">
+   363→                      <div className="min-w-0">
+   364→                        <div className="text-[10px] uppercase tracking-wider text-stone-500">Текущая ставка</div>
+   365→                        {lot.currentBid != null ? (
+   366→                          <>
+   367→                            <div className="text-xl font-bold tabular-nums text-[#d4a017]">
+   368→                              {fmtMoney(lot.currentBid)}
+   369→                            </div>
+   370→                            <div className="truncate text-[11px] text-stone-400">
+   371→                              Лидер: {lot.currentBidderName ?? '—'}
+   372→                            </div>
+   373→                          </>
+   374→                        ) : (
+   375→                          <div className="text-base font-semibold text-stone-500">Ставок нет</div>
+   376→                        )}
+   377→                        {lot.myBid > 0 && (
+   378→                          <div className="mt-0.5 text-[11px] font-medium text-emerald-400">
+   379→                            Ваша ставка: {fmtMoney(lot.myBid)}
+   380→                          </div>
+   381→                        )}
+   382→                      </div>
+   383→                      <div className="shrink-0 text-right">
+   384→                        <div
+   385→                          className={
+   386→                            'text-sm font-semibold tabular-nums ' +
+   387→                            (ended
+   388→                              ? 'text-stone-500'
+   389→                              : remainMs < 60000
+   390→                                ? 'animate-pulse text-red-400'
+   391→                                : 'text-[#d4a017]')
+   392→                          }
+   393→                        >
+   394→                          {ended ? 'Завершён' : fmtTimer(remainMs)}
+   395→                        </div>
+   396→                        <div className="flex items-center justify-end gap-1 text-[11px] text-stone-500">
+   397→                          {!ended && lot.bidCount > 0 && (
+   398→                            <span className="relative flex size-1" aria-hidden>
+   399→                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#d4a017] opacity-75" />
+   400→                              <span className="relative inline-flex size-1 rounded-full bg-[#d4a017]" />
+   401→                            </span>
+   402→                          )}
+   403→                          {lot.bidCount} {plural(lot.bidCount, 'ставка', 'ставки', 'ставок')}
+   404→                        </div>
+   405→                      </div>
+   406→                    </div>
+   407→
+   408→                    {/* История ставок */}
+   409→                    {lot.bidCount > 0 && (
+   410→                      <div className="mt-3">
+   411→                        <button
+   412→                          onClick={() => void toggleHist(lot.id)}
+   413→                          className="flex w-full items-center justify-between rounded-lg border border-[#d4a017]/15 bg-black/20 px-3 py-2 text-[11px] font-medium text-stone-300 transition hover:border-[#d4a017]/35 hover:text-amber-50"
+   414→                          aria-expanded={openHist === lot.id}
+   415→                        >
+   416→                          <span className="flex items-center gap-1.5">
+   417→                            <History className="size-3.5 text-[#d4a017]" aria-hidden />
+   418→                            История ставок ({lot.bidCount})
+   419→                          </span>
+   420→                          {openHist === lot.id ? (
+   421→                            <ChevronUp className="size-3.5 text-stone-500" aria-hidden />
+   422→                          ) : (
+   423→                            <ChevronDown className="size-3.5 text-stone-500" aria-hidden />
+   424→                          )}
+   425→                        </button>
+   426→                        {openHist === lot.id && (
+   427→                          <div className="mt-1.5 max-h-52 overflow-y-auto rounded-lg border border-[#d4a017]/10 bg-black/30 p-1 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#d4a017]/25">
+   428→                            {histLoading && !histBids[lot.id] ? (
+   429→                              <div className="flex items-center justify-center gap-2 py-3 text-[11px] text-stone-500">
+   430→                                <Loader2 className="size-3.5 animate-spin" aria-hidden /> Загружаем торги…
+   431→                              </div>
+   432→                            ) : (histBids[lot.id]?.length ?? 0) === 0 ? (
+   433→                              <div className="py-3 text-center text-[11px] text-stone-500">Ставок пока не было</div>
+   434→                            ) : (
+   435→                              <div className="divide-y divide-stone-800/60">
+   436→                                {histBids[lot.id]!.map((b, i) => (
+   437→                                  <div
+   438→                                    key={b.id}
+   439→                                    className={
+   440→                                      'flex items-center gap-2 px-2.5 py-2 text-xs ' +
+   441→                                      (i === 0 ? 'bg-[#d4a017]/[0.07]' : '')
+   442→                                    }
+   443→                                  >
+   444→                                    <span
+   445→                                      className={
+   446→                                        'flex size-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold ' +
+   447→                                        (i === 0
+   448→                                          ? 'bg-[#d4a017] text-stone-950'
+   449→                                          : 'bg-stone-800 text-stone-400')
+   450→                                      }
+   451→                                    >
+   452→                                      {i + 1}
+   453→                                    </span>
+   454→                                    <span
+   455→                                      className={
+   456→                                        'min-w-0 flex-1 truncate ' +
+   457→                                        (b.isMe ? 'font-semibold text-emerald-400' : 'text-stone-300')
+   458→                                      }
+   459→                                    >
+   460→                                      {b.userName}
+   461→                                      {b.isMe && <span className="ml-1 text-[10px] font-normal text-emerald-500/80">(вы)</span>}
+   462→                                    </span>
+   463→                                    <span className="shrink-0 text-[10px] text-stone-500">{timeAgo(b.createdAt)}</span>
+   464→                                    <span
+   465→                                      className={
+   466→                                        'shrink-0 font-semibold tabular-nums ' +
+   467→                                        (i === 0 ? 'text-[#d4a017]' : 'text-stone-400')
+   468→                                      }
+   469→                                    >
+   470→                                      {fmtMoney(b.amount)}
+   471→                                    </span>
+   472→                                  </div>
+   473→                                ))}
+   474→                              </div>
+   475→                            )}
+   476→                          </div>
+   477→                        )}
+   478→                      </div>
+   479→                    )}
+   480→
+   481→                    {!ended &&
+   482→                      (openBid === lot.id ? (
+   483→                        <div className="mt-3 rounded-xl border border-[#d4a017]/25 bg-black/40 p-3">
+   484→                          <div className="flex items-center justify-between text-[11px] text-stone-400">
+   485→                            <span>Минимальная ставка</span>
+   486→                            <span className="font-semibold tabular-nums text-[#d4a017]">{fmtMoney(minBid(lot))}</span>
+   487→                          </div>
+   488→                          <Input
+   489→                            className="mt-2 h-11 rounded-xl border-[#d4a017]/25 bg-[#0c0a09] text-base font-semibold text-amber-50 placeholder:text-stone-600"
+   490→                            inputMode="numeric"
+   491→                            value={bidInput}
+   492→                            placeholder={String(minBid(lot))}
+   493→                            aria-label={`Ваша ставка для лота ${lot.title}`}
+   494→                            onChange={(e) => setBidInput(e.target.value.replace(/[^\d]/g, ''))}
+   495→                          />
+   496→                          <div className="mt-2 grid grid-cols-3 gap-2">
+   497→                            {[
+   498→                              { label: '+мин', value: minBid(lot) },
+   499→                              { label: '+5%', value: quick5 },
+   500→                              { label: '+10%', value: quick10 },
+   501→                            ].map((b) => (
+   502→                              <button
+   503→                                key={b.label}
+   504→                                onClick={() => {
+   505→                                  setBidInput(String(b.value))
+   506→                                  setBidError(null)
+   507→                                }}
+   508→                                className="h-11 rounded-lg border border-[#d4a017]/30 bg-[#d4a017]/10 text-xs font-semibold text-[#d4a017] transition active:scale-95"
+   509→                              >
+   510→                                {b.label}
+   511→                              </button>
+   512→                            ))}
+   513→                          </div>
+   514→                          {bidError && <div className="mt-2 text-[11px] text-red-400">{bidError}</div>}
+   515→                          <div className="mt-2 flex items-center justify-between text-[11px] text-stone-500">
+   516→                            <span>Ваш баланс</span>
+   517→                            <span className="tabular-nums text-stone-300">{fmtMoney(session?.balance ?? 0)}</span>
+   518→                          </div>
+   519→                          <div className="mt-3 grid grid-cols-2 gap-2">
+   520→                            <Button
+   521→                              variant="outline"
+   522→                              className="h-11 rounded-xl border-stone-700 text-xs font-medium text-stone-300"
+   523→                              onClick={closePanel}
+   524→                            >
+   525→                              Отмена
+   526→                            </Button>
+   527→                            <Button
+   528→                              className="h-11 rounded-xl text-xs font-semibold text-stone-950"
+   529→                              style={{ backgroundColor: GOLD }}
+   530→                              disabled={busy}
+   531→                              onClick={() => void placeBid(lot)}
+   532→                            >
+   533→                              {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : 'Подтвердить ставку'}
+   534→                            </Button>
+   535→                          </div>
+   536→                        </div>
+   537→                      ) : (
+   538→                        <Button
+   539→                          className="mt-3 h-11 w-full rounded-xl text-sm font-semibold text-stone-950"
+   540→                          style={{ backgroundColor: GOLD }}
+   541→                          onClick={() => openPanel(lot)}
+   542→                        >
+   543→                          Сделать ставку
+   544→                        </Button>
+   545→                      ))}
+   546→                  </div>
+   547→                )
+   548→              })
+   549→            )}
+   550→
+   551→            {/* Как это работает */}
+   552→            <div className="rounded-2xl border border-[#d4a017]/20 bg-[#d4a017]/5 p-4">
+   553→              <div className="flex items-center gap-2 text-sm font-semibold text-[#d4a017]">
+   554→                <Info className="size-4" aria-hidden /> Как это работает
+   555→              </div>
+   556→              <ul className="mt-2 space-y-1.5 text-[11px] leading-relaxed text-stone-300">
+   557→                <li className="flex gap-2">
+   558→                  <span className="mt-1 size-1 shrink-0 rounded-full bg-[#d4a017]" aria-hidden />
+   559→                  Лоты выставляет аукционный дом — редко, но метко.
+   560→                </li>
+   561→                <li className="flex gap-2">
+   562→                  <span className="mt-1 size-1 shrink-0 rounded-full bg-[#d4a017]" aria-hidden />
+   563→                  Боты торгуются живьём: ставки растут, пока идёт таймер.
+   564→                </li>
+   565→                <li className="flex gap-2">
+   566→                  <span className="mt-1 size-1 shrink-0 rounded-full bg-[#d4a017]" aria-hidden />
+   567→                  Победитель платит свою ставку и получает товар.
+   568→                </li>
+   569→              </ul>
+   570→            </div>
+   571→
+   572→            <div className="pb-2 text-center text-[10px] text-stone-700">
+   573→              Аукционный дом · молоток падает, это игра
+   574→            </div>
+   575→          </>
+   576→        ) : null}
+   577→      </div>
+   578→    </div>
+   579→  )
+   580→}
+   581→

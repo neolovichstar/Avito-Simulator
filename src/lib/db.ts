@@ -13,7 +13,8 @@ function clientIsStale(client: PrismaClient): boolean {
       !('pricePoint' in client) ||
       !('complaint' in client) ||
       !('favorite' in client) ||
-      !('blockedSeller' in client)
+      !('blockedSeller' in client) ||
+      !('autoBid' in client)
     )
   } catch {
     return false

@@ -48,6 +48,7 @@ model User {
   repairs      RepairOrder[]
   deliveries   Delivery[]
   auctionBids  AuctionBid[]
+  autoBids     AutoBid[]
   savedSearches SavedSearch[]
   complaints    Complaint[] @relation("complaintFrom")
   favorites     Favorite[]
@@ -258,6 +259,7 @@ model AuctionLot {
   endsAt      DateTime
   finishedAt  DateTime?
   bids        AuctionBid[]
+  autoBids    AutoBid[]
 }
 
 model AuctionBid {
@@ -269,6 +271,21 @@ model AuctionBid {
   userName  String
   amount    Int
   createdAt DateTime @default(now())
+}
+
+// Автоставка игрока на аукционе (прокси-ставки как на eBay):
+// пока лидер бот и нужная ставка <= maxAmount, движок автоматически перебивает.
+model AutoBid {
+  id        String     @id @default(cuid())
+  lotId     String
+  lot       AuctionLot @relation(fields: [lotId], references: [id])
+  userId    String
+  user      User       @relation(fields: [userId], references: [id])
+  maxAmount Int
+  createdAt DateTime   @default(now())
+
+  @@unique([lotId, userId])
+  @@index([lotId])
 }
 
 model PricePoint {

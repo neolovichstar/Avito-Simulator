@@ -2,7 +2,7 @@
 
 // Приложение «Аукцион» — роскошный тёмный аукционный дом: фон #0c0a09, золотой акцент #d4a017.
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
-import { ChevronDown, ChevronUp, Gavel, History, Info, Loader2, Trophy } from 'lucide-react'
+import { Bot, ChevronDown, ChevronUp, Gavel, History, Info, Loader2, Trophy } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
 import { fmtMoney, timeAgo } from '@/lib/format'
@@ -93,6 +93,10 @@ export default function AuctionApp() {
   const [bidInput, setBidInput] = useState('')
   const [bidError, setBidError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // автоставка (прокси-ставка): режим панели и ввод потолка
+  const [bidMode, setBidMode] = useState<'manual' | 'auto'>('manual')
+  const [autoInput, setAutoInput] = useState('')
+  const [autoBusy, setAutoBusy] = useState(false)
   // история ставок
   const [openHist, setOpenHist] = useState<string | null>(null)
   const [histBids, setHistBids] = useState<Record<string, BidRow[]>>({})
@@ -167,9 +171,11 @@ export default function AuctionApp() {
     }
   }, [load, openHist, refreshHist])
 
-  const openPanel = (lot: AuctionLotDTO) => {
+  const openPanel = (lot: AuctionLotDTO, mode: 'manual' | 'auto' = 'manual') => {
     setOpenBid(lot.id)
-    setBidInput(String(minBid(lot)))
+    setBidMode(mode)
+    if (mode === 'auto') setAutoInput(lot.myAutoBid > 0 ? String(lot.myAutoBid) : String(minBid(lot)))
+    else setBidInput(String(minBid(lot)))
     setBidError(null)
   }
 
@@ -217,6 +223,43 @@ export default function AuctionApp() {
       setBidError(e instanceof ApiError ? e.message : 'Не удалось сделать ставку')
     } finally {
       setBusy(false)
+    }
+  }
+
+  const placeAutoBid = async (lot: AuctionLotDTO) => {
+    const maxAmount = Math.floor(Number(autoInput.replace(/[^\d]/g, '')) || 0)
+    const min = minBid(lot)
+    if (maxAmount < min) {
+      setBidError(`Потолок не может быть ниже минимальной ставки — ${fmtMoney(min)}`)
+      return
+    }
+    setAutoBusy(true)
+    setBidError(null)
+    try {
+      const res = await api.auctionAutoBid(lot.id, maxAmount)
+      const os = useOS.getState()
+      os.refreshSession({ balance: res.balance })
+      os.pushToast('Автоставка', res.fired ? `Сработала сразу: ставка ${fmtMoney(res.maxAmount)} или ниже` : `Потолок ${fmtMoney(res.maxAmount)} установлен`)
+      closePanel()
+      await load()
+    } catch (e) {
+      setBidError(e instanceof ApiError ? e.message : 'Не удалось включить автоставку')
+    } finally {
+      setAutoBusy(false)
+    }
+  }
+
+  const cancelAutoBid = async (lot: AuctionLotDTO) => {
+    setAutoBusy(true)
+    try {
+      await api.auctionAutoBidCancel(lot.id)
+      useOS.getState().pushToast('Автоставка', 'Отменена — ваша ставка-лидер сохранена')
+      closePanel()
+      await load()
+    } catch {
+      setBidError('Не удалось отменить автоставку')
+    } finally {
+      setAutoBusy(false)
     }
   }
 
@@ -379,6 +422,11 @@ export default function AuctionApp() {
                             Ваша ставка: {fmtMoney(lot.myBid)}
                           </div>
                         )}
+                        {!ended && lot.myAutoBid > 0 && (
+                          <div className="mt-1 inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
+                            <Bot className="size-3" aria-hidden /> Автоставка до {fmtMoney(lot.myAutoBid)}
+                          </div>
+                        )}
                       </div>
                       <div className="shrink-0 text-right">
                         <div
@@ -481,36 +529,85 @@ export default function AuctionApp() {
                     {!ended &&
                       (openBid === lot.id ? (
                         <div className="mt-3 rounded-xl border border-[#d4a017]/25 bg-black/40 p-3">
-                          <div className="flex items-center justify-between text-[11px] text-stone-400">
-                            <span>Минимальная ставка</span>
-                            <span className="font-semibold tabular-nums text-[#d4a017]">{fmtMoney(minBid(lot))}</span>
-                          </div>
-                          <Input
-                            className="mt-2 h-11 rounded-xl border-[#d4a017]/25 bg-[#0c0a09] text-base font-semibold text-amber-50 placeholder:text-stone-600"
-                            inputMode="numeric"
-                            value={bidInput}
-                            placeholder={String(minBid(lot))}
-                            aria-label={`Ваша ставка для лота ${lot.title}`}
-                            onChange={(e) => setBidInput(e.target.value.replace(/[^\d]/g, ''))}
-                          />
-                          <div className="mt-2 grid grid-cols-3 gap-2">
-                            {[
-                              { label: '+мин', value: minBid(lot) },
-                              { label: '+5%', value: quick5 },
-                              { label: '+10%', value: quick10 },
-                            ].map((b) => (
+                          {/* переключатель режима ставки */}
+                          <div className="grid grid-cols-2 gap-1 rounded-lg bg-black/50 p-1">
+                            {([
+                              ['manual', 'Ставка вручную'],
+                              ['auto', 'Автоставка'],
+                            ] as const).map(([mode, label]) => (
                               <button
-                                key={b.label}
+                                key={mode}
                                 onClick={() => {
-                                  setBidInput(String(b.value))
+                                  setBidMode(mode)
+                                  if (mode === 'auto') setAutoInput(lot.myAutoBid > 0 ? String(lot.myAutoBid) : String(minBid(lot)))
+                                  else setBidInput(String(minBid(lot)))
                                   setBidError(null)
                                 }}
-                                className="h-11 rounded-lg border border-[#d4a017]/30 bg-[#d4a017]/10 text-xs font-semibold text-[#d4a017] transition active:scale-95"
+                                className={
+                                  'h-8 rounded-md text-[11px] font-semibold transition ' +
+                                  (bidMode === mode
+                                    ? 'bg-[#d4a017] text-stone-950'
+                                    : 'text-stone-400 hover:text-stone-200')
+                                }
                               >
-                                {b.label}
+                                {label}
                               </button>
                             ))}
                           </div>
+
+                          {bidMode === 'manual' ? (
+                            <>
+                              <div className="mt-2 flex items-center justify-between text-[11px] text-stone-400">
+                                <span>Минимальная ставка</span>
+                                <span className="font-semibold tabular-nums text-[#d4a017]">{fmtMoney(minBid(lot))}</span>
+                              </div>
+                              <Input
+                                className="mt-2 h-11 rounded-xl border-[#d4a017]/25 bg-[#0c0a09] text-base font-semibold text-amber-50 placeholder:text-stone-600"
+                                inputMode="numeric"
+                                value={bidInput}
+                                placeholder={String(minBid(lot))}
+                                aria-label={`Ваша ставка для лота ${lot.title}`}
+                                onChange={(e) => setBidInput(e.target.value.replace(/[^\d]/g, ''))}
+                              />
+                              <div className="mt-2 grid grid-cols-3 gap-2">
+                                {[
+                                  { label: '+мин', value: minBid(lot) },
+                                  { label: '+5%', value: quick5 },
+                                  { label: '+10%', value: quick10 },
+                                ].map((b) => (
+                                  <button
+                                    key={b.label}
+                                    onClick={() => {
+                                      setBidInput(String(b.value))
+                                      setBidError(null)
+                                    }}
+                                    className="h-11 rounded-lg border border-[#d4a017]/30 bg-[#d4a017]/10 text-xs font-semibold text-[#d4a017] transition active:scale-95"
+                                  >
+                                    {b.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <p className="mt-2 text-[11px] leading-relaxed text-stone-400">
+                                Автоставка сама перебивает соперников минимально необходимой суммой, пока ставка не превысит ваш потолок. Резервируются только фактические ставки.
+                              </p>
+                              <Input
+                                className="mt-2 h-11 rounded-xl border-emerald-500/30 bg-[#0c0a09] text-base font-semibold text-amber-50 placeholder:text-stone-600"
+                                inputMode="numeric"
+                                value={autoInput}
+                                placeholder="Ваш максимум, ₽"
+                                aria-label={`Потолок автоставки для лота ${lot.title}`}
+                                onChange={(e) => setAutoInput(e.target.value.replace(/[^\d]/g, ''))}
+                              />
+                              <div className="mt-2 flex items-center justify-between text-[11px] text-stone-400">
+                                <span>Минимальный потолок</span>
+                                <span className="font-semibold tabular-nums text-emerald-400">{fmtMoney(minBid(lot))}</span>
+                              </div>
+                            </>
+                          )}
+
                           {bidError && <div className="mt-2 text-[11px] text-red-400">{bidError}</div>}
                           <div className="mt-2 flex items-center justify-between text-[11px] text-stone-500">
                             <span>Ваш баланс</span>
@@ -524,24 +621,59 @@ export default function AuctionApp() {
                             >
                               Отмена
                             </Button>
-                            <Button
-                              className="h-11 rounded-xl text-xs font-semibold text-stone-950"
-                              style={{ backgroundColor: GOLD }}
-                              disabled={busy}
-                              onClick={() => void placeBid(lot)}
-                            >
-                              {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : 'Подтвердить ставку'}
-                            </Button>
+                            {bidMode === 'manual' ? (
+                              <Button
+                                className="h-11 rounded-xl text-xs font-semibold text-stone-950"
+                                style={{ backgroundColor: GOLD }}
+                                disabled={busy}
+                                onClick={() => void placeBid(lot)}
+                              >
+                                {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : 'Подтвердить ставку'}
+                              </Button>
+                            ) : (
+                              <Button
+                                className="h-11 rounded-xl border border-emerald-500/40 bg-emerald-500/15 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/25"
+                                disabled={autoBusy}
+                                onClick={() => void placeAutoBid(lot)}
+                              >
+                                {autoBusy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : lot.myAutoBid > 0 ? 'Обновить потолок' : 'Включить автоставку'}
+                              </Button>
+                            )}
                           </div>
+                          {bidMode === 'auto' && lot.myAutoBid > 0 && (
+                            <button
+                              onClick={() => void cancelAutoBid(lot)}
+                              disabled={autoBusy}
+                              className="mt-2 h-9 w-full rounded-lg border border-red-500/30 bg-red-500/10 text-[11px] font-medium text-red-300 transition active:scale-95"
+                            >
+                              Отменить автоставку
+                            </button>
+                          )}
                         </div>
                       ) : (
-                        <Button
-                          className="mt-3 h-11 w-full rounded-xl text-sm font-semibold text-stone-950"
-                          style={{ backgroundColor: GOLD }}
-                          onClick={() => openPanel(lot)}
-                        >
-                          Сделать ставку
-                        </Button>
+                        <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
+                          <Button
+                            className="h-11 rounded-xl text-sm font-semibold text-stone-950"
+                            style={{ backgroundColor: GOLD }}
+                            onClick={() => openPanel(lot, 'manual')}
+                          >
+                            Сделать ставку
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className={
+                              'h-11 rounded-xl border px-3 text-xs font-semibold ' +
+                              (lot.myAutoBid > 0
+                                ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
+                                : 'border-[#d4a017]/30 bg-transparent text-[#d4a017]')
+                            }
+                            aria-label={lot.myAutoBid > 0 ? `Изменить автоставку для лота ${lot.title}` : `Включить автоставку для лота ${lot.title}`}
+                            onClick={() => openPanel(lot, 'auto')}
+                          >
+                            <Bot className="size-4" aria-hidden />
+                            Авто
+                          </Button>
+                        </div>
                       ))}
                   </div>
                 )
@@ -565,6 +697,10 @@ export default function AuctionApp() {
                 <li className="flex gap-2">
                   <span className="mt-1 size-1 shrink-0 rounded-full bg-[#d4a017]" aria-hidden />
                   Победитель платит свою ставку и получает товар.
+                </li>
+                <li className="flex gap-2">
+                  <span className="mt-1 size-1 shrink-0 rounded-full bg-emerald-500" aria-hidden />
+                  Автоставка перебивает ботов за вас — до вашего потолка.
                 </li>
               </ul>
             </div>

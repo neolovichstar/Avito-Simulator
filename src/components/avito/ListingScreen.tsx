@@ -5,7 +5,7 @@ import { useCallback, useEffect, useId, useState } from 'react'
 import {
   ChevronLeft, MapPin, Eye, Star, Truck, HandCoins, MessageSquare, ShoppingBag,
   TrendingDown, Zap, Loader2, PackageCheck, AlertTriangle, Clock, BadgeCheck, PenLine,
-  Flag, LineChart, ShieldCheck, ChevronRight, Ban, CircleSlash,
+  Flag, LineChart, ShieldCheck, ChevronRight, Ban, CircleSlash, Handshake,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
@@ -240,6 +240,11 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
               {data.price > 0 && data.marginHint > 0 && (
                 <span className="flex items-center gap-1 text-xs font-bold text-green-700 bg-green-50 px-2 py-1 rounded-lg">
                   <TrendingDown size={12} aria-hidden /> Дешевле рынка на {data.marginHint}%
+                </span>
+              )}
+              {!isMine && data.negotiable && (
+                <span className="flex items-center gap-1 text-xs font-semibold text-[#965EEB] bg-[#965EEB]/10 px-2 py-1 rounded-lg">
+                  <Handshake size={12} aria-hidden /> Торг уместен
                 </span>
               )}
             </div>

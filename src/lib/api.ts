@@ -5,7 +5,7 @@ import type {
   SessionUser, FeedListing, ListingDetailData, ChatListItem, ChatDetailData, ChatMessageDTO,
   BankData, TaxData, MarketStats, NotificationDTO, InventoryItemDTO, ProfileData,
   RepairOrderDTO, RepairQuoteDTO, DeliveryDTO, AuctionData, AuctionLotDTO, CareerData,
-  SavedSearchDTO, SellerProfile, BonusState, PulseItemDTO, RivalsData,
+  SavedSearchDTO, SellerProfile, BonusState, PulseItemDTO, RivalsData, BlockedSellerDTO,
 } from '@/lib/types'
 import type { CatalogItem, CategoryKey } from '@/lib/catalog-types'
 
@@ -142,6 +142,10 @@ export const api = {
     post<{ ok: boolean; balance: number; lot: AuctionLotDTO }>('/api/auction', { lotId, amount }),
   auctionBids: (lotId: string) =>
     req<{ bids: { id: string; userName: string; amount: number; createdAt: string; isMe: boolean }[] }>(`/api/auction/${lotId}`),
+  auctionAutoBid: (lotId: string, maxAmount: number) =>
+    post<{ ok: boolean; fired: boolean; maxAmount: number; balance: number }>('/api/auction/autobid', { lotId, maxAmount }),
+  auctionAutoBidCancel: (lotId: string) =>
+    req<{ ok: boolean }>(`/api/auction/autobid?lotId=${encodeURIComponent(lotId)}`, { method: 'DELETE' }),
 
   // пульс рынка: движения цен за час
   marketPulse: () => req<PulseItemDTO[]>('/api/market/pulse'),
@@ -150,6 +154,7 @@ export const api = {
 
   // чёрный список продавцов
   blockedIds: () => req<{ ids: string[] }>('/api/blocked'),
+  blockedList: () => req<{ items: BlockedSellerDTO[] }>('/api/blocked'),
   toggleBlock: (sellerId: string) =>
     post<{ ok: boolean; blocked: boolean; name?: string }>('/api/blocked', { sellerId }),
 

@@ -23,6 +23,9 @@ export async function GET(req: Request) {
     where: { userId: user.id, lotId: { in: lots.map((l) => l.id) } },
     orderBy: { amount: 'desc' },
   })
+  const myAutoBids = await db.autoBid.findMany({
+    where: { userId: user.id, lotId: { in: lots.map((l) => l.id) } },
+  })
   const wonCount = await db.auctionLot.count({
     where: { status: 'finished', currentBidderId: user.id },
   })
@@ -39,6 +42,7 @@ export async function GET(req: Request) {
     bidCount: l.bidCount,
     endsAt: l.endsAt.toISOString(),
     myBid: myBids.find((b) => b.lotId === l.id)?.amount ?? 0,
+    myAutoBid: myAutoBids.find((a) => a.lotId === l.id)?.maxAmount ?? 0,
     isMine: l.currentBidderId === user.id,
   }))
   const data: AuctionData = { lots: out, activeCount: lots.length, wonCount }
@@ -93,11 +97,14 @@ export async function POST(req: Request) {
   await emitTo('global', 'auction:update', { lotId: lot.id, extended: endsAt.getTime() !== lot.endsAt.getTime() })
 
   const fresh = await db.user.findUnique({ where: { id: user.id } })
+  const myAuto = await db.autoBid.findUnique({
+    where: { lotId_userId: { lotId: lot.id, userId: user.id } },
+  })
   const dto: AuctionLotDTO = {
     id: lot.id, title: lot.title, image: itemImage(lot.itemKey, lot.category), category: lot.category,
     condition: lot.condition, baseValue: lot.baseValue, startPrice: lot.startPrice,
     currentBid: amount, currentBidderName: user.displayName, bidCount: lot.bidCount + 1,
-    endsAt: endsAt.toISOString(), myBid: amount, isMine: true,
+    endsAt: endsAt.toISOString(), myBid: amount, myAutoBid: myAuto?.maxAmount ?? 0, isMine: true,
   }
   return Response.json({ ok: true, balance: fresh?.balance ?? user.balance, lot: dto })
 }
