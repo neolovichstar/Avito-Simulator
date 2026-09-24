@@ -120,3 +120,127 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ============================================================
+   ТЁМНАЯ ТЕМА ОС
+   Класс .theme-dark ставится на корень контента телефона.
+   Переопределяем светлые поверхности/текст утилит Tailwind:
+   авито-тёмная палитра без правок каждого компонента.
+   Яркие акцентные кнопки (bg-amber/bg-emerald + светлый текст)
+   защищены исключениями ниже.
+   ============================================================ */
+.theme-dark {
+  color-scheme: dark;
+}
+
+/* --- Поверхности --- */
+.theme-dark .bg-white { background-color: #1c2025; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.045); }
+.theme-dark .bg-neutral-50 { background-color: #191c21; }
+.theme-dark .bg-neutral-100 { background-color: #121417; }
+.theme-dark .bg-neutral-200 { background-color: #2a2f36; }
+.theme-dark .bg-neutral-300 { background-color: #384049; }
+.theme-dark .bg-neutral-400 { background-color: #4a525c; }
+.theme-dark .bg-neutral-900 { background-color: #262c33; }
+.theme-dark .bg-slate-100 { background-color: #191c21; }
+.theme-dark .bg-slate-200 { background-color: #2a2f36; }
+.theme-dark .bg-slate-400 { background-color: #4a525c; }
+.theme-dark .bg-stone-100 { background-color: #191c21; }
+.theme-dark .bg-stone-200 { background-color: #2a2f36; }
+.theme-dark .bg-gray-100 { background-color: #191c21; }
+.theme-dark .bg-gray-200 { background-color: #2a2f36; }
+.theme-dark .bg-gray-500 { background-color: #4a525c; }
+.theme-dark .bg-gray-700 { background-color: #2a2f36; }
+.theme-dark .bg-\[\#f4f5f7\] { background-color: #22262c; }
+.theme-dark .bg-\[\#f0f1f3\] { background-color: #22262c; }
+
+/* --- Текст --- */
+.theme-dark .text-neutral-900 { color: #f2f3f5; }
+.theme-dark .text-neutral-800 { color: #e8eaed; }
+.theme-dark .text-neutral-700 { color: #d2d6db; }
+.theme-dark .text-neutral-600 { color: #b2b8bf; }
+.theme-dark .text-neutral-500 { color: #90969e; }
+.theme-dark .text-neutral-400 { color: #6e747c; }
+.theme-dark .text-neutral-300 { color: #575d65; }
+.theme-dark .text-stone-950 { color: #f2f3f5; }
+.theme-dark .text-stone-500 { color: #90969e; }
+.theme-dark .text-stone-400 { color: #6e747c; }
+.theme-dark .text-stone-300 { color: #575d65; }
+.theme-dark .text-gray-900 { color: #f2f3f5; }
+.theme-dark .text-gray-400 { color: #6e747c; }
+.theme-dark .text-gray-200 { color: #575d65; }
+
+/* --- Границы --- */
+.theme-dark .border-neutral-100, .theme-dark .border-neutral-200 { border-color: #2a2f36; }
+.theme-dark .border-neutral-300 { border-color: #384049; }
+.theme-dark .border-slate-100, .theme-dark .border-slate-200 { border-color: #2a2f36; }
+.theme-dark .border-stone-200 { border-color: #2a2f36; }
+.theme-dark .border-gray-200 { border-color: #2a2f36; }
+
+/* --- Цветные бейджи/плашки: светлая заливка -> тёмный тон --- */
+.theme-dark .bg-emerald-50 { background-color: rgba(16, 185, 129, 0.12); }
+.theme-dark .bg-emerald-100 { background-color: rgba(16, 185, 129, 0.18); }
+.theme-dark .bg-emerald-200 { background-color: rgba(16, 185, 129, 0.25); }
+.theme-dark .bg-amber-50 { background-color: rgba(245, 158, 11, 0.12); }
+.theme-dark .bg-amber-100 { background-color: rgba(245, 158, 11, 0.18); }
+.theme-dark .bg-rose-50 { background-color: rgba(244, 63, 94, 0.13); }
+.theme-dark .bg-rose-100 { background-color: rgba(244, 63, 94, 0.19); }
+.theme-dark .bg-rose-200 { background-color: rgba(244, 63, 94, 0.26); }
+.theme-dark .bg-blue-50 { background-color: rgba(59, 130, 246, 0.13); }
+.theme-dark .bg-blue-100 { background-color: rgba(59, 130, 246, 0.19); }
+.theme-dark .bg-violet-50 { background-color: rgba(139, 92, 246, 0.13); }
+.theme-dark .bg-violet-100 { background-color: rgba(139, 92, 246, 0.19); }
+.theme-dark .bg-purple-50 { background-color: rgba(168, 85, 247, 0.13); }
+.theme-dark .bg-purple-100 { background-color: rgba(168, 85, 247, 0.19); }
+.theme-dark .bg-orange-50 { background-color: rgba(249, 115, 22, 0.13); }
+.theme-dark .bg-orange-100 { background-color: rgba(249, 115, 22, 0.19); }
+.theme-dark .bg-sky-50 { background-color: rgba(14, 165, 233, 0.13); }
+.theme-dark .bg-sky-100 { background-color: rgba(14, 165, 233, 0.19); }
+.theme-dark .bg-cyan-50 { background-color: rgba(6, 182, 212, 0.13); }
+.theme-dark .bg-lime-50 { background-color: rgba(132, 204, 22, 0.13); }
+.theme-dark .bg-yellow-50 { background-color: rgba(234, 179, 8, 0.13); }
+.theme-dark .bg-yellow-100 { background-color: rgba(234, 179, 8, 0.19); }
+.theme-dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.13); }
+.theme-dark .bg-red-100 { background-color: rgba(239, 68, 68, 0.19); }
+
+/* --- Текст цветных бейджей: приглушаем до тем-версий --- */
+.theme-dark .text-emerald-600, .theme-dark .text-emerald-700 { color: #4ade80; }
+.theme-dark .text-\[\#177A2B\] { color: #4ade80; }
+.theme-dark .text-amber-600, .theme-dark .text-amber-700 { color: #fbbf24; }
+.theme-dark .text-rose-500, .theme-dark .text-rose-600, .theme-dark .text-rose-700 { color: #fb7185; }
+.theme-dark .text-red-500, .theme-dark .text-red-600, .theme-dark .text-red-700 { color: #f87171; }
+.theme-dark .text-blue-600, .theme-dark .text-blue-700 { color: #60a5fa; }
+.theme-dark .text-violet-600, .theme-dark .text-violet-700 { color: #a78bfa; }
+.theme-dark .text-purple-600, .theme-dark .text-purple-700 { color: #c084fc; }
+.theme-dark .text-sky-600, .theme-dark .text-sky-700 { color: #38bdf8; }
+.theme-dark .text-orange-600, .theme-dark .text-orange-700 { color: #fb923c; }
+
+/* --- Границы цветных плашек --- */
+.theme-dark .border-emerald-100, .theme-dark .border-emerald-200 { border-color: rgba(16, 185, 129, 0.28); }
+.theme-dark .border-amber-100, .theme-dark .border-amber-200 { border-color: rgba(245, 158, 11, 0.3); }
+.theme-dark .border-rose-100, .theme-dark .border-rose-200 { border-color: rgba(244, 63, 94, 0.3); }
+.theme-dark .border-blue-100, .theme-dark .border-blue-200 { border-color: rgba(59, 130, 246, 0.3); }
+
+/* --- Исключения: яркая заливка + нейтральный текст остаются контрастными --- */
+.theme-dark [class*="bg-emerald-4"][class*="text-neutral-9"] { color: #06170e; }
+.theme-dark [class*="bg-emerald-3"][class*="text-neutral-9"] { color: #06170e; }
+.theme-dark [class*="bg-lime-4"][class*="text-neutral-9"] { color: #14210a; }
+.theme-dark [class*="bg-yellow-3"][class*="text-neutral-9"] { color: #201703; }
+.theme-dark [class*="bg-amber-2"][class*="text-neutral-9"] { color: #201703; }
+.theme-dark [class*="bg-cyan-3"][class*="text-neutral-9"] { color: #04222b; }
+
+/* --- Полупрозрачные светлые поверхности (стикеры-бары, оверлеи) --- */
+.theme-dark [class*="bg-white/95"] { background-color: rgba(30, 34, 40, 0.96); }
+.theme-dark [class*="bg-white/90"] { background-color: rgba(30, 34, 40, 0.92); }
+.theme-dark [class*="bg-white/85"] { background-color: rgba(30, 34, 40, 0.88); }
+.theme-dark [class*="bg-white/80"] { background-color: rgba(30, 34, 40, 0.82); }
+.theme-dark [class*="bg-white/75"] { background-color: rgba(30, 34, 40, 0.78); }
+.theme-dark [class*="bg-white/70"] { background-color: rgba(30, 34, 40, 0.72); }
+.theme-dark [class*="bg-white/60"] { background-color: rgba(42, 48, 55, 0.62); }
+.theme-dark [class*="bg-white/50"] { background-color: rgba(42, 48, 55, 0.55); }
+.theme-dark [class*="bg-white/40"] { background-color: rgba(46, 52, 60, 0.55); }
+.theme-dark [class*="bg-white/25"] { background-color: rgba(46, 52, 60, 0.45); }
+
+/* --- Скроллбары --- */
+.theme-dark ::-webkit-scrollbar-thumb { background: #3a414b; }
+.theme-dark ::-webkit-scrollbar-thumb:hover { background: #4a525c; }
+.theme-dark ::-webkit-scrollbar-track { background: transparent; }

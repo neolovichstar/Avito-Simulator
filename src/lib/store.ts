@@ -21,6 +21,7 @@ interface OSState {
   soundOn: boolean
   flashlight: boolean
   brightness: number // 0.4..1
+  theme: 'light' | 'dark'
 
   setBooted: (v: boolean) => void
   setLocked: (v: boolean) => void
@@ -41,6 +42,8 @@ interface OSState {
   setSound: (v: boolean) => void
   setFlashlight: (v: boolean) => void
   setBrightness: (v: number) => void
+  setTheme: (t: 'light' | 'dark') => void
+  toggleTheme: () => void
   refreshSession: (u: Partial<SessionUser>) => void
 }
 
@@ -62,6 +65,7 @@ export const useOS = create<OSState>((set, get) => ({
   soundOn: true,
   flashlight: false,
   brightness: 1,
+  theme: 'light',
 
   setBooted: (v) => set({ booted: v }),
   setLocked: (v) => set({ locked: v }),
@@ -94,5 +98,7 @@ export const useOS = create<OSState>((set, get) => ({
   setSound: (v) => set({ soundOn: v }),
   setFlashlight: (v) => set({ flashlight: v }),
   setBrightness: (v) => set({ brightness: Math.max(0.4, Math.min(1, v)) }),
+  setTheme: (t) => set({ theme: t }),
+  toggleTheme: () => set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
   refreshSession: (u) => set((s) => (s.session ? { session: { ...s.session, ...u } } : {})),
 }))

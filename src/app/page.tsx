@@ -24,6 +24,7 @@ import CareerApp from '@/components/apps/CareerApp'
 import DeliveryApp from '@/components/apps/DeliveryApp'
 
 const BATTERY_KEY = 'avito_sim_battery'
+const THEME_KEY = 'avito_sim_theme'
 
 export default function Home() {
   const [recentsOpen, setRecentsOpen] = useState(false)
@@ -45,6 +46,7 @@ export default function Home() {
   const setOnline = useOS((s) => s.setOnline)
   const flashlight = useOS((s) => s.flashlight)
   const brightness = useOS((s) => s.brightness)
+  const theme = useOS((s) => s.theme)
   const setNotifications = useOS((s) => s.setNotifications)
   const pushToast = useOS((s) => s.pushToast)
   const authTried = useRef(false)
@@ -105,6 +107,8 @@ export default function Home() {
   useEffect(() => {
     const saved = Number(localStorage.getItem(BATTERY_KEY) ?? '100')
     setBattery(Number.isFinite(saved) ? saved : 100)
+    const savedTheme = localStorage.getItem(THEME_KEY)
+    if (savedTheme === 'dark' || savedTheme === 'light') useOS.getState().setTheme(savedTheme)
   }, [setBattery])
 
   useEffect(() => {
@@ -123,6 +127,10 @@ export default function Home() {
     if (!booted) return
     localStorage.setItem(BATTERY_KEY, String(Math.round(battery)))
   }, [battery, booted])
+
+  useEffect(() => {
+    localStorage.setItem(THEME_KEY, theme)
+  }, [theme])
 
   const claimDailyBonus = useCallback(async () => {
     try {
@@ -176,10 +184,10 @@ export default function Home() {
     <main className="min-h-[100dvh] flex items-center justify-center bg-neutral-950">
       <PhoneFrame>
         {/* статус-бар */}
-        <StatusBar variant={currentApp ? 'light' : 'dark'} onBell={() => setNotifOpen(true)} />
+        <StatusBar variant={currentApp ? (theme === 'dark' ? 'dark' : 'light') : 'dark'} onBell={() => setNotifOpen(true)} />
 
         {/* контент */}
-        <div className="absolute inset-0 top-10 bottom-12 overflow-hidden bg-black">
+        <div className={`absolute inset-0 top-10 bottom-12 overflow-hidden bg-black ${theme === 'dark' ? 'theme-dark' : ''}`}>
           {!session ? (
             <div className="h-full flex flex-col items-center justify-center gap-3" style={{ backgroundImage: 'linear-gradient(180deg,#0b0b16,#030307)' }}>
               <div className="w-10 h-10 rounded-full border-2 border-white/20 border-t-white/80 animate-spin" />

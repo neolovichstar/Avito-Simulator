@@ -3,7 +3,7 @@
 // Приложение «Настройки» — стиль Android-настроек: белый фон, секции-карточки.
 import { useCallback, useEffect, useState } from 'react'
 import {
-  BatteryCharging, Handshake, Info, Loader2, MapPin, NotebookText, RefreshCw,
+  BatteryCharging, Handshake, Info, Loader2, MapPin, Moon, NotebookText, RefreshCw,
   Star, Volume2, Wallet,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
@@ -47,6 +47,8 @@ export default function SettingsApp() {
   const setCharging = useOS((s) => s.setCharging)
   const soundOn = useOS((s) => s.soundOn)
   const setSound = useOS((s) => s.setSound)
+  const theme = useOS((s) => s.theme)
+  const setTheme = useOS((s) => s.setTheme)
 
   const [profile, setProfile] = useState<ProfileData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -186,6 +188,20 @@ export default function SettingsApp() {
                   <div className="text-xs text-neutral-500">{soundOn ? 'Включён' : 'Выключен'}</div>
                 </div>
                 <Switch checked={soundOn} onCheckedChange={setSound} />
+              </div>
+              <div className="flex items-center gap-3 border-t border-neutral-100 px-4 py-3">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
+                  <Moon className="size-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium text-neutral-800">Тёмная тема</div>
+                  <div className="text-xs text-neutral-500">{theme === 'dark' ? 'Включена: тёмный интерфейс ОС' : 'Выключена: светлый интерфейс'}</div>
+                </div>
+                <Switch
+                  checked={theme === 'dark'}
+                  onCheckedChange={(v) => setTheme(v ? 'dark' : 'light')}
+                  aria-label="Тёмная тема"
+                />
               </div>
             </SectionCard>
 

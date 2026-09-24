@@ -5,7 +5,7 @@
 // звук и зарядка — системные переключатели ОС.
 import { useSyncExternalStore } from 'react'
 import {
-  BatteryCharging, ChevronDown, Flashlight, Settings, Sun, SunDim, Volume2, VolumeX, Zap, Wifi,
+  BatteryCharging, ChevronDown, Flashlight, Moon, Settings, Sun, SunDim, Volume2, VolumeX, Zap, Wifi,
 } from 'lucide-react'
 import { useOS, type AppKey } from '@/lib/store'
 import { enableTorch, stopTorch } from '@/lib/torch'
@@ -23,7 +23,7 @@ function useClock(): Date | null {
 }
 
 function Tile({
-  active, icon, label, sub, onClick, activeCls = 'bg-white text-neutral-900',
+  active, icon, label, sub, onClick, activeCls = 'bg-white text-neutral-900', className = '',
 }: {
   active?: boolean
   icon: React.ReactNode
@@ -31,6 +31,7 @@ function Tile({
   sub?: string
   onClick: () => void
   activeCls?: string
+  className?: string
 }) {
   return (
     <button
@@ -40,7 +41,7 @@ function Tile({
       aria-label={label}
       className={`flex min-h-[68px] items-center gap-3 rounded-3xl px-4 py-3 text-left outline-none transition-all active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white/70 ${
         active ? activeCls : 'bg-white/10 text-white'
-      }`}
+      } ${className}`}
     >
       <span
         className={`flex size-9 shrink-0 items-center justify-center rounded-full ${
@@ -79,6 +80,8 @@ export default function ControlCenter({
   const battery = useOS((s) => s.battery)
   const online = useOS((s) => s.online)
   const pushToast = useOS((s) => s.pushToast)
+  const theme = useOS((s) => s.theme)
+  const toggleTheme = useOS((s) => s.toggleTheme)
   const now = useClock()
 
   const toggleFlash = async () => {
@@ -173,9 +176,21 @@ export default function ControlCenter({
               onClick={() => setCharging(!charging)}
             />
             <Tile
+              active={theme === 'dark'}
+              activeCls="bg-violet-300 text-neutral-900"
+              icon={theme === 'dark' ? <Moon className="size-4.5" aria-hidden="true" /> : <Sun className="size-4.5" aria-hidden="true" />}
+              label="Тема"
+              sub={theme === 'dark' ? 'Тёмная' : 'Светлая'}
+              onClick={() => {
+                toggleTheme()
+                pushToast('Тема ОС', useOS.getState().theme === 'dark' ? 'Тёмная тема включена' : 'Светлая тема включена')
+              }}
+            />
+            <Tile
+              className="col-span-2"
               icon={<Settings className="size-4.5" aria-hidden="true" />}
               label="Настройки"
-              sub="Устройство"
+              sub="Устройство, тема, звук"
               onClick={() => {
                 onClose()
                 onOpenApp('settings')
