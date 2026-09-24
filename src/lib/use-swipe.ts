@@ -66,7 +66,8 @@ export function useSwipe({ threshold = 44, onSwipe }: SwipeOptions) {
 }
 
 interface DragOptions {
-  onStart?: () => void
+  /** Точка старта: удобно снять scrollTop/размеры до начала жеста. */
+  onStart?: (e: React.PointerEvent) => void
   /** Непрерывные координаты драга (dx, dy относительно точки старта). */
   onMove: (dx: number, dy: number) => void
   /** Завершение: итоговое смещение; при отмене системы — (0, 0). */
@@ -86,7 +87,7 @@ export function useDrag({ onStart, onMove, onEnd }: DragOptions) {
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     if (!isPrimary(e)) return
     const start = { id: e.pointerId, x: e.clientX, y: e.clientY }
-    cbs.current.onStart?.()
+    cbs.current.onStart?.(e)
 
     const move = (ev: PointerEvent) => {
       if (ev.pointerId !== start.id) return

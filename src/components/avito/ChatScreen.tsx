@@ -10,6 +10,7 @@ import { useOS } from '@/lib/store'
 import { getSocket } from '@/lib/use-realtime'
 import { fmtMoney, fmtTime } from '@/lib/format'
 import { CONDITION_LABEL } from '@/lib/catalog-types'
+import { useDrag } from '@/lib/use-swipe'
 import type { ChatDetailData, ChatMessageDTO } from '@/lib/types'
 
 export default function ChatScreen({ id, onBack }: { id: string; onBack: () => void }) {
@@ -28,6 +29,23 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
   const bottomRef = useRef<HTMLDivElement>(null)
   const refreshSession = useOS((s) => s.refreshSession)
   const pushToast = useOS((s) => s.pushToast)
+
+  // ─── Edge-swipe назад: тянем от левого края вправо — чат «съезжает» и закрывается.
+  // Работает и мышью на ПК, и пальцем на телефоне (Pointer Events).
+  // Хуки — строго до early-return'ов загрузки/ошибки.
+  const [swipeX, setSwipeX] = useState(0)
+  const [swiping, setSwiping] = useState(false)
+  const edge = useDrag({
+    onStart: () => setSwiping(true),
+    onMove: (dx) => {
+      if (dx > 0) setSwipeX(Math.min(dx * 0.92, 150))
+    },
+    onEnd: (dx) => {
+      setSwiping(false)
+      setSwipeX(0)
+      if (dx > 90) onBack()
+    },
+  })
 
   const load = useCallback(async () => {
     try {
@@ -144,9 +162,35 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
   if (!chat) return null
 
   const canPayInvoices = chat.role === 'buyer'
+  const swipeProgress = Math.min(1, swipeX / 150)
 
   return (
-    <div className="h-full flex flex-col bg-[#f4f5f7]">
+    <div
+      className="relative flex h-full flex-col overflow-hidden bg-[#f4f5f7]"
+      style={{
+        transform: `translateX(${swipeX}px)`,
+        transition: swiping ? 'none' : 'transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)',
+        boxShadow: swipeX > 0 ? '-24px 0 48px -24px rgba(0,0,0,0.35)' : undefined,
+      }}
+    >
+      {/* индикатор «назад» — проявляется по мере свайпа */}
+      {swipeX > 4 && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute left-3 top-1/2 z-40 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-neutral-900/75 text-white backdrop-blur-sm"
+          style={{ opacity: 0.25 + swipeProgress * 0.75 }}
+        >
+          <ChevronLeft size={20} />
+        </span>
+      )}
+      {/* левый край-полоса: старт свайпа-назад */}
+      <div
+        aria-hidden
+        className="absolute bottom-0 left-0 top-0 z-30 w-5"
+        style={{ touchAction: 'none' }}
+        onPointerDown={edge.onPointerDown}
+      />
+
       {/* шапка */}
       <div className="shrink-0 bg-white border-b border-black/5">
         <div className="px-2 py-1.5 flex items-center gap-1">

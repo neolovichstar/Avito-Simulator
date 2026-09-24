@@ -3,7 +3,7 @@
 // Браузер «как в жизни»: каноничный мобильный Chrome — вкладки с обзорным режимом,
 // омнибокс с прогресс-баром, меню трёх точек, нижний тулбар, история, тёмная тема.
 // Внутри: игровые сайты + НАСТОЯЩИЙ интернет через серверный прокси /api/browse.
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   BookOpen, ChevronLeft, ChevronRight, CreditCard, ExternalLink, Globe, History,
   Lock, Plus, RotateCw, Search, ShoppingBag, Square, TrendingDown,
@@ -13,6 +13,7 @@ import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
 import { fmtDateTime, timeAgo } from '@/lib/format'
 import { CATEGORY_LABEL } from '@/lib/catalog-types'
+import { useDrag, useSwipe } from '@/lib/use-swipe'
 import type { MarketStats } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 
@@ -1085,10 +1086,38 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp: (app: 'avito' | '
   // содержимое активной вкладки
   const contentKey = `${activeId}:${currentKey}:${reloadKey}`
 
+  // ─── Chrome-полировка 1: pull-to-refresh — тянем страницу вниз от верха.
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [pull, setPull] = useState(0)
+  const ptr = useDrag({
+    onMove: (_dx, dy) => {
+      const atTop = (scrollRef.current?.scrollTop ?? 0) <= 0
+      setPull(atTop && dy > 0 ? Math.min(dy * 0.42, 96) : 0)
+    },
+    onEnd: () => {
+      setPull((p) => {
+        if (p > 52) reload()
+        return 0
+      })
+    },
+  })
+  const pullShift = Math.min(pull, 64)
+
+  // ─── Chrome-полировка 2: свайп по омнибоксу переключает вкладки (как в мобильном Chrome).
+  const omniSwipe = useSwipe({
+    threshold: 56,
+    onSwipe: (dir) => {
+      if (view !== 'page' || tabs.length < 2) return
+      const i = tabs.findIndex((t) => t.id === activeId)
+      const next = dir === 'left' ? (i + 1) % tabs.length : (i - 1 + tabs.length) % tabs.length
+      pickTab(tabs[next].id)
+    },
+  })
+
   return (
     <div className={'relative flex h-full flex-col overflow-hidden ' + pal.shell}>
       {/* ---------- верхний тулбар Chrome ---------- */}
-      <div className={'relative z-20 border-b ' + pal.toolbarBorder + ' ' + (isNtp ? (theme === 'dark' ? 'bg-[#202124]' : 'bg-white') : theme === 'dark' ? 'bg-[#292a2d]' : 'bg-white')}>
+      <div className={'relative z-20 border-b ' + pal.toolbarBorder + ' ' + (isNtp ? (theme === 'dark' ? 'bg-[#202124]' : 'bg-white') : theme === 'dark' ? 'bg-[#292a2d]' : 'bg-white')} onPointerDown={omniSwipe.onPointerDown}>
         <div className="flex items-center gap-2 px-2.5 py-2">
           {/* омнибокс */}
           <div
@@ -1201,6 +1230,21 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp: (app: 'avito' | '
 
       {/* ---------- контент ---------- */}
       <div className="relative flex-1 overflow-hidden">
+        {/* индикатор pull-to-refresh */}
+        {pull > 0 && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute left-1/2 top-2 z-30"
+            style={{ transform: `translateX(-50%) translateY(${pullShift}px)` }}
+          >
+            <span
+              className="flex size-9 items-center justify-center rounded-full bg-white shadow-md ring-1 ring-black/5"
+              style={{ transform: `rotate(${Math.min(1, pull / 64) * 300}deg)`, opacity: 0.35 + Math.min(1, pull / 64) * 0.65 }}
+            >
+              <RotateCw className="size-4 text-[#5f6368]" />
+            </span>
+          </div>
+        )}
         {view === 'tabs' ? (
           <TabSwitcher
             pal={pal}
@@ -1215,7 +1259,7 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp: (app: 'avito' | '
         ) : view === 'history' ? (
           <HistoryPanel pal={pal} entries={historyEntries} onPick={(e) => { go(e); setMenuOpen(false) }} onBack={() => setView('page')} />
         ) : (
-          <div className="h-full overflow-y-auto [scrollbar-width:thin]">
+          <div ref={scrollRef} className="h-full overflow-y-auto [scrollbar-width:thin]" onPointerDown={ptr.onPointerDown}>
             {isNtp && (
               <NewTabPage pal={pal} urlInput={urlInput} setUrlInput={setUrlInput} onSubmit={submitUrl} onGo={go} />
             )}
