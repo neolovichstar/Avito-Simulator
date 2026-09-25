@@ -10,7 +10,7 @@ import PhoneFrame from '@/components/os/PhoneFrame'
 import StatusBar from '@/components/os/StatusBar'
 import LockScreen from '@/components/os/LockScreen'
 import HomeScreen from '@/components/os/HomeScreen'
-import NavBar from '@/components/os/NavBar'
+import GestureNav from '@/components/os/GestureNav'
 import NotificationCenter from '@/components/os/NotificationCenter'
 import ControlCenter from '@/components/os/ControlCenter'
 import ToastStack from '@/components/os/ToastStack'
@@ -313,8 +313,8 @@ export default function Home() {
         {/* статус-бар */}
         <StatusBar variant={currentApp ? (theme === 'dark' ? 'dark' : 'light') : 'dark'} onBell={() => setNotifOpen(true)} />
 
-        {/* контент */}
-        <div className={`absolute inset-0 top-10 bottom-12 overflow-hidden bg-black ${theme === 'dark' ? 'theme-dark' : ''}`}>
+        {/* контент — до самого низа: пилюля-жест накладывается поверх */}
+        <div className={`absolute inset-0 top-10 bottom-6 overflow-hidden bg-black ${theme === 'dark' ? 'theme-dark' : ''}`}>
           {!session ? (
             authError ? (
               <OfflineScreen compact onRetry={doAuth} />
@@ -367,12 +367,12 @@ export default function Home() {
           onClick={() => setControlOpen(true)}
         />
 
-        {/* навигационная панель */}
-        <NavBar
+        {/* жестовая навигация: пилюля + свайпы от краёв (вместо кнопок) */}
+        <GestureNav
+          canGoBack={!!currentApp}
           onBack={closeApp}
           onHome={closeApp}
           onRecents={() => setRecentsOpen((v) => !v)}
-          recentsActive={recentsOpen}
         />
       </PhoneFrame>
     </main>

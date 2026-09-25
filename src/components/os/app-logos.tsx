@@ -192,58 +192,76 @@ export function DeliveryLogo() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Реестр плиток: градиент фона + логотип + подпись для каждого AppKey.
+// image — вырезанный логотип из фирменного пака (public/img/apps/*.png):
+// прозрачные скруглённые углы, своя подсветка — выглядит как настоящая иконка ОС.
+// SVG-иконки ниже остаются fallback'ом (пока PNG грузится / для консистентности).
 // ─────────────────────────────────────────────────────────────────────────────
-export const APP_TILE: Record<AppKey, { label: string; background: string; icon: ReactNode }> = {
+export const APP_TILE: Record<AppKey, { label: string; background: string; image: string; icon: ReactNode }> = {
   avito: {
     label: 'Resale',
     background: 'linear-gradient(160deg, #FFFFFF 0%, #EDFAF3 55%, #D5F5E3 100%)',
+    image: '/img/apps/avito.png',
     icon: <DealLogo />,
   },
   bank: {
     label: 'Банк',
     background: 'linear-gradient(145deg, #2FBE51 0%, #21A038 55%, #157F2A 100%)',
+    image: '/img/apps/bank.png',
     icon: <BankLogo />,
   },
   taxes: {
     label: 'Налоги',
     background: 'linear-gradient(145deg, #4A5568 0%, #2D3748 55%, #1A202C 100%)',
+    image: '/img/apps/taxes.png',
     icon: <TaxesLogo />,
   },
   browser: {
     label: 'Браузер',
     background: 'linear-gradient(145deg, #0EA5E9, #0284C7)',
+    image: '/img/apps/browser.png',
     icon: <BrowserLogo />,
   },
   settings: {
     label: 'Настройки',
     background: 'linear-gradient(145deg, #6B7280, #4B5563)',
+    image: '/img/apps/settings.png',
     icon: <SettingsLogo />,
   },
   repair: {
     label: 'Сервис',
     background: 'linear-gradient(145deg, #F59E0B, #D97706)',
+    image: '/img/apps/repair.png',
     icon: <RepairLogo />,
   },
   auction: {
     label: 'Аукцион',
     background: 'linear-gradient(145deg, #D4A017, #B45309)',
+    image: '/img/apps/auction.png',
     icon: <AuctionLogo />,
   },
   career: {
     label: 'Задания',
     background: 'linear-gradient(145deg, #15803D, #14532D)',
+    image: '/img/apps/career.png',
     icon: <CareerLogo />,
   },
   delivery: {
     label: 'Доставки',
     background: 'linear-gradient(145deg, #065F46, #064E3B)',
+    image: '/img/apps/delivery.png',
     icon: <DeliveryLogo />,
   },
   leaderboard: {
     label: 'Лидеры',
     background: 'linear-gradient(145deg, #F8FAFC 0%, #E2E8F0 45%, #CBD5E1 100%)',
+    image: '/img/apps/leaderboard.png',
     icon: <LeaderboardLogo />,
   },
+}
+
+/** Иконка-картинка приложения: логотип из пака, заполняет плитку целиком. */
+export function AppTileImage({ app, className }: { app: AppKey; className?: string }) {
+  return <img src={APP_TILE[app].image} alt="" aria-hidden="true" draggable={false} className={`pointer-events-none select-none object-cover ${className ?? ''}`} />
 }
 
 // Порядок иконок на домашнем экране (сетка 4 колонки) и в доке.

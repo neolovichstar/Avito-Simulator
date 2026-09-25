@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Minus, Square, X, Copy } from 'lucide-react'
 import type { AppKey } from '@/lib/store'
-import { APP_TILE } from '@/components/os/app-logos'
+import { APP_TILE, AppTileImage } from '@/components/os/app-logos'
 
 export interface WindowState {
   id: AppKey
@@ -113,11 +113,8 @@ export default function WindowFrame({ win, focused, onFocus, onClose, onMinimize
         onPointerCancel={endDrag}
         onDoubleClick={onToggleMax}
       >
-        <span
-          className="flex size-4 shrink-0 items-center justify-center overflow-hidden"
-          style={{ borderRadius: 4, background: tile.background }}
-        >
-          <span className="scale-[0.42]">{tile.icon}</span>
+        <span className="flex size-4 shrink-0 items-center justify-center overflow-hidden rounded-[4px] ring-1 ring-black/20">
+          <AppTileImage app={win.id} className="h-full w-full" />
         </span>
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-white/85">{tile.label}</span>
         <div className="flex items-center" onPointerDown={(e) => e.stopPropagation()}>

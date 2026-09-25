@@ -200,7 +200,7 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
 
   return (
     <div
-      className={`absolute inset-0 flex flex-col pt-14 ${wallpaperClass(wallpaper)}`}
+      className={`absolute inset-0 flex flex-col pt-14 select-none ${wallpaperClass(wallpaper)}`}
       role="region"
       aria-label="Домашний экран"
     >
@@ -222,13 +222,13 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
               </div>
             </div>
 
-            <div className="mt-7 grid grid-cols-4 gap-5 px-6">
+            <div className="mt-8 grid grid-cols-4 gap-x-5 gap-y-6 px-6">
               {PAGE1_APPS.map((app) => (
                 <AppIcon
                   key={app}
                   icon={APP_TILE[app].icon}
                   label={APP_TILE[app].label}
-                  background={APP_TILE[app].background}
+                  image={APP_TILE[app].image}
                   badge={app === 'avito' ? unreadChats : undefined}
                   onClick={() => onOpenApp(app)}
                 />
@@ -240,7 +240,7 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
 
           {/* Страница 2: «умные» карточки + сервисные приложения */}
           <section className="flex h-full w-1/2 flex-col overflow-y-auto px-5 pb-3 [scrollbar-width:none]" aria-label="Страница 2 — день на площадке" aria-hidden={page !== 1}>
-            <p className="mb-2 mt-1 px-1 text-[11px] font-semibold uppercase tracking-widest text-white/50">
+            <p className="mb-3 mt-2 px-1 text-[11px] font-semibold uppercase tracking-widest text-white/50">
               День на площадке
             </p>
 
@@ -248,9 +248,9 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
             <button
               type="button"
               onClick={() => onOpenApp('career')}
-              className="press mb-2.5 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 p-3.5 text-left backdrop-blur-md active:scale-[0.985]"
+              className="press mb-3 flex items-center gap-3.5 rounded-2xl border border-white/10 bg-white/10 p-4 text-left backdrop-blur-md active:scale-[0.985]"
             >
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-emerald-500/40" aria-hidden>
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-emerald-500/40" aria-hidden>
                 <svg viewBox="0 0 48 48" className="size-6">
                   <path d="M14.5 26.5 l5.5 5.5 L30 21.5" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
                 </svg>
@@ -285,9 +285,9 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
             <button
               type="button"
               onClick={() => onOpenApp('delivery')}
-              className="press mb-2.5 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 p-3.5 text-left backdrop-blur-md active:scale-[0.985]"
+              className="press mb-3 flex items-center gap-3.5 rounded-2xl border border-white/10 bg-white/10 p-4 text-left backdrop-blur-md active:scale-[0.985]"
             >
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/40" aria-hidden>
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-amber-500/40" aria-hidden>
                 <svg viewBox="0 0 24 24" className="size-6" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="2" y="7" width="20" height="12" rx="2" />
                   <path d="M12 7v12" /><path d="M2 11h20" />
@@ -310,7 +310,7 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
             <button
               type="button"
               onClick={() => onOpenApp('leaderboard')}
-              className="press mb-3 rounded-2xl border border-white/10 bg-white/10 p-3.5 text-left backdrop-blur-md active:scale-[0.985]"
+              className="press mb-4 rounded-2xl border border-white/10 bg-white/10 p-4 text-left backdrop-blur-md active:scale-[0.985]"
             >
               <span className="mb-1.5 block text-[10px] uppercase tracking-wider text-white/55">Топ площадки</span>
               {data.top3.length > 0 ? (
@@ -335,14 +335,14 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
               )}
             </button>
 
-            {/* Сервисные приложения */}
-            <div className="grid grid-cols-4 gap-5 px-1">
+            {/* Сервисные приложения — по центру, крупнее, чтобы страница не выглядела пустой */}
+            <div className="mx-auto grid w-full max-w-[236px] grid-cols-2 gap-6 px-1">
               {PAGE2_APPS.map((app) => (
                 <AppIcon
                   key={app}
                   icon={APP_TILE[app].icon}
                   label={APP_TILE[app].label}
-                  background={APP_TILE[app].background}
+                  image={APP_TILE[app].image}
                   badge={app === 'avito' ? unreadChats : undefined}
                   onClick={() => onOpenApp(app)}
                 />
@@ -359,14 +359,14 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
       </div>
 
       {/* Док */}
-      <div className="mx-4 mb-2 rounded-3xl bg-white/10 p-3 backdrop-blur-md">
+      <div className="mx-4 mb-2.5 rounded-3xl bg-white/10 p-3.5 pb-3 backdrop-blur-md">
         <div className="grid grid-cols-4 gap-5">
           {DOCK_APPS.map((app) => (
             <AppIcon
               key={app}
               icon={APP_TILE[app].icon}
               label={APP_TILE[app].label}
-              background={APP_TILE[app].background}
+              image={APP_TILE[app].image}
               badge={app === 'avito' ? unreadChats : undefined}
               onClick={() => onOpenApp(app)}
             />

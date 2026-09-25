@@ -9,7 +9,7 @@ import {
 import { useOS, type AppKey } from '@/lib/store'
 import { wallpaperClass } from '@/lib/wallpapers'
 import { fmtMoney } from '@/lib/format'
-import { APP_TILE, HOME_GRID } from '@/components/os/app-logos'
+import { APP_TILE, AppTileImage, HOME_GRID } from '@/components/os/app-logos'
 import { api } from '@/lib/api'
 import type { NotificationDTO } from '@/lib/types'
 import WindowFrame, { type WindowState } from './WindowFrame'
@@ -257,11 +257,8 @@ export default function DesktopShell({ locked, onUnlock, renderApp, theme }: Pro
                   className="flex flex-col items-center gap-1.5 rounded-lg px-1 py-3 transition hover:bg-white/10"
                   role="menuitem"
                 >
-                  <span
-                    className="flex size-11 items-center justify-center rounded-xl shadow"
-                    style={{ background: APP_TILE[app].background }}
-                  >
-                    {APP_TILE[app].icon}
+                  <span className="flex size-11 items-center justify-center rounded-xl shadow ring-1 ring-black/20">
+                    <AppTileImage app={app} className="h-full w-full rounded-xl" />
                   </span>
                   <span className="max-w-full truncate text-[11px] text-white/85">{APP_TILE[app].label}</span>
                 </button>
@@ -369,11 +366,8 @@ export default function DesktopShell({ locked, onUnlock, renderApp, theme }: Pro
                 }}
                 className={`relative flex size-10 items-center justify-center rounded-lg transition hover:bg-white/10 ${active ? 'bg-white/15' : ''}`}
               >
-                <span
-                  className="flex size-7 items-center justify-center overflow-hidden rounded-md shadow"
-                  style={{ background: APP_TILE[app].background }}
-                >
-                  <span className="scale-[0.62]">{APP_TILE[app].icon}</span>
+                <span className="flex size-7 items-center justify-center overflow-hidden rounded-md shadow ring-1 ring-black/20">
+                  <AppTileImage app={app} className="h-full w-full" />
                 </span>
                 {win && (
                   <span
