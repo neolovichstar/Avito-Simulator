@@ -541,3 +541,66 @@
 }
 
 /* theme v3.2 */
+
+/* ── Android-стиль: ПОЛНОЕ скрытие скроллбаров по всей ОС ────────────────
+   Контент скроллится как обычно, но полос прокрутки не видно нигде —
+   как на настоящем Android/iOS. Индикатор позиции не нужен: есть жесты. */
+* {
+  scrollbar-width: none !important;      /* Firefox */
+  -ms-overflow-style: none !important;   /* IE/legacy Edge */
+}
+*::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;              /* Chrome/Safari/WebView */
+}
+
+/* ============================================================
+   Task 22-a — ANDROID 16 / MATERIAL 3 EXPRESSIVE (оболочка ОС)
+   Добавления в конец: новые обои + кейфреймы панелей.
+   Выше ничего не менялось и не удалялось.
+   ============================================================ */
+
+/* --- Новые обои в духе Android 16 (тёмно-зелёный и тёплый графит) --- */
+.wp-moss {
+  background-image:
+    radial-gradient(circle at 24% 12%, rgba(74, 222, 128, 0.30), transparent 52%),
+    radial-gradient(circle at 80% 88%, rgba(6, 78, 59, 0.60), transparent 56%),
+    radial-gradient(circle at 62% 40%, rgba(16, 185, 129, 0.14), transparent 46%),
+    linear-gradient(175deg, #0c2318 0%, #081710 55%, #040a07 100%);
+}
+.wp-graphite {
+  background-image:
+    radial-gradient(circle at 78% 10%, rgba(214, 163, 82, 0.20), transparent 50%),
+    radial-gradient(circle at 14% 90%, rgba(168, 162, 158, 0.16), transparent 52%),
+    linear-gradient(178deg, #201e1b 0%, #141210 55%, #0a0908 100%);
+}
+
+/* Появление контента системных панелей (шторка, QS, recents):
+   лёгкий подъём с fade — фирменная кривая Material 3. */
+@keyframes m3-rise {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.m3-rise { animation: m3-rise 0.26s cubic-bezier(0.2, 0, 0, 1) both; }
+
+/* Ступенчатое появление плиток QS / карточек шторки (delay задаётся инлайн) */
+.m3-rise-stagger { animation: m3-rise 0.3s cubic-bezier(0.2, 0, 0, 1) both; }
+
+/* Такт «дыхания» для хендла локскрина: едва заметная пульсация ширины */
+@keyframes handle-breathe {
+  0%, 100% { transform: scaleX(1); opacity: 0.5; }
+  50%      { transform: scaleX(0.86); opacity: 0.32; }
+}
+.handle-breathe { animation: handle-breathe 2.8s ease-in-out infinite; }
+
+/* Мягкое появление больших часов локскрина (масштаб из лёгкого «далеко») */
+@keyframes lock-clock-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.97); filter: blur(6px); }
+  to   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+.lock-clock-in { animation: lock-clock-in 0.5s cubic-bezier(0.2, 0, 0, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .m3-rise, .m3-rise-stagger, .handle-breathe, .lock-clock-in { animation: none !important; }
+}

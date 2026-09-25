@@ -1,9 +1,9 @@
 'use client'
 
-// Всплывающие уведомления как в настоящем телефоне (heads-up):
-// иконка и имя приложения, заголовок, текст, время «сейчас» и тонкий прогресс-
-// бар автозакрытия (4.2с — синхронно с TTL тоста в store). Цветная полоска слева
-// подсказывает, из какого приложения уведомление. Тап по кнопке открывает его.
+// Всплывающие уведомления (heads-up) в духе Android 16: тёмная стеклянная
+// карточка с радиусом 24px, тайл иконки приложения слева, заголовок/текст,
+// время «сейчас» и тонкий прогресс-бар автозакрытия (4.2с — синхронно с TTL
+// тоста в store). Вход — сверху, как у настоящих heads-up.
 import { Bell, Gavel, MessageSquare, Receipt, ShoppingBag, Trophy, TrendingUp, Truck, Crown, X, type LucideIcon } from 'lucide-react'
 import { useOS, type AppKey } from '@/lib/store'
 import { openAppForToast } from '@/lib/toast-apps'
@@ -67,23 +67,18 @@ export default function ToastStack({ variant = 'phone' }: { variant?: 'phone' | 
           <div
             key={t.id}
             role="status"
-            className="pointer-events-auto relative flex items-start gap-3 overflow-hidden rounded-[22px] bg-neutral-900/95 p-3.5 text-white shadow-[0_18px_45px_-12px_rgba(0,0,0,0.7)] ring-1 ring-white/10 backdrop-blur-xl animate-in fade-in slide-in-from-top-3 zoom-in-[98%] duration-300"
+            className="pointer-events-auto relative flex items-start gap-3 overflow-hidden rounded-[24px] bg-neutral-900/75 p-3.5 text-white shadow-[0_22px_50px_-14px_rgba(0,0,0,0.75)] ring-1 ring-white/[0.12] backdrop-blur-2xl animate-in fade-in slide-in-from-top-3 zoom-in-[98%] duration-300"
           >
-            {/* Цветной акцент слева — цвет приложения, как на реальных heads-up */}
+            {/* тайл иконки приложения — цветовой якорь heads-up */}
             <span
-              aria-hidden="true"
-              className="absolute inset-y-2 left-0 w-1 rounded-full"
-              style={{ background: meta.bg }}
-            />
-            <span
-              className="ml-1 flex size-9 shrink-0 items-center justify-center rounded-[0.7rem] text-white shadow-sm"
+              className="flex size-10 shrink-0 items-center justify-center rounded-[13px] text-white shadow-sm"
               style={{ background: meta.bg }}
             >
-              <AppIcon className="size-4.5" aria-hidden="true" />
+              <AppIcon className="size-5" aria-hidden="true" />
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline justify-between gap-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-white/50">{meta.app}</p>
+                <p className="truncate text-[10px] font-bold uppercase tracking-[0.08em] text-white/50">{meta.app}</p>
                 <span className="shrink-0 text-[11px] text-white/40">сейчас</span>
               </div>
               <p className="truncate text-[13px] font-bold leading-tight">{t.title}</p>
@@ -95,7 +90,7 @@ export default function ToastStack({ variant = 'phone' }: { variant?: 'phone' | 
                   dropToast(t.id)
                   openApp(openAppForToast(meta.openApp))
                 }}
-                className="mt-1.5 flex min-h-[44px] items-center rounded-full bg-white/10 px-4 text-xs font-semibold text-emerald-300 outline-none transition-colors active:bg-white/20 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                className="mt-1.5 flex min-h-[44px] items-center rounded-full bg-white/10 px-4 text-xs font-bold text-emerald-300 outline-none transition-colors active:bg-white/20 focus-visible:ring-2 focus-visible:ring-emerald-400"
               >
                 Открыть {meta.app}
               </button>

@@ -62,7 +62,12 @@ function NavItem({
   icon: Icon, label, active, onClick,
 }: { icon: LucideIcon; label: string; active: boolean; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="flex min-w-0 flex-col items-center gap-1 py-1">
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={active ? 'page' : undefined}
+      className="flex min-h-[44px] min-w-0 flex-col items-center justify-center gap-1 py-1"
+    >
       <Icon
         className={'size-[22px] ' + (active ? 'text-[#21A03A]' : 'text-[#9AA0A8]')}
         strokeWidth={active ? 2.3 : 2}
@@ -332,8 +337,9 @@ export default function TaxesApp() {
               <AlertTriangle className="mx-auto size-6 text-[#E5584B]" aria-hidden="true" />
               <p className="mt-2 text-[13px] text-[#E5584B]">{error}</p>
               <button
+                type="button"
                 onClick={load}
-                className="mt-4 text-[13px] font-semibold text-[#21A03A] transition active:opacity-70"
+                className="mt-4 inline-flex h-11 items-center justify-center rounded-full bg-[#21A03A]/10 px-5 text-[13px] font-semibold text-[#21A03A] transition active:opacity-80"
               >
                 Повторить
               </button>
@@ -351,8 +357,9 @@ export default function TaxesApp() {
                   <div className="text-[12px] text-[#9AA0A8]">Самозанятый игрок</div>
                 </div>
                 <button
+                  type="button"
                   aria-label="Уведомления"
-                  className="relative flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-[#21A03A] shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition active:scale-95"
+                  className="relative flex size-11 shrink-0 items-center justify-center rounded-full bg-white text-[#21A03A] shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition active:scale-95"
                 >
                   <Mail className="size-[18px]" aria-hidden="true" />
                   <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-[#21A03A] text-[9px] font-bold leading-none text-white ring-2 ring-white">
@@ -360,8 +367,9 @@ export default function TaxesApp() {
                   </span>
                 </button>
                 <button
+                  type="button"
                   aria-label="Справка"
-                  className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-[#21A03A] shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition active:scale-95"
+                  className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white text-[#21A03A] shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition active:scale-95"
                 >
                   <CircleHelp className="size-[18px]" aria-hidden="true" />
                 </button>
@@ -439,8 +447,9 @@ export default function TaxesApp() {
                       <span className="text-[15px] font-semibold text-[#1A1A1A]">Последние платежи</span>
                       {data.bills.length > 0 && (
                         <button
+                          type="button"
                           onClick={() => setTab('bills')}
-                          className="flex items-center text-[13px] font-semibold text-[#21A03A] transition active:opacity-70"
+                          className="-my-3 flex min-h-[44px] items-center px-2 text-[13px] font-semibold text-[#21A03A] transition active:opacity-70"
                         >
                           Все
                           <ChevronRight className="size-4" aria-hidden="true" />
@@ -466,16 +475,17 @@ export default function TaxesApp() {
               {/* ЧЕКИ / СЧЕТА — фильтры + группировка по месяцам */}
               {tab === 'bills' && (
                 <div className="space-y-2">
-                  <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <div role="group" aria-label="Фильтры чеков" className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {BILL_FILTERS.map((f) => {
                       const active = billFilter === f.key
                       return (
                         <button
                           key={f.key}
+                          type="button"
                           onClick={() => setBillFilter(f.key)}
                           aria-pressed={active}
                           className={
-                            'flex h-9 shrink-0 items-center gap-1.5 rounded-full px-4 text-[13px] transition ' +
+                            'flex h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-[13px] transition ' +
                             (active
                               ? 'bg-[#21A03A] font-semibold text-white'
                               : 'bg-white font-medium text-[#1A1A1A] shadow-[0_1px_3px_rgba(0,0,0,0.05)]')
@@ -523,6 +533,8 @@ export default function TaxesApp() {
                   {/* Промо-карусель (светлые плашки; drag-логика не тронута) */}
                   <div>
                     <div
+                      role="region"
+                      aria-label="Промо и правила"
                       onScroll={onPromoScroll}
                       onPointerDown={onPromoPointerDown}
                       className="-mx-4 flex snap-x snap-mandatory cursor-grab gap-3 overflow-x-auto px-4 select-none [scrollbar-width:none] active:cursor-grabbing [&::-webkit-scrollbar]:hidden"
@@ -686,11 +698,12 @@ export default function TaxesApp() {
 
       {/* ===== НИЖНИЙ ТАБ-БАР (Сбер): белый, border-t #E8EAED, активный #21A03A ===== */}
       <nav className="relative z-10 shrink-0 border-t border-[#E8EAED] bg-white" aria-label="Навигация налогов">
-        <div className="grid grid-cols-5 items-end px-1 pt-1.5 pb-[max(8px,env(safe-area-inset-bottom))]">
+        <div className="grid grid-cols-5 items-end px-1 pb-[max(8px,env(safe-area-inset-bottom))] pt-1.5">
           <NavItem icon={Home} label="Главная" active={tab === 'home'} onClick={() => setTab('home')} />
           <NavItem icon={ReceiptText} label="Чеки" active={tab === 'bills'} onClick={() => setTab('bills')} />
           <div className="flex flex-col items-center">
             <button
+              type="button"
               aria-label="Продажа"
               onClick={() => useOS.getState().pushToast('Налоги', 'Создание чека доступно после сделки')}
               className="-mt-7 flex size-14 items-center justify-center rounded-full bg-[#21A03A] text-white shadow-[0_8px_20px_rgba(33,160,58,0.35)] ring-4 ring-white transition-transform active:scale-95"

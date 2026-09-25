@@ -1,8 +1,9 @@
 'use client'
 
-// Виджет «Сейчас играет» в шторке уведомлений — как медиа-виджет в шторке
-// Android. Управляет ГЛОБАЛЬНЫМ плеером ОС (src/lib/player.ts), поэтому
-// работает независимо от того, открыто приложение «Музыка» или нет.
+// Виджет «Сейчас играет» в шторке уведомлений — медиа-карточка Android 16:
+// скруглённое стекло, обложка, таймкоды, тонкая линия прогресса и управление
+// ГЛОБАЛЬНЫМ плеером ОС (src/lib/player.ts) — работает независимо от того,
+// открыто приложение «Музыка» или нет.
 
 import { Pause, Play, SkipBack, SkipForward } from 'lucide-react'
 import { usePlayer } from '@/lib/player'
@@ -30,7 +31,7 @@ export default function NowPlayingShade({ onOpenApp }: { onOpenApp: (app: AppKey
   return (
     <section
       aria-label="Сейчас играет"
-      className="mx-4 mb-1 overflow-hidden rounded-[20px] bg-white/[0.09] ring-1 ring-white/10"
+      className="m3-rise mx-4 mb-1 shrink-0 overflow-hidden rounded-[24px] bg-white/[0.08] ring-1 ring-white/[0.08]"
     >
       <div className="flex items-center gap-3 px-3.5 py-3">
         {/* Тап по информации — открыть приложение «Музыка» */}
@@ -38,20 +39,19 @@ export default function NowPlayingShade({ onOpenApp }: { onOpenApp: (app: AppKey
           type="button"
           tabIndex={0}
           onClick={() => onOpenApp('music')}
-          className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl text-left outline-none focus-visible:ring-2 focus-visible:ring-white/70"
           aria-label={`Открыть музыку: ${current.title} — ${current.artist}`}
         >
-          <span className="relative size-11 shrink-0 overflow-hidden rounded-xl bg-white/10">
+          <span className="relative size-12 shrink-0 overflow-hidden rounded-[14px] bg-white/10">
             {current.artworkSmall ? (
-              // eslint-disable-next-line @next/next/no-img-element
               <img src={current.artworkSmall} alt="" className="h-full w-full object-cover" />
             ) : null}
             {isPlaying && (
-              <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-0.5 bg-emerald-400" />
+              <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[3px] bg-[#3ED598]" />
             )}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-[10px] font-semibold uppercase tracking-wider text-emerald-300/90">
+            <span className="block text-[10px] font-bold uppercase tracking-[0.08em] text-emerald-300/90">
               Сейчас играет
             </span>
             <span className="block truncate text-[13px] font-bold leading-tight text-white">{current.title}</span>
@@ -68,7 +68,7 @@ export default function NowPlayingShade({ onOpenApp }: { onOpenApp: (app: AppKey
             aria-label="Предыдущий трек"
             className="flex size-11 items-center justify-center rounded-full text-white/80 outline-none transition-colors active:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70"
           >
-            <SkipBack className="size-4.5" aria-hidden="true" />
+            <SkipBack className="size-[18px]" aria-hidden="true" />
           </button>
           <button
             type="button"
@@ -86,7 +86,7 @@ export default function NowPlayingShade({ onOpenApp }: { onOpenApp: (app: AppKey
             aria-label="Следующий трек"
             className="flex size-11 items-center justify-center rounded-full text-white/80 outline-none transition-colors active:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70"
           >
-            <SkipForward className="size-4.5" aria-hidden="true" />
+            <SkipForward className="size-[18px]" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -96,7 +96,7 @@ export default function NowPlayingShade({ onOpenApp }: { onOpenApp: (app: AppKey
         <span className="w-8 shrink-0 text-right text-[9px] tabular-nums text-white/40">{fmt(position)}</span>
         <span className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-white/15">
           <span
-            className="block h-full rounded-full bg-emerald-400 transition-[width] duration-300 ease-linear"
+            className="block h-full rounded-full bg-[#3ED598] transition-[width] duration-300 ease-linear"
             style={{ width: `${pct}%` }}
           />
         </span>

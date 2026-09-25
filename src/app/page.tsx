@@ -348,7 +348,10 @@ export default function Home() {
   const controlSwipe = useSwipe({
     threshold: 30,
     onSwipe: (dir) => {
-      if (dir === 'down') setControlOpen(true)
+      if (dir === 'down') {
+        setNotifOpen(false)
+        setControlOpen(true)
+      }
     },
   })
 
@@ -414,7 +417,7 @@ export default function Home() {
       <PhoneFrame>
         {/* статус-бар: тёмные иконки на тёмных экранах,
             над светлыми приложениями (Resale/Банк) — тёмные иконки на светлой полосе */}
-        <StatusBar variant={lightChrome ? 'light' : 'dark'} onBell={() => setNotifOpen(true)} />
+        <StatusBar variant={lightChrome ? 'light' : 'dark'} onBell={() => { setControlOpen(false); setNotifOpen(true) }} />
 
         {/* контент — до самого низа: пилюля-жест накладывается поверх */}
         <div className={`absolute inset-0 top-10 bottom-6 overflow-hidden bg-black ${theme === 'dark' ? 'theme-dark' : ''}`}>
@@ -470,7 +473,7 @@ export default function Home() {
           aria-label="Открыть центр управления"
           className="absolute left-0 right-16 top-0 z-[59] h-8 touch-none outline-none focus-visible:ring-2 focus-visible:ring-white/50"
           onPointerDown={controlSwipe.onPointerDown}
-          onClick={() => setControlOpen(true)}
+          onClick={() => { setNotifOpen(false); setControlOpen(true) }}
         />
 
         {/* жестовая навигация: пилюля + свайпы от краёв (вместо кнопок) */}

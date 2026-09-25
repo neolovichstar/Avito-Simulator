@@ -1,16 +1,18 @@
 'use client'
 
-// Экран блокировки «Resale OS» — максимально простой, как на обычном смартфоне:
-// дата, огромные часы, компактные превью уведомлений (иконка + заголовок + строка)
-// и подсказка «свайп вверх». Никаких паролей и пин-кодов — это игра,
-// телефон открывается одним касанием.
+// Экран блокировки «Resale OS» в духе Android 16:
+// огромные тонкие часы (76px, weight 300), дата под ними, компактные превью
+// уведомлений на стеклянных карточках и два круглых shortcut'а внизу
+// (фонарик — реальный toggle, камера — открывает галерею).
+// Никаких паролей — это игра, телефон открывается свайпом вверх или касанием.
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { ChevronUp, MoonStar } from 'lucide-react'
+import { Camera, Flashlight, MoonStar } from 'lucide-react'
 import { useOS } from '@/lib/store'
 import { sound } from '@/lib/sound'
 import { api } from '@/lib/api'
 import { fmtMoney, timeAgo } from '@/lib/format'
+import { setTorch } from '@/lib/torch'
 import { useDrag } from '@/lib/use-swipe'
 import { KIND_APP } from './NotificationCenter'
 
@@ -28,11 +30,15 @@ function useClock(): Date | null {
 }
 
 const LEAVE_ANIMATION_MS = 400
+const MAX_PREVIEWS = 3 // до трёх превью на локскрине
 
 export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   const dnd = useOS((s) => s.dnd)
   const notifications = useOS((s) => s.notifications)
   const session = useOS((s) => s.session)
+  const flashlight = useOS((s) => s.flashlight)
+  const setFlashlight = useOS((s) => s.setFlashlight)
+  const pushToast = useOS((s) => s.pushToast)
 
   const now = useClock()
   const [leaving, setLeaving] = useState(false)
@@ -74,6 +80,22 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     timerRef.current = window.setTimeout(onUnlock, LEAVE_ANIMATION_MS)
   }, [onUnlock])
 
+  // Фонарик shortcut: реальная вспышка через Torch API (как в центре управления)
+  const toggleFlash = useCallback(async () => {
+    const next = !useOS.getState().flashlight
+    const res = await setTorch(next)
+    setFlashlight(next)
+    if (next) {
+      pushToast('Фонарик', res.real ? 'Вспышка включена на устройстве' : 'Устройство без вспышки — светим виртуально')
+    }
+  }, [setFlashlight, pushToast])
+
+  // Камера shortcut: разблокируем и открываем галерею (ближайшее к камере в игре)
+  const openCamera = useCallback(() => {
+    unlock()
+    useOS.getState().openApp('gallery')
+  }, [unlock])
+
   const { onPointerDown } = useDrag({
     onStart: () => {
       if (leavingRef.current) return
@@ -111,8 +133,9 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [unlock])
 
-  const previews = notifications.filter((n) => !n.readAt).slice(0, 3)
+  const previews = notifications.filter((n) => !n.readAt).slice(0, MAX_PREVIEWS)
   const unreadCount = notifications.filter((n) => !n.readAt).length
+  const moreCount = unreadCount - previews.length
   // «1 уведомление / 2 уведомления / 5 уведомлений» — русские склонения
   const notifWord = (n: number) =>
     n % 10 === 1 && n % 100 !== 11
@@ -145,14 +168,27 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
         className="absolute inset-0"
         style={{
           background:
-            'radial-gradient(120% 55% at 50% -8%, rgba(34,197,94,0.4) 0%, rgba(34,197,94,0.12) 42%, transparent 68%), radial-gradient(90% 40% at 88% 108%, rgba(16,185,129,0.16) 0%, transparent 60%), radial-gradient(80% 36% at 6% 96%, rgba(132,204,22,0.12) 0%, transparent 62%)',
+            'radial-gradient(120% 55% at 50% -8%, rgba(34,197,94,0.38) 0%, rgba(34,197,94,0.12) 42%, transparent 68%), radial-gradient(90% 40% at 88% 108%, rgba(16,185,129,0.16) 0%, transparent 60%), radial-gradient(80% 36% at 6% 96%, rgba(132,204,22,0.10) 0%, transparent 62%)',
         }}
       />
 
-      <div className="relative z-10 flex h-full flex-col px-5 pb-8 pt-12">
-        {/* Дата и время — крупно по центру */}
+      <div className="relative z-10 flex h-full flex-col px-5 pb-4 pt-14">
+        {/* ─── Огромные часы Android 16: тонкие, плотный трекинг ─── */}
         <div className="shrink-0 text-center" suppressHydrationWarning>
-          <p className="text-[15px] font-medium tracking-wide text-white/75">
+          <p
+            className="lock-clock-in text-white"
+            style={{
+              fontSize: '76px',
+              fontWeight: 300,
+              lineHeight: 1,
+              letterSpacing: '-0.045em',
+              fontVariantNumeric: 'tabular-nums',
+              textShadow: '0 4px 44px rgba(0,0,0,0.55)',
+            }}
+          >
+            {now ? now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '\u00A0'}
+          </p>
+          <p className="mt-2 text-[15px] font-medium tracking-wide text-white/80">
             {now
               ? now.toLocaleDateString('ru-RU', {
                   weekday: 'long',
@@ -161,28 +197,20 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
                 })
               : '\u00A0'}
           </p>
-          <p
-            className="mt-1.5 text-6xl font-semibold leading-none tabular-nums tracking-tight text-white"
-            style={{ textShadow: '0 2px 28px rgba(0,0,0,0.5)' }}
-          >
-            {now
-              ? now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-              : '\u00A0'}
-          </p>
         </div>
 
         {/* Режим «Не беспокоить» — одна короткая строка */}
         {dnd && (
-          <p className="mt-3 flex shrink-0 items-center justify-center gap-1.5 text-[11px] text-white/55">
+          <p className="mt-2.5 flex shrink-0 items-center justify-center gap-1.5 text-[11px] text-white/55">
             <MoonStar className="size-3.5" aria-hidden="true" />
             Не беспокоить включён
           </p>
         )}
 
-        {/* Превью уведомлений + итоги дня — иконка приложения, заголовок, одна строка */}
-        <div className="mt-6 min-h-0 flex-1 space-y-2 overflow-y-auto [scrollbar-width:none]">
+        {/* ─── Превью уведомлений: стеклянные карточки white/8, radius 22 ─── */}
+        <div className="mt-6 min-h-0 flex-1 space-y-2.5 overflow-y-auto [scrollbar-width:none]">
           {unreadCount > 0 && (
-            <p className="px-1 text-[11px] font-semibold uppercase tracking-wider text-white/35">
+            <p className="px-1 text-[11px] font-semibold uppercase tracking-wider text-white/40">
               {unreadCount} {notifWord(unreadCount)}
             </p>
           )}
@@ -192,11 +220,11 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
             return (
               <div
                 key={n.id}
-                className="flex items-center gap-3 rounded-2xl bg-black/35 px-3.5 py-3 backdrop-blur-md"
+                className="flex items-center gap-3 rounded-[22px] bg-white/[0.08] px-4 py-3 ring-1 ring-white/[0.06] backdrop-blur-md"
               >
                 <span
                   aria-hidden="true"
-                  className="flex size-9 shrink-0 items-center justify-center rounded-[11px] text-white shadow-sm"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-[12px] text-white shadow-sm"
                   style={{ background: meta.bg }}
                 >
                   <NotifIcon className="size-4" />
@@ -210,12 +238,19 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
             )
           })}
 
-          {/* Итоги дня (если сегодня были сделки) — в том же минималистичном стиле */}
+          {/* «ещё N» — если уведомлений больше трёх */}
+          {moreCount > 0 && (
+            <p className="pt-0.5 text-center text-[11px] font-medium text-white/45">
+              Ещё {moreCount} {notifWord(moreCount)}
+            </p>
+          )}
+
+          {/* Итоги дня (если сегодня были сделки) — в том же стеклянном стиле */}
           {day && dealsLabel && (
-            <div className="flex items-center gap-3 rounded-2xl bg-black/35 px-3.5 py-3 backdrop-blur-md">
+            <div className="flex items-center gap-3 rounded-[22px] bg-white/[0.08] px-4 py-3 ring-1 ring-white/[0.06] backdrop-blur-md">
               <span
                 aria-hidden="true"
-                className="flex size-8 shrink-0 items-center justify-center rounded-[10px] text-white shadow-sm"
+                className="flex size-9 shrink-0 items-center justify-center rounded-[12px] text-white shadow-sm"
                 style={{ background: KIND_APP.deal.bg }}
               >
                 <DayIcon className="size-4" />
@@ -234,14 +269,44 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
           )}
         </div>
 
-        {/* Подсказка снизу: свайп/тап — и телефон открыт */}
-        <div className="shrink-0 pt-3 text-center">
-          <ChevronUp
+        {/* ─── Низ: подсказка, круглые shortcut'ы и Android-handle ─── */}
+        <div className="shrink-0 pt-4">
+          <p className="text-center text-[12px] font-medium text-white/70">Проведите вверх, чтобы открыть</p>
+          <div className="mt-4 flex items-center justify-between px-2">
+            <button
+              type="button"
+              aria-label={flashlight ? 'Выключить фонарик' : 'Включить фонарик'}
+              aria-pressed={flashlight}
+              onClick={(e) => {
+                e.stopPropagation()
+                void toggleFlash()
+              }}
+              className={`flex size-14 items-center justify-center rounded-full backdrop-blur-xl outline-none transition-all duration-200 active:scale-90 focus-visible:ring-2 focus-visible:ring-white/70 ${
+                flashlight
+                  ? 'bg-white text-black shadow-[0_0_28px_rgba(255,251,214,0.45)]'
+                  : 'bg-white/[0.12] text-white'
+              }`}
+            >
+              <Flashlight className="size-6" aria-hidden="true" />
+            </button>
+
+            <button
+              type="button"
+              aria-label="Открыть камеру (галерею)"
+              onClick={(e) => {
+                e.stopPropagation()
+                openCamera()
+              }}
+              className="flex size-14 items-center justify-center rounded-full bg-white/[0.12] text-white backdrop-blur-xl outline-none transition-all duration-200 active:scale-90 focus-visible:ring-2 focus-visible:ring-white/70"
+            >
+              <Camera className="size-6" aria-hidden="true" />
+            </button>
+          </div>
+          {/* Android-handle: тонкая пилюля внизу */}
+          <span
             aria-hidden="true"
-            className="mx-auto size-6 animate-bounce text-white/85"
-            strokeWidth={2.4}
+            className="handle-breathe mx-auto mt-5 block h-1 w-28 rounded-full bg-white/50"
           />
-          <p className="mt-1.5 text-[13px] font-medium text-white/85">Проведите вверх, чтобы открыть</p>
         </div>
       </div>
     </div>

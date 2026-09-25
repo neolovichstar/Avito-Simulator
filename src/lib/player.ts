@@ -227,7 +227,8 @@ type MediaNav = Navigator & {
     artist?: string
     album?: string
     artwork?: { src: string; sizes?: string; type?: string }[]
-  }) => unknown
+    // DOM-тип MediaMetadata (а не unknown), чтобы присваивание в mediaSession.metadata тайп-чекалось.
+  }) => MediaMetadata
 }
 
 function syncMediaSession() {

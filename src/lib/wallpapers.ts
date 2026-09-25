@@ -42,6 +42,26 @@ export const WALLPAPERS: WallpaperDef[] = [
       'radial-gradient(circle at 12% 82%, rgba(190,18,60,0.35), transparent 55%),' +
       'linear-gradient(180deg, #1c0f18 0%, #2b1220 55%, #0d0509 100%)',
   },
+  // Android 16-подобные системные градиенты (тёмные, expressive, без холодных оттенков)
+  {
+    id: 'moss',
+    name: 'Мох',
+    image: null,
+    css:
+      'radial-gradient(circle at 24% 12%, rgba(74,222,128,0.30), transparent 52%),' +
+      'radial-gradient(circle at 80% 88%, rgba(6,78,59,0.60), transparent 56%),' +
+      'radial-gradient(circle at 62% 40%, rgba(16,185,129,0.14), transparent 46%),' +
+      'linear-gradient(175deg, #0c2318 0%, #081710 55%, #040a07 100%)',
+  },
+  {
+    id: 'graphite',
+    name: 'Графит',
+    image: null,
+    css:
+      'radial-gradient(circle at 78% 10%, rgba(214,163,82,0.20), transparent 50%),' +
+      'radial-gradient(circle at 14% 90%, rgba(168,162,158,0.16), transparent 52%),' +
+      'linear-gradient(178deg, #201e1b 0%, #141210 55%, #0a0908 100%)',
+  },
 ]
 
 export function wallpaperById(id: string): WallpaperDef {

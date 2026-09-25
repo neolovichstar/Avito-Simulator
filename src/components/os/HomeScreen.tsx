@@ -6,7 +6,7 @@
 // Перелистывание — свайпом: палец на телефоне, зажатая мышь на ПК (Pointer Events).
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { Crown, Package, Trophy } from 'lucide-react'
+import { Crown, Mic, Package, Search, Trophy } from 'lucide-react'
 import { useOS, type AppKey, type WidgetKey } from '@/lib/store'
 import { fmtMoney } from '@/lib/format'
 import { wallpaperClass } from '@/lib/wallpapers'
@@ -29,8 +29,8 @@ function useClock(): Date | null {
   return ts ? new Date(ts) : null
 }
 
-const glass = 'rounded-2xl bg-white/10 backdrop-blur-md'
-const WIDGET_CLASS = 'flex min-h-12 items-center gap-2 rounded-2xl bg-white/10 px-3 py-2 text-left backdrop-blur-md outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white/70'
+const glass = 'rounded-[22px] bg-white/[0.10] backdrop-blur-md'
+const WIDGET_CLASS = 'flex min-h-12 items-center gap-2 rounded-[22px] bg-white/[0.10] px-3 py-2 text-left backdrop-blur-md outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white/70'
 
 // ─── Компактные виджеты (одна строка, h-12) ──────────────────────────────────
 function Widget({
@@ -192,9 +192,15 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
       role="region"
       aria-label="Домашний экран"
     >
+      {/* скрим сверху — читаемость статус-бара на светлых/фото-обоях */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 z-0 h-28 bg-gradient-to-b from-black/45 via-black/15 to-transparent"
+      />
+
       {/* ─── Страницы (свайп влево/вправо) ─── */}
       {/* touch-none: на телефоне браузер иначе перехватывает свайп под скролл и шлёт pointercancel */}
-      <div className="relative flex-1 touch-none overflow-hidden" onPointerDown={pages.onPointerDown} onClickCapture={guardClick}>
+      <div className="relative z-10 flex-1 touch-none overflow-hidden" onPointerDown={pages.onPointerDown} onClickCapture={guardClick}>
         <div className="flex h-full w-[200%]" style={trackStyle}>
           {/* ─── Страница 1: компактные виджеты + основные приложения ─── */}
           <section className="flex h-full w-1/2 flex-col" aria-label="Страница 1 — приложения" aria-hidden={page !== 0}>
@@ -306,14 +312,28 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
       </div>
 
       {/* Page-dots: активная страница — пилюля */}
-      <div className="mb-3 flex items-center justify-center gap-1.5" aria-hidden="true">
+      <div className="z-10 mb-3 flex items-center justify-center gap-1.5" aria-hidden="true">
         <span className={`h-1.5 rounded-full bg-white transition-all duration-300 ${page === 0 ? 'w-5' : 'w-1.5 bg-white/40'}`} />
         <span className={`h-1.5 rounded-full bg-white transition-all duration-300 ${page === 1 ? 'w-5' : 'w-1.5 bg-white/40'}`} />
       </div>
 
-      {/* Док */}
-      <div className="mx-5 mb-2.5 rounded-3xl bg-white/10 p-3.5 pb-3 backdrop-blur-md">
-        <div className="grid grid-cols-4 gap-5">
+      {/* ─── Поисковая пилюля над доком (в духе Google на Android) ─── */}
+      <div className="z-10 mx-5 mb-3">
+        <button
+          type="button"
+          aria-label="Поиск — открыть браузер"
+          onClick={() => onOpenApp('browser')}
+          className="flex h-12 w-full items-center gap-3 rounded-full bg-white/[0.12] px-4 text-left backdrop-blur-xl outline-none ring-1 ring-white/10 transition-all duration-200 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-white/70"
+        >
+          <Search className="size-[18px] shrink-0 text-white/85" aria-hidden="true" />
+          <span className="flex-1 truncate text-[13px] font-medium text-white/75">Поиск</span>
+          <Mic className="size-[18px] shrink-0 text-white/55" aria-hidden="true" />
+        </button>
+      </div>
+
+      {/* ─── Док на стеклянной панели Android 16 ─── */}
+      <div className="z-10 mx-4 mb-2.5 rounded-[26px] bg-white/10 p-3 pb-3 backdrop-blur-xl ring-1 ring-white/10">
+        <div className="grid grid-cols-4 gap-4">
           {DOCK_APPS.map((app) => (
             <AppIcon
               key={app}

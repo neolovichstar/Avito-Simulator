@@ -17,7 +17,7 @@ const HOME_FLICK = 40 // px вверх для флика «домой»
 const RECENTS_DRAG = 20 // px вверх при медленном драге — «недавние»
 const HOLD_MS = 320 // дольше — это «долгий драг» (недавние), короче — флик
 const BACK_THRESHOLD = 52 // px от бокового края для «назад»
-const PILL_BASE = 112 // ширина пилюли в покое, px
+const PILL_BASE = 112 // ширина пилюли в покое, px (w-28 — как в Android 16)
 
 export default function GestureNav({
   onBack,
@@ -109,8 +109,8 @@ export default function GestureNav({
         style={{ paddingBottom: 'calc(8px + env(safe-area-inset-bottom))' }}
       >
         <span
-          className="block h-[5px] rounded-full bg-white mix-blend-difference transition-[width] duration-100 ease-out"
-          style={{ width: pillWidth, opacity: 0.9 }}
+          className="block h-1 w-28 rounded-full bg-white/40 mix-blend-difference transition-[width] duration-150 ease-[cubic-bezier(0.2,0,0,1)]"
+          style={{ width: pillWidth }}
         />
       </div>
 
@@ -122,8 +122,8 @@ export default function GestureNav({
       {backSide && (
         <span
           aria-hidden="true"
-          className={`absolute top-1/2 z-[60] flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/25 backdrop-blur-md ${
-            backSide === 'left' ? 'left-2.5' : 'right-2.5'
+          className={`absolute top-1/2 z-[60] flex size-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/12 ring-1 ring-white/25 backdrop-blur-md ${
+            backSide === 'left' ? 'left-2' : 'right-2'
           }`}
           style={{
             opacity: 0.35 + backProgress * 0.65,

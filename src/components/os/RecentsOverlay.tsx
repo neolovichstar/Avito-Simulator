@@ -1,9 +1,11 @@
 'use client'
 
-// Недавние приложения: тап возвращает в приложение, свайп карточки вверх —
-// закрывает его из списка недавних (как на настоящем телефоне).
+// Недавние приложения в духе Android 16: горизонтальная карусель карточек
+// («скриншот» = логотип приложения на фирменном фоне), в шапке карточки —
+// иконка и имя, внизу — кнопки «Открыть» и закрыть. Свайп карточки вверх —
+// закрывает приложение из недавних, в конце ленты — «Очистить все».
 import { useRef, useState } from 'react'
-import { X } from 'lucide-react'
+import { Eraser, X } from 'lucide-react'
 import { useOS, type AppKey } from '@/lib/store'
 import { useDrag } from '@/lib/use-swipe'
 import { APP_TILE, AppTileImage } from './app-logos'
@@ -52,6 +54,20 @@ export default function RecentsOverlay({
     },
   })
 
+  // Тап по карточке — вернуться в приложение (как в настоящих recents)
+  const resume = (key: AppKey) => {
+    if (suppressClick.current) return
+    if (useOS.getState().currentApp !== key) useOS.getState().openApp(key)
+    onClose()
+    onResume()
+  }
+
+  const clearAll = () => {
+    for (const key of useOS.getState().openApps) dismissApp(key)
+    onClose()
+    onResume()
+  }
+
   if (!open) return null
 
   return (
@@ -64,9 +80,15 @@ export default function RecentsOverlay({
       />
       <div className="pointer-events-none relative flex h-full flex-col items-center justify-center gap-6">
         {openApps.length === 0 ? (
-          <p className="text-sm text-white/60">Нет недавних приложений</p>
+          <div className="m3-rise flex flex-col items-center gap-3">
+            <div className="flex size-16 items-center justify-center rounded-[22px] bg-white/[0.07]">
+              <Eraser className="size-7 text-white/40" aria-hidden="true" />
+            </div>
+            <p className="text-sm font-semibold text-white/80">Нет недавних приложений</p>
+            <p className="text-xs text-white/45">Откройте любое — оно появится здесь</p>
+          </div>
         ) : (
-          <div className="flex w-full items-center gap-5 overflow-x-auto px-8 py-4">
+          <div className="flex w-full items-center gap-4 overflow-x-auto px-7 py-4">
             {openApps.map((key) => {
               const tile = APP_TILE[key]
               const isDrag = dragging?.key === key
@@ -77,49 +99,83 @@ export default function RecentsOverlay({
                   key={key}
                   data-appkey={key}
                   onPointerDown={onCardPointerDown}
+                  onClick={() => resume(key)}
                   style={{
                     transform: isDrag ? `translateY(${dy}px)` : undefined,
                     opacity: isDrag ? Math.max(0, 1 - Math.abs(dy) / 130) : undefined,
                     touchAction: 'pan-x',
                   }}
-                  className="pointer-events-auto flex shrink-0 select-none flex-col items-center gap-2.5"
+                  className="pointer-events-auto m3-rise-stagger shrink-0 select-none"
                 >
-                  <button
-                    type="button"
+                  <div
+                    role="button"
+                    tabIndex={0}
                     aria-label={`Вернуться в приложение ${tile.label}. Смахните вверх, чтобы закрыть`}
-                    onClick={() => {
-                      if (suppressClick.current) return
-                      onResume()
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        resume(key)
+                      }
                     }}
-                    style={{ backgroundImage: tile.background }}
-                    className={`relative flex h-[210px] w-[140px] items-center justify-center rounded-[20px] shadow-2xl ring-1 outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white ${
-                      willClose ? 'ring-red-400/70' : 'ring-white/15'
+                    className={`w-[168px] cursor-pointer overflow-hidden rounded-[20px] bg-neutral-900 shadow-[0_26px_60px_-18px_rgba(0,0,0,0.9)] ring-1 outline-none transition-shadow ${
+                      willClose ? 'ring-2 ring-red-400/80' : 'ring-white/15'
                     }`}
                   >
-                    {/* бейдж «закрыть» проявляется при драге */}
-                    {isDrag && dy < -20 && (
-                      <span
-                        aria-hidden="true"
-                        className="absolute -top-2 left-1/2 flex size-6 -translate-x-1/2 items-center justify-center rounded-full bg-red-500 text-white shadow-lg"
-                      >
-                        <X className="size-3.5" />
+                    {/* шапка карточки: иконка + имя приложения */}
+                    <div className="flex items-center gap-2 bg-black/45 px-3 py-2.5">
+                      <span className="block size-6 shrink-0 overflow-hidden rounded-[7px]">
+                        <AppTileImage app={key} className="size-6" />
                       </span>
-                    )}
-                    <AppTileImage app={key} className="size-20 rounded-[1.2rem] shadow-xl ring-1 ring-black/10" />
-                  </button>
-                  {/* подпись под карточкой — как под иконкой на рабочем столе */}
-                  <span className="max-w-[140px] truncate text-xs font-medium text-white/90 [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">
-                    {tile.label}
-                  </span>
+                      <span className="truncate text-[12px] font-bold text-white/95">{tile.label}</span>
+                    </div>
+                    {/* «скриншот»: логотип приложения на фирменном фоне */}
+                    <div
+                      className="flex h-[164px] items-center justify-center"
+                      style={{ backgroundImage: tile.background }}
+                    >
+                      <AppTileImage app={key} className="size-[74px] rounded-[1.15rem] shadow-xl ring-1 ring-black/10" />
+                    </div>
+                    {/* низ: «Открыть» + крестик */}
+                    <div className="flex items-center gap-1.5 bg-black/45 p-2">
+                      <span className="flex h-9 flex-1 items-center justify-center rounded-full bg-white/12 text-[11px] font-bold text-white transition-colors active:bg-white/20">
+                        Открыть
+                      </span>
+                      <button
+                        type="button"
+                        aria-label={`Закрыть ${tile.label} из недавних`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (suppressClick.current) return
+                          dismissApp(key)
+                        }}
+                        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white/12 text-white/85 outline-none transition-colors active:bg-white/25 focus-visible:ring-2 focus-visible:ring-white"
+                      >
+                        <X className="size-4" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )
             })}
+
+            {/* «Очистить все» в конце ленты */}
+            <div className="pointer-events-auto flex shrink-0 items-center pl-1">
+              <button
+                type="button"
+                onClick={clearAll}
+                aria-label="Очистить все недавние приложения"
+                className="flex h-11 items-center gap-2 rounded-full bg-white/10 px-5 text-[13px] font-bold text-white/90 outline-none ring-1 ring-white/10 transition-all duration-200 active:scale-[0.96] active:bg-white/20 focus-visible:ring-2 focus-visible:ring-white"
+              >
+                <Eraser className="size-4" aria-hidden="true" />
+                Очистить все
+              </button>
+            </div>
           </div>
         )}
         <p className="text-xs text-white/50">
           {openApps.length > 0
             ? 'Нажмите, чтобы вернуться · смахните вверх, чтобы закрыть'
-            : 'Откройте любое приложение — оно появится здесь'}
+            : 'Смахните вверх от низа экрана, чтобы вернуться домой'}
         </p>
       </div>
     </div>

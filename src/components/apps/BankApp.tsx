@@ -2,17 +2,19 @@
 
 // Приложение «Банк» — редизайн 1:1 по интерфейсу СберБанк Онлайн (светлая тема):
 // фон #F5F6FA, мягкий зелёный градиентный хедер (#D3ECD3→#F5F6FA) с аватаром-инициалами,
-// белой пилюлей поиска и зелёным кружком-микрофоном; карусель карт в зелёном градиенте
-// #21A03A→#4FCB62 с чипом «Дебетовая»; белый блок «Карты» radius 20 с рядами продуктов;
+// белой пилюлей поиска и зелёным кружком-микрофоном; карусель карт с фонами-изображениями
+// из реестра public/img/cards (30 градиентов) + пикер «Оформление карты» (bottom-sheet,
+// выбор каждой карты сохраняется в localStorage); белый блок «Карты» radius 20;
 // быстрые действия — 4 белых круга 48px с зелёными иконками; «История» с цветными
 // кругами-категориями (поступления +зелёные, списания чёрные); промо-баннер #D8E9FA;
 // нижний таб-бар Главный/Платежи/История/Ещё (активный #21A03A, неактивный #9AA0A8).
 // Вся бизнес-логика (api.bank/takeLoan/repayLoan/depositOp, поиск, аналитика, CSV,
 // нижние листы, touch-action свайпов) сохранена 1:1.
 import { useCallback, useEffect, useMemo, useState, type UIEvent } from 'react'
+import { AnimatePresence, motion, useDragControls } from 'framer-motion'
 import {
-  AlertTriangle, ArrowLeftRight, Banknote, Bell, Building2, Car, ChevronRight, Clock, CreditCard,
-  FileDown, Gavel, Home, Info, Landmark, LayoutGrid, Loader2, Mic, Percent, PieChart,
+  AlertTriangle, ArrowLeftRight, Banknote, Bell, Building2, Car, Check, ChevronRight, Clock, CreditCard,
+  FileDown, Gavel, Home, Info, Landmark, LayoutGrid, Loader2, Mic, Palette, Percent, PieChart,
   PiggyBank, Plus, QrCode, Receipt, Search, Send, ShieldCheck, ShoppingBag, Smartphone, TrendingUp,
   Truck, Undo2, Wifi, X, type LucideIcon,
 } from 'lucide-react'
@@ -24,10 +26,23 @@ import type { BankData, SessionUser, TransactionDTO } from '@/lib/types'
 import { DEPOSIT_RATE_PER_HOUR, cardNumberFor, creditLabel } from '@/lib/economy'
 import { useCountUp } from '@/lib/use-count-up'
 import { Slider } from '@/components/ui/slider'
+import { sound } from '@/lib/sound'
+import {
+  ALL_CARD_BGS, CARD_COLORS, CARD_COLOR_LABEL, DEFAULT_CARD_BGS, cardBg,
+  getCardBg, setCardBg, type CardBg, type CardColor,
+} from '@/lib/cards'
 
 type Screen = 'main' | 'payments' | 'analytics' | 'history'
 type SheetKey = 'deposit' | 'loan' | 'qr' | 'more' | null
+type CardKey = 'debit' | 'credit' | 'savings'
 type ChartMode = 'inc' | 'exp'
+
+// Названия карт игрока для пикера оформления
+const CARD_STYLE_LABEL: Record<CardKey, string> = {
+  debit: 'Дебетовая',
+  credit: 'Кредитная',
+  savings: 'Накопительный счёт',
+}
 
 const MONTH_SHORT = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек']
 const MONTH_NOM = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
@@ -273,6 +288,158 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
   )
 }
 
+// Пикер оформления карты: bottom-sheet на framer-motion (slide-up, свайп вниз за ручку),
+// светлая тема: чипы-фильтры по цвету + сетка 3 колонки всех 30 фонов (2:1, rounded-[14px]).
+// Тап по превью применяет фон мгновенно (persist делает родитель через applyCardBg).
+function CardStyleSheet({ cardLabel, current, onPick, onClose }: {
+  cardLabel: string
+  current: CardBg
+  onPick: (bg: CardBg) => void
+  onClose: () => void
+}) {
+  const [filter, setFilter] = useState<'all' | CardColor>('all')
+  const controls = useDragControls()
+
+  const filters: { key: 'all' | CardColor; label: string }[] = [
+    { key: 'all', label: 'Все' },
+    ...CARD_COLORS.map((c) => ({ key: c, label: CARD_COLOR_LABEL[c] })),
+  ]
+  const list = filter === 'all' ? ALL_CARD_BGS : ALL_CARD_BGS.filter((i) => i.color === filter)
+
+  return (
+    <div
+      className="absolute inset-0 z-50 flex flex-col justify-end"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Оформление карты «${cardLabel}»`}
+    >
+      <motion.button
+        type="button"
+        aria-label="Закрыть"
+        onClick={onClose}
+        className="absolute inset-0 bg-black/40"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+      />
+      <motion.div
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'tween', duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+        drag="y"
+        dragListener={false}
+        dragControls={controls}
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={{ top: 0, bottom: 0.55 }}
+        onDragEnd={(_e, info) => {
+          if (info.offset.y > 72 || info.velocity.y > 550) onClose()
+        }}
+        className="relative max-h-[88%] rounded-t-[28px] bg-white pb-[max(18px,env(safe-area-inset-bottom))] shadow-[0_-12px_40px_rgba(0,0,0,0.18)]"
+      >
+        {/* ручка: свайп вниз закрывает пикер */}
+        <div
+          onPointerDown={(e) => controls.start(e)}
+          className="mx-auto flex h-9 w-full cursor-grab touch-none items-center justify-center active:cursor-grabbing"
+          aria-hidden="true"
+        >
+          <span className="h-1 w-10 rounded-full bg-[#E1E4E9]" />
+        </div>
+
+        <div className="flex items-center justify-between gap-3 px-5">
+          <div className="min-w-0">
+            <h2 className="text-[17px] font-bold tracking-tight text-[#1A1A1A]">Оформление карты</h2>
+            <p className="mt-0.5 truncate text-[11px] text-[#9AA0A8]">
+              {cardLabel} · Выбор сохраняется автоматически
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Закрыть"
+            className="relative flex size-10 shrink-0 items-center justify-center rounded-full bg-[#F5F6FA] text-[#9AA0A8] transition active:scale-95 after:absolute after:-inset-1 after:content-['']"
+          >
+            <X className="size-4" aria-hidden="true" />
+          </button>
+        </div>
+
+        {/* чипы-фильтры по цвету */}
+        <div
+          role="group"
+          aria-label="Фильтр по цвету"
+          className="flex gap-2 overflow-x-auto px-5 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {filters.map((f) => {
+            const active = filter === f.key
+            return (
+              <button
+                key={f.key}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setFilter(f.key)}
+                className={`relative flex h-10 shrink-0 items-center rounded-full px-4 text-[13px] transition after:absolute after:inset-x-0 after:-inset-y-2 after:content-[''] ${
+                  active
+                    ? 'bg-[#21A03A] font-semibold text-white'
+                    : 'bg-[#F5F6FA] font-medium text-[#1A1A1A]'
+                }`}
+              >
+                {f.label}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* сетка всех фонов: 3 колонки, тап = применить */}
+        <div
+          role="radiogroup"
+          aria-label="Фон карты"
+          className="grid max-h-[46vh] grid-cols-3 gap-2.5 overflow-y-auto px-5 pb-1 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          style={{ touchAction: 'pan-y' }}
+        >
+          {list.map(({ bg, color, style }) => {
+            const active = bg === current
+            return (
+              <button
+                key={bg}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                aria-label={`${CARD_COLOR_LABEL[color]}, вариант ${style}`}
+                onClick={() => onPick(bg)}
+                className={`relative aspect-[2/1] overflow-hidden rounded-[14px] transition active:scale-[0.97] ${
+                  active ? 'ring-2 ring-[#21A03A] ring-offset-2' : 'ring-1 ring-black/[0.06]'
+                }`}
+              >
+                <img
+                  src={cardBg(bg)}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  draggable={false}
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+                {active && (
+                  <span
+                    className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-[#21A03A] text-white shadow"
+                    aria-hidden="true"
+                  >
+                    <Check className="size-3" strokeWidth={3.5} />
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+
+        <p className="px-5 pt-2 text-center text-[10px] text-[#9AA0A8]">
+          Оформление применяется сразу и остаётся на устройстве
+        </p>
+      </motion.div>
+    </div>
+  )
+}
+
 export default function BankApp() {
   const session = useOS((s) => s.session)
   const openApp = useOS((s) => s.openApp)
@@ -294,6 +461,9 @@ export default function BankApp() {
   const [analyticsMode, setAnalyticsMode] = useState<'out' | 'in'>('out')
   const [chartMode, setChartMode] = useState<ChartMode>('inc')
   const [cardSlide, setCardSlide] = useState(0)
+  // фоны карт игрока (реестр /img/cards) + открытый пикер оформления
+  const [cardBgs, setCardBgs] = useState<Record<CardKey, CardBg>>(DEFAULT_CARD_BGS)
+  const [styleFor, setStyleFor] = useState<CardKey | null>(null)
   // плавный «счётчик денег» на карте и в блоке «Карты»
   const animatedBalance = useCountUp(data?.balance ?? 0)
 
@@ -312,6 +482,22 @@ export default function BankApp() {
   useEffect(() => {
     load()
   }, [load])
+
+  // Оформления карт читаем после монтирования: localStorage доступен только на клиенте
+  useEffect(() => {
+    setCardBgs({
+      debit: getCardBg('debit', DEFAULT_CARD_BGS.debit),
+      credit: getCardBg('credit', DEFAULT_CARD_BGS.credit),
+      savings: getCardBg('savings', DEFAULT_CARD_BGS.savings),
+    })
+  }, [])
+
+  // Тап по превью в пикере: применяем сразу, persist в localStorage, лёгкий haptic
+  const applyCardBg = useCallback((key: CardKey, bg: CardBg) => {
+    setCardBgs((prev) => ({ ...prev, [key]: bg }))
+    setCardBg(key, bg)
+    sound.pop()
+  }, [])
 
   // Подстраиваем суммы под актуальные данные банка
   useEffect(() => {
@@ -414,8 +600,8 @@ export default function BankApp() {
   const score = data?.creditScore ?? 500
   const credit = creditLabel(score)
 
-  // Карусель карт под Сбер: зелёный градиент, белые данные, чип продукта
-  const cards = data
+  // Карусель карт под Сбер: фон каждой карты — из реестра /img/cards, белые данные, чип продукта
+  const cards: { key: CardKey; chip: string; num: string; label: string; amount: string; sub: string; bg: CardBg; aria: string; run: () => void }[] = data
     ? [
         {
           key: 'debit',
@@ -424,7 +610,7 @@ export default function BankApp() {
           label: 'Доступно',
           amount: fmtMoney(animatedBalance),
           sub: holderName,
-          gradient: 'linear-gradient(135deg,#21A03A 0%,#4FCB62 100%)',
+          bg: cardBgs.debit,
           aria: `Дебетовая карта ${maskedCard}, доступно ${fmtMoney(data.balance)}`,
           run: () => pushToast('Дебетовая карта', `Доступно: ${fmtMoney(data.balance)}`),
         },
@@ -437,7 +623,7 @@ export default function BankApp() {
           sub: data.activeLoan
             ? `Погашение до ${new Date(data.activeLoan.dueAt).toLocaleDateString('ru-RU')}`
             : `Лимит ${fmtMoney(data.loanLimit)}`,
-          gradient: 'linear-gradient(135deg,#177A2C 0%,#2FA34C 100%)',
+          bg: cardBgs.credit,
           aria: 'Кредитная карта, открыть кредитный лист',
           run: () => setSheet('loan'),
         },
@@ -448,7 +634,7 @@ export default function BankApp() {
           label: 'Накопительный счёт',
           amount: fmtMoney(data.deposit),
           sub: `«Копилка» · ${rate}% в час`,
-          gradient: 'linear-gradient(135deg,#2FA34C 0%,#6FD584 100%)',
+          bg: cardBgs.savings,
           aria: 'Накопительный счёт, открыть вклад «Копилка»',
           run: () => setSheet('deposit'),
         },
@@ -588,7 +774,7 @@ export default function BankApp() {
                     </h1>
                   </div>
 
-                  {/* карусель карт: зелёный градиент #21A03A→#4FCB62, белые данные, чип «Дебетовая» */}
+                  {/* карусель карт: фон из реестра /img/cards + затемняющий градиент, белые данные, чип продукта */}
                   <div
                     role="region"
                     aria-label="Мои карты"
@@ -597,28 +783,50 @@ export default function BankApp() {
                     onScroll={onCardsScroll}
                   >
                     {cards.map((c) => (
-                      <button
-                        key={c.key}
-                        type="button"
-                        onClick={c.run}
-                        aria-label={c.aria}
-                        className="relative h-[140px] w-[82%] shrink-0 snap-center overflow-hidden rounded-[20px] p-4 text-left transition active:scale-[0.99]"
-                        style={{ background: c.gradient }}
-                      >
-                        <span className="absolute -right-6 -top-12 size-36 rounded-full bg-white/10" aria-hidden="true" />
-                        <span className="absolute -bottom-16 -left-8 size-40 rounded-full bg-white/[0.07]" aria-hidden="true" />
-                        <span className="relative flex items-center justify-between">
-                          <span className="rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-semibold text-white">{c.chip}</span>
-                          <span className="text-[12px] font-medium tabular-nums tracking-[0.14em] text-white/80">{c.num}</span>
-                        </span>
-                        <span className="relative mt-4 block">
-                          <span className="block text-[11px] text-white/75">{c.label}</span>
-                          <span className="value-pop block text-[24px] font-bold leading-tight tabular-nums text-white">{c.amount}</span>
-                        </span>
-                        <span className="absolute inset-x-4 bottom-3 block truncate text-[11px] uppercase tracking-wide text-white/75">
-                          {c.sub}
-                        </span>
-                      </button>
+                      <div key={c.key} className="relative h-[140px] w-[82%] shrink-0 snap-center">
+                        <button
+                          type="button"
+                          onClick={c.run}
+                          aria-label={c.aria}
+                          className="absolute inset-0 overflow-hidden rounded-[20px] p-4 text-left transition active:scale-[0.99]"
+                        >
+                          {/* фон карты из реестра + затемняющий градиент для читаемости белого текста */}
+                          <img
+                            src={cardBg(c.bg)}
+                            alt=""
+                            draggable={false}
+                            className="absolute inset-0 h-full w-full object-cover"
+                          />
+                          <span
+                            className="absolute inset-0"
+                            style={{ background: 'linear-gradient(rgba(0,0,0,0.18), rgba(0,0,0,0.38))' }}
+                            aria-hidden="true"
+                          />
+                          <span className="absolute -right-6 -top-12 size-36 rounded-full bg-white/10" aria-hidden="true" />
+                          <span className="absolute -bottom-16 -left-8 size-40 rounded-full bg-white/[0.07]" aria-hidden="true" />
+                          <span className="relative flex items-center justify-between">
+                            <span className="rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-semibold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">{c.chip}</span>
+                            <span className="text-[12px] font-medium tabular-nums tracking-[0.14em] text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">{c.num}</span>
+                          </span>
+                          <span className="relative mt-4 block">
+                            <span className="block text-[11px] text-white/85 drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">{c.label}</span>
+                            <span className="value-pop block text-[24px] font-bold leading-tight tabular-nums text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">{c.amount}</span>
+                          </span>
+                          <span className="absolute bottom-3 left-4 right-[124px] block truncate text-[11px] uppercase tracking-wide text-white/85 drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">
+                            {c.sub}
+                          </span>
+                        </button>
+                        {/* кнопка «Оформление» — открывает пикер фона этой карты */}
+                        <button
+                          type="button"
+                          onClick={() => setStyleFor(c.key)}
+                          aria-label={`Оформление карты «${c.chip}»`}
+                          className="absolute bottom-2.5 right-2.5 z-10 flex h-9 items-center gap-1.5 rounded-full bg-black/35 px-3 text-[11px] font-semibold text-white backdrop-blur-[2px] transition active:scale-95 after:absolute after:-inset-1.5 after:content-['']"
+                        >
+                          <Palette className="size-3.5" aria-hidden="true" />
+                          Оформление
+                        </button>
+                      </div>
                     ))}
                   </div>
                   <div className="mt-2.5 flex justify-center gap-1.5" aria-hidden="true">
@@ -1192,6 +1400,19 @@ export default function BankApp() {
           )}
         </Sheet>
       )}
+
+      {/* ===== ПИКЕР ОФОРМЛЕНИЯ КАРТЫ (bottom-sheet, framer-motion) ===== */}
+      <AnimatePresence>
+        {styleFor && (
+          <CardStyleSheet
+            key={styleFor}
+            cardLabel={CARD_STYLE_LABEL[styleFor]}
+            current={cardBgs[styleFor]}
+            onPick={(bg) => applyCardBg(styleFor, bg)}
+            onClose={() => setStyleFor(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

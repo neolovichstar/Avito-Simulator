@@ -1,12 +1,13 @@
 'use client'
 
-// Уведомления как в настоящем телефоне: иконка приложения, имя приложения,
-// заголовок, текст. Тап разворачивает карточку — видно весь текст и кнопку «Открыть».
-// Карточку можно смахнуть в сторону — она удалится (и на сервере тоже).
-import { useRef, useState } from 'react'
+// Шторка уведомлений в духе Android 16: мелкий хендл сверху, дата слева,
+// справа — «прочитать всё», настройки и «Очистить». Карточки — стекло white/8
+// с радиусом 24px: иконка приложения, имя, заголовок, текст. Тап разворачивает
+// карточку, свайп в сторону удаляет (и на сервере тоже).
+import { useRef, useState, useSyncExternalStore } from 'react'
 import {
-  Bell, ChevronDown, Crown, Gavel, Info, MessageSquare, Receipt,
-  ShoppingBag, Trash2, TrendingUp, Truck, Trophy, type LucideIcon,
+  Bell, CheckCheck, ChevronDown, Crown, Gavel, Info, MessageSquare, Receipt,
+  Settings, ShoppingBag, Trash2, TrendingUp, Truck, Trophy, type LucideIcon,
 } from 'lucide-react'
 import { useOS, type AppKey } from '@/lib/store'
 import { api } from '@/lib/api'
@@ -42,6 +43,19 @@ export const KIND_APP: Record<string, NotifApp> = {
 const clampX = (x: number) => Math.max(-150, Math.min(150, x))
 const SWIPE_DELETE = 88 // порог смахивания, px
 
+// Живые тики — для даты в шапке шторки.
+function useClock(): Date | null {
+  const ts = useSyncExternalStore(
+    (onStoreChange) => {
+      const id = setInterval(onStoreChange, 1000)
+      return () => clearInterval(id)
+    },
+    () => Math.floor(Date.now() / 1000) * 1000,
+    () => 0,
+  )
+  return ts ? new Date(ts) : null
+}
+
 export default function NotificationCenter({
   open,
   onClose,
@@ -59,6 +73,7 @@ export default function NotificationCenter({
   const [dragging, setDragging] = useState<{ id: string; dx: number } | null>(null)
   const dragRef = useRef<{ id: string } | null>(null)
   const suppressClick = useRef(false)
+  const now = useClock()
 
   // Группировка: непрочитанные сверху, затем разделитель «Ранее» и прочитанные
   const unreadItems = notifications.filter((n) => !n.readAt)
@@ -147,8 +162,10 @@ export default function NotificationCenter({
             opacity: isDrag ? Math.max(0, 1 - Math.abs(dx) / 170) : undefined,
             touchAction: 'pan-y',
           }}
-          className={`relative cursor-pointer touch-pan-y select-none overflow-hidden rounded-[20px] px-4 py-3.5 outline-none transition-[background-color,box-shadow] duration-200 focus-visible:ring-2 focus-visible:ring-white/60 ${
-            willDelete ? 'bg-red-500/30 ring-1 ring-red-400/50' : unread ? 'bg-white/10' : 'bg-white/[0.045]'
+          className={`relative cursor-pointer touch-pan-y select-none overflow-hidden rounded-[24px] px-4 py-3.5 outline-none ring-1 transition-[background-color,box-shadow] duration-200 focus-visible:ring-2 focus-visible:ring-white/60 ${
+            willDelete
+              ? 'bg-red-500/30 ring-red-400/50'
+              : `backdrop-blur-md ${unread ? 'bg-white/[0.09] ring-white/[0.07]' : 'bg-white/[0.04] ring-white/[0.04]'}`
           } ${expanded && !isDrag ? 'bg-white/[0.13]' : !isDrag && !willDelete ? 'active:bg-white/[0.09]' : ''}`}
         >
           {/* Цветной акцент слева у непрочитанных — цвет приложения, как у тостов */}
@@ -160,16 +177,16 @@ export default function NotificationCenter({
             />
           )}
           <div className="flex items-center gap-2.5">
-            {/* иконка приложения — квадрат с радиусом, как на рабочем столе */}
+            {/* иконка приложения — скруглённый тайл, как на рабочем столе */}
             <span
-              className="ml-1 flex size-9 shrink-0 items-center justify-center rounded-[0.7rem] text-white shadow-sm"
+              className="ml-1 flex size-9 shrink-0 items-center justify-center rounded-[12px] text-white shadow-sm"
               style={{ background: meta.bg }}
             >
               <AppIcon className="size-4.5" aria-hidden="true" />
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline justify-between gap-2">
-                <span className="truncate text-[11px] font-semibold uppercase tracking-wide text-white/55">
+                <span className="truncate text-[10px] font-bold uppercase tracking-[0.08em] text-white/50">
                   {meta.app}
                 </span>
                 <span className="shrink-0 text-[11px] text-white/45">{timeAgo(n.createdAt)}</span>
@@ -179,7 +196,7 @@ export default function NotificationCenter({
             {unread && <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-emerald-400" />}
           </div>
 
-          <p className={`mt-1.5 pl-[46px] text-[13px] leading-snug text-white/75 ${expanded ? '' : 'line-clamp-2'}`}>
+          <p className={`mt-1.5 pl-[46px] text-[13px] leading-snug text-white/70 ${expanded ? '' : 'line-clamp-2'}`}>
             {n.body}
           </p>
 
@@ -193,7 +210,7 @@ export default function NotificationCenter({
                   onClose()
                   onOpenApp(meta.openApp)
                 }}
-                className="min-h-[44px] rounded-full bg-white px-5 text-[13px] font-bold text-neutral-900 outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white"
+                className="min-h-[44px] rounded-full bg-[#21A038] px-5 text-[13px] font-bold text-white outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-emerald-300"
               >
                 Открыть {meta.app}
               </button>
@@ -220,46 +237,65 @@ export default function NotificationCenter({
       {/* Панель */}
       <section
         aria-label="Центр уведомлений"
-        className={`pointer-events-auto absolute inset-x-0 top-0 flex max-h-[78%] flex-col rounded-b-[2rem] bg-neutral-900/92 text-white shadow-2xl backdrop-blur-2xl transition-transform duration-300 ease-out ${
+        className={`pointer-events-auto absolute inset-x-0 top-0 flex max-h-[80%] flex-col rounded-b-[28px] bg-[#0a0d0b]/95 text-white shadow-2xl backdrop-blur-2xl transition-transform duration-300 ease-[cubic-bezier(0.2,0,0,1)] ${
           open ? 'translate-y-0' : '-translate-y-full'
         }`}
       >
-        <div className="flex items-center justify-between gap-3 px-5 pb-2 pt-4">
+        {/* мелкий хендл — как в шторке Android 16 */}
+        <span aria-hidden="true" className="mx-auto mt-2.5 block h-1 w-14 rounded-full bg-white/30" />
+
+        {/* шапка: дата слева, справа — «прочитать всё», настройки, «Очистить» */}
+        <div className="flex items-center justify-between gap-2 px-5 pb-2 pt-2.5">
           <div className="flex min-w-0 items-center gap-2">
-            <h2 className="text-[13px] font-semibold uppercase tracking-wide text-white/50">Уведомления</h2>
+            <span className="truncate text-[13px] font-semibold text-white/85" suppressHydrationWarning>
+              {now
+                ? now.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' })
+                : '\u00A0'}
+            </span>
             {unreadItems.length > 0 && (
               <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-white/80">
                 {unreadLabel}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-0.5">
+            <button
+              type="button"
+              onClick={readAll}
+              tabIndex={open ? 0 : -1}
+              disabled={unreadItems.length === 0}
+              aria-label="Отметить всё прочитанным"
+              className="flex size-11 items-center justify-center rounded-full text-white/65 outline-none transition-colors duration-200 enabled:active:bg-white/10 enabled:hover:text-white disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-white/70"
+            >
+              <CheckCheck className="size-[18px]" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onOpenApp('settings')}
+              tabIndex={open ? 0 : -1}
+              aria-label="Открыть настройки"
+              className="flex size-11 items-center justify-center rounded-full text-white/65 outline-none transition-colors duration-200 active:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/70"
+            >
+              <Settings className="size-[18px]" aria-hidden="true" />
+            </button>
             <button
               type="button"
               onClick={clearAll}
               tabIndex={open ? 0 : -1}
               disabled={notifications.length === 0}
-              className="flex min-h-[44px] items-center gap-1 rounded-full px-3 text-[13px] text-white/70 outline-none transition-colors duration-200 enabled:active:bg-white/10 enabled:hover:text-white disabled:opacity-35 focus-visible:ring-2 focus-visible:ring-white/70"
+              className="flex h-11 items-center gap-1.5 rounded-full bg-white/[0.08] px-3.5 text-[13px] font-semibold text-white/85 outline-none transition-colors duration-200 enabled:active:bg-white/15 disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-white/70"
             >
               <Trash2 className="size-4" aria-hidden="true" />
               Очистить
             </button>
             <button
               type="button"
-              onClick={readAll}
-              tabIndex={open ? 0 : -1}
-              className="flex min-h-[44px] items-center rounded-full px-3 text-[13px] text-emerald-400 outline-none transition-colors duration-200 active:bg-white/10 focus-visible:ring-2 focus-visible:ring-emerald-400"
-            >
-              Прочитать всё
-            </button>
-            <button
-              type="button"
               aria-label="Свернуть панель уведомлений"
               onClick={onClose}
               tabIndex={open ? 0 : -1}
-              className="flex h-11 w-11 items-center justify-center rounded-full text-white/70 outline-none transition-colors duration-200 active:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70"
+              className="flex size-11 items-center justify-center rounded-full text-white/65 outline-none transition-colors duration-200 active:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/70"
             >
-              <ChevronDown className="h-5 w-5" aria-hidden="true" />
+              <ChevronDown className="size-5" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -273,25 +309,28 @@ export default function NotificationCenter({
         )}
 
         {notifications.length === 0 ? (
-          <div className="flex flex-col items-center px-5 py-12">
-            <div className="flex size-14 items-center justify-center rounded-2xl bg-white/5">
+          <div className="flex flex-col items-center px-5 py-10">
+            <div className="flex size-14 items-center justify-center rounded-[18px] bg-white/[0.06]">
               <Bell className="size-6 text-white/30" aria-hidden="true" />
             </div>
             <p className="mt-3 text-sm text-white/50">Пока пусто</p>
             <p className="mt-1 text-[11px] text-white/30">Здесь появятся сообщения и события</p>
           </div>
         ) : (
-          <ul className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-4 pb-5 pt-1">
+          <ul className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-4 pb-3 pt-1">
             {/* Сначала непрочитанные — как в шторке настоящего телефона */}
             {unreadItems.map((n) => renderCard(n))}
             {unreadItems.length > 0 && readItems.length > 0 && (
-              <li aria-hidden="true" className="px-1 pb-0.5 pt-1 text-[11px] font-semibold uppercase tracking-wider text-white/35">
+              <li aria-hidden="true" className="px-1 pb-0.5 pt-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/35">
                 Ранее
               </li>
             )}
             {readItems.map((n) => renderCard(n))}
           </ul>
         )}
+
+        {/* мелкий хендл-подпись внизу панели */}
+        <span aria-hidden="true" className="mx-auto mb-2.5 mt-1 block h-1 w-14 rounded-full bg-white/25" />
       </section>
     </div>
   )
