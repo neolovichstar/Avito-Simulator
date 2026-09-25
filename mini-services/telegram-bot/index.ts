@@ -41,6 +41,8 @@ const CHANNEL_URL = process.env.CHANNEL_URL ?? 'https://t.me/SnapTeamDev'
 // ПРЯМОЙ домен Mini App (не t.me!). Когда задан — кнопки открывают игру напрямую
 // (web_app-кнопка, initData приходит сразу, без обёртки t.me).
 const PUBLIC_URL = (process.env.APP_PUBLIC_URL ?? '').trim().replace(/\/+$/, '')
+// API игры для бота: при заданном домене — прод (Vercel), иначе локальный dev-сервер
+const GAME_API = PUBLIC_URL || 'http://127.0.0.1:3000'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Премиум-эмодзи (custom_emoji_id). Все ID проверены через getCustomEmojiStickers,
@@ -359,7 +361,7 @@ async function sendWelcome(chatId: number | string): Promise<TgResult | null> {
 
 async function apiGet<T>(path: string): Promise<T | null> {
   try {
-    const res = await fetch(`http://127.0.0.1:3000${path}`, {
+    const res = await fetch(`${GAME_API}${path}`, {
       headers: { 'x-service-secret': SECRET },
       signal: AbortSignal.timeout(6000),
     })
@@ -386,7 +388,7 @@ async function handleCommand(msg: TgMessage): Promise<void> {
   if (cmd === '/start' || cmd === '/link') {
     const code = args[0]?.toUpperCase()
     if (code) {
-      const res = await fetch('http://127.0.0.1:3000/api/telegram/bind', {
+      const res = await fetch(`${GAME_API}/api/telegram/bind`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-service-secret': SECRET },
         body: JSON.stringify({ code, chatId: String(chatId), tgUsername: from?.username ?? null }),
