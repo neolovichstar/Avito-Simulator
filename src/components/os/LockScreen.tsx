@@ -115,7 +115,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
 
   return (
     <div
-      className={`absolute inset-0 z-50 cursor-pointer overflow-hidden select-none ease-out ${
+      className={`absolute inset-0 z-50 cursor-pointer touch-none overflow-hidden select-none ease-out ${
         dragging ? '' : 'transition-transform duration-[400ms]'
       }`}
       role="dialog"

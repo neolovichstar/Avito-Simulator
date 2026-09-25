@@ -193,7 +193,8 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
       aria-label="Домашний экран"
     >
       {/* ─── Страницы (свайп влево/вправо) ─── */}
-      <div className="relative flex-1 overflow-hidden" onPointerDown={pages.onPointerDown} onClickCapture={guardClick}>
+      {/* touch-none: на телефоне браузер иначе перехватывает свайп под скролл и шлёт pointercancel */}
+      <div className="relative flex-1 touch-none overflow-hidden" onPointerDown={pages.onPointerDown} onClickCapture={guardClick}>
         <div className="flex h-full w-[200%]" style={trackStyle}>
           {/* ─── Страница 1: компактные виджеты + основные приложения ─── */}
           <section className="flex h-full w-1/2 flex-col" aria-label="Страница 1 — приложения" aria-hidden={page !== 0}>

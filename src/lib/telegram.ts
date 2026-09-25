@@ -1,5 +1,21 @@
 import crypto from 'crypto'
 
+// Разбор initData БЕЗ проверки подписи — только когда на сервере не задан
+// BOT_TOKEN (например, на деплое без секретов): строгая проверка невозможна,
+// а без этого все Telegram-игроки молча отваливаются в dev-фолбэк «Игрок».
+export function parseInitDataUser(initData: string): TgUser | null {
+  try {
+    const params = new URLSearchParams(initData)
+    const userRaw = params.get('user')
+    if (!userRaw) return null
+    const user = JSON.parse(userRaw) as TgUser
+    if (!user?.id) return null
+    return user
+  } catch {
+    return null
+  }
+}
+
 // Валидация Telegram WebApp initData (по официальной документации)
 export interface TgUser {
   id: number

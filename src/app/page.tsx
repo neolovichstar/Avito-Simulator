@@ -131,7 +131,15 @@ export default function Home() {
   // ---------- AUTH (3 ретрая, затем экран повтора) ----------
   const doAuth = useCallback(async () => {
     setAuthError(false)
-    const tg = (window as unknown as { Telegram?: { WebApp?: { initData?: string; ready?: () => void; expand?: () => void } } }).Telegram?.WebApp
+    // SDK Telegram (telegram-web-app.js) подключён тегом async: на мобильной
+    // сети он появляется позже первого рендера. Ждём его до 3с — иначе
+    // initData = null и сервер создаёт безликого «Игрока» вместо профиля.
+    let tg: { initData?: string; ready?: () => void; expand?: () => void } | undefined
+    for (let i = 0; i < 30; i++) {
+      tg = (window as unknown as { Telegram?: { WebApp?: { initData?: string; ready?: () => void; expand?: () => void } } }).Telegram?.WebApp
+      if (tg) break
+      await new Promise((r) => setTimeout(r, 100))
+    }
     tg?.ready?.()
     tg?.expand?.()
     applyTelegramChrome('#050d09')
@@ -399,7 +407,7 @@ export default function Home() {
         <div
           role="button"
           aria-label="Открыть центр управления"
-          className="absolute left-0 right-16 top-0 z-[59] h-8 outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+          className="absolute left-0 right-16 top-0 z-[59] h-8 touch-none outline-none focus-visible:ring-2 focus-visible:ring-white/50"
           onPointerDown={controlSwipe.onPointerDown}
           onClick={() => setControlOpen(true)}
         />

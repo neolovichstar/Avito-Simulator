@@ -1537,7 +1537,7 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp?: (app: AppKey) =>
     <div className={'relative flex h-full flex-col overflow-hidden ' + (incognito ? 'bg-[#090D1A] text-white' : 'bg-[#0A1420] text-white')}>
       {/* ---------- верхний тулбар ---------- */}
       <div
-        className={'relative z-20 border-b border-white/[0.06] ' + (incognito ? 'bg-[#080C16]' : 'bg-[#0A1420]')}
+        className={'relative z-20 touch-pan-y border-b border-white/[0.06] ' + (incognito ? 'bg-[#080C16]' : 'bg-[#0A1420]')}
         onPointerDown={omniSwipe.onPointerDown}
       >
         <div className="flex items-center gap-2 px-3 py-2">
@@ -1692,7 +1692,7 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp?: (app: AppKey) =>
         ) : view === 'private' ? (
           <PrivateScreen onOpenPrivate={() => newTab(true)} onBack={() => setView('page')} />
         ) : (
-          <div ref={scrollRef} className="h-full overflow-y-auto [scrollbar-width:thin]" onPointerDown={ptr.onPointerDown}>
+          <div ref={scrollRef} className="h-full touch-pan-y overflow-y-auto [scrollbar-width:thin]" onPointerDown={ptr.onPointerDown}>
             {current.type === 'site' && isNtp && !incognito && (
               <NewTabPage
                 urlInput={urlInput}

@@ -1,5 +1,5 @@
 import { db } from '@/lib/db'
-import { signSession, validateInitData } from '@/lib/telegram'
+import { parseInitDataUser, signSession, validateInitData } from '@/lib/telegram'
 import { rateLimit } from '@/lib/ratelimit'
 import { levelFromXp } from '@/lib/economy'
 
@@ -15,12 +15,21 @@ export async function POST(req: Request) {
   let user: Awaited<ReturnType<typeof db.user.findUnique>> = null
 
   // 1. Пробуем Telegram initData
-  if (body.initData && botToken) {
-    const tg = validateInitData(body.initData, botToken)
-    if (!tg) {
-      // Диагностика: запрос из Telegram дошёл, но подпись не совпала —
-      // это значит, что BotFather-приложение открылось с чужим токеном.
-      console.warn('[auth] initData INVALID: hash mismatch или устарел; длина =', body.initData.length)
+  if (body.initData) {
+    let tg: ReturnType<typeof validateInitData> = null
+    if (botToken) {
+      tg = validateInitData(body.initData, botToken)
+      if (!tg) {
+        // Диагностика: запрос из Telegram дошёл, но подпись не совпала —
+        // это значит, что BotFather-приложение открылось с чужим токеном.
+        console.warn('[auth] initData INVALID: hash mismatch или устарел; длина =', body.initData.length)
+      }
+    } else {
+      // BOT_TOKEN не задан на этом сервере (деплой без секретов): строгая
+      // проверка подписи невозможна. Принимаем профиль без проверки, иначе
+      // ВСЕ Telegram-игроки получают безликого «Игрока» вместо своего профиля.
+      tg = parseInitDataUser(body.initData)
+      if (tg) console.warn('[auth] BOT_TOKEN не задан — initData принят БЕЗ проверки подписи; tgId:', tg.id)
     }
     if (tg) {
       const username = tg.username ? `@${tg.username}` : `tg_${tg.id}`
