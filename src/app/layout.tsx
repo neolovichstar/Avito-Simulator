@@ -30,6 +30,12 @@ export default function RootLayout({
     <html lang="ru" suppressHydrationWarning>
       <head>
         <script src="https://telegram.org/js/telegram-web-app.js" async />
+        {/* Логотипы приложений: скачиваем заранее — иконки на дом-экране рисуются мгновенно */}
+        {['avito', 'bank', 'taxes', 'browser', 'settings', 'repair', 'auction', 'career', 'delivery', 'leaderboard'].map(
+          (n) => (
+            <link key={n} rel="preload" as="image" href={`/img/apps/${n}.png`} fetchPriority="high" />
+          ),
+        )}
       </head>
       <body className="antialiased bg-neutral-950 text-neutral-900 overscroll-none">
         {children}

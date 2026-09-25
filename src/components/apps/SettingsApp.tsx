@@ -1,9 +1,14 @@
 'use client'
 
-// Приложение «Настройки» — стиль Android-настроек: белый фон, секции-карточки.
+// Приложение «Настройки» — редизайн по макету юзера, дизайн-система «Resale Dark»:
+// всегда тёмный фон #050D09, профиль сверху (аватар, @username, уровень + XP-прогресс
+// в строке), секции-списки строк с иконками в зелёных плашках и ChevronRight,
+// секция «Состояние системы» (БД/Кэш/ИИ-бюджет с прогресс-баром и перезагрузкой).
+// Вся бизнес-логика (api.profile/blockedList/telegram*/toggleBlock/systemStatus,
+// switches устройства, обои, виджеты) сохранена 1:1.
 import { useCallback, useEffect, useState } from 'react'
 import {
-  BatteryCharging, Ban, Bot, CheckCircle2, Database, Handshake, Info, Loader2, MapPin, Moon, MoonStar, NotebookText, RefreshCw,
+  BatteryCharging, Ban, Bot, CheckCircle2, ChevronRight, Database, Handshake, Info, Loader2, MapPin, Moon, MoonStar, NotebookText, RefreshCw,
   Send, Server, Settings as SettingsIcon, Shield, Star, Volume2, Wallet, Zap,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
@@ -13,31 +18,69 @@ import { WALLPAPERS, wallpaperPreviewStyle } from '@/lib/wallpapers'
 import { fmtMoney, initials, hueColor, timeAgo } from '@/lib/format'
 import { sound } from '@/lib/sound'
 import type { ProfileData, BlockedSellerDTO } from '@/lib/types'
-import { Button } from '@/components/ui/button'
-import { Switch } from '@/components/ui/switch'
+
+// Тёмные тоны иконок строк
+const TINTS = {
+  emerald: 'bg-emerald-500/15 text-emerald-400',
+  sky: 'bg-sky-500/15 text-sky-400',
+  amber: 'bg-amber-500/15 text-amber-400',
+  red: 'bg-red-500/15 text-red-400',
+  plain: 'bg-white/[0.06] text-white/60',
+} as const
+type Tint = keyof typeof TINTS
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div>
-      <div className="mb-1.5 px-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">{title}</div>
-      <div className="rounded-2xl border border-neutral-200/80 bg-white shadow-sm">{children}</div>
+    <section>
+      <div className="mb-1.5 px-2 text-[11px] font-semibold uppercase tracking-wider text-white/35">{title}</div>
+      <div className="overflow-hidden rounded-2xl border border-emerald-500/15 bg-[#0E1F16]">{children}</div>
+    </section>
+  )
+}
+
+function Row({ icon, tint = 'emerald', label, value, chevron = true }: {
+  icon: React.ReactNode
+  tint?: Tint
+  label: string
+  value?: React.ReactNode
+  chevron?: boolean
+}) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <div className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${TINTS[tint]}`} aria-hidden="true">
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium text-white">{label}</div>
+        {value !== null && value !== undefined && value !== '' && (
+          <div className="truncate text-xs text-white/50">{value}</div>
+        )}
+      </div>
+      {chevron && <ChevronRight className="size-4 shrink-0 text-white/25" aria-hidden="true" />}
     </div>
   )
 }
 
-function Row({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
+// Зелёный переключатель (пилюля w-11 h-6) по дизайн-системе
+function Toggle({ checked, onCheckedChange, label }: {
+  checked: boolean
+  onCheckedChange: (v: boolean) => void
+  label: string
+}) {
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
-      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium text-neutral-800">{label}</div>
-        {value !== null && value !== undefined && value !== '' && (
-          <div className="truncate text-xs text-neutral-500">{value}</div>
-        )}
-      </div>
-    </div>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onCheckedChange(!checked)}
+      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${checked ? 'bg-[#22C55E]' : 'bg-white/15'}`}
+    >
+      <span
+        aria-hidden="true"
+        className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-[22px]' : 'translate-x-0.5'}`}
+      />
+    </button>
   )
 }
 
@@ -157,92 +200,96 @@ export default function SettingsApp() {
   const xpPct = levelProgress(xpTotal)
 
   return (
-    <div className="h-full flex flex-col bg-white text-neutral-900">
+    <div
+      className="flex h-full flex-col text-white"
+      style={{ background: 'linear-gradient(180deg,#07130D 0%,#050D09 100%)' }}
+    >
       {/* шапка приложения */}
-      <div className="flex shrink-0 items-center gap-3 border-b border-neutral-100 px-4 py-3.5">
-        <div className="flex size-9 items-center justify-center rounded-xl bg-neutral-900">
-          <SettingsIcon className="size-4.5 text-white" aria-hidden />
+      <div className="flex shrink-0 items-center gap-3 border-b border-white/[0.06] px-4 py-3.5">
+        <div className="flex size-9 items-center justify-center rounded-xl bg-emerald-500/15">
+          <SettingsIcon className="size-4.5 text-emerald-400" aria-hidden="true" />
         </div>
-        <div className="text-[15px] font-bold">Настройки</div>
+        <div className="text-[15px] font-bold text-white">Настройки</div>
       </div>
       <div className="flex-1 space-y-5 overflow-y-auto p-4 [scrollbar-width:thin]">
         {error && !profile ? (
-          <div className="rounded-2xl border border-red-100 bg-red-50 p-6 text-center">
-            <p className="text-sm font-medium text-red-700">{error}</p>
-            <Button className="mt-4 rounded-xl" onClick={load}>
+          <div className="rounded-2xl border border-red-500/25 bg-red-500/10 p-6 text-center">
+            <p className="text-[13px] text-red-400">{error}</p>
+            <button
+              type="button"
+              onClick={load}
+              className="mt-4 text-[13px] font-semibold text-emerald-400 transition active:opacity-70"
+            >
               Повторить
-            </Button>
+            </button>
           </div>
         ) : loading && !profile ? (
           <div className="space-y-4">
             <div className="flex items-center gap-4 p-2">
-              <div className="size-16 rounded-full bg-neutral-200 animate-pulse" />
+              <div className="size-16 animate-pulse rounded-full bg-white/[0.06]" />
               <div className="flex-1 space-y-2">
-                <div className="h-4 w-1/2 rounded bg-neutral-200 animate-pulse" />
-                <div className="h-3 w-1/3 rounded bg-neutral-200 animate-pulse" />
+                <div className="h-4 w-1/2 animate-pulse rounded bg-white/[0.06]" />
+                <div className="h-3 w-1/3 animate-pulse rounded bg-white/[0.06]" />
               </div>
             </div>
-            <div className="h-20 rounded-2xl bg-neutral-200 animate-pulse" />
-            <div className="h-32 rounded-2xl bg-neutral-200 animate-pulse" />
-            <div className="flex items-center justify-center gap-2 text-sm text-neutral-400">
-              <Loader2 className="size-4 animate-spin" /> Загрузка профиля…
+            <div className="h-20 animate-pulse rounded-2xl bg-white/[0.06]" />
+            <div className="h-12 animate-pulse rounded-xl bg-white/[0.06]" />
+            <div className="h-12 animate-pulse rounded-xl bg-white/[0.06]" />
+            <div className="flex items-center justify-center gap-2 text-[13px] text-white/40">
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" /> Загрузка профиля…
             </div>
           </div>
         ) : (
           <>
             {/* Профиль — hero-карточка */}
-            <div className="overflow-hidden rounded-2xl shadow-sm ring-1 ring-black/5">
-              <div className="bg-gradient-to-br from-[#231a33] via-[#1a1426] to-[#120e1a] p-4 text-white">
-                <div className="flex items-center gap-4">
-                  {session?.photoUrl ? (
-                    <img src={session.photoUrl} alt={name} className="size-16 shrink-0 rounded-full object-cover ring-2 ring-white/20" />
-                  ) : (
-                    <div
-                      className="flex size-16 shrink-0 items-center justify-center rounded-full text-xl font-semibold text-white ring-2 ring-white/20"
-                      style={{ backgroundColor: hueColor(210) }}
-                    >
-                      {initials(name)}
-                    </div>
-                  )}
-                  <div className="min-w-0">
-                    <div className="truncate text-lg font-bold">{name}</div>
-                    <div className="truncate text-xs text-white/50">@{session?.username ?? 'player'}</div>
-                    <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-[#4ade80]/20 px-2.5 py-0.5 text-[11px] font-semibold text-[#86efac]">
-                      <Zap className="size-3" aria-hidden />
+            <div className="rounded-2xl border border-emerald-400/25 bg-gradient-to-br from-emerald-500/25 to-emerald-500/5 p-4">
+              <div className="flex items-center gap-4">
+                {session?.photoUrl ? (
+                  <img src={session.photoUrl} alt={name} className="size-16 shrink-0 rounded-full object-cover ring-2 ring-white/20" />
+                ) : (
+                  <div
+                    className="flex size-16 shrink-0 items-center justify-center rounded-full text-xl font-semibold text-white ring-2 ring-white/20"
+                    style={{ backgroundColor: hueColor(210) }}
+                  >
+                    {initials(name)}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <div className="truncate text-lg font-bold text-white">{name}</div>
+                  <div className="truncate text-xs text-white/50">@{session?.username ?? 'player'}</div>
+                  {/* уровень + XP-прогресс в одной строке */}
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-300">
+                      <Zap className="size-3" aria-hidden="true" />
                       Уровень {session?.level ?? 1}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Прогресс XP (хардкорная кривая) */}
-                <div className="mt-4">
-                  <div className="flex justify-between text-[11px] text-white/50">
-                    <span>Опыт</span>
-                    <span className="tabular-nums">
-                      {xpInLevel} / {xpNeed} XP
                     </span>
+                    <span className="text-[11px] tabular-nums text-white/50">{xpInLevel} / {xpNeed} XP</span>
                   </div>
-                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/10">
-                    <div className="h-full rounded-full bg-gradient-to-r from-[#4ade80] to-[#86efac] transition-all" style={{ width: `${xpPct}%` }} />
-                  </div>
-                  <p className="mt-1 text-[10px] text-white/40">Прогресс хардкорный: на высоких уровнях XP нужен в разы больше</p>
                 </div>
               </div>
 
+              {/* Прогресс XP (хардкорная кривая) */}
+              <div className="mt-3.5">
+                <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full rounded-full bg-[#22C55E] transition-all" style={{ width: `${xpPct}%` }} />
+                </div>
+                <p className="mt-1 text-[10px] text-white/35">Прогресс хардкорный: на высоких уровнях XP нужен в разы больше</p>
+              </div>
+
               {/* Рейтинг и баланс */}
-              <div className="grid grid-cols-2 gap-3 border-t border-neutral-100 bg-white p-3.5">
-                <div className="rounded-xl bg-amber-50 px-3 py-2">
-                  <div className="text-[10px] text-neutral-500">Рейтинг</div>
-                  <div className="mt-0.5 flex items-center gap-1 text-sm font-semibold">
-                    <Star className="size-4 fill-yellow-400 text-yellow-400" />
+              <div className="mt-3.5 grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-white/[0.06] bg-white/[0.07] px-3 py-2">
+                  <div className="text-[10px] text-white/45">Рейтинг</div>
+                  <div className="mt-0.5 flex items-center gap-1 text-sm font-semibold text-white">
+                    <Star className="size-4 fill-amber-400 text-amber-400" aria-hidden="true" />
                     {rating.toFixed(1)}
-                    <span className="text-[11px] font-normal text-neutral-400">({ratingCount})</span>
+                    <span className="text-[11px] font-normal text-white/40">({ratingCount})</span>
                   </div>
                 </div>
-                <div className="rounded-xl bg-emerald-50 px-3 py-2">
-                  <div className="text-[10px] text-neutral-500">Баланс</div>
-                  <div className="mt-0.5 flex items-center gap-1 text-sm font-semibold">
-                    <Wallet className="size-4 text-emerald-600" />
+                <div className="rounded-xl border border-white/[0.06] bg-white/[0.07] px-3 py-2">
+                  <div className="text-[10px] text-white/45">Баланс</div>
+                  <div className="mt-0.5 flex items-center gap-1 text-sm font-semibold text-white">
+                    <Wallet className="size-4 text-emerald-400" aria-hidden="true" />
                     {fmtMoney(session?.balance ?? 0)}
                   </div>
                 </div>
@@ -252,77 +299,78 @@ export default function SettingsApp() {
             {/* Устройство */}
             <SectionCard title="Устройство">
               <div className="flex items-center gap-3 px-4 py-3">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
-                  <BatteryCharging className="size-4" />
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400" aria-hidden="true">
+                  <BatteryCharging className="size-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium text-neutral-800">Зарядка подключена</div>
-                  <div className="text-xs text-neutral-500">Уровень батареи: {battery}%</div>
+                  <div className="text-sm font-medium text-white">Зарядка подключена</div>
+                  <div className="text-xs text-white/50">Уровень батареи: {battery}%</div>
                 </div>
-                <Switch checked={charging} onCheckedChange={setCharging} />
+                <Toggle checked={charging} onCheckedChange={setCharging} label="Зарядка подключена" />
               </div>
-              <div className="flex items-center gap-3 border-t border-neutral-100 px-4 py-3">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
-                  <Moon className="size-4" />
+              <div className="flex items-center gap-3 border-t border-white/[0.06] px-4 py-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400" aria-hidden="true">
+                  <Moon className="size-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium text-neutral-800">Тёмная тема</div>
-                  <div className="text-xs text-neutral-500">{theme === 'dark' ? 'Включена: тёмный интерфейс ОС' : 'Выключена: светлый интерфейс'}</div>
+                  <div className="text-sm font-medium text-white">Тёмная тема</div>
+                  <div className="text-xs text-white/50">{theme === 'dark' ? 'Включена: тёмный интерфейс ОС' : 'Выключена: светлый интерфейс'}</div>
                 </div>
-                <Switch
+                <Toggle
                   checked={theme === 'dark'}
                   onCheckedChange={(v) => setTheme(v ? 'dark' : 'light')}
-                  aria-label="Тёмная тема"
+                  label="Тёмная тема"
                 />
               </div>
-              <div className="flex items-center gap-3 border-t border-neutral-100 px-4 py-3">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
-                  <MoonStar className="size-4" />
+              <div className="flex items-center gap-3 border-t border-white/[0.06] px-4 py-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400" aria-hidden="true">
+                  <MoonStar className="size-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium text-neutral-800">Не беспокоить</div>
-                  <div className="text-xs text-neutral-500">{dnd ? 'Тосты скрыты — всё копится в шторке' : 'Уведомления всплывают поверх экрана'}</div>
+                  <div className="text-sm font-medium text-white">Не беспокоить</div>
+                  <div className="text-xs text-white/50">{dnd ? 'Тосты скрыты — всё копится в шторке' : 'Уведомления всплывают поверх экрана'}</div>
                 </div>
-                <Switch checked={dnd} onCheckedChange={setDnd} aria-label="Не беспокоить" />
+                <Toggle checked={dnd} onCheckedChange={setDnd} label="Не беспокоить" />
               </div>
-              <div className="flex items-center gap-3 border-t border-neutral-100 px-4 py-3">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
-                  <Volume2 className="size-4" />
+              <div className="flex items-center gap-3 border-t border-white/[0.06] px-4 py-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400" aria-hidden="true">
+                  <Volume2 className="size-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium text-neutral-800">Звук и вибрация</div>
-                  <div className="text-xs text-neutral-500">{soundOn ? 'Системные звуки интерфейса включены' : 'Тихий режим: без звуков и вибрации'}</div>
+                  <div className="text-sm font-medium text-white">Звук и вибрация</div>
+                  <div className="text-xs text-white/50">{soundOn ? 'Системные звуки интерфейса включены' : 'Тихий режим: без звуков и вибрации'}</div>
                 </div>
-                <Switch
+                <Toggle
                   checked={soundOn}
                   onCheckedChange={(v) => sound.setEnabled(v)}
-                  aria-label="Звук и вибрация"
+                  label="Звук и вибрация"
                 />
               </div>
             </SectionCard>
 
             {/* Игрок */}
             <SectionCard title="Игрок">
-              <Row icon={<MapPin className="size-4" />} label="Город" value={session?.city ?? '—'} />
-              <div className="border-t border-neutral-100" />
-              <Row icon={<NotebookText className="size-4" />} label="О себе" value={session?.bio ?? 'Не указано'} />
-              <div className="border-t border-neutral-100" />
-              <Row icon={<Handshake className="size-4" />} label="Сделок" value={dealsCount !== null ? String(dealsCount) : null} />
+              <div className="divide-y divide-white/[0.06]">
+                <Row icon={<MapPin className="size-5" />} label="Город" value={session?.city ?? '—'} />
+                <Row icon={<NotebookText className="size-5" />} label="О себе" value={session?.bio ?? 'Не указано'} />
+                <Row icon={<Handshake className="size-5" />} label="Сделок" value={dealsCount !== null ? String(dealsCount) : null} />
+              </div>
             </SectionCard>
 
             {/* Персонализация: обои и виджеты */}
             <SectionCard title="Персонализация">
               <div className="px-4 py-3">
-                <div className="text-sm font-medium text-neutral-800">Обои</div>
+                <div className="text-sm font-medium text-white">Обои</div>
                 <div className="mt-2.5 grid grid-cols-4 gap-2.5">
                   {WALLPAPERS.map((w) => (
                     <button
                       key={w.id}
+                      type="button"
                       aria-label={`Обои: ${w.name}`}
                       aria-pressed={wallpaper === w.id}
                       onClick={() => setWallpaper(w.id)}
                       className={`group relative h-16 overflow-hidden rounded-xl border transition active:scale-95 ${
-                        wallpaper === w.id ? 'border-[#16A34A] ring-2 ring-[#16A34A]/40' : 'border-neutral-200 hover:border-neutral-300'
+                        wallpaper === w.id ? 'border-[#22C55E] ring-2 ring-[#22C55E]/40' : 'border-white/10 hover:border-white/25'
                       }`}
                       style={wallpaperPreviewStyle(w.id)}
                     >
@@ -333,22 +381,22 @@ export default function SettingsApp() {
                   ))}
                 </div>
               </div>
-              <div className="border-t border-neutral-100 px-4 py-3">
-                <div className="text-sm font-medium text-neutral-800">Виджеты</div>
-                <div className="mt-1 text-xs text-neutral-500">Что показывать на домашнем экране и рабочем столе</div>
+              <div className="border-t border-white/[0.06] px-4 py-3">
+                <div className="text-sm font-medium text-white">Виджеты</div>
+                <div className="mt-1 text-xs text-white/50">Что показывать на домашнем экране и рабочем столе</div>
                 <div className="mt-2 space-y-1">
                   {ALL_WIDGETS.map((w: WidgetKey) => {
                     const on = widgets.includes(w)
                     return (
                       <div key={w} className="flex items-center justify-between rounded-lg px-1 py-1.5">
-                        <span className="text-sm text-neutral-700">{WIDGET_LABEL[w]}</span>
-                        <Switch
+                        <span className="text-sm text-white/80">{WIDGET_LABEL[w]}</span>
+                        <Toggle
                           checked={on}
                           onCheckedChange={(v) => {
                             const next = v ? [...widgets, w] : widgets.filter((x) => x !== w)
                             setWidgets(next)
                           }}
-                          aria-label={`Виджет: ${WIDGET_LABEL[w]}`}
+                          label={`Виджет: ${WIDGET_LABEL[w]}`}
                         />
                       </div>
                     )
@@ -360,64 +408,65 @@ export default function SettingsApp() {
             {/* Telegram-бот: уведомления и команды */}
             <SectionCard title="Telegram">
               <div className="flex items-center gap-3 px-4 py-3">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#2AABEE]/10 text-[#2AABEE]">
-                  <Send className="size-4" />
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 text-sky-400" aria-hidden="true">
+                  <Send className="size-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium text-neutral-800">Уведомления в Telegram</div>
+                  <div className="text-sm font-medium text-white">Уведомления в Telegram</div>
                   {tg === null ? (
-                    <div className="text-xs text-neutral-400">Проверяем привязку…</div>
+                    <div className="text-xs text-white/40">Проверяем привязку…</div>
                   ) : tg.linked ? (
-                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-emerald-600">
-                      <CheckCircle2 className="size-3.5" />
+                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-emerald-400">
+                      <CheckCircle2 className="size-3.5 shrink-0" aria-hidden="true" />
                       Привязано{tg.tgUsername ? `: @${tg.tgUsername}` : ''} — бот присылает сделки, ставки и налоги
                     </div>
                   ) : (
-                    <div className="mt-0.5 text-xs text-neutral-500">
+                    <div className="mt-0.5 text-xs text-white/50">
                       Привяжите аккаунт — бот @{tg.botUsername} сообщит о сделке, перебитой ставке, доставке и налогах
                     </div>
                   )}
                 </div>
+                <ChevronRight className="size-4 shrink-0 text-white/25" aria-hidden="true" />
               </div>
 
               {tg !== null && !tg.linked && (
-                <div className="border-t border-neutral-100 px-4 py-3">
+                <div className="border-t border-white/[0.06] px-4 py-3">
                   {tgCode ? (
-                    <div className="rounded-xl border border-[#2AABEE]/30 bg-[#2AABEE]/5 p-3.5">
-                      <div className="text-[11px] font-medium text-neutral-600">Ваш код привязки (живёт 15 минут):</div>
-                      <div className="mt-1.5 select-all text-center font-mono text-2xl font-bold tracking-[0.3em] text-[#2AABEE]">
+                    <div className="rounded-xl border border-sky-500/30 bg-sky-500/10 p-3.5">
+                      <div className="text-[11px] font-medium text-white/60">Ваш код привязки (живёт 15 минут):</div>
+                      <div className="mt-1.5 select-all text-center font-mono text-2xl font-bold tracking-[0.3em] text-sky-300">
                         {tgCode}
                       </div>
-                      <ol className="mt-2.5 space-y-1 text-[11px] leading-relaxed text-neutral-600">
-                        <li>1. Откройте в Telegram бота <span className="font-semibold">@{tg.botUsername}</span></li>
+                      <ol className="mt-2.5 space-y-1 text-[11px] leading-relaxed text-white/60">
+                        <li>1. Откройте в Telegram бота <span className="font-semibold text-white">@{tg.botUsername}</span></li>
                         <li>2. Нажмите «Старт» и отправьте команду</li>
-                        <li>3. Затем напишите боту: <span className="font-mono font-semibold">/start {tgCode}</span></li>
+                        <li>3. Затем напишите боту: <span className="font-mono font-semibold text-white">/start {tgCode}</span></li>
                       </ol>
-                      <div className="mt-2 text-[10px] text-neutral-400">После привязки этот код погасится автоматически.</div>
+                      <div className="mt-2 text-[10px] text-white/35">После привязки этот код погасится автоматически.</div>
                     </div>
                   ) : (
-                    <Button
-                      className="h-10 w-full rounded-xl bg-[#2AABEE] text-[13px] font-semibold text-white hover:bg-[#2AABEE]/90"
+                    <button
+                      type="button"
+                      className="flex h-10 w-full items-center justify-center rounded-xl bg-[#22C55E] text-[13px] font-bold text-[#052E16] transition active:scale-[0.98] disabled:opacity-60"
                       disabled={tgBusy}
                       onClick={() => void getTgCode()}
                     >
-                      {tgBusy ? <Loader2 className="size-4 animate-spin" /> : 'Получить код привязки'}
-                    </Button>
+                      {tgBusy ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : 'Получить код привязки'}
+                    </button>
                   )}
                 </div>
               )}
 
               {tg?.linked && (
-                <div className="border-t border-neutral-100 px-4 py-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9 w-full rounded-lg border-red-200 text-[11px] font-semibold text-red-600 hover:bg-red-50 hover:text-red-700"
+                <div className="border-t border-white/[0.06] px-4 py-3">
+                  <button
+                    type="button"
+                    className="flex h-9 w-full items-center justify-center rounded-lg border border-red-500/25 bg-red-500/10 text-[11px] font-semibold text-red-400 transition active:scale-[0.98] disabled:opacity-60"
                     disabled={tgBusy}
                     onClick={() => void unlinkTg()}
                   >
-                    {tgBusy ? <Loader2 className="size-3.5 animate-spin" /> : 'Отвязать Telegram'}
-                  </Button>
+                    {tgBusy ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : 'Отвязать Telegram'}
+                  </button>
                 </div>
               )}
             </SectionCard>
@@ -425,22 +474,22 @@ export default function SettingsApp() {
             {/* Безопасность: чёрный список продавцов */}
             <SectionCard title={`Безопасность · чёрный список${blocked?.length ? ` (${blocked.length})` : ''}`}>
               {blocked === null ? (
-                <div className="flex items-center justify-center gap-2 px-4 py-4 text-xs text-neutral-400">
-                  <Loader2 className="size-3.5 animate-spin" /> Загружаем…
+                <div className="flex items-center justify-center gap-2 px-4 py-4 text-xs text-white/40">
+                  <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> Загружаем…
                 </div>
               ) : blocked.length === 0 ? (
                 <div className="flex items-start gap-3 px-4 py-3.5">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
-                    <Shield className="size-4" />
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white/50" aria-hidden="true">
+                    <Shield className="size-5" />
                   </div>
-                  <p className="text-xs leading-relaxed text-neutral-500">
+                  <p className="text-xs leading-relaxed text-white/50">
                     Список пуст. Заблокированные продавцы исчезнут из ленты и перестанут писать вам первыми.
                     Заблокировать можно в шите «Пожаловаться» на карточке любого объявления.
                   </p>
                 </div>
               ) : (
                 blocked.map((b, i) => (
-                  <div key={b.sellerId} className={i > 0 ? 'border-t border-neutral-100' : ''}>
+                  <div key={b.sellerId} className={i > 0 ? 'border-t border-white/[0.06]' : ''}>
                     <div className="flex items-center gap-3 px-4 py-3">
                       {b.photoUrl ? (
                         <img src={b.photoUrl} alt="" className="size-10 shrink-0 rounded-full object-cover" />
@@ -448,60 +497,81 @@ export default function SettingsApp() {
                         <span
                           className="flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
                           style={{ backgroundColor: hueColor(b.sellerId.length * 47 % 360) }}
-                          aria-hidden
+                          aria-hidden="true"
                         >
                           {initials(b.name)}
                         </span>
                       )}
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium text-neutral-800">{b.name}</div>
-                        <div className="flex items-center gap-1 text-[11px] text-neutral-500">
-                          <Star className="size-3 fill-amber-400 text-amber-400" aria-hidden />
+                        <div className="truncate text-sm font-medium text-white">{b.name}</div>
+                        <div className="flex items-center gap-1 text-[11px] text-white/50">
+                          <Star className="size-3 fill-amber-400 text-amber-400" aria-hidden="true" />
                           {b.rating > 0 ? b.rating.toFixed(1) : 'новый'}
-                          {b.ratingCount > 0 && <span className="text-neutral-400">({b.ratingCount})</span>}
-                          <span aria-hidden>·</span>
-                          <MapPin className="size-3" aria-hidden /> {b.city}
+                          {b.ratingCount > 0 && <span className="text-white/35">({b.ratingCount})</span>}
+                          <span aria-hidden="true">·</span>
+                          <MapPin className="size-3" aria-hidden="true" /> {b.city}
                         </div>
-                        <div className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-neutral-400">
-                          <Ban className="size-3" aria-hidden /> заблокирован {timeAgo(b.blockedAt)}
+                        <div className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-white/35">
+                          <Ban className="size-3" aria-hidden="true" /> заблокирован {timeAgo(b.blockedAt)}
                         </div>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-9 shrink-0 rounded-lg border-red-200 px-3 text-[11px] font-semibold text-red-600 hover:bg-red-50 hover:text-red-700"
+                      <button
+                        type="button"
+                        className="flex h-9 shrink-0 items-center justify-center rounded-lg border border-red-500/25 bg-red-500/10 px-3 text-[11px] font-semibold text-red-400 transition active:scale-[0.98] disabled:opacity-60"
                         disabled={unblocking === b.sellerId}
                         onClick={() => void unblock(b)}
                       >
-                        {unblocking === b.sellerId ? <Loader2 className="size-3.5 animate-spin" /> : 'Разблокировать'}
-                      </Button>
+                        {unblocking === b.sellerId ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : 'Разблокировать'}
+                      </button>
                     </div>
                   </div>
                 ))
               )}
             </SectionCard>
 
-            {/* Инфраструктура */}
-            <SectionCard title="Инфраструктура">
-              <div className="divide-y divide-neutral-100">
+            {/* Состояние системы */}
+            <SectionCard title="Состояние системы">
+              <div className="divide-y divide-white/[0.06]">
                 <div className="flex items-center gap-3 px-4 py-3">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-500">
-                    <Zap className="size-4" aria-hidden />
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400" aria-hidden="true">
+                    <Database className="size-5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 text-sm font-medium text-neutral-800">
-                      Redis-кэш
-                      {sys ? (
-                        sys.redis.alive ? (
-                          <span className="size-2 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)]" aria-hidden />
-                        ) : (
-                          <span className="size-2 shrink-0 rounded-full bg-red-400" aria-hidden />
-                        )
-                      ) : (
-                        <Loader2 className="size-3 animate-spin text-neutral-300" />
+                    <div className="flex items-center gap-2 text-sm font-medium text-white">
+                      База данных
+                      {sys && (
+                        <span
+                          className={`size-2 shrink-0 rounded-full ${sys.db.ok ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.7)]' : 'bg-red-400'}`}
+                          aria-hidden="true"
+                        />
                       )}
                     </div>
-                    <div className="text-xs text-neutral-500">
+                    <div className="text-xs text-white/50">
+                      {sys ? `SQLite (Prisma) · запрос ${sys.db.latencyMs} мс` : 'проверяем…'}
+                    </div>
+                  </div>
+                  <span className={`shrink-0 text-xs font-semibold ${sys ? (sys.db.ok ? 'text-emerald-400' : 'text-red-400') : 'text-white/30'}`}>
+                    {sys ? (sys.db.ok ? 'Норма' : 'Сбой') : '—'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 text-sky-400" aria-hidden="true">
+                    <Zap className="size-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 text-sm font-medium text-white">
+                      Кэш
+                      {sys ? (
+                        sys.redis.alive ? (
+                          <span className="size-2 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.7)]" aria-hidden="true" />
+                        ) : (
+                          <span className="size-2 shrink-0 rounded-full bg-red-400" aria-hidden="true" />
+                        )
+                      ) : (
+                        <Loader2 className="size-3 animate-spin text-white/30" aria-hidden="true" />
+                      )}
+                    </div>
+                    <div className="text-xs text-white/50">
                       {sys
                         ? sys.redis.alive
                           ? `Upstash · подключён · ${sys.redis.latencyMs ?? '—'} мс`
@@ -511,51 +581,17 @@ export default function SettingsApp() {
                         : 'проверяем…'}
                     </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 shrink-0 rounded-lg px-2.5 text-[11px] font-semibold"
-                    disabled={sysBusy}
-                    onClick={async () => {
-                      setSysBusy(true)
-                      try {
-                        setSys(await api.systemStatus())
-                      } catch {
-                        /* статус остаётся прежним */
-                      } finally {
-                        setSysBusy(false)
-                      }
-                    }}
-                  >
-                    {sysBusy ? <Loader2 className="size-3.5 animate-spin" /> : 'Проверить'}
-                  </Button>
+                  <span className={`shrink-0 text-xs font-semibold ${sys ? (sys.redis.alive ? 'text-emerald-400' : 'text-red-400') : 'text-white/30'}`}>
+                    {sys ? (sys.redis.alive ? 'Норма' : 'Недоступен') : '—'}
+                  </span>
                 </div>
                 <div className="flex items-center gap-3 px-4 py-3">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-                    <Database className="size-4" aria-hidden />
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400" aria-hidden="true">
+                    <Bot className="size-5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 text-sm font-medium text-neutral-800">
-                      База данных
-                      {sys && (
-                        <span
-                          className={`size-2 shrink-0 rounded-full ${sys.db.ok ? 'bg-emerald-500' : 'bg-red-400'}`}
-                          aria-hidden
-                        />
-                      )}
-                    </div>
-                    <div className="text-xs text-neutral-500">
-                      {sys ? `SQLite (Prisma) · запрос ${sys.db.latencyMs} мс` : 'проверяем…'}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 px-4 py-3">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-600">
-                    <Bot className="size-4" aria-hidden />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-neutral-800">ИИ-запросы сегодня</div>
-                    <div className="text-xs text-neutral-500">
+                    <div className="text-sm font-medium text-white">ИИ-бюджет</div>
+                    <div className="text-xs text-white/50">
                       {sys
                         ? `${sys.ai.used} из ${sys.ai.limit} · только в чатах · всё остальное на скриптах`
                         : 'проверяем…'}
@@ -563,9 +599,9 @@ export default function SettingsApp() {
                   </div>
                   {sys && (
                     <div className="w-16 shrink-0">
-                      <div className="h-1.5 overflow-hidden rounded-full bg-neutral-100">
+                      <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
                         <div
-                          className={`h-full rounded-full ${sys.ai.used / sys.ai.limit > 0.85 ? 'bg-red-400' : 'bg-emerald-500'}`}
+                          className={`h-full rounded-full ${sys.ai.used / sys.ai.limit > 0.85 ? 'bg-red-400' : 'bg-[#22C55E]'}`}
                           style={{ width: `${Math.min(100, Math.round((sys.ai.used / sys.ai.limit) * 100))}%` }}
                         />
                       </div>
@@ -573,45 +609,72 @@ export default function SettingsApp() {
                   )}
                 </div>
                 <div className="flex items-center gap-3 px-4 py-3">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
-                    <Server className="size-4" aria-hidden />
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400" aria-hidden="true">
+                    <Server className="size-5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-neutral-800">Сервер</div>
-                    <div className="text-xs text-neutral-500">
+                    <div className="text-sm font-medium text-white">Сервер</div>
+                    <div className="text-xs text-white/50">
                       {sys ? `аптайм ${Math.floor(sys.uptimeSec / 60)} мин ${sys.uptimeSec % 60} с · Next.js 16` : 'проверяем…'}
                     </div>
                   </div>
+                  <span className="shrink-0 text-xs font-semibold text-emerald-400">{sys ? 'Норма' : '—'}</span>
                 </div>
+              </div>
+              <div className="border-t border-white/[0.06] px-4 py-3">
+                <button
+                  type="button"
+                  className="flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.06] text-[12px] font-semibold text-white transition active:scale-[0.98] disabled:opacity-60"
+                  disabled={sysBusy}
+                  onClick={async () => {
+                    setSysBusy(true)
+                    try {
+                      setSys(await api.systemStatus())
+                    } catch {
+                      /* статус остаётся прежним */
+                    } finally {
+                      setSysBusy(false)
+                    }
+                  }}
+                >
+                  {sysBusy ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : <RefreshCw className="size-3.5" aria-hidden="true" />}
+                  Перезагрузить
+                </button>
               </div>
             </SectionCard>
 
             {/* Об игре */}
             <SectionCard title="Об игре">
-              <div className="px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <Info className="size-4 text-neutral-400" />
-                  <span className="text-sm font-medium text-neutral-800">Resale</span>
-                  <span className="ml-auto rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-500">
-                    версия 2.5.0
-                  </span>
+              <div className="divide-y divide-white/[0.06]">
+                <Row
+                  icon={<Info className="size-5" />}
+                  tint="plain"
+                  label="Resale"
+                  value="Игра-симулятор перепродажи"
+                />
+                <div className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-medium text-white/50">
+                      версия 2.5.0
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs leading-relaxed text-white/50">
+                    «Resale» — игра-симулятор перепродажи. Экономика живая: цены двигают ИИ-боты и реальные
+                    игроки. Налоги, банк, рынок — как в жизни.
+                  </p>
                 </div>
-                <p className="mt-2 text-xs leading-relaxed text-neutral-500">
-                  «Resale» — игра-симулятор перепродажи. Экономика живая: цены двигают ИИ-боты и реальные
-                  игроки. Налоги, банк, рынок — как в жизни.
-                </p>
               </div>
             </SectionCard>
 
-            <Button
-              variant="outline"
-              className="h-11 w-full rounded-xl text-sm font-semibold"
+            <button
+              type="button"
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.06] text-[15px] font-semibold text-white transition active:scale-[0.98] disabled:opacity-60"
               disabled={refreshing}
               onClick={refreshProfile}
             >
-              {refreshing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+              {refreshing ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <RefreshCw className="size-4" aria-hidden="true" />}
               Обновить профиль
-            </Button>
+            </button>
           </>
         )}
       </div>

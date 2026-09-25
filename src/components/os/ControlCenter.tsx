@@ -1,14 +1,14 @@
 'use client'
 
 // Центр управления: свайп сверху вниз, как в настоящем телефоне.
-// Фонарик включает РЕАЛЬНУЮ вспышку (Torch API), яркость затемняет экран,
-// зарядка — системный переключатель ОС.
+// Wi-Fi и батарея — РЕАЛЬНЫЕ датчики устройства (device.ts), фонарик —
+// настоящая вспышка через Torch API с одноразовым разрешением (torch.ts).
 import { useSyncExternalStore } from 'react'
 import {
-  BatteryCharging, ChevronDown, Flashlight, Moon, MoonStar, Settings, Sun, SunDim, Wallet, Zap, Wifi,
+  BatteryCharging, ChevronDown, Flashlight, Moon, MoonStar, Settings, Sun, SunDim, Wallet, Zap, Wifi, WifiOff,
 } from 'lucide-react'
 import { useOS, type AppKey } from '@/lib/store'
-import { enableTorch, stopTorch } from '@/lib/torch'
+import { setTorch } from '@/lib/torch'
 
 function useClock(): Date | null {
   const ts = useSyncExternalStore(
@@ -23,7 +23,7 @@ function useClock(): Date | null {
 }
 
 function Tile({
-  active, icon, label, sub, onClick, activeCls = 'bg-white text-neutral-900', className = '',
+  active, icon, label, sub, onClick, activeCls = 'bg-white text-neutral-900', className = '', disabled = false,
 }: {
   active?: boolean
   icon: React.ReactNode
@@ -32,6 +32,7 @@ function Tile({
   onClick: () => void
   activeCls?: string
   className?: string
+  disabled?: boolean
 }) {
   return (
     <button
@@ -39,9 +40,10 @@ function Tile({
       onClick={onClick}
       aria-pressed={active}
       aria-label={label}
-      className={`flex min-h-[68px] items-center gap-3 rounded-3xl px-4 py-3 text-left outline-none transition-all active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white/70 ${
-        active ? activeCls : 'bg-white/10 text-white'
-      } ${className}`}
+      disabled={disabled}
+      className={`flex min-h-[68px] items-center gap-3 rounded-3xl px-4 py-3 text-left outline-none transition-all focus-visible:ring-2 focus-visible:ring-white/70 ${
+        disabled ? 'cursor-default opacity-70' : 'active:scale-[0.97]'
+      } ${active ? activeCls : 'bg-white/10 text-white'} ${className}`}
     >
       <span
         className={`flex size-9 shrink-0 items-center justify-center rounded-full ${
@@ -75,6 +77,9 @@ export default function ControlCenter({
   const setDnd = useOS((s) => s.setDnd)
   const charging = useOS((s) => s.charging)
   const setCharging = useOS((s) => s.setCharging)
+  const batteryReal = useOS((s) => s.batteryReal)
+  const netOnline = useOS((s) => s.netOnline)
+  const netKind = useOS((s) => s.netKind)
   const brightness = useOS((s) => s.brightness)
   const setBrightness = useOS((s) => s.setBrightness)
   const battery = useOS((s) => s.battery)
@@ -85,20 +90,15 @@ export default function ControlCenter({
   const now = useClock()
 
   const toggleFlash = async () => {
-    if (flashlight) {
-      stopTorch()
-      setFlashlight(false)
-      return
-    }
-    const ok = await enableTorch()
-    if (ok) {
-      setFlashlight(true)
-      pushToast('Фонарик', 'Вспышка включена на реальном устройстве')
-    } else {
-      setFlashlight(true) // визуально работает даже без вспышки
-      pushToast('Фонарик', 'Устройство без вспышки — светим виртуально')
+    const next = !flashlight
+    const res = await setTorch(next)
+    setFlashlight(next)
+    if (next) {
+      pushToast('Фонарик', res.real ? 'Вспышка включена на устройстве' : 'Устройство без вспышки — светим виртуально')
     }
   }
+
+  const netLabel = !netOnline ? 'Нет интернета' : netKind === 'slow' ? 'Слабый сигнал' : 'Wi-Fi'
 
   return (
     <div className={`pointer-events-none absolute inset-0 z-55 ${open ? '' : 'invisible'}`}>
@@ -135,9 +135,16 @@ export default function ControlCenter({
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold">
-                <Wifi className="size-3.5 text-emerald-400" aria-hidden="true" />
-                {online}
+              <span
+                className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold"
+                title={`Сеть устройства: ${netLabel}`}
+              >
+                {netOnline ? (
+                  <Wifi className="size-3.5 text-emerald-400" aria-hidden="true" />
+                ) : (
+                  <WifiOff className="size-3.5 text-red-400" aria-hidden="true" />
+                )}
+                {netLabel}
               </span>
               <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold tabular-nums">
                 {charging ? (
@@ -172,6 +179,17 @@ export default function ControlCenter({
               }}
             />
             <Tile
+              active={netOnline}
+              activeCls="bg-emerald-500 text-white"
+              icon={netOnline ? <Wifi className="size-4.5" aria-hidden="true" /> : <WifiOff className="size-4.5" aria-hidden="true" />}
+              label="Wi-Fi"
+              sub={netOnline ? (netKind === 'slow' ? 'Слабый сигнал' : 'Подключено') : 'Нет сети'}
+              onClick={() => {
+                onClose()
+                onOpenApp('settings')
+              }}
+            />
+            <Tile
               active={dnd}
               activeCls="bg-emerald-400 text-neutral-900"
               icon={<MoonStar className="size-4.5" aria-hidden="true" />}
@@ -182,14 +200,27 @@ export default function ControlCenter({
                 pushToast('Не беспокоить', !useOS.getState().dnd ? 'Тосты снова всплывают' : 'Уведомления копятся в центре')
               }}
             />
-            <Tile
-              active={charging}
-              activeCls="bg-emerald-400 text-neutral-900"
-              icon={<Zap className="size-4.5" aria-hidden="true" />}
-              label="Зарядка"
-              sub={charging ? 'Питание подключено' : 'Батарея'}
-              onClick={() => setCharging(!charging)}
-            />
+            {batteryReal ? (
+              // Настоящая батарея устройства — управление недоступно, только статус.
+              <Tile
+                active={charging}
+                activeCls="bg-emerald-400 text-neutral-900"
+                icon={<BatteryCharging className="size-4.5" aria-hidden="true" />}
+                label="Батарея"
+                sub="По данным устройства"
+                disabled
+                onClick={() => {}}
+              />
+            ) : (
+              <Tile
+                active={charging}
+                activeCls="bg-emerald-400 text-neutral-900"
+                icon={<Zap className="size-4.5" aria-hidden="true" />}
+                label="Зарядка"
+                sub={charging ? 'Питание подключено' : 'Батарея'}
+                onClick={() => setCharging(!charging)}
+              />
+            )}
             <Tile
               active={theme === 'dark'}
               activeCls="bg-emerald-300 text-neutral-900"

@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { RefreshCw, WifiOff } from 'lucide-react'
-import { useOS, type AppKey } from '@/lib/store'
+import { useOS, type AppKey, WALLPAPER_TOP } from '@/lib/store'
 import { api, setToken } from '@/lib/api'
 import { useRealtime } from '@/lib/use-realtime'
 import { useSwipe } from '@/lib/use-swipe'
+import { initDeviceSensors } from '@/lib/device'
 import PhoneFrame from '@/components/os/PhoneFrame'
 import StatusBar from '@/components/os/StatusBar'
 import LockScreen from '@/components/os/LockScreen'
@@ -26,6 +27,14 @@ import AuctionApp from '@/components/apps/AuctionApp'
 import CareerApp from '@/components/apps/CareerApp'
 import DeliveryApp from '@/components/apps/DeliveryApp'
 import LeaderboardApp from '@/components/apps/LeaderboardApp'
+import CalcApp from '@/components/apps/CalcApp'
+import ClockApp from '@/components/apps/ClockApp'
+import CalendarApp from '@/components/apps/CalendarApp'
+import NotesApp from '@/components/apps/NotesApp'
+import WeatherApp from '@/components/apps/WeatherApp'
+import GalleryApp from '@/components/apps/GalleryApp'
+import MusicApp from '@/components/apps/MusicApp'
+import PhoneApp from '@/components/apps/PhoneApp'
 
 const BATTERY_KEY = 'avito_sim_battery'
 const THEME_KEY = 'avito_sim_theme'
@@ -98,19 +107,26 @@ export default function Home() {
     return () => window.removeEventListener('resize', check)
   }, [])
 
-  // ---------- TELEGRAM: слить рамки Mini App с фоном телефона ----------
-  const applyTelegramChrome = useCallback(() => {
+  // ---------- TELEGRAM: прозрачные рамки — цвет шапки/низа Telegram = цвет верха контента ----------
+  const applyTelegramChrome = useCallback((color: string) => {
     const tg = (window as unknown as { Telegram?: { WebApp?: Record<string, ((v: string) => void) | undefined> } }).Telegram?.WebApp
     if (!tg) return
-    const BG = '#050d09' // зелёно-чёрный Resale — совпадает с фоном/обоями
     try {
-      tg.setHeaderColor?.(BG) // верхняя панель Telegram
-      tg.setBackgroundColor?.(BG) // фон окна
-      tg.setBottomBarColor?.(BG) // нижняя панель (Bot API 9+)
+      tg.setHeaderColor?.(color) // верхняя панель Telegram сливается с контентом
+      tg.setBackgroundColor?.(color) // фон окна
+      tg.setBottomBarColor?.(color) // нижняя панель (Bot API 9+)
     } catch {
       /* старый клиент без поддержки — просто игнорируем */
     }
   }, [])
+
+  // Перекрашиваем рамки Telegram под текущий экран: локскрин/загрузка — чёрно-зелёные,
+  // дом — верх обоев, приложения — их фирменный фон #050D09.
+  const wallpaper = useOS((s) => s.wallpaper)
+  useEffect(() => {
+    const chrome = locked || !session ? '#050d09' : currentApp ? '#050d09' : (WALLPAPER_TOP[wallpaper] ?? '#07130d')
+    applyTelegramChrome(chrome)
+  }, [locked, session, currentApp, wallpaper, applyTelegramChrome])
 
   // ---------- AUTH (3 ретрая, затем экран повтора) ----------
   const doAuth = useCallback(async () => {
@@ -118,7 +134,7 @@ export default function Home() {
     const tg = (window as unknown as { Telegram?: { WebApp?: { initData?: string; ready?: () => void; expand?: () => void } } }).Telegram?.WebApp
     tg?.ready?.()
     tg?.expand?.()
-    applyTelegramChrome()
+    applyTelegramChrome('#050d09')
     let lastErr: unknown = null
     for (let attempt = 0; attempt < 3; attempt++) {
       if (attempt > 0) await new Promise((r) => setTimeout(r, 700 * attempt))
@@ -149,6 +165,17 @@ export default function Home() {
     if (authTried.current) return
     authTried.current = true
     doAuth()
+    initDeviceSensors()
+  }, [doAuth])
+
+  // ---------- АВТО-ПЕРЕПОДКЛЮЧЕНИЕ: сеть вернулась — тихо повторяем авторизацию ----------
+  useEffect(() => {
+    const onOnline = () => {
+      if (useOS.getState().session) return
+      doAuth()
+    }
+    window.addEventListener('online', onOnline)
+    return () => window.removeEventListener('online', onOnline)
   }, [doAuth])
 
   // ---------- REALTIME ----------
@@ -194,6 +221,8 @@ export default function Home() {
 
   useEffect(() => {
     if (!booted) return
+    // Настоящая батарея устройства — симуляция разряда не нужна.
+    if (useOS.getState().batteryReal) return
     const drain = setInterval(() => {
       if (useOS.getState().charging) {
         setBattery(useOS.getState().battery + 2)
@@ -270,6 +299,14 @@ export default function Home() {
       case 'career': return <CareerApp />
       case 'delivery': return <DeliveryApp />
       case 'leaderboard': return <LeaderboardApp />
+      case 'calc': return <CalcApp />
+      case 'clock': return <ClockApp />
+      case 'calendar': return <CalendarApp />
+      case 'notes': return <NotesApp />
+      case 'weather': return <WeatherApp />
+      case 'gallery': return <GalleryApp />
+      case 'music': return <MusicApp />
+      case 'phone': return <PhoneApp />
       default: return null
     }
   }
@@ -310,8 +347,8 @@ export default function Home() {
   return (
     <main className="min-h-[100dvh] flex items-center justify-center bg-neutral-950">
       <PhoneFrame>
-        {/* статус-бар */}
-        <StatusBar variant={currentApp ? (theme === 'dark' ? 'dark' : 'light') : 'dark'} onBell={() => setNotifOpen(true)} />
+        {/* статус-бар — над всеми тёмными экранами (приложения всегда тёмные) */}
+        <StatusBar onBell={() => setNotifOpen(true)} />
 
         {/* контент — до самого низа: пилюля-жест накладывается поверх */}
         <div className={`absolute inset-0 top-10 bottom-6 overflow-hidden bg-black ${theme === 'dark' ? 'theme-dark' : ''}`}>

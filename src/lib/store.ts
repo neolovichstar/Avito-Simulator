@@ -5,11 +5,29 @@ import type { SessionUser, NotificationDTO } from '@/lib/types'
 import { levelFromXp } from '@/lib/economy'
 import { sound } from '@/lib/sound'
 
-export type AppKey = 'avito' | 'bank' | 'taxes' | 'browser' | 'settings' | 'repair' | 'auction' | 'career' | 'delivery' | 'leaderboard'
+export type AppKey =
+  | 'avito' | 'bank' | 'taxes' | 'browser' | 'settings'
+  | 'repair' | 'auction' | 'career' | 'delivery' | 'leaderboard'
+  | 'calc' | 'clock' | 'calendar' | 'notes' | 'weather'
+  | 'gallery' | 'music' | 'phone'
+
+/** Реальный тип сети устройства (Network Information API + navigator.onLine). */
+export type NetKind = 'offline' | 'slow' | '3g' | '4g' | 'wifi'
 
 // Виджеты домашнего экрана / рабочего стола ПК
 export type WidgetKey = 'clock' | 'wallet' | 'online' | 'quest' | 'delivery'
 export const ALL_WIDGETS: WidgetKey[] = ['clock', 'wallet', 'online', 'quest', 'delivery']
+
+/** Верхняя кромка обоев — для слияния рамки Telegram с фоном экрана. */
+export const WALLPAPER_TOP: Record<string, string> = {
+  resale: '#07130d',
+  wave: '#14102b',
+  peak: '#2b1d4d',
+  city: '#101423',
+  marble: '#0d2b23',
+  aurora: '#0b0b16',
+  ember: '#1c0f18',
+}
 export const WIDGET_LABEL: Record<WidgetKey, string> = {
   clock: 'Часы и дата',
   wallet: 'Кошелёк',
@@ -27,6 +45,12 @@ interface OSState {
   openApps: AppKey[] // история открытых приложений (для recents)
   battery: number
   charging: boolean
+  /** Батарея настоящая (Battery API устройства) — симуляцию тяги отключаем. */
+  batteryReal: boolean
+  /** Реальная связь с интернетом на устройстве. */
+  netOnline: boolean
+  /** Реальный тип сети: влияет на значки в статус-баре. */
+  netKind: NetKind
   online: number
   notifications: NotificationDTO[]
   unreadChats: number
@@ -48,6 +72,8 @@ interface OSState {
   dismissApp: (app: AppKey) => void // убрать приложение из недавних (свайп в recents)
   setBattery: (v: number) => void
   setCharging: (v: boolean) => void
+  setBatteryReal: (v: boolean) => void
+  setNet: (online: boolean, kind: NetKind) => void
   setOnline: (n: number) => void
   setNotifications: (n: NotificationDTO[]) => void
   addNotification: (n: NotificationDTO) => void
@@ -78,6 +104,9 @@ export const useOS = create<OSState>((set, get) => ({
   openApps: [],
   battery: 100,
   charging: false,
+  batteryReal: false,
+  netOnline: true,
+  netKind: 'wifi',
   online: 0,
   notifications: [],
   unreadChats: 0,
@@ -109,6 +138,8 @@ export const useOS = create<OSState>((set, get) => ({
     })),
   setBattery: (v) => set({ battery: Math.max(0, Math.min(100, v)) }),
   setCharging: (v) => set({ charging: v }),
+  setBatteryReal: (v) => set({ batteryReal: v }),
+  setNet: (online, kind) => set({ netOnline: online, netKind: kind }),
   setOnline: (n) => set({ online: n }),
   setNotifications: (n) => set({ notifications: n }),
   addNotification: (n) => set((s) => ({ notifications: [n, ...s.notifications].slice(0, 40) })),

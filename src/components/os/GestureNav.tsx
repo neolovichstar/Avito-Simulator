@@ -99,11 +99,15 @@ export default function GestureNav({
       <div
         aria-hidden="true"
         className="absolute inset-x-0 bottom-0 z-[60] h-7 touch-none select-none"
+        style={{ bottom: 'env(safe-area-inset-bottom)' }}
         {...bottom}
       />
 
       {/* пилюля-индикатор (клик = домой, драг обрабатывает зона под ней) */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[61] flex h-6 items-end justify-center pb-2">
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-[61] flex h-6 items-end justify-center pb-2"
+        style={{ paddingBottom: 'calc(8px + env(safe-area-inset-bottom))' }}
+      >
         <span
           className="block h-[5px] rounded-full bg-white mix-blend-difference transition-[width] duration-100 ease-out"
           style={{ width: pillWidth, opacity: 0.9 }}

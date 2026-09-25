@@ -1,0 +1,244 @@
+'use client'
+
+// Погода ОС: полностью офлайн — детерминированный псевдорандом (mulberry32
+// от хэша строки «город+дата») вместо сети. Одинаковый город и день всегда
+// дают одинаковую погоду.
+
+import { useMemo, useState } from 'react'
+import {
+  Cloud,
+  CloudRain,
+  CloudSnow,
+  CloudSun,
+  Droplets,
+  Gauge,
+  Sun,
+  Thermometer,
+  Wind,
+} from 'lucide-react'
+import { sound } from '@/lib/sound'
+
+const CITIES = [
+  { name: 'Москва', base: 4 },
+  { name: 'Санкт-Петербург', base: 3 },
+  { name: 'Сочи', base: 13 },
+  { name: 'Казань', base: 2 },
+]
+
+const CONDITIONS = ['Солнечно', 'Облачно', 'Пасмурно', 'Дождь', 'Снег'] as const
+type Condition = (typeof CONDITIONS)[number]
+
+interface DayWeather {
+  cond: Condition
+  temp: number
+  tMin: number
+  tMax: number
+  wind: number
+  hum: number
+  press: number
+  feels: number
+}
+
+interface HourWeather {
+  hour: number
+  cond: Condition
+  temp: number
+}
+
+// Хэш строки (FNV-1a, 32 бита)
+function hashStr(s: string): number {
+  let h = 2166136261
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return h >>> 0
+}
+
+// Детерминированный ГПСЧ mulberry32
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0
+  return () => {
+    a = (a + 0x6d2b79f5) | 0
+    let t = Math.imul(a ^ (a >>> 15), 1 | a)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+function dayKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function pickCond(r: number): Condition {
+  return CONDITIONS[Math.floor(r * CONDITIONS.length)] ?? 'Облачно'
+}
+
+function buildWeather(cityName: string, base: number, date: Date): DayWeather {
+  const rnd = mulberry32(hashStr(cityName + '|' + dayKey(date)))
+  const cond = pickCond(rnd())
+  let temp = Math.round(base + rnd() * 7 - 2)
+  if (cond === 'Снег' && temp > -1) temp = -1 - Math.round(rnd() * 5)
+  if (cond === 'Дождь' && temp > 26) temp = 24
+  const wind = Math.round((0.5 + rnd() * 8) * 10) / 10
+  const hum = Math.round(45 + rnd() * 45)
+  const press = Math.round(738 + rnd() * 24)
+  const feels = temp - Math.round(rnd() * 2) - (wind > 5 ? 1 : 0)
+  const tMax = temp + 1 + Math.round(rnd() * 3)
+  const tMin = temp - 2 - Math.round(rnd() * 4)
+  return { cond, temp, tMin, tMax, wind, hum, press, feels }
+}
+
+function buildHours(cityName: string, day: DayWeather, date: Date): HourWeather[] {
+  const rnd = mulberry32(hashStr(cityName + '|' + dayKey(date) + '|h'))
+  const out: HourWeather[] = []
+  for (let h = 0; h < 24; h++) {
+    // кривая суток: холоднее к 3 ночи, теплее к 15 дня
+    const amp = -3 * Math.cos(((h - 3) / 24) * Math.PI * 2)
+    const cond = rnd() < 0.6 ? day.cond : pickCond(rnd())
+    out.push({ hour: h, cond, temp: Math.round(day.temp + amp) })
+  }
+  return out
+}
+
+function CondIcon({ cond, className }: { cond: Condition; className: string }) {
+  if (cond === 'Солнечно') return <Sun className={className + ' text-amber-300'} aria-hidden="true" />
+  if (cond === 'Облачно') return <CloudSun className={className + ' text-amber-300'} aria-hidden="true" />
+  if (cond === 'Пасмурно') return <Cloud className={className + ' text-white/80'} aria-hidden="true" />
+  if (cond === 'Дождь') return <CloudRain className={className + ' text-white/80'} aria-hidden="true" />
+  return <CloudSnow className={className + ' text-white/80'} aria-hidden="true" />
+}
+
+function fmtDeg(n: number): string {
+  return (n > 0 ? '+' : '') + Math.round(n) + '°'
+}
+
+export default function WeatherApp() {
+  const [cityIdx, setCityIdx] = useState(0)
+  const city = CITIES[cityIdx] ?? CITIES[0]!
+  const today = useMemo(() => new Date(), [])
+
+  const model = useMemo(() => {
+    const now = buildWeather(city.name, city.base, today)
+    const hours = buildHours(city.name, now, today)
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i)
+      return { date: d, w: buildWeather(city.name, city.base, d) }
+    })
+    return { now, hours, days }
+  }, [city, today])
+
+  const nowHour = today.getHours()
+
+  return (
+    <div className="flex h-full flex-col bg-[linear-gradient(180deg,#07130D,#050D09)] text-white">
+      <header className="flex h-14 shrink-0 items-center gap-3 px-5">
+        <h1 className="text-[17px] font-semibold">Погода</h1>
+      </header>
+
+      <div className="flex-1 overflow-y-auto [scrollbar-width:thin] px-4 pb-6">
+        {/* Города */}
+        <div className="flex flex-wrap gap-2">
+          {CITIES.map((c, i) => (
+            <button
+              key={c.name}
+              type="button"
+              onClick={() => {
+                sound.tap()
+                setCityIdx(i)
+              }}
+              aria-label={`Погода в городе ${c.name}`}
+              aria-pressed={i === cityIdx}
+              className={
+                'h-9 rounded-full px-4 text-[13px] transition-transform active:scale-95 ' +
+                (i === cityIdx ? 'bg-emerald-500 font-semibold text-[#052E16]' : 'bg-white/[0.06] text-white/70')
+              }
+            >
+              {c.name}
+            </button>
+          ))}
+        </div>
+
+        {/* Сейчас */}
+        <div className="mt-4 flex items-center justify-between rounded-2xl border border-emerald-500/15 bg-[#0E1F16] p-5">
+          <div className="min-w-0">
+            <div className="text-[12px] text-white/40">{city.name}</div>
+            <div className="mt-1 text-[56px] font-light leading-none tabular-nums">{fmtDeg(model.now.temp)}</div>
+            <div className="mt-2 text-[14px] text-white/70">{model.now.cond}</div>
+          </div>
+          <CondIcon cond={model.now.cond} className="size-20 shrink-0" />
+        </div>
+
+        {/* По часам */}
+        <div className="mt-3 rounded-2xl border border-emerald-500/15 bg-[#0E1F16] p-4">
+          <div className="text-[12px] text-white/60">По часам</div>
+          <div className="mt-3 flex gap-4 overflow-x-auto [scrollbar-width:thin]">
+            {model.hours.map((h) => (
+              <div
+                key={h.hour}
+                className={
+                  'flex min-w-10 flex-col items-center gap-1.5 ' +
+                  (h.hour === nowHour ? 'text-emerald-400' : h.hour < nowHour ? 'text-white/40' : '')
+                }
+              >
+                <span className="text-[11px] tabular-nums">{String(h.hour).padStart(2, '0')}</span>
+                <CondIcon cond={h.cond} className="size-4" />
+                <span className="text-[11px] tabular-nums">{fmtDeg(h.temp)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* На 7 дней */}
+        <div className="mt-3 rounded-2xl border border-emerald-500/15 bg-[#0E1F16] p-4">
+          <div className="text-[12px] text-white/60">На 7 дней</div>
+          <div className="mt-1">
+            {model.days.map(({ date, w }, i) => (
+              <div
+                key={dayKey(date)}
+                className="flex items-center justify-between border-b border-white/5 py-2.5 last:border-0"
+              >
+                <span className={'text-[14px] ' + (i === 0 ? 'font-medium text-white' : 'text-white/70')}>
+                  {i === 0 ? 'Сегодня' : date.toLocaleDateString('ru-RU', { weekday: 'short' })}
+                </span>
+                <CondIcon cond={w.cond} className="size-5" />
+                <span className="flex items-baseline gap-2 tabular-nums">
+                  <span className="text-[13px] text-white/40">{fmtDeg(w.tMin)}</span>
+                  <span className="text-[13px] font-medium">{fmtDeg(w.tMax)}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Детали */}
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-emerald-500/15 bg-[#0E1F16] p-4">
+            <div className="flex items-center gap-2 text-[12px] text-white/50">
+              <Wind className="size-4" aria-hidden="true" /> Ветер
+            </div>
+            <div className="mt-2 text-[18px] font-semibold tabular-nums">{model.now.wind.toFixed(1)} м/с</div>
+          </div>
+          <div className="rounded-2xl border border-emerald-500/15 bg-[#0E1F16] p-4">
+            <div className="flex items-center gap-2 text-[12px] text-white/50">
+              <Droplets className="size-4" aria-hidden="true" /> Влажность
+            </div>
+            <div className="mt-2 text-[18px] font-semibold tabular-nums">{model.now.hum}%</div>
+          </div>
+          <div className="rounded-2xl border border-emerald-500/15 bg-[#0E1F16] p-4">
+            <div className="flex items-center gap-2 text-[12px] text-white/50">
+              <Gauge className="size-4" aria-hidden="true" /> Давление
+            </div>
+            <div className="mt-2 text-[18px] font-semibold tabular-nums">{model.now.press} мм рт.</div>
+          </div>
+          <div className="rounded-2xl border border-emerald-500/15 bg-[#0E1F16] p-4">
+            <div className="flex items-center gap-2 text-[12px] text-white/50">
+              <Thermometer className="size-4" aria-hidden="true" /> Ощущается
+            </div>
+            <div className="mt-2 text-[18px] font-semibold tabular-nums">{fmtDeg(model.now.feels)}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

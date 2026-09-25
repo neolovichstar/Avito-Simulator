@@ -1,18 +1,19 @@
 'use client'
 
 // Домашний экран «Resale OS»: две страницы, как на настоящем смартфоне.
-// Страница 1 — виджеты + основные приложения, страница 2 — «умные» карточки
-// (задания, посылка, топ площадки) и остальные приложения.
+// Страница 1 — компактные виджеты + основные приложения, страница 2 —
+// мини-стрип дня + ЕДИНАЯ сетка 4 колонки (как требует настоящая ОС).
 // Перелистывание — свайпом: палец на телефоне, зажатая мышь на ПК (Pointer Events).
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { Crown, Package, Trophy } from 'lucide-react'
 import { useOS, type AppKey, type WidgetKey } from '@/lib/store'
 import { fmtMoney } from '@/lib/format'
 import { wallpaperClass } from '@/lib/wallpapers'
 import { api } from '@/lib/api'
 import { useDrag } from '@/lib/use-swipe'
 import AppIcon from './AppIcon'
-import { APP_TILE, DOCK_APPS, HOME_GRID } from './app-logos'
+import { APP_TILE, DOCK_APPS, PAGE1_APPS, PAGE2_APPS } from './app-logos'
 import type { CareerData, DeliveryDTO } from '@/lib/types'
 
 // Живые тики каждые 1000 мс без setState в эффекте (useSyncExternalStore).
@@ -29,38 +30,9 @@ function useClock(): Date | null {
 }
 
 const glass = 'rounded-2xl bg-white/10 backdrop-blur-md'
-const WIDGET_CLASS = 'min-h-11 rounded-2xl bg-white/10 px-3.5 py-2 text-left backdrop-blur-md outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-white/70'
+const WIDGET_CLASS = 'flex min-h-12 items-center gap-2 rounded-2xl bg-white/10 px-3 py-2 text-left backdrop-blur-md outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-white/70'
 
-// Разбивка приложений по страницам: 8 основных + сервисные
-const PAGE1_APPS = HOME_GRID.slice(0, 8)
-const PAGE2_APPS = HOME_GRID.slice(8)
-
-// Данные для «умных» карточек: квест, доставка и топ площадки
-function useWidgetData() {
-  const [quest, setQuest] = useState<{ title: string; progress: number; target: number; reward: number } | null>(null)
-  const [delivery, setDelivery] = useState<{ title: string; status: string } | null>(null)
-  const [top3, setTop3] = useState<{ name: string; value: number; isMe: boolean }[]>([])
-  useEffect(() => {
-    let alive = true
-    api.career().then((c: CareerData) => {
-      if (!alive) return
-      const q = c.quests.find((x) => !x.claimed && x.progress > 0) ?? c.quests.find((x) => !x.claimed)
-      if (q) setQuest({ title: q.title, progress: Math.min(q.progress, q.target), target: q.target, reward: q.reward })
-    }).catch(() => {})
-    api.deliveries().then((d: { items: DeliveryDTO[] }) => {
-      if (!alive) return
-      const act = d.items.find((x) => x.status === 'in_transit')
-      if (act) setDelivery({ title: act.title, status: 'В пути' })
-    }).catch(() => {})
-    api.leaderboard().then((b) => {
-      if (!alive) return
-      setTop3(b.balance.slice(0, 3).map((r) => ({ name: r.isMe ? 'Вы' : r.name, value: r.value, isMe: r.isMe })))
-    }).catch(() => {})
-    return () => { alive = false }
-  }, [])
-  return { quest, delivery, top3 }
-}
-
+// ─── Компактные виджеты (одна строка, h-12) ──────────────────────────────────
 function Widget({
   w,
   now,
@@ -73,24 +45,24 @@ function Widget({
   now: Date | null
   online: number
   balance: number
-  data: { quest: { title: string; progress: number; target: number; reward: number } | null; delivery: { title: string; status: string } | null; top3: { name: string; value: number; isMe: boolean }[] }
+  data: { quest: { progress: number; target: number } | null; delivery: { status: string } | null }
   onOpenApp: (app: AppKey) => void
 }) {
   if (w === 'clock') {
     return (
-      <div aria-label="Время и дата" className={`flex flex-col justify-center px-3.5 py-2 ${glass}`}>
-        <p className="text-2xl font-light leading-none tabular-nums text-white" suppressHydrationWarning>
+      <div aria-label="Время и дата" className={`${glass} flex min-h-12 flex-col justify-center px-3.5 py-1.5`}>
+        <p className="text-xl font-semibold leading-none tabular-nums text-white" suppressHydrationWarning>
           {now ? now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '\u00A0'}
         </p>
-        <p className="mt-1.5 text-[11px] leading-none text-white/70" suppressHydrationWarning>
-          {now ? now.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'long' }) : '\u00A0'}
+        <p className="mt-1 text-[10px] leading-none text-white/60" suppressHydrationWarning>
+          {now ? now.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' }) : '\u00A0'}
         </p>
       </div>
     )
   }
   if (w === 'online') {
     return (
-      <div aria-label={`Онлайн: ${online}`} className={`flex items-center gap-2 px-3 ${glass}`}>
+      <div aria-label={`Онлайн: ${online}`} className={`${glass} flex min-h-12 items-center gap-2 px-3`}>
         <span className="relative flex h-2 w-2" aria-hidden="true">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
@@ -102,27 +74,21 @@ function Widget({
   if (w === 'wallet') {
     return (
       <button type="button" aria-label="Открыть кошелёк в приложении Банк" onClick={() => onOpenApp('bank')} className={WIDGET_CLASS}>
-        <span className="block text-[10px] uppercase tracking-wider text-white/60">Кошелёк</span>
-        <span className="mt-0.5 block text-base font-semibold tabular-nums text-white">{fmtMoney(balance)}</span>
+        <span className="flex flex-col justify-center">
+          <span className="block text-[9px] uppercase tracking-wider text-white/55">Кошелёк</span>
+          <span className="block text-[15px] font-semibold leading-tight tabular-nums text-white">{fmtMoney(balance)}</span>
+        </span>
       </button>
     )
   }
   if (w === 'quest') {
     return (
       <button type="button" aria-label="Открыть задания" onClick={() => onOpenApp('career')} className={WIDGET_CLASS}>
-        <span className="block text-[10px] uppercase tracking-wider text-white/60">Задания</span>
+        <Trophy className="size-4 shrink-0 text-amber-300" aria-hidden="true" />
         {data.quest ? (
-          <>
-            <span className="mt-0.5 block max-w-40 truncate text-xs font-medium text-white">{data.quest.title}</span>
-            <span className="mt-1 flex items-center gap-1.5">
-              <span className="h-1.5 w-16 overflow-hidden rounded-full bg-white/20">
-                <span className="block h-full rounded-full bg-emerald-400" style={{ width: `${Math.min(100, Math.round((data.quest.progress / Math.max(1, data.quest.target)) * 100))}%` }} />
-              </span>
-              <span className="text-[10px] font-semibold tabular-nums text-white/80">{data.quest.progress}/{data.quest.target}</span>
-            </span>
-          </>
+          <span className="text-[13px] font-semibold tabular-nums text-white">{data.quest.progress}/{data.quest.target}</span>
         ) : (
-          <span className="mt-0.5 block text-xs text-white/60">На сегодня всё чисто</span>
+          <span className="text-[11px] text-white/60">Заданий нет</span>
         )}
       </button>
     )
@@ -130,19 +96,41 @@ function Widget({
   // delivery
   return (
     <button type="button" aria-label="Открыть доставки" onClick={() => onOpenApp('delivery')} className={WIDGET_CLASS}>
-      <span className="block text-[10px] uppercase tracking-wider text-white/60">Доставка</span>
+      <Package className="size-4 shrink-0 text-emerald-300" aria-hidden="true" />
       {data.delivery ? (
-        <>
-          <span className="mt-0.5 block max-w-40 truncate text-xs font-medium text-white">{data.delivery.title}</span>
-          <span className={`mt-0.5 block text-[10px] font-semibold ${data.delivery.status === 'В пути' ? 'text-amber-300' : 'text-emerald-300'}`}>
-            {data.delivery.status}
-          </span>
-        </>
+        <span className="text-[11px] font-semibold text-amber-300">{data.delivery.status}</span>
       ) : (
-        <span className="mt-0.5 block text-xs text-white/60">Посылок нет</span>
+        <span className="text-[11px] text-white/60">Посылок нет</span>
       )}
     </button>
   )
+}
+
+// ─── Данные для мини-стрипа страницы 2 ───────────────────────────────────────
+function useDayData() {
+  const [quest, setQuest] = useState<{ progress: number; target: number; reward: number } | null>(null)
+  const [delivery, setDelivery] = useState<{ status: string } | null>(null)
+  const [myPlace, setMyPlace] = useState<number | null>(null)
+  useEffect(() => {
+    let alive = true
+    api.career().then((c: CareerData) => {
+      if (!alive) return
+      const q = c.quests.find((x) => !x.claimed && x.progress > 0) ?? c.quests.find((x) => !x.claimed)
+      if (q) setQuest({ progress: Math.min(q.progress, q.target), target: q.target, reward: q.reward })
+    }).catch(() => {})
+    api.deliveries().then((d: { items: DeliveryDTO[] }) => {
+      if (!alive) return
+      const act = d.items.find((x) => x.status === 'in_transit')
+      if (act) setDelivery({ status: 'В пути' })
+    }).catch(() => {})
+    api.leaderboard().then((b) => {
+      if (!alive) return
+      const me = b.balance.findIndex((r) => r.isMe)
+      setMyPlace(me >= 0 ? me + 1 : null)
+    }).catch(() => {})
+    return () => { alive = false }
+  }, [])
+  return { quest, delivery, myPlace }
 }
 
 export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
@@ -152,7 +140,7 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
   const wallpaper = useOS((s) => s.wallpaper)
   const widgets = useOS((s) => s.widgets)
   const now = useClock()
-  const data = useWidgetData()
+  const day = useDayData()
 
   // ─── Страницы + свайп (ПК и телефон) ───────────────────────────────────────
   const [page, setPage] = useState(0)
@@ -200,35 +188,32 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
 
   return (
     <div
-      className={`absolute inset-0 flex flex-col pt-14 select-none ${wallpaperClass(wallpaper)}`}
+      className={`absolute inset-0 flex flex-col pt-12 select-none ${wallpaperClass(wallpaper)}`}
       role="region"
       aria-label="Домашний экран"
     >
       {/* ─── Страницы (свайп влево/вправо) ─── */}
       <div className="relative flex-1 overflow-hidden" onPointerDown={pages.onPointerDown} onClickCapture={guardClick}>
         <div className="flex h-full w-[200%]" style={trackStyle}>
-          {/* Страница 1: виджеты + основные приложения */}
+          {/* ─── Страница 1: компактные виджеты + основные приложения ─── */}
           <section className="flex h-full w-1/2 flex-col" aria-label="Страница 1 — приложения" aria-hidden={page !== 0}>
-            <div className="flex items-stretch justify-between gap-2.5 px-6">
-              <div className="flex items-stretch gap-2.5">
-                {widgets.filter((w) => w === 'clock').map((w) => (
-                  <Widget key={w} w={w} now={now} online={online} balance={balance} data={data} onOpenApp={onOpenApp} />
-                ))}
-              </div>
-              <div className="flex items-stretch gap-2.5">
-                {widgets.filter((w) => w !== 'clock').map((w) => (
-                  <Widget key={w} w={w} now={now} online={online} balance={balance} data={data} onOpenApp={onOpenApp} />
-                ))}
-              </div>
+            <div className="flex items-stretch gap-2 px-5">
+              {widgets.filter((w) => w === 'clock').map((w) => (
+                <Widget key={w} w={w} now={now} online={online} balance={balance} data={day} onOpenApp={onOpenApp} />
+              ))}
+              {widgets.filter((w) => w !== 'clock').slice(0, 3).map((w) => (
+                <Widget key={w} w={w} now={now} online={online} balance={balance} data={day} onOpenApp={onOpenApp} />
+              ))}
             </div>
 
-            <div className="mt-8 grid grid-cols-4 gap-x-5 gap-y-6 px-6">
+            <div className="mt-7 grid grid-cols-4 gap-x-5 gap-y-6 px-6">
               {PAGE1_APPS.map((app) => (
                 <AppIcon
                   key={app}
                   icon={APP_TILE[app].icon}
                   label={APP_TILE[app].label}
-                  image={APP_TILE[app].image}
+                  image={APP_TILE[app].image || undefined}
+                  imageBg={APP_TILE[app].background}
                   badge={app === 'avito' ? unreadChats : undefined}
                   onClick={() => onOpenApp(app)}
                 />
@@ -238,116 +223,83 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
             <div className="flex-1" />
           </section>
 
-          {/* Страница 2: «умные» карточки + сервисные приложения */}
-          <section className="flex h-full w-1/2 flex-col overflow-y-auto px-5 pb-3 [scrollbar-width:none]" aria-label="Страница 2 — день на площадке" aria-hidden={page !== 1}>
-            <p className="mb-3 mt-2 px-1 text-[11px] font-semibold uppercase tracking-widest text-white/50">
-              День на площадке
-            </p>
-
-            {/* Квест-карточка */}
-            <button
-              type="button"
-              onClick={() => onOpenApp('career')}
-              className="press mb-3 flex items-center gap-3.5 rounded-2xl border border-white/10 bg-white/10 p-4 text-left backdrop-blur-md active:scale-[0.985]"
-            >
-              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-emerald-500/40" aria-hidden>
-                <svg viewBox="0 0 48 48" className="size-6">
-                  <path d="M14.5 26.5 l5.5 5.5 L30 21.5" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                </svg>
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[10px] uppercase tracking-wider text-white/55">Задание дня</span>
-                {data.quest ? (
-                  <>
-                    <span className="mt-0.5 block truncate text-[13px] font-semibold text-white">{data.quest.title}</span>
-                    <span className="mt-1.5 flex items-center gap-2">
-                      <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/20">
-                        <span
-                          className="block h-full rounded-full bg-gradient-to-r from-emerald-400 to-green-500 transition-[width] duration-500"
-                          style={{ width: `${Math.min(100, Math.round((data.quest.progress / Math.max(1, data.quest.target)) * 100))}%` }}
-                        />
-                      </span>
-                      <span className="text-[10px] font-bold tabular-nums text-white/75">{data.quest.progress}/{data.quest.target}</span>
-                    </span>
-                  </>
-                ) : (
-                  <span className="mt-0.5 block text-[13px] text-white/70">Все задания выполнены — красавчик</span>
-                )}
-              </span>
-              {data.quest && (
-                <span className="shrink-0 rounded-full bg-emerald-400/20 px-2 py-1 text-[10px] font-bold text-emerald-300">
-                  +{fmtMoney(data.quest.reward)}
+          {/* ─── Страница 2: мини-стрип дня + единая сетка приложений ─── */}
+          <section className="flex h-full w-1/2 flex-col" aria-label="Страница 2 — приложения" aria-hidden={page !== 1}>
+            {/* мини-стрип дня: задание / посылка / место в топе */}
+            <div className="mx-5 grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                aria-label="Задание дня"
+                onClick={() => onOpenApp('career')}
+                className={`${glass} flex min-h-12 flex-col justify-center px-3 py-1.5 text-left outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-white/70`}
+              >
+                <span className="flex items-center gap-1.5 text-[9px] uppercase tracking-wider text-white/55">
+                  <Trophy className="size-3 text-amber-300" aria-hidden="true" /> Задание
                 </span>
-              )}
-            </button>
-
-            {/* Посылка */}
-            <button
-              type="button"
-              onClick={() => onOpenApp('delivery')}
-              className="press mb-3 flex items-center gap-3.5 rounded-2xl border border-white/10 bg-white/10 p-4 text-left backdrop-blur-md active:scale-[0.985]"
-            >
-              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-amber-500/40" aria-hidden>
-                <svg viewBox="0 0 24 24" className="size-6" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="2" y="7" width="20" height="12" rx="2" />
-                  <path d="M12 7v12" /><path d="M2 11h20" />
-                </svg>
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[10px] uppercase tracking-wider text-white/55">Посылка</span>
-                {data.delivery ? (
+                {day.quest ? (
                   <>
-                    <span className="mt-0.5 block truncate text-[13px] font-semibold text-white">{data.delivery.title}</span>
-                    <span className="mt-0.5 block text-[11px] font-semibold text-amber-300">{data.delivery.status} — курьер уже едет</span>
-                  </>
-                ) : (
-                  <span className="mt-0.5 block text-[13px] text-white/70">Активных посылок нет</span>
-                )}
-              </span>
-            </button>
-
-            {/* Топ площадки */}
-            <button
-              type="button"
-              onClick={() => onOpenApp('leaderboard')}
-              className="press mb-4 rounded-2xl border border-white/10 bg-white/10 p-4 text-left backdrop-blur-md active:scale-[0.985]"
-            >
-              <span className="mb-1.5 block text-[10px] uppercase tracking-wider text-white/55">Топ площадки</span>
-              {data.top3.length > 0 ? (
-                <span className="flex flex-col gap-1.5">
-                  {data.top3.map((r, i) => (
-                    <span key={r.name} className="flex items-center gap-2">
+                    <span className="mt-0.5 text-[12px] font-semibold tabular-nums text-white">
+                      {day.quest.progress}/{day.quest.target}
+                    </span>
+                    <span className="mt-1 h-1 w-full overflow-hidden rounded-full bg-white/15">
                       <span
-                        className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${
-                          i === 0 ? 'bg-amber-400 text-amber-950' : i === 1 ? 'bg-slate-300 text-slate-800' : 'bg-orange-300 text-orange-950'
-                        }`}
-                        aria-hidden
-                      >
-                        {i + 1}
-                      </span>
-                      <span className={`min-w-0 flex-1 truncate text-xs font-medium ${r.isMe ? 'font-bold text-emerald-300' : 'text-white/85'}`}>{r.name}</span>
-                      <span className="shrink-0 text-[11px] font-bold tabular-nums text-white">{fmtMoney(r.value)}</span>
+                        className="block h-full rounded-full bg-emerald-400"
+                        style={{ width: `${Math.min(100, Math.round((day.quest.progress / Math.max(1, day.quest.target)) * 100))}%` }}
+                      />
                     </span>
-                  ))}
+                  </>
+                ) : (
+                  <span className="mt-0.5 text-[11px] text-white/60">Всё чисто</span>
+                )}
+              </button>
+              <button
+                type="button"
+                aria-label="Посылка"
+                onClick={() => onOpenApp('delivery')}
+                className={`${glass} flex min-h-12 flex-col justify-center px-3 py-1.5 text-left outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-white/70`}
+              >
+                <span className="flex items-center gap-1.5 text-[9px] uppercase tracking-wider text-white/55">
+                  <Package className="size-3 text-emerald-300" aria-hidden="true" /> Посылка
                 </span>
-              ) : (
-                <span className="block text-[13px] text-white/70">Загружаем лидеров…</span>
-              )}
-            </button>
+                {day.delivery ? (
+                  <span className="mt-0.5 text-[12px] font-semibold text-amber-300">В пути</span>
+                ) : (
+                  <span className="mt-0.5 text-[11px] text-white/60">Посылок нет</span>
+                )}
+              </button>
+              <button
+                type="button"
+                aria-label="Топ площадки"
+                onClick={() => onOpenApp('leaderboard')}
+                className={`${glass} flex min-h-12 flex-col justify-center px-3 py-1.5 text-left outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-white/70`}
+              >
+                <span className="flex items-center gap-1.5 text-[9px] uppercase tracking-wider text-white/55">
+                  <Crown className="size-3 text-amber-300" aria-hidden="true" /> Топ
+                </span>
+                {day.myPlace ? (
+                  <span className="mt-0.5 text-[12px] font-semibold text-white">{day.myPlace} место</span>
+                ) : (
+                  <span className="mt-0.5 text-[11px] text-white/60">Не в топе</span>
+                )}
+              </button>
+            </div>
 
-            {/* Сервисные приложения — по центру, крупнее, чтобы страница не выглядела пустой */}
-            <div className="mx-auto grid w-full max-w-[236px] grid-cols-2 gap-6 px-1">
+            {/* ЕДИНАЯ сетка 4 колонки — как на странице 1 */}
+            <div className="mt-7 grid grid-cols-4 gap-x-5 gap-y-6 px-6">
               {PAGE2_APPS.map((app) => (
                 <AppIcon
                   key={app}
                   icon={APP_TILE[app].icon}
                   label={APP_TILE[app].label}
-                  image={APP_TILE[app].image}
+                  image={APP_TILE[app].image || undefined}
+                  imageBg={APP_TILE[app].background}
                   badge={app === 'avito' ? unreadChats : undefined}
                   onClick={() => onOpenApp(app)}
                 />
               ))}
             </div>
+
+            <div className="flex-1" />
           </section>
         </div>
       </div>
@@ -366,7 +318,8 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
               key={app}
               icon={APP_TILE[app].icon}
               label={APP_TILE[app].label}
-              image={APP_TILE[app].image}
+              image={APP_TILE[app].image || undefined}
+              imageBg={APP_TILE[app].background}
               badge={app === 'avito' ? unreadChats : undefined}
               onClick={() => onOpenApp(app)}
             />

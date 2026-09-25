@@ -3,15 +3,22 @@
 import type { ReactNode } from 'react'
 
 /** Логотип из фирменного пака: картинка сама — плитка (фон уже «вшит» в PNG). */
-function TileImage({ src }: { src: string }) {
+function TileImage({ src, bg }: { src: string; bg?: string }) {
   return (
-    <img
-      src={src}
-      alt=""
-      aria-hidden="true"
-      draggable={false}
-      className="absolute inset-0 h-full w-full select-none object-cover"
-    />
+    <>
+      {/* подложка в тон логотипа — пока PNG грузится, плитка не мигает белым */}
+      <span aria-hidden="true" className="absolute inset-0" style={bg ? { background: bg } : undefined} />
+      <img
+        src={src}
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        loading="eager"
+        decoding="sync"
+        fetchPriority="high"
+        className="absolute inset-0 h-full w-full select-none object-cover"
+      />
+    </>
   )
 }
 
@@ -31,6 +38,7 @@ export default function AppIcon({
   color,
   background,
   image,
+  imageBg,
   badge,
   onClick,
 }: {
@@ -42,6 +50,8 @@ export default function AppIcon({
   background?: string
   /** PNG-логотип из пака — заполняет плитку целиком, перекрывает icon/background. */
   image?: string
+  /** Фон-подложка под PNG (пока картинка грузится — плитка уже окрашена). */
+  imageBg?: string
   badge?: number
   onClick: () => void
 }) {
@@ -64,7 +74,7 @@ export default function AppIcon({
         style={image ? undefined : { backgroundImage: tileBackground }}
       >
         {image ? (
-          <TileImage src={image} />
+          <TileImage src={image} bg={imageBg ?? background} />
         ) : (
           <>
             {/* Блик сверху — стеклянный отблеск, как у настоящих иконок ОС */}

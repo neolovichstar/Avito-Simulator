@@ -190,6 +190,104 @@ export function DeliveryLogo() {
   )
 }
 
+// ─── Системные приложения Resale OS ────────────────────────────────────────
+
+// Калькулятор: сетка кнопок.
+export function CalcLogo() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+      <rect x="11" y="8" width="26" height="9" rx="2" fill="#ffffff" opacity="0.95" />
+      {[0, 1, 2].map((r) =>
+        [0, 1, 2].map((c) => (
+          <rect key={`${r}${c}`} x={11 + c * 9.5} y={21 + r * 7} width="7" height="5.4" rx="1.4" fill="#ffffff" opacity={0.55} />
+        )),
+      )}
+      <rect x="30" y="21" width="7" height="12.4" rx="1.4" fill="#ffffff" />
+    </svg>
+  )
+}
+
+// Часы: циферблат со стрелками.
+export function ClockLogo() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+      <circle cx="24" cy="24" r="16.5" fill="#ffffff" opacity="0.95" />
+      <circle cx="24" cy="24" r="16.5" stroke="#0f172a" strokeOpacity="0.18" strokeWidth="1.4" />
+      <path d="M24 14.5 V24 l6.5 4.5" stroke="#0f172a" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="24" cy="24" r="1.9" fill="#ef4444" />
+    </svg>
+  )
+}
+
+// Календарь: листок с красной шапкой и числом.
+export function CalendarLogo() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+      <rect x="9" y="10" width="30" height="29" rx="4" fill="#ffffff" />
+      <path d="M9 14 a4 4 0 0 1 4-4 h22 a4 4 0 0 1 4 4 v5 H9 Z" fill="#ef4444" />
+      <text x="24" y="33.5" textAnchor="middle" fontSize="14" fontWeight="700" fill="#1f2937" fontFamily="system-ui, sans-serif">25</text>
+    </svg>
+  )
+}
+
+// Заметки: жёлтый лист с строками.
+export function NotesLogo() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+      <rect x="10" y="8" width="28" height="32" rx="4" fill="#fef3c7" />
+      <path d="M10 12 a4 4 0 0 1 4-4 h20 a4 4 0 0 1 4 4 v3 H10 Z" fill="#f59e0b" />
+      <path d="M16 22 h16 M16 27.5 h16 M16 33 h10" stroke="#92400e" strokeWidth="2.2" strokeLinecap="round" opacity="0.75" />
+    </svg>
+  )
+}
+
+// Погода: солнце за облаком.
+export function WeatherLogo() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+      <circle cx="19" cy="18" r="7.5" fill="#fde047" />
+      <path d="M15 34 a7 7 0 0 1 1.2-13.9 9 9 0 0 1 17.3 2.4 A6 6 0 0 1 33 34 Z" fill="#ffffff" />
+    </svg>
+  )
+}
+
+// Галерея: разноцветный «цветок» из лепестков.
+export function GalleryLogo() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+      <circle cx="24" cy="16.5" r="6" fill="#ef4444" opacity="0.9" />
+      <circle cx="31.5" cy="24" r="6" fill="#f59e0b" opacity="0.9" />
+      <circle cx="24" cy="31.5" r="6" fill="#22c55e" opacity="0.9" />
+      <circle cx="16.5" cy="24" r="6" fill="#0ea5e9" opacity="0.9" />
+      <circle cx="24" cy="24" r="3.4" fill="#ffffff" />
+    </svg>
+  )
+}
+
+// Музыка: нота.
+export function MusicLogo() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+      <path d="M19 34.5 V13.5 l16-3.5 v19" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <ellipse cx="14.5" cy="34.8" rx="5" ry="4" fill="#ffffff" />
+      <ellipse cx="30.5" cy="29.3" rx="5" ry="4" fill="#ffffff" />
+    </svg>
+  )
+}
+
+// Телефон: классическая трубка.
+export function PhoneLogo() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+      <path
+        transform="translate(3.6 3.6) scale(1.7)"
+        fill="#ffffff"
+        d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"
+      />
+    </svg>
+  )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Реестр плиток: градиент фона + логотип + подпись для каждого AppKey.
 // image — вырезанный логотип из фирменного пака (public/img/apps/*.png):
@@ -257,11 +355,71 @@ export const APP_TILE: Record<AppKey, { label: string; background: string; image
     image: '/img/apps/leaderboard.png',
     icon: <LeaderboardLogo />,
   },
+  calc: {
+    label: 'Калькулятор',
+    background: 'linear-gradient(145deg, #334155, #1E293B)',
+    image: '',
+    icon: <CalcLogo />,
+  },
+  clock: {
+    label: 'Часы',
+    background: 'linear-gradient(145deg, #1E293B, #0F172A)',
+    image: '',
+    icon: <ClockLogo />,
+  },
+  calendar: {
+    label: 'Календарь',
+    background: 'linear-gradient(145deg, #FFFFFF, #F1F5F9)',
+    image: '',
+    icon: <CalendarLogo />,
+  },
+  notes: {
+    label: 'Заметки',
+    background: 'linear-gradient(145deg, #FDE68A, #F59E0B)',
+    image: '',
+    icon: <NotesLogo />,
+  },
+  weather: {
+    label: 'Погода',
+    background: 'linear-gradient(145deg, #5EEAD4, #0F766E)',
+    image: '',
+    icon: <WeatherLogo />,
+  },
+  gallery: {
+    label: 'Галерея',
+    background: 'linear-gradient(145deg, #FFFFFF, #E2E8F0)',
+    image: '',
+    icon: <GalleryLogo />,
+  },
+  music: {
+    label: 'Музыка',
+    background: 'linear-gradient(145deg, #FB7185, #BE123C)',
+    image: '',
+    icon: <MusicLogo />,
+  },
+  phone: {
+    label: 'Телефон',
+    background: 'linear-gradient(145deg, #4ADE80, #16A34A)',
+    image: '',
+    icon: <PhoneLogo />,
+  },
 }
 
 /** Иконка-картинка приложения: логотип из пака, заполняет плитку целиком. */
 export function AppTileImage({ app, className }: { app: AppKey; className?: string }) {
-  return <img src={APP_TILE[app].image} alt="" aria-hidden="true" draggable={false} className={`pointer-events-none select-none object-cover ${className ?? ''}`} />
+  const src = APP_TILE[app].image
+  if (!src) return null
+  return (
+    <img
+      src={src}
+      alt=""
+      aria-hidden="true"
+      draggable={false}
+      loading="eager"
+      decoding="sync"
+      className={`pointer-events-none select-none object-cover ${className ?? ''}`}
+    />
+  )
 }
 
 // Порядок иконок на домашнем экране (сетка 4 колонки) и в доке.
@@ -270,12 +428,24 @@ export const HOME_GRID: AppKey[] = [
   'bank',
   'leaderboard',
   'taxes',
-  'browser',
-  'settings',
+  'calc',
+  'clock',
+  'calendar',
+  'notes',
+  'weather',
+  'music',
+  'gallery',
   'repair',
   'auction',
   'career',
   'delivery',
+  'settings',
+  'browser',
+  'phone',
 ]
 
 export const DOCK_APPS: AppKey[] = ['avito', 'bank', 'auction', 'career']
+
+/** Приложения-«функции» для страницы 2 и системные. */
+export const PAGE1_APPS = HOME_GRID.slice(0, 8)
+export const PAGE2_APPS = HOME_GRID.slice(8)
