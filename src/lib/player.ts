@@ -64,6 +64,8 @@ interface Engine {
   history: number[]
   errorTimer: ReturnType<typeof setTimeout> | null
   saveTimer: ReturnType<typeof setTimeout> | null
+  /** id трека, которому уже делали тихую перезагрузку (одна попытка на трек). */
+  retriedId: string | null
 }
 
 const eng: Engine = {
@@ -73,6 +75,7 @@ const eng: Engine = {
   history: [],
   errorTimer: null,
   saveTimer: null,
+  retriedId: null,
 }
 
 const g = globalThis as unknown as { __resaleAudio?: HTMLAudioElement }
@@ -109,9 +112,21 @@ function ensureAudio(): HTMLAudioElement {
     handleEnded()
   })
   a.addEventListener('error', () => {
-    // Трек побит/недоступен — тихо перепрыгиваем на следующий через 1.5с.
     const st = usePlayer.getState()
     if (!st.current) return
+    // Первая ошибка: контент-нода могла моргнуть — тихо перезагружаем поток через 800мс.
+    if (eng.retriedId !== st.current.id) {
+      eng.retriedId = st.current.id
+      const sep = st.current.streamUrl.includes('?') ? '&' : '?'
+      a.src = `${st.current.streamUrl}${sep}r=${Date.now()}`
+      a.load()
+      eng.errorTimer = setTimeout(() => {
+        eng.errorTimer = null
+        void a.play().catch(() => usePlayer.setState({ isPlaying: false }))
+      }, 800)
+      return
+    }
+    // Вторая ошибка на том же треке — пропускаем.
     usePlayer.setState({ trackError: true, isPlaying: false })
     if (eng.errorTimer) clearTimeout(eng.errorTimer)
     eng.errorTimer = setTimeout(() => {
@@ -126,6 +141,7 @@ function ensureAudio(): HTMLAudioElement {
 
 function load(track: Track, autoplay: boolean) {
   const a = ensureAudio()
+  eng.retriedId = null
   if (eng.errorTimer) {
     clearTimeout(eng.errorTimer)
     eng.errorTimer = null

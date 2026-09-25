@@ -110,7 +110,8 @@ function normalize(raw: RawAudiusTrack): Track | null {
     artwork: artwork || artworkSmall,
     artworkSmall: artworkSmall || artwork,
     duration,
-    streamUrl: `${HOST}/v1/tracks/${raw.id}/stream?app_name=${APP_NAME}`,
+    // same-origin прокси: решает 302/CORS/недоступность контент-нод из webview.
+    streamUrl: `/api/music/stream?id=${raw.id}`,
     releaseDate: raw.release_date?.slice(0, 10) || undefined,
     plays: typeof raw.play_count === 'number' ? raw.play_count : undefined,
     genre: raw.genre || undefined,
