@@ -188,6 +188,17 @@ export interface BankData {
   activeLoan: { principal: number; owed: number; rate: number; dueAt: string } | null
 }
 
+// Запись кредитной истории (/api/bank/loans)
+export interface LoanHistoryItem {
+  id: string
+  principal: number
+  owed: number
+  rate: number
+  status: 'active' | 'repaid' | 'overdue' | string
+  takenAt: string
+  repaidAt: string | null
+}
+
 export interface TaxBillDTO {
   id: string
   amount: number

@@ -6,6 +6,7 @@ import type {
   BankData, TaxData, MarketStats, NotificationDTO, InventoryItemDTO, ProfileData,
   RepairOrderDTO, RepairQuoteDTO, DeliveryDTO, AuctionData, AuctionLotDTO, CareerData, QuestDTO,
   SavedSearchDTO, SellerProfile, BonusState, PulseItemDTO, RivalsData, BlockedSellerDTO,
+  LoanHistoryItem,
 } from '@/lib/types'
 import type { CatalogItem, CategoryKey } from '@/lib/catalog-types'
 
@@ -121,8 +122,9 @@ export const api = {
 
   // банк
   bank: () => req<BankData>('/api/bank'),
-  takeLoan: (amount: number) => post<{ ok: boolean; balance: number }>('/api/bank/loan', { amount }),
+  takeLoan: (amount: number, days?: number) => post<{ ok: boolean; balance: number }>('/api/bank/loan', { amount, days }),
   repayLoan: (amount: number) => post<{ ok: boolean; balance: number; debt: number }>('/api/bank/loan', { repay: amount }),
+  loanHistory: () => req<{ loans: LoanHistoryItem[] }>('/api/bank/loans'),
   depositOp: (amount: number, op: 'top' | 'withdraw') => post<{ ok: boolean; balance: number; deposit: number }>('/api/bank/deposit', { amount, op }),
 
   // налоги

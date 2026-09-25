@@ -765,4 +765,12 @@
   background: linear-gradient(135deg, rgba(33, 160, 56, 0.2) 0%, rgba(33, 160, 56, 0.1) 60%, rgba(18, 20, 23, 0) 100%) !important;
 }
 
+/* Кредитный центр: зелёный герой-баннер «Предодобренное предложение» */
+.credit-hero {
+  background: linear-gradient(135deg, #2bb24a 0%, #21a03a 45%, #17632b 100%);
+}
+.theme-dark .credit-hero {
+  background: linear-gradient(135deg, #14512a 0%, #0f3d20 55%, #0d2a1b 100%) !important;
+}
+
 /* theme v5.1 marker */

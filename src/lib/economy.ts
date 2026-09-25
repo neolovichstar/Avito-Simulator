@@ -37,8 +37,28 @@ export function loanLimitFor(level: number, creditScore = 500): number {
 }
 
 export function creditRateFor(creditScore: number): number {
-  // базовая ставка 15%, хороший рейтинг снижает до 9%, плохой поднимает до 25%
-  return Math.round((25 - Math.max(0, Math.min(1, (creditScore - 300) / 550)) * 16) * 10) / 10
+  // базовая ставка 15%, хороший рейтинг снижает до 9%, плохой поднимает до 25%.
+  // Целое число: ставка хранится в Loan.rate (Int) и показывается в договоре.
+  return Math.round(25 - Math.max(0, Math.min(1, (creditScore - 300) / 550)) * 16)
+}
+
+// ---------- Кредит: сроки ----------
+// Как в жизни: заёмщик выбирает срок, чем он длиннее — тем выше полная стоимость.
+// Базовая ставка (creditRateFor) действует для 7 дней; длиннее — дороже.
+export const LOAN_TERM_OPTIONS: { days: number; label: string; factor: number }[] = [
+  { days: 7, label: '7 дней', factor: 1 },
+  { days: 14, label: '14 дней', factor: 1.6 },
+  { days: 30, label: '30 дней', factor: 2.6 },
+]
+
+export function termRateFactor(days: number): number {
+  const found = LOAN_TERM_OPTIONS.find((t) => t.days === days)
+  return found ? found.factor : 1
+}
+
+// Ставка для выбранного срока (целая, для Loan.rate Int)
+export function rateForTerm(creditScore: number, days: number): number {
+  return Math.round(creditRateFor(creditScore) * termRateFactor(days))
 }
 
 export function creditLabel(score: number): { label: string; cls: string } {
