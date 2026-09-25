@@ -288,6 +288,17 @@ export function PhoneLogo() {
   )
 }
 
+// Госуслуги: флаг-ромб бренда (стилизованный).
+export function GosLogo() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+      <path d="M24 6 L42 24 L24 42 L6 24 Z" fill="#ffffff" />
+      <path d="M24 13 L35 24 L24 35 L13 24 Z" fill="#0D4CD3" />
+      <circle cx="24" cy="24" r="4" fill="#ffffff" />
+    </svg>
+  )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Реестр плиток: градиент фона + логотип + подпись для каждого AppKey.
 // image — вырезанный логотип из фирменного пака (public/img/apps/*.png):
@@ -403,6 +414,12 @@ export const APP_TILE: Record<AppKey, { label: string; background: string; image
     image: '/img/apps/phone.png',
     icon: <PhoneLogo />,
   },
+  gosuslugi: {
+    label: 'Госуслуги',
+    background: 'linear-gradient(145deg, #377FF3, #0D4CD3)',
+    image: '/img/apps/gosuslugi.png',
+    icon: <GosLogo />,
+  },
 }
 
 /** Иконка-картинка приложения: логотип из пака, заполняет плитку целиком. */
@@ -442,6 +459,7 @@ export const HOME_GRID: AppKey[] = [
   'settings',
   'browser',
   'phone',
+  'gosuslugi',
 ]
 
 export const DOCK_APPS: AppKey[] = ['avito', 'bank', 'auction', 'career']

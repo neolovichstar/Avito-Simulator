@@ -3,7 +3,7 @@
 // Лента «Resale» — светлый маркетплейс 1:1 как настоящий Авито:
 // шапка с городом и круглым аватаром, серая пилюля поиска, чипы категорий,
 // белые карточки (сердечко в белом кружке, цена bold 17, зелёная звезда продавца).
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   Search, SlidersHorizontal, Heart, Star, Zap, Bell, BellPlus, X, SearchX,
   History, Activity, Scale, Handshake, ArrowUpDown, ChevronDown,
@@ -15,9 +15,25 @@ import { fmtNum, fmtTime, initials, hueColor, timeAgo } from '@/lib/format'
 import { useOS } from '@/lib/store'
 import { getViewed, clearViewed, type ViewedItem } from '@/lib/viewed'
 import { getSocket } from '@/lib/use-realtime'
+import { topMatches, fuzzyMatch, Highlight } from '@/lib/smart-search'
 import type { FeedListing, SavedSearchDTO, PulseItemDTO } from '@/lib/types'
 
 const FAV_KEY = 'avito_sim_favs'
+const RECENT_Q_KEY = 'resale_avito_recent_q_v1'
+const RECENT_Q_MAX = 6
+
+function readRecentQueries(): string[] {
+  if (typeof window === 'undefined') return []
+  try { return JSON.parse(localStorage.getItem(RECENT_Q_KEY) ?? '[]') as string[] } catch { return [] }
+}
+
+function saveRecentQuery(raw: string): string[] {
+  const v = raw.trim()
+  if (v.length < 2) return readRecentQueries()
+  const next = [v, ...readRecentQueries().filter((x) => x.toLowerCase() !== v.toLowerCase())].slice(0, RECENT_Q_MAX)
+  try { localStorage.setItem(RECENT_Q_KEY, JSON.stringify(next)) } catch { /* приватный режим */ }
+  return next
+}
 
 export function getFavs(): string[] {
   if (typeof window === 'undefined') return []
@@ -78,6 +94,8 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
   const [cities, setCities] = useState<{ city: string; count: number }[]>([])
   const [pulse, setPulse] = useState<PulseItemDTO[]>([])
   const [pulseFlash, setPulseFlash] = useState(false)
+  // умные подсказки: недавние запросы пользователя
+  const [recentQ, setRecentQ] = useState<string[]>([])
   // сравнение объявлений: до трёх карточек, шит со сводной таблицей
   const [compare, setCompare] = useState<FeedListing[]>([])
   const [showCompare, setShowCompare] = useState(false)
@@ -102,6 +120,7 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
   useEffect(() => {
     setFavs(getFavs())
     setViewed(getViewed())
+    setRecentQ(readRecentQueries())
     // разовая синхронизация избранного с сервером (для оповещений о снижении цены)
     const t = setTimeout(() => {
       api.favSyncAll(getFavs()).catch(() => {})
@@ -163,6 +182,7 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
   const applySaved = (s: SavedSearchDTO) => {
     setQ(s.query)
     setQuery(s.query)
+    if (s.query) setRecentQ(saveRecentQuery(s.query))
     setCategory((s.category as CategoryKey | null) ?? 'all')
   }
 
@@ -226,6 +246,29 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
   const filtered = !favoritesMode && (Boolean(query) || category !== 'all' || city !== 'all')
   const sectionTitle = favoritesMode ? 'Избранное' : filtered ? `Найдено ${fmtNum(total)}` : 'Объявления рядом'
 
+  // Умные подсказки под строкой поиска: категории + сохранённые поиски +
+  // недавние запросы + пульс рынка, отобранные fuzzy по вводу.
+  // Поиск по объявлениям — серверный (api.feed), поэтому локально НИЧЕГО
+  // не перетариваем: только подсказываем, что искать.
+  const qTrim = q.trim()
+  const suggestItems = useMemo(() => {
+    if (!qTrim || qTrim.length < 2) return []
+    const pool: string[] = []
+    for (const c of CATEGORIES) pool.push(c.label)
+    for (const s of saved) if (s.query) pool.push(s.query)
+    pool.push(...recentQ)
+    for (const p of pulse) {
+      const words = p.title.split(' ')
+      pool.push(words.length <= 2 ? p.title : words.slice(0, 2).join(' '))
+    }
+    return topMatches(qTrim, pool, 5, 0.55).filter((m) => m.value.toLowerCase() !== qTrim.toLowerCase())
+  }, [qTrim, saved, recentQ, pulse])
+  const showSuggest = !favoritesMode && suggestItems.length > 0 && qTrim.toLowerCase() !== query.trim().toLowerCase()
+
+  // В избранном поиск клиентский — применяем к нему fuzzy (только внутри уже
+  // загруженного набора, серверные фильтры не трогаем).
+  const visibleItems = favoritesMode && qTrim ? items.filter((l) => fuzzyMatch(qTrim, [l.title, l.city, CATEGORY_LABEL[l.category] ?? ''])) : items
+
   return (
     <div className="relative h-full flex flex-col bg-[#F7F8FA]">
       {/* ШАПКА (sticky): город + аватар, пилюля поиска, чипы категорий, фильтры */}
@@ -260,16 +303,24 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
                 aria-hidden
               >
                 {user?.photoUrl
-                  ? <img src={user.photoUrl} alt="" className="h-full w-full object-cover" />
+                  ? <img loading="lazy" decoding="async" src={user.photoUrl} alt="" className="h-full w-full object-cover"/>
                   : initials(user?.displayName ?? 'Я')}
               </div>
             </div>
           </div>
         )}
 
-        {/* пилюля поиска + «Отмена» на экране поиска */}
+        {/* пилюля поиска + «Отмена» на экране поиска + умные подсказки */}
         <div className="flex items-center gap-1.5">
-          <form className="flex-1" onSubmit={(e) => { e.preventDefault(); setQuery(q.trim()) }}>
+          <form
+            className="relative flex-1"
+            onSubmit={(e) => {
+              e.preventDefault()
+              const v = q.trim()
+              setQuery(v)
+              if (v) setRecentQ(saveRecentQuery(v))
+            }}
+          >
             <div className="flex items-center gap-2 bg-[#F0F1F5] rounded-[12px] px-3.5 h-11">
               <Search size={18} className="text-[#8B8F99] shrink-0" aria-hidden />
               <input
@@ -291,6 +342,36 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
                 </button>
               )}
             </div>
+
+            {/* подсказки: категории/сохранённые/недавние/пульс — fuzzy по вводу; тап = применить */}
+            {showSuggest && (
+              <div
+                className="absolute inset-x-0 top-full z-30 mt-1.5 overflow-hidden rounded-[14px] bg-white shadow-[0_14px_40px_-10px_rgba(0,0,0,0.3)] ring-1 ring-[#EBEDF0]"
+                role="listbox"
+                aria-label="Подсказки поиска"
+              >
+                {suggestItems.map((m) => (
+                  <button
+                    key={m.value}
+                    type="button"
+                    role="option"
+                    aria-selected={false}
+                    onClick={() => {
+                      setQ(m.value)
+                      setQuery(m.value)
+                      setRecentQ(saveRecentQuery(m.value))
+                    }}
+                    className="flex min-h-[42px] w-full items-center gap-2.5 px-3.5 py-2 text-left transition-colors active:bg-[#F7F8FA]"
+                  >
+                    <Search size={14} className="shrink-0 text-[#8B8F99]" aria-hidden />
+                    <span className="min-w-0 flex-1 truncate text-[14px] text-black">
+                      <Highlight text={m.value} query={qTrim} />
+                    </span>
+                    <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-[#8B8F99]">искать</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </form>
           {searchMode && onCancelSearch && (
             <button
@@ -425,24 +506,26 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
           <div className="px-3 grid grid-cols-2 gap-x-2.5 gap-y-3 content-start">
             {Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} />)}
           </div>
-        ) : items.length === 0 ? (
+        ) : visibleItems.length === 0 ? (
           <div className="text-center pt-10 px-8 space-y-3">
             <div className="mx-auto w-16 h-16 rounded-3xl bg-[#F0F1F5] flex items-center justify-center" aria-hidden>
               <SearchX size={28} className="text-[#8B8F99]" />
             </div>
             <p className="text-[15px] text-black font-semibold">
-              {favoritesMode ? 'В избранном пусто' : 'Ничего не нашлось'}
+              {favoritesMode ? (qTrim ? 'В избранном нет такого' : 'В избранном пусто') : 'Ничего не нашлось'}
             </p>
             <p className="text-[13px] text-[#8B8F99] leading-relaxed">
               {favoritesMode
-                ? 'Нажимайте на сердечко у объявлений — они появятся здесь'
+                ? qTrim
+                  ? 'Попробуйте другой запрос — опечатки не страшны'
+                  : 'Нажимайте на сердечко у объявлений — они появятся здесь'
                 : 'Попробуйте другой запрос или сохраните поиск — сообщим, когда товар появится'}
             </p>
           </div>
         ) : (
           <>
             <div className="px-3 grid grid-cols-2 gap-x-2.5 gap-y-3 content-start">
-              {items.map((l) => (
+              {visibleItems.map((l) => (
                 <ListingCard
                   key={l.id}
                   listing={l}
@@ -873,7 +956,7 @@ function CompareSheet({ items, onClose, onClear, onOpen }: {
               <div key={l.id} className="px-1.5 min-w-0">
                 <button onClick={() => onOpen(l.id)} className="block w-full text-left" aria-label={`Открыть ${l.title}`}>
                   <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-[#F0F1F5]">
-                    <img src={l.image} alt={l.title} className="w-full h-full object-cover" />
+                    <img loading="lazy" decoding="async" src={l.image} alt={l.title} className="w-full h-full object-cover"/>
                   </div>
                   <p className="mt-1.5 text-[11px] font-semibold text-black line-clamp-2 leading-snug min-h-[28px]">{l.title}</p>
                   <p

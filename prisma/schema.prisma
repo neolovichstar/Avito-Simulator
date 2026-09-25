@@ -57,6 +57,8 @@ model User {
   blockedMe     BlockedSeller[] @relation("blockedOne")
   telegramLink  TelegramLink?
   telegramCodes TelegramCode[]
+  phoneNumbers  PhoneNumber[]
+  callLogs      CallLog[]
 }
 
 model Listing {
@@ -380,4 +382,41 @@ model TelegramCode {
   user      User     @relation(fields: [userId], references: [id])
   expiresAt DateTime
   createdAt DateTime @default(now())
+}
+
+// ───────────────────────── Телефония (ОС Resale) ─────────────────────────
+
+// Виртуальный номер телефона игрока. Система выбивания как в GTA5 RP:
+// платная прокрутка, красивые номера дороже, бронь сохраняется до выкупа.
+model PhoneNumber {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  number      String    @unique // «+7 (985) 123-45-67» — человекочитаемый формат
+  digits      String    @unique // «79851234567» — только цифры (поиск/дедуп)
+  regionCode  String // «985», «495», «812»…
+  regionName  String // «Москва», «Санкт-Петербург»…
+  tier        String // basic | silver | gold | platinum | diamond
+  beautyScore Int // 0..100 — расчётная «красота» номера
+  status      String    @default("active") // active | reserved | released
+  reservedFor String? // userId, за которым забронирован (брони чужих номеров)
+  holdUntil   DateTime? // бронь истекает
+  buyPrice    Int       @default(0) // цена выкупа брони (для reserved)
+  isMain      Boolean   @default(false) // основной номер профиля
+  createdAt   DateTime  @default(now())
+}
+
+// Журнал звонков: входящие/исходящие/пропущенные, длительность, статус.
+model CallLog {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  peerUserId  String? // собеседник-игрок (если есть)
+  peerName    String? // имя для фейковых/внешних
+  number      String // куда/откуда звонили
+  direction   String // in | out | missed
+  status      String   @default("completed") // completed | declined | no_answer | failed
+  durationSec Int      @default(0)
+  aiPersonaId String? // если звонили продавцу-боту
+  createdAt   DateTime @default(now())
 }

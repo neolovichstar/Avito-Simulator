@@ -254,7 +254,7 @@ function ParcelRow({ d, onOpen }: { d: DeliveryDTO; onOpen: () => void }) {
       aria-label={`Открыть посылку ${d.title}`}
       className={`${CARD} flex w-full items-center gap-3 p-3 text-left transition-transform active:scale-[0.99]`}
     >
-      <img src={d.image} alt="" className="size-14 shrink-0 rounded-xl bg-[#F0F1F5] object-cover" />
+      <img loading="lazy" decoding="async" src={d.image} alt="" className="size-14 shrink-0 rounded-xl bg-[#F0F1F5] object-cover"/>
       <div className="min-w-0 flex-1">
         <div className="truncate text-[14px] font-semibold text-[#1A1A1A]">{d.title}</div>
         <div className="mt-0.5 truncate font-mono text-[11px] text-[#9AA0A8]">{trackOf(d.id)}</div>
@@ -315,7 +315,7 @@ function ParcelDetails({ d, onBack, nowMs }: { d: DeliveryDTO; onBack: () => voi
         {/* фото + название + цена + трек */}
         <div className={`${CARD} p-4`}>
           <div className="flex gap-3">
-            <img src={d.image} alt="" className="size-20 shrink-0 rounded-xl bg-[#F0F1F5] object-cover" />
+            <img loading="lazy" decoding="async" src={d.image} alt="" className="size-20 shrink-0 rounded-xl bg-[#F0F1F5] object-cover"/>
             <div className="min-w-0 flex-1">
               <div className="line-clamp-2 text-[14px] font-semibold text-[#1A1A1A]">{d.title}</div>
               <div className="mt-1 text-[18px] font-bold tabular-nums text-[#1A1A1A]">{fmtMoney(d.price)}</div>

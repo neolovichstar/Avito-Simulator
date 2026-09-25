@@ -50,7 +50,7 @@ function gameInn(seed: string): string {
 
 function Avatar({ name, photoUrl, className = 'size-10' }: { name: string; photoUrl?: string | null; className?: string }) {
   const base = 'flex shrink-0 items-center justify-center overflow-hidden rounded-full ' + className
-  if (photoUrl) return <img src={photoUrl} alt={name} className={base + ' object-cover ring-2 ring-white'} />
+  if (photoUrl) return <img loading="lazy" decoding="async" src={photoUrl} alt={name} className={base + ' object-cover ring-2 ring-white'}/>
   return (
     <div className={base + ' bg-[#21A03A] ring-2 ring-white'}>
       <span className="text-xs font-bold text-white">{initials(name)}</span>

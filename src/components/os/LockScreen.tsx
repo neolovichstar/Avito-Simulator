@@ -53,7 +53,7 @@ function LockMedia() {
     >
       <span className="relative size-11 shrink-0 overflow-hidden rounded-[13px] bg-white/10">
         {current.artworkSmall ? (
-          <img src={current.artworkSmall} alt="" className="h-full w-full object-cover" />
+          <img loading="lazy" decoding="async" src={current.artworkSmall} alt="" className="h-full w-full object-cover"/>
         ) : null}
         {isPlaying && <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[3px] bg-[#3ED598]" />}
       </span>

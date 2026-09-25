@@ -106,11 +106,9 @@ export default function GalleryApp() {
           </button>
 
           <div className="flex flex-1 items-center justify-center overflow-hidden p-4">
-            <img
-              src={PHOTOS[open]!.src}
+            <img loading="lazy" decoding="async" src={PHOTOS[open]!.src}
               alt={PHOTOS[open]!.name}
-              className="max-h-full max-w-full object-contain"
-            />
+              className="max-h-full max-w-full object-contain"/>
           </div>
 
           {open > 0 && (

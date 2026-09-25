@@ -113,7 +113,7 @@ export default function SellScreen({ onDone }: { onDone: () => void }) {
                     onClick={() => { setSelected(i); setPrice(String(i.estValue)); setDesc('') }}
                     className="w-full rounded-2xl bg-white p-3 flex gap-3 text-left active:scale-[0.99] transition-transform"
                   >
-                    <img src={i.image} alt={i.title} className="w-20 h-20 rounded-xl object-cover bg-[#F0F1F5] shrink-0" />
+                    <img loading="lazy" decoding="async" src={i.image} alt={i.title} className="w-20 h-20 rounded-xl object-cover bg-[#F0F1F5] shrink-0"/>
                     <div className="flex-1 min-w-0">
                       <p className="text-[14px] font-semibold text-black truncate">{i.title}</p>
                       <div className="flex items-center gap-1.5 mt-1">
@@ -136,7 +136,7 @@ export default function SellScreen({ onDone }: { onDone: () => void }) {
         ) : (
           <div className="space-y-3">
             <div className="rounded-2xl bg-white p-3 flex gap-3">
-              <img src={selected.image} alt={selected.title} className="w-20 h-20 rounded-xl object-cover bg-[#F0F1F5] shrink-0" />
+              <img loading="lazy" decoding="async" src={selected.image} alt={selected.title} className="w-20 h-20 rounded-xl object-cover bg-[#F0F1F5] shrink-0"/>
               <div>
                 <p className="text-[14px] font-semibold text-black">{selected.title}</p>
                 <div className="flex items-center gap-1.5 mt-1">

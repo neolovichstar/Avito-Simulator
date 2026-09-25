@@ -1159,7 +1159,7 @@ export default function BankApp() {
                   {/* аватар / поиск / микрофон */}
                   <div className="flex items-center gap-2.5">
                     {session?.photoUrl ? (
-                      <img src={session.photoUrl} alt={holderName} className="size-10 shrink-0 rounded-full object-cover ring-2 ring-white" />
+                      <img loading="lazy" decoding="async" src={session.photoUrl} alt={holderName} className="size-10 shrink-0 rounded-full object-cover ring-2 ring-white"/>
                     ) : (
                       <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#21A03A] text-[12px] font-bold text-white ring-2 ring-white">
                         {firstName.slice(0, 2).toUpperCase()}
@@ -1256,12 +1256,10 @@ export default function BankApp() {
                           className="absolute inset-0 overflow-hidden rounded-[20px] p-4 text-left transition active:scale-[0.99]"
                         >
                           {/* фон карты из реестра + затемняющий градиент для читаемости белого текста */}
-                          <img
-                            src={cardBg(c.bg)}
+                          <img loading="lazy" decoding="async" src={cardBg(c.bg)}
                             alt=""
                             draggable={false}
-                            className="absolute inset-0 h-full w-full object-cover"
-                          />
+                            className="absolute inset-0 h-full w-full object-cover"/>
                           <span
                             className="absolute inset-0"
                             style={{ background: 'linear-gradient(rgba(0,0,0,0.18), rgba(0,0,0,0.38))' }}
@@ -1998,12 +1996,10 @@ export default function BankApp() {
                 <div className="px-4">
                   {/* герой-карта с фоном игрока */}
                   <div className="relative h-[168px] overflow-hidden rounded-[22px] text-white">
-                    <img
-                      src={cardBg(cardBgs[cardKey])}
+                    <img loading="lazy" decoding="async" src={cardBg(cardBgs[cardKey])}
                       alt=""
                       draggable={false}
-                      className="absolute inset-0 h-full w-full object-cover"
-                    />
+                      className="absolute inset-0 h-full w-full object-cover"/>
                     <span className="absolute inset-0" style={{ background: 'linear-gradient(rgba(0,0,0,0.18), rgba(0,0,0,0.42))' }} aria-hidden="true" />
                     <span className="absolute -right-6 -top-12 size-36 rounded-full bg-white/10" aria-hidden="true" />
                     <div className="relative flex h-full flex-col justify-between p-4">

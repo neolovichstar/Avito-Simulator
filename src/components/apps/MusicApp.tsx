@@ -35,12 +35,17 @@ import {
   SkipForward,
   TrendingUp,
   Trash2,
+  Volume2,
+  VolumeX,
   X,
 } from 'lucide-react'
 import { usePlayer } from '@/lib/player'
+import { useVolume } from '@/lib/volume'
 import { useSwipe } from '@/lib/use-swipe'
 import { hydrateTrackRecord, toCompactTrack } from '@/lib/track-store'
 import type { CompactTrack } from '@/lib/track-store'
+import { fuzzyScore, topMatches, Highlight } from '@/lib/smart-search'
+import { LocalTracksSection } from './music/local-tracks'
 import type { HomeData, MusicSection, Track } from '@/lib/music-types'
 
 // ---------------------------------------------------------------------------
@@ -138,6 +143,29 @@ function plural(n: number, one: string, few: string, many: string): string {
   if (m10 === 1 && m100 !== 11) return one
   if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few
   return many
+}
+
+/**
+ * Умный re-filter поверх серверных результатов поиска: пересортировка по
+ * fuzzyScore (название > артист > жанр). Опечатки («обуфь») поднимают
+ * похожие треки; если ничего не сматчилось — возвращаем серверный порядок
+ * (сервер что-то нашёл — не прячем его результаты).
+ */
+function refilterTracks(results: Track[], query: string): Track[] {
+  const q = query.trim()
+  if (q.length < 2 || results.length <= 1) return results
+  const scored = results.map((t) => ({
+    t,
+    s: Math.max(
+      fuzzyScore(q, t.title),
+      fuzzyScore(q, t.artist) * 0.95,
+      t.genre ? fuzzyScore(q, t.genre) * 0.8 : 0,
+    ),
+  }))
+  const hits = scored.filter((x) => x.s > 0)
+  if (!hits.length) return results
+  hits.sort((a, b) => b.s - a.s)
+  return hits.map((x) => x.t)
 }
 
 // Кэш треков храним В КОМПАКТНОМ формате (см. src/lib/track-store.ts):
@@ -418,9 +446,13 @@ interface TrackRowProps {
   playsLabel?: string
   /** Это текущий трек глобального плеера. */
   active?: boolean
+  /** Подсветка совпавшей части (умный поиск). */
+  highlight?: string
+  /** Локальные файлы нельзя лайкать (blob:-URL не восстановится). */
+  hideLike?: boolean
 }
 
-function TrackRow({ track, onPlay, liked, onToggleLike, rank, medal, playsLabel, active }: TrackRowProps) {
+function TrackRow({ track, onPlay, liked, onToggleLike, rank, medal, playsLabel, active, highlight, hideLike }: TrackRowProps) {
   const medalColor = medal && rank ? MEDALS[rank] : undefined
   return (
     <div className="flex items-center gap-1.5 rounded-[14px] p-1.5 transition-colors active:bg-[#F5F6F8]">
@@ -443,8 +475,12 @@ function TrackRow({ track, onPlay, liked, onToggleLike, rank, medal, playsLabel,
       >
         <Cover track={track} small className="h-14 w-14 rounded-[12px]" />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[14px] font-semibold leading-tight text-[#17181A]">{track.title}</span>
-          <span className="mt-0.5 block truncate text-[12px] text-[#8B8F99]">{track.artist}</span>
+          <span className="block truncate text-[14px] font-semibold leading-tight text-[#17181A]">
+            {highlight ? <Highlight text={track.title} query={highlight} /> : track.title}
+          </span>
+          <span className="mt-0.5 block truncate text-[12px] text-[#8B8F99]">
+            {highlight ? <Highlight text={track.artist} query={highlight} /> : track.artist}
+          </span>
         </span>
       </button>
       <div className="flex w-10 shrink-0 items-center justify-end" aria-hidden>
@@ -454,7 +490,7 @@ function TrackRow({ track, onPlay, liked, onToggleLike, rank, medal, playsLabel,
           <span className="text-[12px] tabular-nums text-[#8B8F99]">{playsLabel}</span>
         ) : null}
       </div>
-      <HeartBtn liked={liked} onToggle={onToggleLike} size={20} />
+      {!hideLike && <HeartBtn liked={liked} onToggle={onToggleLike} size={20} />}
     </div>
   )
 }
@@ -668,6 +704,8 @@ interface SearchScreenProps {
   results: Track[]
   state: 'idle' | 'loading' | 'done' | 'error'
   recent: string[]
+  /** Пул кандидатов автодополнения (треки/артисты/жанры из кэша). */
+  pool: string[]
   onSuggestion: (q: string) => void
   onClearRecent: () => void
   onSubmit: () => void
@@ -676,10 +714,18 @@ interface SearchScreenProps {
   onPlay: (tracks: Track[], i: number) => void
 }
 
-function SearchScreen({ query, onQuery, results, state, recent, onSuggestion, onClearRecent, onSubmit, onRetry, likes, onPlay }: SearchScreenProps) {
+function SearchScreen({ query, onQuery, results, state, recent, pool, onSuggestion, onClearRecent, onSubmit, onRetry, likes, onPlay }: SearchScreenProps) {
   const currentId = usePlayer((s) => s.current?.id ?? null)
   const trimmed = query.trim()
   const showSuggestions = trimmed.length < 2
+
+  // Умные автодополнения из уже загруженных треков/артистов/жанров:
+  // fuzzy-матч по пулу, тап подставляет запрос.
+  const completions = useMemo(() => (trimmed.length >= 2 ? topMatches(trimmed, pool, 4, 0.55) : []), [trimmed, pool])
+  const showCompletions = completions.length > 0
+
+  // Локальный умный re-filter: опечатки + сортировка по релевантности.
+  const displayed = useMemo(() => refilterTracks(results, trimmed), [results, trimmed])
 
   return (
     <div className="pb-6">
@@ -714,6 +760,28 @@ function SearchScreen({ query, onQuery, results, state, recent, onSuggestion, on
           )}
         </div>
       </div>
+
+      {/* Автодополнения: список под строкой поиска, тап = подставить */}
+      {showCompletions && (
+        <div className="mx-4 mt-2 rounded-[16px] bg-white shadow-sm" role="listbox" aria-label="Подсказки">
+          {completions.map((c) => (
+            <button
+              key={c.value}
+              type="button"
+              role="option"
+              aria-selected={false}
+              onClick={() => onSuggestion(c.value)}
+              className="flex min-h-11 w-full items-center gap-2.5 rounded-[16px] px-4 py-2 text-left transition-colors active:bg-[#F5F6F8]"
+            >
+              <Search size={15} className="shrink-0 text-[#B9BDC7]" aria-hidden />
+              <span className="min-w-0 flex-1 truncate text-[13.5px] text-[#17181A]">
+                <Highlight text={c.value} query={trimmed} />
+              </span>
+              <span className="shrink-0 text-[10.5px] uppercase tracking-wide text-[#B9BDC7]">подставить</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {showSuggestions ? (
         <div className="mt-5 px-4">
@@ -764,19 +832,20 @@ function SearchScreen({ query, onQuery, results, state, recent, onSuggestion, on
         <ListSkeleton rows={6} />
       ) : state === 'error' ? (
         <ErrorState title="Поиск не удался" hint="Проверьте интернет и попробуйте снова" onRetry={onRetry} />
-      ) : results.length === 0 ? (
+      ) : displayed.length === 0 ? (
         <NothingFound />
       ) : (
         <div className="mx-4 mt-4 rounded-[20px] bg-white p-1.5 shadow-sm">
-          {results.map((t, i) => (
+          {displayed.map((t, i) => (
             <TrackRow
               key={t.id}
               track={t}
               rank={i + 1}
               active={t.id === currentId}
+              highlight={trimmed}
               liked={likes.isLiked(t.id)}
               onToggleLike={() => likes.toggle(t)}
-              onPlay={() => onPlay(results, i)}
+              onPlay={() => onPlay(displayed, i)}
             />
           ))}
         </div>
@@ -973,6 +1042,9 @@ function LibraryScreen({ likedTracks, likes, onCacheBump, onPlay }: LibraryScree
           </div>
         )}
       </section>
+
+      {/* На устройстве — локальные файлы (blob:-URL, честный UX после перезагрузки) */}
+      <LocalTracksSection currentId={currentId} onPlay={onPlay} />
 
       {/* Часто слушаете */}
       {topEntries.length > 0 && (
@@ -1172,6 +1244,10 @@ function FullPlayer({ onClose, likes }: { onClose: () => void; likes: LikesApi }
   const toggleShuffle = usePlayer((s) => s.toggleShuffle)
   const cycleRepeat = usePlayer((s) => s.cycleRepeat)
 
+  // Глобальная громкость медиа (volume.ts): управляет <audio> движком напрямую.
+  const volume = useVolume((s) => s.volume)
+  const setVolume = useVolume((s) => s.setVolume)
+
   const { onPointerDown } = useSwipe({ threshold: 64, onSwipe: (dir) => { if (dir === 'down') onClose() } })
 
   if (!current) return null
@@ -1235,6 +1311,31 @@ function FullPlayer({ onClose, likes }: { onClose: () => void; likes: LikesApi }
         {/* Перемотка */}
         <div className="shrink-0 px-6">
           <SeekBar onSeek={seek} />
+        </div>
+
+        {/* Громкость медиа (глобальная: дефолт 50%, синхронизирована с ОС и плашкой) */}
+        <div className="flex shrink-0 items-center gap-2.5 px-6 pt-0.5">
+          <button
+            type="button"
+            aria-label={volume === 0 ? 'Включить звук' : 'Выключить звук'}
+            onClick={() => setVolume(volume === 0 ? 0.5 : 0)}
+            className="flex size-9 shrink-0 items-center justify-center rounded-full text-[#17181A] transition-transform active:scale-90"
+          >
+            {volume === 0 ? <VolumeX size={18} aria-hidden /> : <Volume2 size={18} aria-hidden />}
+          </button>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={Math.round(volume * 100)}
+            onChange={(e) => setVolume(Number(e.target.value) / 100)}
+            aria-label="Громкость медиа"
+            className="vol-music h-1.5 min-w-0 flex-1 cursor-pointer appearance-none rounded-full bg-[#E4E6EB] outline-none"
+            style={{ background: `linear-gradient(to right, #17181A ${volume * 100}%, #E4E6EB ${volume * 100}%)` }}
+          />
+          <span className="w-8 shrink-0 text-right text-[11px] font-semibold tabular-nums text-[#8B8F99]">
+            {Math.round(volume * 100)}%
+          </span>
         </div>
 
         {/* Управление */}
@@ -1470,6 +1571,27 @@ export default function MusicApp() {
     return likeStore.likes.map((id) => cache[id]).filter((t): t is Track => !!t)
   }, [likeStore.likes, cacheVersion])
 
+  // Пул кандидатов автодополнения: жанры + недавние + всё, что уже видел
+  // клиент (карусели Главной и кэш треков). Тап по подсказке подставляет запрос.
+  const suggestionPool = useMemo(() => {
+    void cacheVersion // триггер перерасчёта после cacheTracks()
+    const pool: string[] = [...GENRE_CHIPS]
+    for (const s of homeSections) {
+      for (const t of s.tracks) {
+        pool.push(t.title)
+        pool.push(t.artist)
+      }
+    }
+    const cache = readTrackCache()
+    for (const t of Object.values(cache)) {
+      pool.push(t.title)
+      pool.push(t.artist)
+      if (t.genre) pool.push(t.genre)
+    }
+    pool.push(...recent)
+    return pool
+  }, [homeSections, recent, cacheVersion])
+
   const playQueue = usePlayer((s) => s.playQueue)
   const onPlay = useCallback((tracks: Track[], i: number) => playQueue(tracks, i), [playQueue])
 
@@ -1489,6 +1611,7 @@ export default function MusicApp() {
             results={searchResults}
             state={searchState}
             recent={recent}
+            pool={suggestionPool}
             onSuggestion={onSuggestion}
             onClearRecent={onClearRecent}
             onSubmit={onSubmit}

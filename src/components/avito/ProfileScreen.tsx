@@ -142,7 +142,7 @@ export default function ProfileScreen({ onOpenListing, onGoSell, onGoFavorites }
       <div className="px-4 pt-4">
         <div className="flex items-center gap-3.5">
           {data.user.photoUrl ? (
-            <img src={data.user.photoUrl} alt={data.user.displayName} className="w-[72px] h-[72px] rounded-full object-cover ring-1 ring-[#EBEDF0]" />
+            <img loading="lazy" decoding="async" src={data.user.photoUrl} alt={data.user.displayName} className="w-[72px] h-[72px] rounded-full object-cover ring-1 ring-[#EBEDF0]"/>
           ) : (
             <div
               className="w-[72px] h-[72px] rounded-full flex items-center justify-center text-white text-2xl font-bold shrink-0 bg-[#5C616B]"
@@ -240,7 +240,7 @@ export default function ProfileScreen({ onOpenListing, onGoSell, onGoFavorites }
               {myListings.map((l) => (
                 <div key={l.id} className="rounded-2xl bg-white p-3">
                   <button onClick={() => onOpenListing(l.id)} className="w-full flex gap-3 text-left">
-                    <img src={l.image} alt={l.title} className="w-16 h-16 rounded-xl object-cover bg-[#F0F1F5] shrink-0" />
+                    <img loading="lazy" decoding="async" src={l.image} alt={l.title} className="w-16 h-16 rounded-xl object-cover bg-[#F0F1F5] shrink-0"/>
                     <div className="flex-1 min-w-0">
                       <p className="text-[14px] font-semibold text-black truncate">{l.title}</p>
                       <p className="text-[15px] font-bold text-black mt-0.5 tabular-nums">{l.price === 0 ? 'Даром' : `${fmtNum(l.price)} ₽`}</p>
@@ -289,7 +289,7 @@ export default function ProfileScreen({ onOpenListing, onGoSell, onGoFavorites }
               const profit = i.estValue - i.purchasePrice
               return (
                 <div key={i.id} className="rounded-2xl bg-white p-3 flex gap-3">
-                  <img src={i.image} alt={i.title} className="w-16 h-16 rounded-xl object-cover bg-[#F0F1F5] shrink-0" />
+                  <img loading="lazy" decoding="async" src={i.image} alt={i.title} className="w-16 h-16 rounded-xl object-cover bg-[#F0F1F5] shrink-0"/>
                   <div className="flex-1 min-w-0">
                     <p className="text-[14px] font-semibold text-black truncate">{i.title}</p>
                     <div className="flex items-center gap-1.5 mt-1">
@@ -322,7 +322,7 @@ export default function ProfileScreen({ onOpenListing, onGoSell, onGoFavorites }
               {data.purchases.map((p) => (
                 <div key={p.listingId} className="rounded-2xl bg-white p-3">
                   <button onClick={() => onOpenListing(p.listingId)} className="w-full flex gap-3 text-left">
-                    <img src={p.image} alt={p.title} className="w-16 h-16 rounded-xl object-cover bg-[#F0F1F5] shrink-0" />
+                    <img loading="lazy" decoding="async" src={p.image} alt={p.title} className="w-16 h-16 rounded-xl object-cover bg-[#F0F1F5] shrink-0"/>
                     <div className="flex-1 min-w-0">
                       <p className="text-[14px] font-semibold text-black truncate">{p.title}</p>
                       <p className="text-[15px] font-bold text-black mt-0.5 tabular-nums">{p.price === 0 ? 'Даром' : `${fmtNum(p.price)} ₽`}</p>
@@ -393,7 +393,7 @@ export default function ProfileScreen({ onOpenListing, onGoSell, onGoFavorites }
           >
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[#EBEDF0]" />
             <div className="flex items-center gap-3">
-              <img src={priceEdit.image} alt={priceEdit.title} className="w-12 h-12 rounded-xl object-cover bg-[#F0F1F5]" />
+              <img loading="lazy" decoding="async" src={priceEdit.image} alt={priceEdit.title} className="w-12 h-12 rounded-xl object-cover bg-[#F0F1F5]"/>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-black truncate">{priceEdit.title}</p>
                 <p className="text-xs text-[#8B8F99]">Текущая цена: {priceEdit.price === 0 ? 'Даром' : `${fmtNum(priceEdit.price)} ₽`}</p>

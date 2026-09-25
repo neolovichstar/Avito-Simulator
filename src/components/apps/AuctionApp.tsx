@@ -407,7 +407,7 @@ export default function AuctionApp() {
           <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4 pt-2 [scrollbar-width:thin]">
             {/* большое фото (в DTO одно изображение — счётчик 1/1) */}
             <div className="relative shrink-0 overflow-hidden rounded-[20px]" style={{ boxShadow: CARD_SHADOW }}>
-              <img src={detailLot.image} alt={detailLot.title} className="aspect-[4/3] w-full object-cover" />
+              <img loading="lazy" decoding="async" src={detailLot.image} alt={detailLot.title} className="aspect-[4/3] w-full object-cover"/>
               <div className="absolute left-3 top-3">
                 <ConditionBadge value={detailLot.condition} />
               </div>
@@ -756,7 +756,7 @@ export default function AuctionApp() {
                         aria-label={`Открыть лот ${featured.title}`}
                         className="block w-full"
                       >
-                        <img src={featured.image} alt={featured.title} className="h-44 w-full object-cover" />
+                        <img loading="lazy" decoding="async" src={featured.image} alt={featured.title} className="h-44 w-full object-cover"/>
                       </button>
                       <div className="absolute right-3 top-3">
                         <HeartBtn
@@ -841,7 +841,7 @@ export default function AuctionApp() {
                           style={{ boxShadow: CARD_SHADOW }}
                         >
                           <div className="relative aspect-square w-full overflow-hidden">
-                            <img src={lot.image} alt={lot.title} className="size-full object-cover" />
+                            <img loading="lazy" decoding="async" src={lot.image} alt={lot.title} className="size-full object-cover"/>
                             {/* таймер-плашка — янтарная, моно-цифры */}
                             <div
                               className={
@@ -924,7 +924,7 @@ export default function AuctionApp() {
 
             {/* заголовок лота */}
             <div className="flex items-center gap-3">
-              <img src={biddingLot.image} alt={biddingLot.title} className="size-14 shrink-0 rounded-xl object-cover" />
+              <img loading="lazy" decoding="async" src={biddingLot.image} alt={biddingLot.title} className="size-14 shrink-0 rounded-xl object-cover"/>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-semibold">{biddingLot.title}</div>
                 <div className="mt-0.5 text-[11px] text-[#9AA0A8]">

@@ -15,7 +15,7 @@ import {
   EyeOff, FileText, Gamepad2, Globe, Handshake as HandshakeIcon, History, Image as ImageIcon, Landmark, LifeBuoy, Lock,
   Megaphone, Menu, MessagesSquare, Mic, Moon, Music, Newspaper, Package, Plus, RotateCw, Search,
   Settings2, ShoppingBag, Square, Star, Timer, Trash2, TrendingDown, TrendingUp, Trophy, Users,
-  VenetianMask, X, Zap,
+  VenetianMask, X, Zap, ArrowUpRight, CornerDownLeft,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
@@ -23,6 +23,7 @@ import { useOS, type AppKey } from '@/lib/store'
 import { fmtTime, timeAgo } from '@/lib/format'
 import { CATEGORY_LABEL } from '@/lib/catalog-types'
 import { useDrag, useSwipe } from '@/lib/use-swipe'
+import { fuzzyScore, fuzzyMatch, bestScore, Highlight } from '@/lib/smart-search'
 import type { MarketStats } from '@/lib/types'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -574,7 +575,7 @@ function ResaleSite({ onOpenApp }: { onOpenApp?: (app: AppKey) => void }) {
 
       <div className="mx-4 mt-4">
         <div className="relative h-48 overflow-hidden rounded-3xl border border-[#EBEDF0]">
-          <img src="/img/p/iphone-13.jpg" alt="" className="absolute inset-0 size-full object-cover" />
+          <img loading="lazy" decoding="async" src="/img/p/iphone-13.jpg" alt="" className="absolute inset-0 size-full object-cover"/>
           <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/20 to-transparent" />
           <div className="absolute bottom-4 left-4">
             <span className="rounded-full bg-[#21A038] px-2.5 py-1 text-[10px] font-semibold text-white">Маркетплейс</span>
@@ -606,7 +607,7 @@ function ResaleSite({ onOpenApp }: { onOpenApp?: (app: AppKey) => void }) {
         <div className="flex gap-3 overflow-x-auto px-4 pb-1 touch-pan-y">
           {RESALE_CATS.map((c) => (
             <button key={c.label} type="button" onClick={() => onOpenApp?.('avito')} className="w-24 shrink-0 text-left transition active:scale-95">
-              <img src={c.img} alt="" className="h-16 w-24 rounded-2xl border border-[#EBEDF0] object-cover" />
+              <img loading="lazy" decoding="async" src={c.img} alt="" className="h-16 w-24 rounded-2xl border border-[#EBEDF0] object-cover"/>
               <span className="mt-1.5 block truncate text-[11px] text-[#5F6368]">{c.label}</span>
             </button>
           ))}
@@ -722,7 +723,7 @@ function CityAdsSite() {
       <div className="mt-3 space-y-2.5 px-4">
         {CITY_ADS.map((ad) => (
           <div key={ad.title} className="flex items-center gap-3 rounded-2xl border border-[#EBEDF0] bg-white p-2.5 shadow-[0_1px_2px_rgba(23,24,26,0.04)]">
-            <img src={ad.img} alt="" className="size-16 shrink-0 rounded-xl border border-[#EBEDF0] object-cover" />
+            <img loading="lazy" decoding="async" src={ad.img} alt="" className="size-16 shrink-0 rounded-xl border border-[#EBEDF0] object-cover"/>
             <div className="min-w-0 flex-1">
               <div className="truncate text-[13px] font-medium text-[#17181A]">{ad.title}</div>
               <div className="mt-0.5 truncate text-[11px] text-[#8B8F99]">{ad.area}</div>
@@ -908,6 +909,107 @@ function SearchPill({ urlInput, setUrlInput, onSubmit }: { urlInput: string; set
   )
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// умные подсказки омнибокса: ввод + история + закладки + популярные сайты,
+// отсортированные fuzzy-релевантностью (в приватной вкладке история не участвует)
+// ─────────────────────────────────────────────────────────────────────────────
+interface OmniItem {
+  key: string
+  entry: NavEntry
+  title: string
+  sub: string
+  favicon: string
+}
+
+function omniSuggestionList(
+  raw: string,
+  history: { entry: NavEntry; at: number }[],
+  bookmarks: { key: string; entry: NavEntry }[],
+  incognito: boolean,
+): OmniItem[] {
+  const q = raw.trim()
+  if (q.length < 2) return []
+  const pool: (OmniItem & { score: number })[] = []
+  const push = (entry: NavEntry, title: string, sub: string) => {
+    const score = bestScore(q, [title, entrySub(entry), urlOf(entry)])
+    if (score > 0.5) pool.push({ key: entryKey(entry), entry, title, sub, favicon: entrySub(entry), score })
+  }
+  if (!incognito) {
+    // свежие визиты первыми в очереди кандидатов
+    for (const h of history.slice(0, 30)) push(h.entry, entryTitle(h.entry), entrySub(h.entry))
+    for (const b of bookmarks) push(b.entry, entryTitle(b.entry), `Закладка · ${entrySub(b.entry)}`)
+  }
+  for (const s of SITES) push({ type: 'site', site: s.site }, s.title, s.desc)
+  const seen = new Set<string>()
+  return pool
+    .sort((a, b) => b.score - a.score)
+    .filter((x) => {
+      if (seen.has(x.key)) return false
+      seen.add(x.key)
+      return true
+    })
+    .slice(0, 5)
+    .map(({ key, entry, title, sub, favicon }) => ({ key, entry, title, sub, favicon }))
+}
+
+function OmniSuggestions({
+  q,
+  items,
+  incognito,
+  onPick,
+  onSearch,
+}: {
+  q: string
+  items: OmniItem[]
+  incognito: boolean
+  onPick: (e: NavEntry) => void
+  onSearch: (q: string) => void
+}) {
+  return (
+    <div
+      className="absolute inset-x-0 top-full z-40 mt-2.5 overflow-hidden rounded-2xl bg-[var(--sur)] py-1 shadow-[0_14px_44px_-10px_rgba(0,0,0,0.4)] ring-1 ring-[var(--bd)]"
+      role="listbox"
+      aria-label="Подсказки адресной строки"
+      onMouseDown={(e) => e.preventDefault()}
+    >
+      {!incognito && !isProbablyUrl(q) && (
+        <button
+          type="button"
+          role="option"
+          aria-selected={false}
+          onClick={() => onSearch(q)}
+          className="flex min-h-11 w-full items-center gap-3 px-3.5 py-2 text-left transition active:bg-[var(--hov)]"
+        >
+          <Search className="size-4 shrink-0 text-[var(--txt2)]" aria-hidden />
+          <span className="min-w-0 flex-1 truncate text-[13.5px] text-[var(--txt)]">
+            Искать <span className="font-semibold">«{q}»</span>
+          </span>
+          <CornerDownLeft className="size-3.5 shrink-0 text-[var(--txt2)]" aria-hidden />
+        </button>
+      )}
+      {items.map((x) => (
+        <button
+          key={x.key}
+          type="button"
+          role="option"
+          aria-selected={false}
+          onClick={() => onPick(x.entry)}
+          className="flex min-h-11 w-full items-center gap-3 px-3.5 py-2 text-left transition active:bg-[var(--hov)]"
+        >
+          <Favicon seed={x.favicon} size={26} />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[13.5px] text-[var(--txt)]">
+              <Highlight text={x.title} query={q} />
+            </span>
+            <span className="block truncate text-[11px] text-[var(--txt2)]">{x.sub}</span>
+          </span>
+          <ArrowUpRight className="size-3.5 shrink-0 text-[var(--txt2)]" aria-hidden />
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function ShortcutTile({ label, node, onTap }: { label: string; node: ReactNode; onTap: () => void }) {
   return (
     <button type="button" onClick={onTap} className="flex min-h-[44px] flex-col items-center gap-1.5 transition active:scale-95">
@@ -1044,12 +1146,24 @@ const SEARCH_CHIPS = ['Все', 'Картинки', 'Покупки', 'Виде�
 function searchCatalog(query: string): SiteDef[] {
   const tokens = query
     .toLowerCase()
-    .split(/[^0-9a-zа-яё-]+/i)
+    .replace(/ё/g, 'е')
+    .split(/[^0-9a-zа-я-]+/i)
     .filter(Boolean)
   if (tokens.length === 0) return []
   return SITES.map((s) => {
     const hay = (s.site + ' ' + s.title + ' ' + s.desc + ' ' + s.snippet + ' ' + s.keywords.join(' ')).toLowerCase()
-    return { s, score: tokens.filter((t) => hay.includes(t)).length }
+    // точные токены — как раньше (вес 1), промахи добираем fuzzy (опечатки/подпоследовательности)
+    let score = 0
+    for (const t of tokens) {
+      if (hay.includes(t)) {
+        score += 1
+        continue
+      }
+      const words = hay.split(/[^0-9a-zа-я]+/).filter(Boolean)
+      const fuzzy = Math.max(0, ...words.map((w) => fuzzyScore(t, w)))
+      score += fuzzy * 0.8
+    }
+    return { s, score }
   })
     .filter((r) => r.score > 0)
     .sort((a, b) => b.score - a.score)
@@ -1060,7 +1174,7 @@ function SearchResultThumb({ s }: { s: SiteDef }) {
   if (s.thumb) {
     return (
       <span className="relative block size-16 shrink-0 overflow-hidden rounded-xl border border-[var(--bd)]">
-        <img src={s.thumb} alt="" className="absolute inset-0 size-full object-cover" />
+        <img loading="lazy" decoding="async" src={s.thumb} alt="" className="absolute inset-0 size-full object-cover"/>
       </span>
     )
   }
@@ -1158,6 +1272,13 @@ function BookmarksPanel({
   onBack: () => void
   onAdd: () => void
 }) {
+  // умный поиск по закладкам (fuzzy по названию/адресу)
+  const [sq, setSq] = useState('')
+  const qTrim = sq.trim()
+  const visible = qTrim
+    ? bookmarks.filter(({ entry }) => fuzzyMatch(qTrim, [entryTitle(entry), entrySub(entry), urlOf(entry)]))
+    : bookmarks
+
   return (
     <div className="relative flex h-full flex-col bg-[var(--bg)] text-[var(--txt)]">
       <div className="flex items-center gap-2 border-b border-[var(--bd)] px-3 py-3">
@@ -1168,8 +1289,35 @@ function BookmarksPanel({
         <Bookmark className="size-4.5 text-[var(--txt2)] opacity-60" aria-hidden />
       </div>
 
+      {bookmarks.length > 2 && (
+        <div className="border-b border-[var(--bd)] px-3 py-2">
+          <div className="flex h-10 items-center gap-2 rounded-full bg-[var(--pill)] px-3.5">
+            <Search className="size-4 shrink-0 text-[var(--txt2)]" aria-hidden />
+            <input
+              value={sq}
+              onChange={(e) => setSq(e.target.value)}
+              placeholder="Найти в закладках"
+              aria-label="Поиск по закладкам"
+              className="min-w-0 flex-1 bg-transparent text-[13px] text-[var(--txt)] outline-none placeholder:text-[var(--txt2)]"
+            />
+            {qTrim && (
+              <button type="button" aria-label="Очистить поиск" onClick={() => setSq('')} className="flex size-7 shrink-0 items-center justify-center rounded-full transition active:bg-[var(--hov)]">
+                <X className="size-3.5 text-[var(--txt2)]" aria-hidden />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto">
-        {bookmarks.length === 0 ? (
+        {visible.length === 0 ? (
+          qTrim ? (
+            <div className="flex flex-col items-center px-6 pt-14 text-center">
+              <Search className="size-10 text-[var(--txt2)] opacity-50" aria-hidden />
+              <div className="mt-3 text-[14px] font-medium">Ничего не нашлось</div>
+              <p className="mt-1 text-[12px] text-[var(--txt2)]">Попробуйте другой запрос — опечатки не страшны</p>
+            </div>
+          ) : (
           <div className="flex flex-col items-center px-6 pt-14 text-center">
             <Bookmark className="size-10 text-[var(--txt2)] opacity-50" aria-hidden />
             <div className="mt-3 text-[14px] font-medium">Закладок нет</div>
@@ -1182,14 +1330,17 @@ function BookmarksPanel({
               Добавить закладку вручную
             </button>
           </div>
+          )
         ) : (
           <ul className="divide-y divide-[var(--bd)]">
-            {bookmarks.map(({ key, entry }) => (
+            {visible.map(({ key, entry }) => (
               <li key={key} className="flex items-center pr-2">
                 <button type="button" onClick={() => onPick(entry)} className="flex min-h-[52px] min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left transition active:bg-[var(--hov)]">
                   <Favicon seed={entrySub(entry)} size={32} />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[14px]">{entryTitle(entry)}</span>
+                    <span className="block truncate text-[14px]">
+                      {qTrim ? <Highlight text={entryTitle(entry)} query={qTrim} /> : entryTitle(entry)}
+                    </span>
                     <span className="block truncate text-[11px] text-[var(--txt2)]">{entrySub(entry)}</span>
                   </span>
                   <ChevronRight className="size-4 shrink-0 text-[var(--txt2)] opacity-60" aria-hidden />
@@ -1235,6 +1386,13 @@ function HistoryPanel({
   onClear: () => void
   onBack: () => void
 }) {
+  // умный поиск по истории (fuzzy по названию/адресу/запросу)
+  const [sq, setSq] = useState('')
+  const qTrim = sq.trim()
+  const visible = qTrim
+    ? entries.filter(({ entry }) => fuzzyMatch(qTrim, [entryTitle(entry), entrySub(entry), urlOf(entry)]))
+    : entries
+
   return (
     <div className="flex h-full flex-col bg-[var(--bg)] text-[var(--txt)]">
       <div className="flex items-center gap-2 border-b border-[var(--bd)] px-3 py-3">
@@ -1253,21 +1411,52 @@ function HistoryPanel({
           </button>
         )}
       </div>
-      <div className="flex-1 overflow-y-auto">
-        {entries.length === 0 ? (
-          <div className="flex flex-col items-center px-6 pt-14 text-center">
-            <History className="size-10 text-[var(--txt2)] opacity-50" aria-hidden />
-            <div className="mt-3 text-[14px] font-medium">История пуста</div>
-            <p className="mt-1 text-[12px] text-[var(--txt2)]">Открытые сайты появятся здесь</p>
+
+      {entries.length > 2 && (
+        <div className="border-b border-[var(--bd)] px-3 py-2">
+          <div className="flex h-10 items-center gap-2 rounded-full bg-[var(--pill)] px-3.5">
+            <Search className="size-4 shrink-0 text-[var(--txt2)]" aria-hidden />
+            <input
+              value={sq}
+              onChange={(e) => setSq(e.target.value)}
+              placeholder="Найти в истории"
+              aria-label="Поиск по истории"
+              className="min-w-0 flex-1 bg-transparent text-[13px] text-[var(--txt)] outline-none placeholder:text-[var(--txt2)]"
+            />
+            {qTrim && (
+              <button type="button" aria-label="Очистить поиск" onClick={() => setSq('')} className="flex size-7 shrink-0 items-center justify-center rounded-full transition active:bg-[var(--hov)]">
+                <X className="size-3.5 text-[var(--txt2)]" aria-hidden />
+              </button>
+            )}
           </div>
+        </div>
+      )}
+
+      <div className="flex-1 overflow-y-auto">
+        {visible.length === 0 ? (
+          qTrim ? (
+            <div className="flex flex-col items-center px-6 pt-14 text-center">
+              <Search className="size-10 text-[var(--txt2)] opacity-50" aria-hidden />
+              <div className="mt-3 text-[14px] font-medium">Ничего не нашлось</div>
+              <p className="mt-1 text-[12px] text-[var(--txt2)]">Попробуйте другой запрос — опечатки не страшны</p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center px-6 pt-14 text-center">
+              <History className="size-10 text-[var(--txt2)] opacity-50" aria-hidden />
+              <div className="mt-3 text-[14px] font-medium">История пуста</div>
+              <p className="mt-1 text-[12px] text-[var(--txt2)]">Открытые сайты появятся здесь</p>
+            </div>
+          )
         ) : (
           <ul className="divide-y divide-[var(--bd)]">
-            {entries.map(({ entry, at }, i) => (
+            {visible.map(({ entry, at }, i) => (
               <li key={i}>
                 <button type="button" onClick={() => onPick(entry)} className="flex min-h-[52px] w-full items-center gap-3 px-4 py-2.5 text-left transition active:bg-[var(--hov)]">
                   <Favicon seed={entrySub(entry)} size={32} />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[14px]">{entryTitle(entry)}</span>
+                    <span className="block truncate text-[14px]">
+                      {qTrim ? <Highlight text={entryTitle(entry)} query={qTrim} /> : entryTitle(entry)}
+                    </span>
                     <span className="block truncate text-[11px] text-[var(--txt2)]">{entrySub(entry)}</span>
                   </span>
                   <span className="shrink-0 text-[10px] text-[var(--txt2)]">{fmtTime(new Date(at))}</span>
@@ -1853,6 +2042,11 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp?: (app: AppKey) =>
 
   const clearable = urlInput.length > 0 && (omniFocused || current.type === 'search')
 
+  // умные подсказки омнибокса (история + закладки + каталог сайтов, fuzzy-сортировка;
+  // в приватной вкладке история/закладки не подсказываем — как в Chrome)
+  const omniItems = view === 'page' ? omniSuggestionList(urlInput, historyLog, bookmarks, incognito) : []
+  const showOmniSuggestions = omniFocused && view === 'page' && (omniItems.length > 0 || (!incognito && urlInput.trim().length >= 2 && !isProbablyUrl(urlInput.trim())))
+
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-[var(--bg)] text-[var(--txt)]" style={chromeVars}>
       {/* ---------- верхняя панель: омнибокс + счётчик вкладок ---------- */}
@@ -1915,6 +2109,23 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp?: (app: AppKey) =>
             >
               <RotateCw className="size-4 text-[var(--txt2)]" aria-hidden />
             </button>
+
+            {/* умные подсказки под омнибоксом */}
+            {showOmniSuggestions && (
+              <OmniSuggestions
+                q={urlInput.trim()}
+                items={omniItems}
+                incognito={incognito}
+                onPick={(e) => {
+                  setOmniFocused(false)
+                  go(e)
+                }}
+                onSearch={(q) => {
+                  setOmniFocused(false)
+                  go({ type: 'search', query: q })
+                }}
+              />
+            )}
           </div>
 
           {/* счётчик вкладок (Chrome-стиль: квадрат с числом) */}

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { RefreshCw, WifiOff } from 'lucide-react'
 import { useOS, type AppKey, WALLPAPER_TOP } from '@/lib/store'
 import { hydratePrefs } from '@/lib/prefs'
+import { hydrateVolume, initVolumeEngineBridge } from '@/lib/volume'
 import { api, getToken, setToken } from '@/lib/api'
 import { useRealtime } from '@/lib/use-realtime'
 import { useSwipe } from '@/lib/use-swipe'
@@ -16,6 +17,8 @@ import GestureNav from '@/components/os/GestureNav'
 import NotificationCenter from '@/components/os/NotificationCenter'
 import ControlCenter from '@/components/os/ControlCenter'
 import ToastStack from '@/components/os/ToastStack'
+import VolumePlate from '@/components/os/VolumePlate'
+import CallOverlay from '@/components/os/CallOverlay'
 import RecentsOverlay from '@/components/os/RecentsOverlay'
 import DesktopShell from '@/components/desktop/DesktopShell'
 import AvitoApp from '@/components/avito/AvitoApp'
@@ -36,6 +39,7 @@ import WeatherApp from '@/components/apps/WeatherApp'
 import GalleryApp from '@/components/apps/GalleryApp'
 import MusicApp from '@/components/apps/MusicApp'
 import PhoneApp from '@/components/apps/PhoneApp'
+import GosuslugiApp from '@/components/apps/GosuslugiApp'
 
 const BATTERY_KEY = 'avito_sim_battery'
 const THEME_KEY = 'avito_sim_theme'
@@ -68,7 +72,7 @@ function getDeviceId(): string | null {
 // Приложения со СВЕТЛОЙ темой интерфейса. Когда открыто одно из них, хром ОС
 // подстраивается: иконки статус-бара становятся тёмными, а рамки Telegram —
 // светлыми. Все остальные приложения и лончер остаются тёмными.
-const LIGHT_APPS: Partial<Record<AppKey, true>> = { avito: true, bank: true, taxes: true, auction: true, repair: true, career: true, delivery: true, leaderboard: true, music: true }
+const LIGHT_APPS: Partial<Record<AppKey, true>> = { avito: true, bank: true, taxes: true, auction: true, repair: true, career: true, delivery: true, leaderboard: true, music: true, gosuslugi: true }
 
 // Экран «нет связи с сервером» — показывается после 3 неудачных попыток авторизации.
 function OfflineScreen({ onRetry, compact = false }: { onRetry: () => void; compact?: boolean }) {
@@ -249,6 +253,8 @@ export default function Home() {
     doAuth()
     initDeviceSensors()
     hydratePrefs() // накатываем сохранённые свитчи (Wi-Fi/пин/…) поверх дефолтов
+    hydrateVolume() // медиа-громкость из localStorage (дефолт 50%)
+    initVolumeEngineBridge() // применяем громкость к аудио-движку + клавиатура ↑/↓
   }, [doAuth])
 
   // ---------- АВТО-ПЕРЕПОДКЛЮЧЕНИЕ: сеть вернулась — тихо повторяем авторизацию ----------
@@ -404,6 +410,7 @@ export default function Home() {
       case 'gallery': return <GalleryApp />
       case 'music': return <MusicApp />
       case 'phone': return <PhoneApp />
+      case 'gosuslugi': return <GosuslugiApp />
       default: return null
     }
   }
@@ -481,6 +488,8 @@ export default function Home() {
         <NotificationCenter open={notifOpen} onClose={() => setNotifOpen(false)} onOpenApp={(a) => { setNotifOpen(false); openApp(a) }} />
         <ControlCenter open={controlOpen} onClose={() => setControlOpen(false)} onOpenApp={(a) => { setControlOpen(false); openApp(a) }} />
         <ToastStack />
+        <VolumePlate />
+        <CallOverlay /> {/* системный звонок поверх приложений (26-d) */}
 
         {/* яркость: затемняющий слой поверх всего */}
         <div

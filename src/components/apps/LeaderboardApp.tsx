@@ -61,7 +61,7 @@ function Avatar({ row, size = 'md' }: { row: Board; size?: 'md' | 'lg' }) {
   const ring = row.isMe ? 'ring-2 ring-[#21A03A]/60' : 'ring-1 ring-black/5'
   if (row.photoUrl) {
     return (
-      <img src={row.photoUrl} alt="" className={`${cls} shrink-0 rounded-full object-cover ${ring}`} />
+      <img loading="lazy" decoding="async" src={row.photoUrl} alt="" className={`${cls} shrink-0 rounded-full object-cover ${ring}`}/>
     )
   }
   return (

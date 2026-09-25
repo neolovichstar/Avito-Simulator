@@ -11,14 +11,17 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import {
-  Bell, Bluetooth, Check, ChevronRight, Fingerprint, LayoutGrid, Moon, MoonStar, Palette,
+  Bell, Bluetooth, Check, ChevronRight, Eye, EyeOff, Fingerprint, LayoutGrid, LockKeyhole, Moon, MoonStar, Palette,
   Search, Signal, Smartphone, Sparkles, Sun, User, Vibrate, Volume2, Wifi, X, Zap,
 } from 'lucide-react'
 import { useOS, ALL_WIDGETS, WIDGET_LABEL, type AppKey, type NetKind, type WidgetKey } from '@/lib/store'
 import { usePrefs } from '@/lib/prefs'
+import { useVolume } from '@/lib/volume'
+import { collectDeviceInfo, type DeviceInfo } from '@/lib/device-info'
 import { WALLPAPERS, wallpaperPreviewStyle } from '@/lib/wallpapers'
 import { APP_TILE } from '@/components/os/app-logos'
 import { sound } from '@/lib/sound'
+import { fuzzyMatch } from '@/lib/smart-search'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // M3 Switch (Expressive): track 52×32, thumb 24, галочка в thumb, 200ms M3-easing
@@ -258,13 +261,35 @@ export default function SettingsApp() {
   const btOn = usePrefs((s) => s.bt)
   const autoRotate = usePrefs((s) => s.rotate)
   const notifOn = usePrefs((s) => s.appNotif)
+  const allowCalls = usePrefs((s) => s.allowCalls)
+  const hideNumber = usePrefs((s) => s.hideNumber)
+  const hideOnline = usePrefs((s) => s.hideOnline)
+  const hideBalance = usePrefs((s) => s.hideBalance)
   const setPref = usePrefs((s) => s.setPref)
-  const [volume, setVolume] = useState(0.65)
 
-  // поиск по настройкам
+  // Громкость медиа — ГЛОБАЛЬНАЯ (store volume.ts): реально управляет музыкой,
+  // дефолт 50%, синхронизирована с плашкой громкости и центром управления.
+  const volume = useVolume((s) => s.volume)
+  const setVolume = useVolume((s) => s.setVolume)
+
+  // Реальные данные устройства (для «О телефоне»)
+  const [device, setDevice] = useState<DeviceInfo | null>(null)
+  useEffect(() => {
+    let alive = true
+    collectDeviceInfo().then((d) => {
+      if (alive) setDevice(d)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  // поиск по настройкам — умный fuzzy: «вайфай» найдёт Wi-Fi (ключевые слова
+  // в строках ниже), «звак» найдёт зарядку (подпоследовательность),
+  // «обуфь»-подобные опечатки ловит Левенштейн ≤2.
   const [query, setQuery] = useState('')
   const q = query.trim().toLowerCase()
-  const hit = (s: string) => q === '' || s.toLowerCase().includes(q)
+  const hit = (s: string) => q === '' || fuzzyMatch(query, s)
 
   // deviceId из localStorage (авито-симулятор) — последние 8 знаков
   const [deviceId] = useState(() => {
@@ -300,7 +325,7 @@ export default function SettingsApp() {
       right: <M3Switch checked={mobileData} onChange={(v) => setPref('mobileData', v)} label="Мобильные данные" />,
       onClick: () => setPref('mobileData', !mobileData),
     },
-  ].filter((r) => hit(`${r.label} ${r.desc ?? ''}`))
+  ].filter((r) => hit(`${r.label} ${r.desc ?? ''} wifi вайфай вай-фай беспроводная сеть интернет подключение роутер нет`))
 
   const btRows: RowItem[] = [
     {
@@ -312,26 +337,24 @@ export default function SettingsApp() {
       right: <M3Switch checked={btOn} onChange={(v) => setPref('bt', v)} label="Bluetooth" />,
       onClick: () => setPref('bt', !btOn),
     },
-  ].filter((r) => hit(`${r.label} ${r.desc ?? ''}`))
+  ].filter((r) => hit(`${r.label} ${r.desc ?? ''} блютус бт гарнитура наушники подключение сопряжение`))
 
   const appRows: RowItem[] = APPS.map(({ key, role }) => ({
     key: `app-${key}`,
     color: '#21A038',
     noTile: true,
     icon: (
-      <img
-        src={APP_TILE[key].image}
+      <img loading="lazy" decoding="async" src={APP_TILE[key].image}
         alt=""
         aria-hidden="true"
         draggable={false}
-        className="size-10 select-none rounded-[13px] shadow-[0_3px_10px_-3px_rgba(23,24,26,0.35)]"
-      />
+        className="size-10 select-none rounded-[13px] shadow-[0_3px_10px_-3px_rgba(23,24,26,0.35)]"/>
     ),
     label: APP_TILE[key].label,
     desc: `${role} · системное`,
     chevron: true,
     onClick: () => openApp(key),
-  })).filter((r) => hit(`${r.label} ${r.desc ?? ''}`))
+  })).filter((r) => hit(`${r.label} ${r.desc ?? ''} маркетплейс банк браузер музыка аукционы посылки задания налоги приложение`))
 
   const notifRows: RowItem[] = [
     {
@@ -352,7 +375,7 @@ export default function SettingsApp() {
       right: <M3Switch checked={notifOn} onChange={(v) => setPref('appNotif', v)} label="Уведомления приложений" />,
       onClick: () => setPref('appNotif', !notifOn),
     },
-  ].filter((r) => hit(`${r.label} ${r.desc ?? ''}`))
+  ].filter((r) => hit(`${r.label} ${r.desc ?? ''} уведомления пуши оповещения шторка всплывающие тишина`))
 
   const soundRows: RowItem[] = [
     {
@@ -364,7 +387,7 @@ export default function SettingsApp() {
       right: <M3Switch checked={vibro} onChange={(v) => sound.setEnabled(v)} label="Вибро-отклик" />,
       onClick: () => sound.setEnabled(!vibro),
     },
-  ].filter((r) => hit(`${r.label} ${r.desc ?? ''}`))
+  ].filter((r) => hit(`${r.label} ${r.desc ?? ''} вибро вибрация отклик тактильный гудок`))
 
   const screenRows: RowItem[] = [
     {
@@ -391,7 +414,7 @@ export default function SettingsApp() {
       right: <M3Switch checked={autoRotate} onChange={(v) => setPref('rotate', v)} label="Автоповорот" />,
       onClick: () => setPref('rotate', !autoRotate),
     },
-  ].filter((r) => hit(`${r.label} ${r.desc ?? ''}`))
+  ].filter((r) => hit(`${r.label} ${r.desc ?? ''} тёмная тема ночь оформление автоповорот ориентация экран поворот ландшафт`))
 
   const batteryRows: RowItem[] = [
     {
@@ -413,7 +436,46 @@ export default function SettingsApp() {
         if (!batteryReal) setCharging(!charging)
       },
     },
-  ].filter((r) => hit(`${r.label} ${r.desc ?? ''}`))
+  ].filter((r) => hit(`${r.label} ${r.desc ?? ''} зарядка заряд аккумулятор батарея питание кабель розетка нет`))
+
+  const privacyRows: RowItem[] = [
+    {
+      key: 'allowCalls',
+      color: '#21A038',
+      icon: <LockKeyhole className="size-5" />,
+      label: 'Принимать звонки',
+      desc: allowCalls ? 'Входящие вызовы проходят' : 'Все входящие отклоняются автоматически',
+      right: <M3Switch checked={allowCalls} onChange={(v) => setPref('allowCalls', v)} label="Принимать звонки" />,
+      onClick: () => setPref('allowCalls', !allowCalls),
+    },
+    {
+      key: 'hideNumber',
+      color: '#44474F',
+      icon: <EyeOff className="size-5" />,
+      label: 'Скрывать номер',
+      desc: hideNumber ? 'Собеседник видит «Скрытый номер»' : 'Номер виден собеседникам и продавцам',
+      right: <M3Switch checked={hideNumber} onChange={(v) => setPref('hideNumber', v)} label="Скрывать номер" />,
+      onClick: () => setPref('hideNumber', !hideNumber),
+    },
+    {
+      key: 'hideOnline',
+      color: '#0A8A76',
+      icon: <Eye className="size-5" />,
+      label: 'Статус онлайн',
+      desc: hideOnline ? 'Скрыт — вы «невидимка»' : 'Виден всем в чатах и объявлениях',
+      right: <M3Switch checked={hideOnline} onChange={(v) => setPref('hideOnline', v)} label="Статус онлайн" />,
+      onClick: () => setPref('hideOnline', !hideOnline),
+    },
+    {
+      key: 'hideBalance',
+      color: '#E8A020',
+      icon: <EyeOff className="size-5" />,
+      label: 'Скрывать баланс',
+      desc: hideBalance ? 'Баланс виден только вам' : 'Баланс виден в профиле',
+      right: <M3Switch checked={hideBalance} onChange={(v) => setPref('hideBalance', v)} label="Скрывать баланс" />,
+      onClick: () => setPref('hideBalance', !hideBalance),
+    },
+  ].filter((r) => hit(`${r.label} ${r.desc ?? ''} приватность безопасность конфиденциальность звонки номер онлайн баланс скрыть инкогнито невидимка`))
 
   const aboutRows: RowItem[] = [
     {
@@ -421,21 +483,65 @@ export default function SettingsApp() {
       color: '#44474F',
       icon: <Smartphone className="size-5" />,
       label: 'Модель',
-      desc: 'Resale Phone 16 · 8 ГБ / 256 ГБ',
+      desc: device
+        ? `${device.model} · ${device.deviceBrand} · ${device.ramGb ? `${device.ramGb} ГБ ОЗУ` : `${device.cores ?? '?'} ядер`}`
+        : 'Определение устройства…',
     },
     {
       key: 'version',
       color: '#0A8A76',
       icon: <Sparkles className="size-5" />,
       label: 'Версия ОС',
-      desc: 'Android 16 · Material 3 Expressive',
+      desc: device?.osVersion ? `Android 17 · реальная ОС: ${device.osName} ${device.osVersion}` : 'Android 17 · Material 3 Expressive',
+    },
+    {
+      key: 'screen',
+      color: '#21A038',
+      icon: <LayoutGrid className="size-5" />,
+      label: 'Экран',
+      desc: device?.screenPhysical
+        ? `${device.screenPhysical} px (${device.screen})`
+        : device?.screen ?? '—',
+    },
+    {
+      key: 'cpu',
+      color: '#E8A020',
+      icon: <Zap className="size-5" />,
+      label: 'Процессор',
+      desc: device?.cores
+        ? `${device.cores} ядер · ${device.ramGb ? `${(device.ramGb * 1024).toFixed(0)} МБ ОЗУ доступно системе` : 'реальные ядра устройства'}`
+        : 'Определение…',
+    },
+    {
+      key: 'storage',
+      color: '#D64570',
+      icon: <Fingerprint className="size-5" />,
+      label: 'Хранилище',
+      desc:
+        device?.storageUsed
+          ? `Занято ${device.storageUsed} · свободно ${device.storageFree ?? '—'}`
+          : 'Нет доступа к StorageManager',
+    },
+    {
+      key: 'net',
+      color: '#0A8A76',
+      icon: <Signal className="size-5" />,
+      label: 'Сеть',
+      desc: NET_LABEL[netKind],
+    },
+    {
+      key: 'locale',
+      color: '#44474F',
+      icon: <User className="size-5" />,
+      label: 'Язык и регион',
+      desc: device ? `${device.language} · ${device.timezone}` : '—',
     },
     {
       key: 'build',
       color: '#E8A020',
       icon: <LayoutGrid className="size-5" />,
       label: 'Сборка',
-      desc: 'ResaleOS 2.5.0 (build 130)',
+      desc: `ResaleOS 2.6.0 (build 140) · ${device?.browser ?? 'WebView'}`,
     },
     {
       key: 'deviceid',
@@ -456,12 +562,13 @@ export default function SettingsApp() {
       label: name,
       desc: session ? `@${session.username} · уровень ${session.level}` : 'Сессия не найдена',
     },
-  ].filter((r) => hit(`${r.label} ${r.desc ?? ''}`))
+  ].filter((r) => hit(`${r.label} ${r.desc ?? ''} о телефоне модель версия ос экран процессор хранилище память язык сборка устройство`))
 
-  const wallpaperHit = hit('обои стиль виджеты домашний экран персонализация фон')
-  const brightnessHit = hit('яркость экран подсветка')
-  const volumeHit = hit('громкость звук мультимедиа')
-  const batteryHit = hit('батарея зарядка аккумулятор питание')
+  const wallpaperHit = hit('обои стиль виджеты домашний экран персонализация фон картинка')
+  const brightnessHit = hit('яркость экран подсветка светло тьма')
+  const volumeHit = hit('громкость звук мультимедиа медиа музыка тише')
+  const privacyHit = hit('приватность безопасность конфиденциальность звонки номер онлайн баланс скрыть')
+  const batteryHit = hit('батарея зарядка аккумулятор питание энергия заряд проценты')
 
   const sections: { key: string; visible: boolean; node: ReactNode }[] = [
     {
@@ -508,16 +615,16 @@ export default function SettingsApp() {
           {volumeHit && (
             <div className="border-b border-[#EBEDF0] px-4 py-4">
               <div className="mb-2.5 flex items-baseline justify-between">
-                <span className="text-[15px] font-medium text-[#17181A]">Громкость</span>
+                <span className="text-[15px] font-medium text-[#17181A]">Громкость медиа</span>
                 <span className="text-[13px] font-semibold tabular-nums text-[#8B8F99]">{Math.round(volume * 100)}%</span>
               </div>
               <M3Slider
                 value={volume}
                 onChange={setVolume}
-                ariaLabel="Громкость мультимедиа"
+                ariaLabel="Громкость медиа"
                 leftIcon={<Volume2 className="size-5" />}
               />
-              <p className="mt-2 text-[11px] text-[#8B8F99]">Мультимедиа · демо-ползунок системы</p>
+              <p className="mt-2 text-[11px] text-[#8B8F99]">Управляет музыкой ОС · синхронизировано с плашкой громкости</p>
             </div>
           )}
           {soundRows.map((r) => <RowLine key={r.key} r={r} />)}
@@ -646,6 +753,15 @@ export default function SettingsApp() {
       ),
     },
     {
+      key: 'privacy',
+      visible: privacyRows.length > 0 || privacyHit,
+      node: (
+        <Section title="Приватность и безопасность">
+          {privacyRows.map((r) => <RowLine key={r.key} r={r} />)}
+        </Section>
+      ),
+    },
+    {
       key: 'about',
       visible: aboutRows.length > 0,
       node: (
@@ -700,7 +816,7 @@ export default function SettingsApp() {
         )}
 
         <p className="px-1 pb-2 pt-1 text-center text-[11px] text-[#8B8F99]">
-          Resale Phone 16 · Android 16 · ResaleOS 2.5.0 (130)
+          Resale Phone 17 · Android 17 · ResaleOS 2.6.0 (140)
         </p>
       </div>
     </div>

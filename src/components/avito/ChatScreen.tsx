@@ -5,11 +5,13 @@
 // Всё решение — в переписке: счёты, торг, ИИ-собеседник. Логика не тронута.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  ChevronLeft, Send, Receipt, Loader2, Star, CheckCheck, Banknote, X,
+  ChevronLeft, Send, Receipt, Loader2, Star, CheckCheck, Banknote, X, Phone,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
 import { sound } from '@/lib/sound'
+import { useCall } from '@/lib/call'
+import { botDigits, formatNumber } from '@/lib/phone'
 import { getSocket } from '@/lib/use-realtime'
 import { fmtMoney, fmtTime, initials, hueColor } from '@/lib/format'
 import { CONDITION_LABEL } from '@/lib/catalog-types'
@@ -195,6 +197,20 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
   }
   if (!chat) return null
 
+  // Живой голосовой звонок продавцу по этому товару: звонок уровня ОС (useCall),
+  // экран рисует системный CallOverlay — из приложения можно выйти, звонок продолжится.
+  const callSeller = () => {
+    sound.tap()
+    useCall.getState().startCall({
+      name: chat.counterpart.displayName,
+      number: formatNumber(botDigits(chat.counterpart.id)),
+      peerUserId: chat.counterpart.id,
+      personaId: null, // сервер вычислит личность по боту
+      listingTitle: chat.listing.title,
+      listingPrice: chat.listing.price,
+    })
+  }
+
   const canPayInvoices = chat.role === 'buyer'
   const swipeProgress = Math.min(1, swipeX / 150)
 
@@ -251,7 +267,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
         </div>
         {/* карточка товара */}
         <div className="mx-3 mb-2 flex items-center gap-2 rounded-xl bg-[#F0F1F5] p-2">
-          <img src={chat.listing.image} alt="" className="w-10 h-10 rounded-lg object-cover bg-white" />
+          <img loading="lazy" decoding="async" src={chat.listing.image} alt="" className="w-10 h-10 rounded-lg object-cover bg-white"/>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-black truncate">{chat.listing.title}</p>
             <p className="text-xs font-bold text-black">
@@ -346,8 +362,18 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
         </div>
       )}
 
-      {/* ввод: белая пилюля + зелёная круглая кнопка отправки */}
+      {/* ввод: звонок + счёт + белая пилюля + зелёная круглая кнопка отправки */}
       <div className="shrink-0 bg-[#F7F8FA] border-t border-[#EBEDF0] p-2.5 flex items-center gap-2">
+        {chat.counterpart.isBot && chat.role === 'buyer' && chat.listing.status !== 'sold' && (
+          <button
+            onClick={callSeller}
+            aria-label={`Позвонить продавцу ${chat.counterpart.displayName} по товару`}
+            title="Позвонить продавцу"
+            className="w-11 h-11 rounded-full bg-[#F0F1F5] flex items-center justify-center text-[#0AC760] shrink-0 active:scale-95 transition-transform"
+          >
+            <Phone size={19} aria-hidden />
+          </button>
+        )}
         <button
           onClick={() => { setInvoiceOpen(true); setInvoiceAmount(String(chat.listing.price)) }}
           aria-label="Выставить счёт"

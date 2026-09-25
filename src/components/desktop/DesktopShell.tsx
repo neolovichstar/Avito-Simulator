@@ -256,7 +256,7 @@ export default function DesktopShell({ locked, onUnlock, renderApp, theme }: Pro
             {session && (
               <div className="mt-4 flex items-center gap-3 border-t border-white/10 pt-3">
                 {session.photoUrl ? (
-                  <img src={session.photoUrl} alt="" className="size-8 rounded-full object-cover" />
+                  <img loading="lazy" decoding="async" src={session.photoUrl} alt="" className="size-8 rounded-full object-cover"/>
                 ) : (
                   <span className="flex size-8 items-center justify-center rounded-full bg-[#16A34A] text-xs font-bold text-white">
                     {(session.displayName ?? 'И')[0]}

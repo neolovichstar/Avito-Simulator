@@ -29,7 +29,7 @@ export default function MiniPlayer({ onOpenApp }: { onOpenApp: (app: AppKey) => 
         >
           <span className="relative size-10 shrink-0 overflow-hidden rounded-[13px] bg-white/10">
             {current.artworkSmall ? (
-              <img src={current.artworkSmall} alt="" className="h-full w-full object-cover" />
+              <img loading="lazy" decoding="async" src={current.artworkSmall} alt="" className="h-full w-full object-cover"/>
             ) : null}
           </span>
           <span className="min-w-0 flex-1">

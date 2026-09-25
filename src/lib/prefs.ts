@@ -26,6 +26,10 @@ export type PrefsKey =
   | 'appNotif' // Уведомления приложений (Настройки)
   | 'bankPin' // Вход по пину (Банк → Безопасность)
   | 'bankOpsNotif' // Уведомления об операциях (Банк → Безопасность)
+  | 'allowCalls' // Приватность: принимать входящие звонки
+  | 'hideNumber' // Приватность: скрывать свой номер при звонках/чатах
+  | 'hideOnline' // Приватность: скрывать статус «онлайн»
+  | 'hideBalance' // Приватность: скрывать баланс в профиле
 
 const DEFAULTS: Record<PrefsKey, boolean> = {
   wifi: true,
@@ -35,6 +39,10 @@ const DEFAULTS: Record<PrefsKey, boolean> = {
   appNotif: true,
   bankPin: true,
   bankOpsNotif: true,
+  allowCalls: true,
+  hideNumber: false,
+  hideOnline: false,
+  hideBalance: false,
 }
 
 export const PREFS_DEFAULTS: Record<PrefsKey, boolean> = DEFAULTS

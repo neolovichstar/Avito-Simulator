@@ -352,11 +352,9 @@ export default function CareerApp() {
             <div className={`${CARD} p-4`}>
               <div className="flex items-center gap-3">
                 {session?.photoUrl ? (
-                  <img
-                    src={session.photoUrl}
+                  <img loading="lazy" decoding="async" src={session.photoUrl}
                     alt=""
-                    className="size-12 shrink-0 rounded-full object-cover ring-1 ring-black/5"
-                  />
+                    className="size-12 shrink-0 rounded-full object-cover ring-1 ring-black/5"/>
                 ) : (
                   <div
                     className="flex size-12 shrink-0 items-center justify-center rounded-full text-[13px] font-bold text-white"

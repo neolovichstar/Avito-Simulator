@@ -6,8 +6,9 @@
 // открыто приложение «Музыка» или нет.
 
 import { useSyncExternalStore } from 'react'
-import { Music2, Pause, Play, SkipBack, SkipForward } from 'lucide-react'
+import { Music2, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
 import { usePlayer } from '@/lib/player'
+import { useVolume } from '@/lib/volume'
 import type { AppKey } from '@/lib/store'
 
 const emptySubscribe = () => () => {}
@@ -34,6 +35,10 @@ export default function NowPlayingShade({ onOpenApp }: { onOpenApp: (app: AppKey
   // useSyncExternalStore: на сервере false, после гидрации true — без setState-в-эффекте.
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
 
+  // Громкость медиа — глобальный стор + плашка громкости Android 17.
+  const volume = useVolume((s) => s.volume)
+  const setVolume = useVolume((s) => s.setVolume)
+
   if (!mounted || !current) return null
   const pct = duration > 0 ? Math.min(100, (position / duration) * 100) : 0
 
@@ -53,7 +58,7 @@ export default function NowPlayingShade({ onOpenApp }: { onOpenApp: (app: AppKey
         >
           <span className="relative size-12 shrink-0 overflow-hidden rounded-[14px] bg-white/10">
             {current.artworkSmall ? (
-              <img src={current.artworkSmall} alt="" className="h-full w-full object-cover" />
+              <img loading="lazy" decoding="async" src={current.artworkSmall} alt="" className="h-full w-full object-cover"/>
             ) : (
               <span className="flex h-full w-full items-center justify-center">
                 <Music2 className="size-5 text-white/50" aria-hidden="true" />
@@ -121,6 +126,32 @@ export default function NowPlayingShade({ onOpenApp }: { onOpenApp: (app: AppKey
           />
         </span>
         <span className="w-8 shrink-0 text-[9px] tabular-nums text-white/40">{fmt(duration)}</span>
+      </div>
+
+      {/* Громкость медиа: мини-слайдер с иконкой (тап — mute), тап/драг меняет громкость */}
+      <div className="flex items-center gap-2 px-3.5 pb-3">
+        <button
+          type="button"
+          tabIndex={0}
+          aria-label={volume === 0 ? 'Включить звук' : 'Выключить звук'}
+          onClick={() => setVolume(volume === 0 ? 0.5 : 0)}
+          className="flex size-8 shrink-0 items-center justify-center rounded-full text-white/75 outline-none transition-colors active:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70"
+        >
+          {volume === 0 ? <VolumeX className="size-4" aria-hidden="true" /> : <Volume2 className="size-4" aria-hidden="true" />}
+        </button>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={Math.round(volume * 100)}
+          onChange={(e) => setVolume(Number(e.target.value) / 100)}
+          aria-label="Громкость медиа"
+          className="vol-shade h-1.5 min-w-0 flex-1 cursor-pointer appearance-none rounded-full outline-none"
+          style={{
+            background: `linear-gradient(to right, #3ED598 ${volume * 100}%, rgba(255,255,255,0.15) ${volume * 100}%)`,
+          }}
+        />
+        <span className="w-7 shrink-0 text-right text-[9px] tabular-nums text-white/40">{Math.round(volume * 100)}%</span>
       </div>
     </section>
   )

@@ -350,11 +350,9 @@ export default function RepairApp() {
                     >
                       <div className="flex gap-3">
                         <div className="relative">
-                          <img
-                            src={order.itemImage}
+                          <img loading="lazy" decoding="async" src={order.itemImage}
                             alt={order.itemTitle}
-                            className="size-20 shrink-0 rounded-2xl object-cover"
-                          />
+                            className="size-20 shrink-0 rounded-2xl object-cover"/>
                           {order.status === 'ready' && (
                             <span
                               className="absolute -right-1.5 -top-1.5 flex size-6 items-center justify-center rounded-full text-white shadow"
@@ -445,11 +443,9 @@ export default function RepairApp() {
                     style={{ boxShadow: CARD_SHADOW }}
                   >
                     <div className="flex gap-3 p-4">
-                      <img
-                        src={item.image}
+                      <img loading="lazy" decoding="async" src={item.image}
                         alt={item.title}
-                        className="size-16 shrink-0 rounded-2xl object-cover"
-                      />
+                        className="size-16 shrink-0 rounded-2xl object-cover"/>
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-[15px] font-semibold">{item.title}</div>
                         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
