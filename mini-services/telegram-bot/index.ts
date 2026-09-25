@@ -38,6 +38,9 @@ const API = `https://api.telegram.org/bot${TOKEN}`
 // Публичные ссылки бота
 const APP_URL = process.env.APP_URL ?? 'https://t.me/resalesimbot/resalesimulator'
 const CHANNEL_URL = process.env.CHANNEL_URL ?? 'https://t.me/SnapTeamDev'
+// ПРЯМОЙ домен Mini App (не t.me!). Когда задан — кнопки открывают игру напрямую
+// (web_app-кнопка, initData приходит сразу, без обёртки t.me).
+const PUBLIC_URL = (process.env.APP_PUBLIC_URL ?? '').trim().replace(/\/+$/, '')
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Премиум-эмодзи (custom_emoji_id). Все ID проверены через getCustomEmojiStickers,
@@ -82,6 +85,7 @@ interface Btn {
   text: string
   url?: string
   callback_data?: string
+  web_app?: { url: string }
   style?: 'primary' | 'success' | 'danger' | 'link'
   icon_custom_emoji_id?: string
 }
@@ -89,9 +93,15 @@ interface Markup {
   inline_keyboard: Btn[][]
 }
 
+// Кнопка «Начать»: с прямым доменом — web_app (открывает игру сразу),
+// без него — t.me-ссылка (фолбэк)
+const PLAY_BTN: Btn = PUBLIC_URL
+  ? { text: 'Начать ресейлить', web_app: { url: PUBLIC_URL }, style: 'success', icon_custom_emoji_id: EMOJI.arrowUp }
+  : { text: 'Начать ресейлить', url: APP_URL, style: 'success', icon_custom_emoji_id: EMOJI.arrowUp }
+
 const WELCOME_MARKUP: Markup = {
   inline_keyboard: [
-    [{ text: 'Начать ресейлить', url: APP_URL, style: 'success', icon_custom_emoji_id: EMOJI.arrowUp }],
+    [PLAY_BTN],
     [{ text: 'Подписаться на канал', url: CHANNEL_URL, style: 'primary', icon_custom_emoji_id: EMOJI.bell }],
     [{ text: 'Пользовательское соглашение', callback_data: 'terms', icon_custom_emoji_id: EMOJI.info }],
     [{ text: 'Помощь и команды', callback_data: 'help', style: 'link', icon_custom_emoji_id: EMOJI.chat }],
@@ -106,7 +116,7 @@ const BACK_MARKUP: Markup = {
 
 const START_MARKUP: Markup = {
   inline_keyboard: [
-    [{ text: 'Начать ресейлить', url: APP_URL, style: 'success', icon_custom_emoji_id: EMOJI.arrowUp }],
+    [PLAY_BTN],
     [{ text: 'Помощь и команды', callback_data: 'help', style: 'link', icon_custom_emoji_id: EMOJI.chat }],
   ],
 }
@@ -549,9 +559,11 @@ async function setupBot(): Promise<void> {
     ],
   })
   await tg('setChatMenuButton', {
-    menu_button: { type: 'web_app', text: 'Начать ресейлить', web_app: { url: APP_URL } },
+    menu_button: PUBLIC_URL
+      ? { type: 'web_app', text: 'Начать ресейлить', web_app: { url: PUBLIC_URL } }
+      : { type: 'web_app', text: 'Начать ресейлить', web_app: { url: APP_URL } },
   })
-  console.log('[tg-bot] profile configured: name, commands, menu button (web_app)')
+  console.log(`[tg-bot] profile configured: name, commands, menu button (web_app, url=${PUBLIC_URL || APP_URL})`)
 }
 
 // ---------------------------------------------------------------------------
