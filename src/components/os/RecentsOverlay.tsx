@@ -66,47 +66,52 @@ export default function RecentsOverlay({
         {openApps.length === 0 ? (
           <p className="text-sm text-white/60">Нет недавних приложений</p>
         ) : (
-          <div className="flex w-full items-center gap-4 overflow-x-auto px-8 py-4">
+          <div className="flex w-full items-center gap-5 overflow-x-auto px-8 py-4">
             {openApps.map((key) => {
               const tile = APP_TILE[key]
               const isDrag = dragging?.key === key
               const dy = isDrag ? Math.min(0, dragging.dy) : 0
               const willClose = isDrag && dy < -SWIPE_CLOSE
               return (
-                <button
+                <div
                   key={key}
-                  type="button"
-                  aria-label={`Вернуться в приложение ${tile.label}. Смахните вверх, чтобы закрыть`}
                   data-appkey={key}
                   onPointerDown={onCardPointerDown}
-                  onClick={() => {
-                    if (suppressClick.current) return
-                    onResume()
-                  }}
                   style={{
-                    backgroundImage: tile.background,
-                    transform: isDrag ? `translateY(${dy}px) scale(${willClose ? 0.92 : 1})` : undefined,
+                    transform: isDrag ? `translateY(${dy}px)` : undefined,
                     opacity: isDrag ? Math.max(0, 1 - Math.abs(dy) / 130) : undefined,
                     touchAction: 'pan-x',
                   }}
-                  className={`pointer-events-auto relative flex h-[220px] w-[120px] shrink-0 flex-col items-center rounded-2xl p-3 text-left shadow-2xl ring-1 outline-none transition-[background-color,box-shadow] focus-visible:ring-2 focus-visible:ring-white ${
-                    willClose ? 'ring-red-400/70' : 'ring-white/15'
-                  }`}
+                  className="pointer-events-auto flex shrink-0 select-none flex-col items-center gap-2.5"
                 >
-                  {/* бейдж «закрыть» проявляется при драге */}
-                  {isDrag && dy < -20 && (
-                    <span
-                      aria-hidden="true"
-                      className="absolute -top-2 left-1/2 flex size-6 -translate-x-1/2 items-center justify-center rounded-full bg-red-500 text-white shadow-lg"
-                    >
-                      <X className="size-3.5" />
-                    </span>
-                  )}
-                  <span className="flex flex-1 items-center justify-center">
-                    <AppTileImage app={key} className="size-16 rounded-[1.1rem] shadow-xl ring-1 ring-black/10" />
+                  <button
+                    type="button"
+                    aria-label={`Вернуться в приложение ${tile.label}. Смахните вверх, чтобы закрыть`}
+                    onClick={() => {
+                      if (suppressClick.current) return
+                      onResume()
+                    }}
+                    style={{ backgroundImage: tile.background }}
+                    className={`relative flex h-[210px] w-[140px] items-center justify-center rounded-[20px] shadow-2xl ring-1 outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white ${
+                      willClose ? 'ring-red-400/70' : 'ring-white/15'
+                    }`}
+                  >
+                    {/* бейдж «закрыть» проявляется при драге */}
+                    {isDrag && dy < -20 && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute -top-2 left-1/2 flex size-6 -translate-x-1/2 items-center justify-center rounded-full bg-red-500 text-white shadow-lg"
+                      >
+                        <X className="size-3.5" />
+                      </span>
+                    )}
+                    <AppTileImage app={key} className="size-20 rounded-[1.2rem] shadow-xl ring-1 ring-black/10" />
+                  </button>
+                  {/* подпись под карточкой — как под иконкой на рабочем столе */}
+                  <span className="max-w-[140px] truncate text-xs font-medium text-white/90 [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">
+                    {tile.label}
                   </span>
-                  <span className="text-xs font-medium text-white drop-shadow">{tile.label}</span>
-                </button>
+                </div>
               )
             })}
           </div>

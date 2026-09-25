@@ -41,7 +41,7 @@ function Tile({
       aria-pressed={active}
       aria-label={label}
       disabled={disabled}
-      className={`flex min-h-[68px] items-center gap-3 rounded-3xl px-4 py-3 text-left outline-none transition-all focus-visible:ring-2 focus-visible:ring-white/70 ${
+      className={`flex min-h-[68px] items-center gap-3 rounded-[20px] px-4 py-3 text-left outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white/70 ${
         disabled ? 'cursor-default opacity-70' : 'active:scale-[0.97]'
       } ${active ? activeCls : 'bg-white/10 text-white'} ${className}`}
     >
@@ -244,7 +244,7 @@ export default function ControlCenter({
           </div>
 
           {/* яркость */}
-          <div className="mt-2.5 flex min-h-12 items-center gap-3 rounded-3xl bg-white/10 px-4 py-2">
+          <div className="mt-2.5 flex min-h-12 items-center gap-3 rounded-[20px] bg-white/10 px-4 py-2">
             {brightness > 0.62 ? (
               <Sun className="size-4.5 shrink-0 text-white" aria-hidden="true" />
             ) : (
@@ -270,7 +270,7 @@ export default function ControlCenter({
             type="button"
             aria-label="Свернуть"
             onClick={onClose}
-            className="mx-auto mt-4 flex h-8 w-24 items-center justify-center rounded-full bg-white/10 outline-none transition-colors active:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/70"
+            className="mx-auto mt-3 flex h-11 w-24 items-center justify-center rounded-full bg-white/10 outline-none transition-colors duration-200 active:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/70"
           >
             <ChevronDown className="size-5 text-white/70" aria-hidden="true" />
           </button>

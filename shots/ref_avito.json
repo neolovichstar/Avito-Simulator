@@ -1,0 +1,51 @@
+{
+  "success": true,
+  "query": "Avito app main screen screenshot marketplace listings feed mobile interface",
+  "count": 6,
+  "ranked": true,
+  "captioned_count": 6,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/371409203ac1.png",
+      "caption": "Browser screenshot of Russian Avito website (avito.ru/additem) contact form \"Контакты\" with phone number protection notice.",
+      "source": "Octo Browser Blog",
+      "original_width": "1440px",
+      "original_height": "900px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/30803946be40.jpeg",
+      "caption": "The image is a dark navy webpage interface titled \"e-commerce scrapers\" with a search bar and a grid of scraper options: Adidas, Alibaba, AliExpress, Allegro, Amazon Price Scraper API, Amazon, Amazon.in, ASOS Scraper API, Avito, Best Buy Scraper API, Chewy, Cosstores, Depop, eBay Scraper API, eCommerce, Etsy Scraper API, plus a \"Show more\" link. Contains substantial text, appears to be a screenshot of a web tool directory.",
+      "source": "Apify Blog",
+      "original_width": "2000px",
+      "original_height": "1031px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/26710237d506.jpg",
+      "caption": "ShopStory LIVE banner: \"Live Commerce solution to increase sales\" with bullet points: More sales, Growth of Trust, Purchase Promotion, Easy Integration, and shopstory.live.",
+      "source": "LinkedIn",
+      "original_width": "1172px",
+      "original_height": "720px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/adec4638b65e.png",
+      "caption": "This is a dark promotional banner ad for \"crawlbase\" with the Crawlbase logo, featuring the headline \"Give your agent live web access.\" in white and bright green text. It includes an \"MCP\" badge, feature text \"Clean Markdown · screenshots · JS rendering · proxy rotation · anti-bot\", and on the right side, \"Trusted by 70,000+ developers\" with a bright green \"Start free →\" button and \"Up to 5,000 free requests · no credit card\" below. Contains a brand logo, moderate text, high clarity, strong visual contrast—suitable for background image.",
+      "source": "GitHub",
+      "original_width": "2760px",
+      "original_height": "480px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/a3efa790948a.png",
+      "caption": "Yellow tech illustration showing a dotted globe, browser bar, and code labels \"country_code: US\" and \"add_html: true\".",
+      "source": "ScrapingBee",
+      "original_width": "1200px",
+      "original_height": "675px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/df979646483f.jpg",
+      "caption": "A promotional banner: \"LaunchKit – Build websites, startups and web apps with your AI coding assistant,\" designed for various AI tools, with \"Learn more\" button.",
+      "source": "GitHub",
+      "original_width": "2760px",
+      "original_height": "480px"
+    }
+  ]
+}

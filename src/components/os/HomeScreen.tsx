@@ -30,7 +30,7 @@ function useClock(): Date | null {
 }
 
 const glass = 'rounded-2xl bg-white/10 backdrop-blur-md'
-const WIDGET_CLASS = 'flex min-h-12 items-center gap-2 rounded-2xl bg-white/10 px-3 py-2 text-left backdrop-blur-md outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-white/70'
+const WIDGET_CLASS = 'flex min-h-12 items-center gap-2 rounded-2xl bg-white/10 px-3 py-2 text-left backdrop-blur-md outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white/70'
 
 // ─── Компактные виджеты (одна строка, h-12) ──────────────────────────────────
 function Widget({
@@ -207,7 +207,7 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
               ))}
             </div>
 
-            <div className="mt-7 grid grid-cols-4 gap-x-5 gap-y-6 px-6">
+            <div className="mt-7 grid grid-cols-4 gap-x-5 gap-y-6 px-5">
               {PAGE1_APPS.map((app) => (
                 <AppIcon
                   key={app}
@@ -232,7 +232,7 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
                 type="button"
                 aria-label="Задание дня"
                 onClick={() => onOpenApp('career')}
-                className={`${glass} flex min-h-12 flex-col justify-center px-3 py-1.5 text-left outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-white/70`}
+                className={`${glass} flex min-h-12 flex-col justify-center px-3 py-1.5 text-left outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white/70`}
               >
                 <span className="flex items-center gap-1.5 text-[9px] uppercase tracking-wider text-white/55">
                   <Trophy className="size-3 text-amber-300" aria-hidden="true" /> Задание
@@ -257,7 +257,7 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
                 type="button"
                 aria-label="Посылка"
                 onClick={() => onOpenApp('delivery')}
-                className={`${glass} flex min-h-12 flex-col justify-center px-3 py-1.5 text-left outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-white/70`}
+                className={`${glass} flex min-h-12 flex-col justify-center px-3 py-1.5 text-left outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white/70`}
               >
                 <span className="flex items-center gap-1.5 text-[9px] uppercase tracking-wider text-white/55">
                   <Package className="size-3 text-emerald-300" aria-hidden="true" /> Посылка
@@ -272,7 +272,7 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
                 type="button"
                 aria-label="Топ площадки"
                 onClick={() => onOpenApp('leaderboard')}
-                className={`${glass} flex min-h-12 flex-col justify-center px-3 py-1.5 text-left outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-white/70`}
+                className={`${glass} flex min-h-12 flex-col justify-center px-3 py-1.5 text-left outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white/70`}
               >
                 <span className="flex items-center gap-1.5 text-[9px] uppercase tracking-wider text-white/55">
                   <Crown className="size-3 text-amber-300" aria-hidden="true" /> Топ
@@ -286,7 +286,7 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
             </div>
 
             {/* ЕДИНАЯ сетка 4 колонки — как на странице 1 */}
-            <div className="mt-7 grid grid-cols-4 gap-x-5 gap-y-6 px-6">
+            <div className="mt-7 grid grid-cols-4 gap-x-5 gap-y-6 px-5">
               {PAGE2_APPS.map((app) => (
                 <AppIcon
                   key={app}
@@ -312,7 +312,7 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
       </div>
 
       {/* Док */}
-      <div className="mx-4 mb-2.5 rounded-3xl bg-white/10 p-3.5 pb-3 backdrop-blur-md">
+      <div className="mx-5 mb-2.5 rounded-3xl bg-white/10 p-3.5 pb-3 backdrop-blur-md">
         <div className="grid grid-cols-4 gap-5">
           {DOCK_APPS.map((app) => (
             <AppIcon

@@ -1,16 +1,18 @@
 'use client'
 
-// Экран блокировки «Resale OS» — как на обычном смартфоне:
-// дата, крупные часы, превью уведомлений и подсказка «свайп вверх».
-// Никаких паролей и пин-кодов — это игра, телефон открывается одним касанием.
+// Экран блокировки «Resale OS» — максимально простой, как на обычном смартфоне:
+// дата, огромные часы, компактные превью уведомлений (иконка + заголовок + строка)
+// и подсказка «свайп вверх». Никаких паролей и пин-кодов — это игра,
+// телефон открывается одним касанием.
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { ChevronUp, Lock, MoonStar } from 'lucide-react'
+import { ChevronUp, MoonStar } from 'lucide-react'
 import { useOS } from '@/lib/store'
 import { sound } from '@/lib/sound'
 import { api } from '@/lib/api'
 import { fmtMoney } from '@/lib/format'
 import { useDrag } from '@/lib/use-swipe'
+import { KIND_APP } from './NotificationCenter'
 
 // Живые тики каждые 1000 мс без setState в эффекте (useSyncExternalStore).
 function useClock(): Date | null {
@@ -110,6 +112,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   }, [unlock])
 
   const previews = notifications.filter((n) => !n.readAt).slice(0, 3)
+  const DayIcon = KIND_APP.deal.icon
   const dealsLabel =
     day && (day.deals === 1 ? 'сделка' : day.deals < 5 ? 'сделки' : 'сделок')
 
@@ -138,19 +141,9 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
         }}
       />
 
-      <div className="relative z-10 flex h-full flex-col px-5 pb-7 pt-7">
-        {/* Замок сверху — как на системном лок-скрине */}
-        <div className="flex shrink-0 justify-center">
-          <span
-            className="flex size-9 items-center justify-center rounded-full border border-white/15 bg-white/10 backdrop-blur-md"
-            aria-hidden="true"
-          >
-            <Lock className="size-4 text-white/85" strokeWidth={2.2} />
-          </span>
-        </div>
-
+      <div className="relative z-10 flex h-full flex-col px-5 pb-8 pt-12">
         {/* Дата и время — крупно по центру */}
-        <div className="mt-4 shrink-0 text-center" suppressHydrationWarning>
+        <div className="shrink-0 text-center" suppressHydrationWarning>
           <p className="text-[15px] font-medium tracking-wide text-white/75">
             {now
               ? now.toLocaleDateString('ru-RU', {
@@ -161,7 +154,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
               : '\u00A0'}
           </p>
           <p
-            className="mt-1.5 text-[76px] font-light leading-none tabular-nums tracking-tight text-white"
+            className="mt-1.5 text-6xl font-semibold leading-none tabular-nums tracking-tight text-white"
             style={{ textShadow: '0 2px 28px rgba(0,0,0,0.5)' }}
           >
             {now
@@ -170,50 +163,54 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
           </p>
         </div>
 
-        {/* Превью уведомлений + итоги дня */}
-        <div className="mt-6 min-h-0 flex-1 space-y-2 overflow-y-auto [scrollbar-width:none]">
-          {dnd && (
-            <div className="flex items-center justify-center gap-1.5 text-[11px] text-white/70">
-              <MoonStar className="size-3.5" aria-hidden="true" />
-              Не беспокоить включён — уведомления копятся в центре
-            </div>
-          )}
-          {previews.map((n) => (
-            <div
-              key={n.id}
-              className="rounded-2xl border border-white/10 bg-white/10 px-3.5 py-2.5 backdrop-blur-md"
-            >
-              <p className="text-[12px] font-semibold text-white">{n.title}</p>
-              <p className="mt-0.5 line-clamp-2 text-[12px] text-white/70">{n.body}</p>
-            </div>
-          ))}
+        {/* Режим «Не беспокоить» — одна короткая строка */}
+        {dnd && (
+          <p className="mt-3 flex shrink-0 items-center justify-center gap-1.5 text-[11px] text-white/55">
+            <MoonStar className="size-3.5" aria-hidden="true" />
+            Не беспокоить включён
+          </p>
+        )}
 
-          {/* Итоги дня (если сегодня были сделки) */}
+        {/* Превью уведомлений + итоги дня — иконка приложения, заголовок, одна строка */}
+        <div className="mt-6 min-h-0 flex-1 space-y-2 overflow-y-auto [scrollbar-width:none]">
+          {previews.map((n) => {
+            const meta = KIND_APP[n.kind] ?? KIND_APP.system
+            const NotifIcon = meta.icon
+            return (
+              <div
+                key={n.id}
+                className="flex items-center gap-3 rounded-2xl bg-black/35 px-3.5 py-3 backdrop-blur-md"
+              >
+                <span
+                  aria-hidden="true"
+                  className="flex size-8 shrink-0 items-center justify-center rounded-[10px] text-white shadow-sm"
+                  style={{ background: meta.bg }}
+                >
+                  <NotifIcon className="size-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13px] font-semibold leading-tight text-white">{n.title}</p>
+                  <p className="mt-0.5 truncate text-[12px] leading-tight text-white/65">{n.body}</p>
+                </div>
+              </div>
+            )
+          })}
+
+          {/* Итоги дня (если сегодня были сделки) — в том же минималистичном стиле */}
           {day && dealsLabel && (
-            <div className="flex items-center gap-2.5 rounded-2xl border border-white/10 bg-white/10 px-3.5 py-2.5 backdrop-blur-md">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-emerald-500 shadow-md shadow-emerald-900/40">
-                <svg viewBox="0 0 48 48" className="size-5" aria-hidden="true">
-                  <path
-                    d="M14.5 26.5 l5.5 5.5 L30 21.5"
-                    stroke="#ffffff"
-                    strokeWidth="4"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    fill="none"
-                  />
-                </svg>
+            <div className="flex items-center gap-3 rounded-2xl bg-black/35 px-3.5 py-3 backdrop-blur-md">
+              <span
+                aria-hidden="true"
+                className="flex size-8 shrink-0 items-center justify-center rounded-[10px] text-white shadow-sm"
+                style={{ background: KIND_APP.deal.bg }}
+              >
+                <DayIcon className="size-4" />
               </span>
-              <div className="min-w-0">
-                <p className="text-[12px] font-semibold text-white">Сегодня в Resale</p>
-                <p className="text-[11px] text-white/70">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-semibold leading-tight text-white">Сегодня в Resale</p>
+                <p className="mt-0.5 truncate text-[12px] leading-tight text-white/65">
                   {day.deals} {dealsLabel} ·{' '}
-                  <span
-                    className={
-                      day.net >= 0
-                        ? 'font-semibold text-emerald-300'
-                        : 'font-semibold text-red-300'
-                    }
-                  >
+                  <span className={day.net >= 0 ? 'font-semibold text-emerald-300' : 'font-semibold text-red-300'}>
                     {day.net >= 0 ? '+' : ''}
                     {fmtMoney(day.net)}
                   </span>
@@ -230,10 +227,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
             className="mx-auto size-6 animate-bounce text-white/85"
             strokeWidth={2.4}
           />
-          <p className="mt-1 animate-pulse text-[13px] font-medium text-white/80">
-            Проведите вверх, чтобы открыть
-          </p>
-          <p className="mt-0.5 text-[11px] text-white/45">На ПК — потяните мышью вверх</p>
+          <p className="mt-1.5 text-[13px] font-medium text-white/85">Проведите вверх, чтобы открыть</p>
         </div>
       </div>
     </div>

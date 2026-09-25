@@ -1,0 +1,65 @@
+{
+  "success": true,
+  "query": "приложение Авито скриншот главного экрана объявления каталог",
+  "count": 8,
+  "ranked": true,
+  "captioned_count": 8,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/74d71ef2fbec.png",
+      "caption": "Russian Avito website login popup with text fields \"Телефон или почта,\" \"Пароль,\" \"Войти\" button, social icons, registration option.",
+      "source": "Callibri",
+      "original_width": "1532px",
+      "original_height": "830px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/4d3c1d436da2.png",
+      "caption": "A Russian pricing chart titled \"3 тарифа Авито Про\" comparing three tiers: Базовый (free), Расширенный (from 2,000 ₽/month), and Максимальный (from 4,000 ₽/month), each listing features with green checkmarks.",
+      "source": "Блог Альбато",
+      "original_width": "1600px",
+      "original_height": "990px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/56181a3e41ff.png",
+      "caption": "A cartoon businessman holds a sign reading \"Продвинуто\" with a growth chart and colorful shapes.",
+      "source": "zemedia",
+      "original_width": "1800px",
+      "original_height": "750px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/db887aae99c5.png",
+      "caption": "Product card showing an orange sweatshirt on hanger, text \"Свитшот 1 800 ₽\", with colorful geometric shapes and line-art photographer illustrations.",
+      "source": "Авито",
+      "original_width": "1800px",
+      "original_height": "750px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/34950551986a.jpg",
+      "caption": "Claude AI login webpage with \"Think fast, build faster\" heading, Google/email sign-in options, and navigation menu.",
+      "source": "Пикабу",
+      "original_width": "1200px",
+      "original_height": "800px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/f17fb40e1f4f.png",
+      "caption": "A pastel gradient banner with a small logo and Russian text: \"Реклама обучения веб-дизайну. 150+ примеров текстов, шаблоны и готовые идеи\".",
+      "source": "NeuroPanda",
+      "original_width": "1280px",
+      "original_height": "720px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/bbe5a9c01215.png",
+      "caption": "Black-and-white photo: excited bearded man holding smartphone displaying \"Avito\" logo and yellow tag reading \"объявление\", promotional banner design.",
+      "source": "AffTimes.com",
+      "original_width": "1536px",
+      "original_height": "1024px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/da1b25a84aae.png",
+      "caption": "A screenshot of the Avito website showing home appliance listings, viewed via the Wayback Machine.\n\nThe image contains the Wayback Machine logo and the Avito website logo. The image contains a large amount of text information, so I do not need to output the text completely.",
+      "source": "Пикабу",
+      "original_width": "1891px",
+      "original_height": "965px"
+    }
+  ]
+}

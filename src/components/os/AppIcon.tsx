@@ -65,7 +65,7 @@ export default function AppIcon({
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="flex w-full flex-col items-center gap-1.5 rounded-2xl outline-none transition-transform duration-150 active:scale-90 focus-visible:ring-2 focus-visible:ring-white/80"
+      className="flex w-full flex-col items-center gap-1.5 rounded-2xl outline-none transition-transform duration-200 active:scale-95 focus-visible:ring-2 focus-visible:ring-white/80"
     >
       <span
         className={`relative block aspect-square w-full overflow-hidden rounded-[1.4rem] shadow-[0_12px_26px_-6px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.35),inset_0_-10px_16px_-10px_rgba(0,0,0,0.35)] ${
@@ -91,7 +91,7 @@ export default function AppIcon({
           </span>
         )}
       </span>
-      <span className="w-20 truncate text-center text-xs text-white/90">{label}</span>
+      <span className="w-20 truncate text-center text-[11px] text-white/90 [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">{label}</span>
     </button>
   )
 }

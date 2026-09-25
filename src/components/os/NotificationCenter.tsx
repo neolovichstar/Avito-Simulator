@@ -5,7 +5,7 @@
 // Карточку можно смахнуть в сторону — она удалится (и на сервере тоже).
 import { useRef, useState } from 'react'
 import {
-  Bell, ChevronDown, ChevronUp, Crown, Gavel, Info, MessageSquare, Receipt,
+  Bell, ChevronDown, Crown, Gavel, Info, MessageSquare, Receipt,
   ShoppingBag, Trash2, TrendingUp, Truck, Trophy, type LucideIcon,
 } from 'lucide-react'
 import { useOS, type AppKey } from '@/lib/store'
@@ -21,7 +21,9 @@ interface NotifApp {
   openApp: AppKey
 }
 
-const KIND_APP: Record<string, NotifApp> = {
+// Публичная карта «тип уведомления → приложение»: используется и в локскрине
+// (превью с иконкой приложения), и здесь, в центре уведомлений.
+export const KIND_APP: Record<string, NotifApp> = {
   deal: { app: 'Resale', icon: ShoppingBag, bg: 'linear-gradient(145deg,#4ADE80,#15803D)', openApp: 'avito' },
   message: { app: 'Resale', icon: MessageSquare, bg: 'linear-gradient(145deg,#4ADE80,#15803D)', openApp: 'avito' },
   tax: { app: 'Налоги', icon: Receipt, bg: 'linear-gradient(145deg,#4a5568,#2d3748)', openApp: 'taxes' },
@@ -128,26 +130,23 @@ export default function NotificationCenter({
         }`}
       >
         <div className="flex items-center justify-between gap-3 px-5 pb-2 pt-4">
-          <h2 className="flex items-center gap-2 text-sm font-semibold tracking-wide text-white/90">
-            <Bell className="size-4" aria-hidden="true" />
-            Уведомления
-          </h2>
+          <h2 className="text-[13px] font-semibold uppercase tracking-wide text-white/50">Уведомления</h2>
           <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={clearAll}
               tabIndex={open ? 0 : -1}
               disabled={notifications.length === 0}
-              className="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs text-white/70 outline-none transition-colors enabled:active:bg-white/10 enabled:hover:text-white disabled:opacity-35 focus-visible:ring-2 focus-visible:ring-white/70"
+              className="flex min-h-[44px] items-center gap-1 rounded-full px-3 text-[13px] text-white/70 outline-none transition-colors duration-200 enabled:active:bg-white/10 enabled:hover:text-white disabled:opacity-35 focus-visible:ring-2 focus-visible:ring-white/70"
             >
-              <Trash2 className="size-3.5" aria-hidden="true" />
+              <Trash2 className="size-4" aria-hidden="true" />
               Очистить
             </button>
             <button
               type="button"
               onClick={readAll}
               tabIndex={open ? 0 : -1}
-              className="rounded-full px-3 py-1.5 text-xs text-emerald-400 outline-none transition-colors active:bg-white/10 focus-visible:ring-2 focus-visible:ring-emerald-400"
+              className="flex min-h-[44px] items-center rounded-full px-3 text-[13px] text-emerald-400 outline-none transition-colors duration-200 active:bg-white/10 focus-visible:ring-2 focus-visible:ring-emerald-400"
             >
               Прочитать всё
             </button>
@@ -156,7 +155,7 @@ export default function NotificationCenter({
               aria-label="Свернуть панель уведомлений"
               onClick={onClose}
               tabIndex={open ? 0 : -1}
-              className="rounded-full p-1.5 text-white/70 outline-none transition-colors active:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-white/70 outline-none transition-colors duration-200 active:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70"
             >
               <ChevronDown className="h-5 w-5" aria-hidden="true" />
             </button>
@@ -172,7 +171,7 @@ export default function NotificationCenter({
             <p className="mt-1 text-[11px] text-white/30">Здесь появятся сообщения и события</p>
           </div>
         ) : (
-          <ul className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-3 pb-5 pt-1">
+          <ul className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-4 pb-5 pt-1">
             {notifications.map((n) => {
               const meta = KIND_APP[n.kind] ?? KIND_APP.system
               const AppIcon = meta.icon
@@ -202,7 +201,7 @@ export default function NotificationCenter({
                       opacity: isDrag ? Math.max(0, 1 - Math.abs(dx) / 170) : undefined,
                       touchAction: 'pan-y',
                     }}
-                    className={`cursor-pointer touch-pan-y select-none rounded-2xl px-3.5 py-3 outline-none transition-[background-color,box-shadow] focus-visible:ring-2 focus-visible:ring-white/60 ${
+                    className={`cursor-pointer touch-pan-y select-none rounded-[20px] px-4 py-3.5 outline-none transition-[background-color,box-shadow] duration-200 focus-visible:ring-2 focus-visible:ring-white/60 ${
                       willDelete ? 'bg-red-500/30 ring-1 ring-red-400/50' : unread ? 'bg-white/10' : 'bg-white/[0.045]'
                     } ${expanded && !isDrag ? 'bg-white/[0.13]' : !isDrag && !willDelete ? 'active:bg-white/[0.09]' : ''}`}
                   >
@@ -240,23 +239,16 @@ export default function NotificationCenter({
                             onClose()
                             onOpenApp(meta.openApp)
                           }}
-                          className="h-9 rounded-full bg-white px-4 text-xs font-bold text-neutral-900 outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-white"
+                          className="min-h-[44px] rounded-full bg-white px-5 text-[13px] font-bold text-neutral-900 outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white"
                         >
                           Открыть {meta.app}
                         </button>
-                        <span className="flex items-center gap-1 text-[11px] text-white/45">
-                          {expanded ? <ChevronUp className="size-3.5" aria-hidden="true" /> : <ChevronDown className="size-3.5" aria-hidden="true" />}
-                          {expanded ? 'Свернуть' : 'Развернуть'}
-                        </span>
                       </div>
                     )}
                   </div>
                 </li>
               )
             })}
-            <li aria-hidden="true" className="pt-1 text-center text-[11px] text-white/30">
-              Смахните карточку в сторону, чтобы удалить
-            </li>
           </ul>
         )}
       </section>

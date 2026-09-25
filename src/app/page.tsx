@@ -43,6 +43,11 @@ const WIDGETS_KEY = 'avito_sim_widgets'
 const DND_KEY = 'avito_sim_dnd'
 const DESKTOP_MIN_WIDTH = 1024
 
+// Приложения со СВЕТЛОЙ темой интерфейса. Когда открыто одно из них, хром ОС
+// подстраивается: иконки статус-бара становятся тёмными, а рамки Telegram —
+// светлыми. Все остальные приложения и лончер остаются тёмными.
+const LIGHT_APPS: Partial<Record<AppKey, true>> = { avito: true, bank: true, taxes: true }
+
 // Экран «нет связи с сервером» — показывается после 3 неудачных попыток авторизации.
 function OfflineScreen({ onRetry, compact = false }: { onRetry: () => void; compact?: boolean }) {
   return (
@@ -120,11 +125,20 @@ export default function Home() {
     }
   }, [])
 
+  // Светлый хром ОС — только когда открыто светлое приложение (Resale/Банк):
+  // статус-бар получает тёмные иконки на светлой полосе, Telegram — светлые рамки.
+  const lightChrome = !!(session && currentApp && LIGHT_APPS[currentApp])
+
   // Перекрашиваем рамки Telegram под текущий экран: локскрин/загрузка — чёрно-зелёные,
-  // дом — верх обоев, приложения — их фирменный фон #050D09.
+  // дом — верх обоев, тёмные приложения — их фирменный фон #050D09,
+  // светлые приложения — светло-серый #F7F8FA.
   const wallpaper = useOS((s) => s.wallpaper)
   useEffect(() => {
-    const chrome = locked || !session ? '#050d09' : currentApp ? '#050d09' : (WALLPAPER_TOP[wallpaper] ?? '#07130d')
+    const chrome = locked || !session
+      ? '#050d09'
+      : currentApp
+        ? (LIGHT_APPS[currentApp] ? '#F7F8FA' : '#050d09')
+        : (WALLPAPER_TOP[wallpaper] ?? '#07130d')
     applyTelegramChrome(chrome)
   }, [locked, session, currentApp, wallpaper, applyTelegramChrome])
 
@@ -355,8 +369,9 @@ export default function Home() {
   return (
     <main className="min-h-[100dvh] flex items-center justify-center bg-neutral-950">
       <PhoneFrame>
-        {/* статус-бар — над всеми тёмными экранами (приложения всегда тёмные) */}
-        <StatusBar onBell={() => setNotifOpen(true)} />
+        {/* статус-бар: тёмные иконки на тёмных экранах,
+            над светлыми приложениями (Resale/Банк) — тёмные иконки на светлой полосе */}
+        <StatusBar variant={lightChrome ? 'light' : 'dark'} onBell={() => setNotifOpen(true)} />
 
         {/* контент — до самого низа: пилюля-жест накладывается поверх */}
         <div className={`absolute inset-0 top-10 bottom-6 overflow-hidden bg-black ${theme === 'dark' ? 'theme-dark' : ''}`}>

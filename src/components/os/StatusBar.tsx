@@ -30,9 +30,11 @@ function SignalBars({ kind }: { kind: 'offline' | 'slow' | '3g' | '4g' | 'wifi' 
 }
 
 // ─── Батарея: корпус + заливка по уровню + молния при зарядке ───────────────
+// Заливка обычного уровня — currentColor: следует за темой статус-бара
+// (белая на тёмных экранах, чёрная на светлых).
 function BatteryIcon({ level, charging }: { level: number; charging: boolean }) {
   const fill = Math.max(4, Math.min(100, level))
-  const color = level <= 15 ? '#FF453A' : level <= 30 ? '#FF9F0A' : '#ffffff'
+  const color = level <= 15 ? '#FF453A' : level <= 30 ? '#FF9F0A' : 'currentColor'
   return (
     <span className="relative flex items-center" role="img" aria-label={`Батарея ${Math.round(level)}%`}>
       <span aria-hidden="true" className="relative block h-[12.5px] w-[25px] rounded-[4px] border border-current/40 p-[1.5px]">
@@ -69,6 +71,8 @@ function useClock(): Date | null {
   return ts ? new Date(ts) : null
 }
 
+// variant: 'dark' — белые иконки (лончер, тёмные приложения, локскрин),
+// 'light' — тёмные иконки на светлой полосе (светлые приложения Resale/Банк).
 export default function StatusBar({ variant, onBell }: { variant?: 'light' | 'dark'; onBell?: () => void }) {
   const battery = useOS((s) => s.battery)
   const charging = useOS((s) => s.charging)
@@ -84,8 +88,8 @@ export default function StatusBar({ variant, onBell }: { variant?: 'light' | 'da
 
   return (
     <header
-      className={`absolute inset-x-0 top-0 z-40 flex h-10 items-center justify-between px-5 ${
-        isDark ? 'text-white' : 'text-slate-900'
+      className={`absolute inset-x-0 top-0 z-40 flex h-10 items-center justify-between px-5 transition-colors duration-200 ${
+        isDark ? 'text-white' : 'bg-[#F7F8FA] text-black'
       }`}
     >
       <time className="text-[13px] font-semibold tabular-nums" suppressHydrationWarning>
@@ -95,7 +99,7 @@ export default function StatusBar({ variant, onBell }: { variant?: 'light' | 'da
       <div className="flex items-center gap-2">
         <span
           className={`flex items-center gap-1 text-xs tabular-nums ${
-            isDark ? 'text-white/80' : 'text-slate-900/70'
+            isDark ? 'text-white/80' : 'text-black/60'
           }`}
         >
           <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
@@ -106,12 +110,12 @@ export default function StatusBar({ variant, onBell }: { variant?: 'light' | 'da
         {netOnline ? (
           <Wifi className="h-4 w-4" aria-hidden="true" />
         ) : (
-          <WifiOff className="h-4 w-4 text-red-400" aria-label="Нет подключения к интернету" role="img" />
+          <WifiOff className={`h-4 w-4 ${isDark ? 'text-red-400' : 'text-red-500'}`} aria-label="Нет подключения к интернету" role="img" />
         )}
-        {flashlight && <Flashlight className="h-4 w-4 text-amber-300" aria-hidden="true" />}
+        {flashlight && <Flashlight className={`h-4 w-4 ${isDark ? 'text-amber-300' : 'text-amber-500'}`} aria-hidden="true" />}
         {dnd && (
           <span className="flex items-center" title="Не беспокоить">
-            <Moon className="h-4 w-4 text-violet-300" aria-label="Включён режим «Не беспокоить»" role="img" />
+            <Moon className={`h-4 w-4 ${isDark ? 'text-violet-300' : 'text-violet-600'}`} aria-label="Включён режим «Не беспокоить»" role="img" />
           </span>
         )}
         <span className="flex items-center gap-1.5">
