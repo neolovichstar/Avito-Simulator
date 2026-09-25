@@ -28,15 +28,27 @@ function range(from: number, to: number): string[] {
   return out
 }
 
+/** Блатные федеральные коды — вынуты из общего мобильного пула, только у элиты. */
+export const GOLD_CODES = ['777', '888', '999']
+/** Столичные статусные мобильные (Москва): дороже и престижнее прочих. */
+const CAPITAL_CODES = ['985', '916', '925']
+
+/** Код — блатной (777/888/999): золотая плашка и штамп. */
+export function isGoldCode(code: string): boolean {
+  return GOLD_CODES.includes(code)
+}
+
 /**
- * Все субъекты РФ: топ-3 (Москва/СПб/федеральные мобильные) впереди,
+ * Все субъекты РФ: топ-3 (Москва/СПб/блатные федеральные) впереди,
  * дальше миллионники и областные центры по убыванию престижа, в конце —
  * национальные республики и дальневосточная глубинка.
  */
 export const REGIONS: Region[] = [
   { id: 'msk', name: 'Москва', short: 'Москва', codes: ['495', '499'], prestige: 1.2, rollPrice: 700 },
   { id: 'spb', name: 'Санкт-Петербург', short: 'СПб', codes: ['812'], prestige: 1.1, rollPrice: 650 },
-  { id: 'mob', name: 'Мобильные федеральные', short: 'Мобильные', codes: range(900, 999), prestige: 1.0, rollPrice: 600 },
+  { id: 'gold', name: 'Блатные федеральные', short: 'Блатные', codes: GOLD_CODES, prestige: 1.4, rollPrice: 1000 },
+  { id: 'cap', name: 'Столичные мобильные', short: 'Столичные', codes: CAPITAL_CODES, prestige: 1.15, rollPrice: 750 },
+  { id: 'mob', name: 'Мобильные федеральные', short: 'Мобильные', codes: range(900, 999).filter((c) => !GOLD_CODES.includes(c) && !CAPITAL_CODES.includes(c)), prestige: 1.0, rollPrice: 600 },
 
   // миллионники и крупные центры
   { id: 'kzn', name: 'Казань', short: 'Казань', codes: ['843'], prestige: 1.0, rollPrice: 600 },

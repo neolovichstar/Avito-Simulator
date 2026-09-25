@@ -15,8 +15,8 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { animate, AnimatePresence, motion, useMotionValue, useTransform, type AnimationPlaybackControls } from 'framer-motion'
-import { BadgeCheck, Check, ChevronDown, Dices, Loader2, MapPin, Search, Timer, Wallet, X } from 'lucide-react'
-import { REGIONS, RESERVE_HOURS, reserveSecondsLeft } from '@/lib/phone'
+import { BadgeCheck, Check, ChevronDown, Crown, Dices, Loader2, MapPin, Search, Timer, Wallet, X } from 'lucide-react'
+import { REGIONS, RESERVE_HOURS, isGoldCode, reserveSecondsLeft } from '@/lib/phone'
 import { fmtMoney } from '@/lib/format'
 import { sound } from '@/lib/sound'
 import { useOS } from '@/lib/store'
@@ -311,6 +311,7 @@ function PlateReels({
   onSettled: () => void
 }) {
   const refs = useRef<(ReelHandle | null)[]>([])
+  const goldStamp = isGoldCode(stamp.code)
 
   // Новый объект spin = новая команда прокрутки (разгон или докрутка до реальных).
   useEffect(() => {
@@ -360,13 +361,23 @@ function PlateReels({
       </span>
       <DigitReel ref={(el) => { refs.current[8] = el }} />
       <DigitReel ref={(el) => { refs.current[9] = el }} />
-      {/* штамп региона — как «78 RUS» на ГТА-плашке, только с именем мелко */}
+      {/* штамп региона — как «78 RUS» на ГТА-плашке; у блатных кодов — золотой */}
       <span
-        className="ml-1.5 flex shrink-0 flex-col items-center justify-center gap-[3px] border-l-2 border-[#17181A]/[0.08] pl-2 pr-0.5"
+        className={
+          'ml-1.5 flex shrink-0 flex-col items-center justify-center gap-[3px] border-l-2 pl-2 pr-0.5 ' +
+          (goldStamp ? 'border-[#C08A2D]/45' : 'border-[#17181A]/[0.08]')
+        }
         style={{ height: CELL + 6 }}
       >
-        <span className="text-[13.5px] font-extrabold leading-none tabular-nums">{stamp.code}</span>
-        <span className="max-w-[48px] truncate text-[6.5px] font-bold uppercase leading-none tracking-[0.1em] text-[#17181A]/40">
+        <span className={'text-[13.5px] font-extrabold leading-none tabular-nums' + (goldStamp ? ' stamp-gold' : '')}>
+          {stamp.code}
+        </span>
+        <span
+          className={
+            'max-w-[48px] truncate text-[6.5px] font-bold uppercase leading-none tracking-[0.1em] ' +
+            (goldStamp ? 'stamp-gold opacity-70' : 'text-[#17181A]/40')
+          }
+        >
           {stamp.name}
         </span>
       </span>
@@ -580,7 +591,10 @@ function RegionSheet({
                 className="flex w-full items-center gap-3 border-b border-[#17181A]/[0.06] py-2.5 text-left transition-colors last:border-b-0 active:bg-[#17181A]/[0.03]"
               >
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[14px] font-medium">{r.name}</span>
+                  <span className="flex items-center gap-1.5">
+                    {r.id === 'gold' && <Crown className="size-3.5 shrink-0 text-[#C08A2D]" aria-label="Блатной регион" />}
+                    <span className="truncate text-[14px] font-medium">{r.name}</span>
+                  </span>
                   <span className="mt-0.5 flex items-center gap-2">
                     <span className="text-[11px] tabular-nums text-[#17181A]/40">{codesLabel(r.codes)}</span>
                     <span className="flex items-center gap-[3px]" aria-hidden="true">
@@ -745,7 +759,8 @@ export default function NumbersApp() {
 
   const tierColor = result ? tierMeta(result.tier).color : '#A8B3AC'
   const pattern = result ? patternOf(result.digits.slice(4)) : null
-  const glowColor = result && !rolling ? GLOW[result.tier] : undefined
+  const goldPlate = isGoldCode(stampCode)
+  const glowColor = result && !rolling ? (GLOW[result.tier] ?? (goldPlate ? '#E3B341' : undefined)) : undefined
 
   const counts: Partial<Record<Tab, number>> = {
     reserves: n.reserves.length,
@@ -819,7 +834,7 @@ export default function NumbersApp() {
             >
               <span className="flex min-w-0 items-center gap-2">
                 <MapPin className="size-4 shrink-0 text-[#17181A]/45" aria-hidden="true" />
-                <span className="truncate text-[14px] font-semibold">{regionMeta.name}</span>
+                <span className="truncate text-[14px] font-semibold">{regionMeta.short}</span>
                 <span className="shrink-0 text-[11.5px] tabular-nums text-[#17181A]/40">{codesLabel(regionMeta.codes)}</span>
               </span>
               <span className="flex shrink-0 items-center gap-1.5">
@@ -843,7 +858,10 @@ export default function NumbersApp() {
               />
               <motion.div
                 style={{ scale: plateScale }}
-                className="plate-frame relative overflow-hidden rounded-[18px] bg-white px-1 py-3"
+                className={
+                  'plate-frame relative overflow-hidden rounded-[18px] bg-white px-1 py-3' +
+                  (goldPlate ? ' plate-gold' : '')
+                }
               >
                 <PlateReels spin={spin ?? IDLE_SPIN} stamp={{ code: stampCode, name: stampName, label: stampLabel }} onSettled={handleSettled} />
                 {/* цветная волна тира по плашке на финале */}
@@ -929,9 +947,10 @@ export default function NumbersApp() {
                     type="button"
                     onClick={doRoll}
                     disabled={busy}
-                    className="h-[52px] flex-1 rounded-full border border-[#17181A]/12 bg-white text-[14px] font-semibold transition-transform active:scale-[0.98] disabled:opacity-50"
+                    aria-label={`Крутить ещё за ${regionMeta.rollPrice} рублей`}
+                    className="h-[52px] flex-1 whitespace-nowrap rounded-full border border-[#17181A]/12 bg-white px-3 text-[13.5px] font-semibold transition-transform active:scale-[0.98] disabled:opacity-50"
                   >
-                    Крутить ещё · {fmtMoney(regionMeta.rollPrice)}
+                    Ещё · {fmtMoney(regionMeta.rollPrice)}
                   </button>
                 </div>
                 {!canAfford && (

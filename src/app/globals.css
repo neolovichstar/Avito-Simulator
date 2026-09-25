@@ -950,3 +950,15 @@
 
 .reel-line { background: rgba(23, 24, 26, 0.07); }
 .theme-dark .reel-line { background: rgba(255, 255, 255, 0.07); }
+
+/* --- Блатные коды (777/888/999): золотая рамка плашки и штамп --- */
+.plate-gold {
+  border-color: rgba(198, 148, 60, 0.9);
+  box-shadow: 0 12px 30px rgba(198, 148, 60, 0.18), inset 0 1px 0 rgba(255, 244, 214, 0.9);
+}
+.theme-dark .plate-gold {
+  border-color: rgba(230, 185, 100, 0.55);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 244, 214, 0.07);
+}
+.stamp-gold { color: #b07f24; }
+.theme-dark .stamp-gold { color: #e3b341; }
