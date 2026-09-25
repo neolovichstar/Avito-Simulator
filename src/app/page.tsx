@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { RefreshCw, WifiOff } from 'lucide-react'
 import { useOS, type AppKey, WALLPAPER_TOP } from '@/lib/store'
+import { hydratePrefs } from '@/lib/prefs'
 import { api, getToken, setToken } from '@/lib/api'
 import { useRealtime } from '@/lib/use-realtime'
 import { useSwipe } from '@/lib/use-swipe'
@@ -246,6 +247,7 @@ export default function Home() {
     authTried.current = true
     doAuth()
     initDeviceSensors()
+    hydratePrefs() // накатываем сохранённые свитчи (Wi-Fi/пин/…) поверх дефолтов
   }, [doAuth])
 
   // ---------- АВТО-ПЕРЕПОДКЛЮЧЕНИЕ: сеть вернулась — тихо повторяем авторизацию ----------
@@ -359,7 +361,18 @@ export default function Home() {
     claimDailyBonus()
   }
 
-  // ---------- ЖЕСТ: СВАЙП СВЕРХУ ВНИЗ — ЦЕНТР УПРАВЛЕНИЯ (телефон + мышь на ПК) ----------
+  // ---------- ЖЕСТЫ ШТОРКИ (как в настоящем Android): -----------------------
+  // свайп вниз от ЛЕВОЙ половины верхнего края — центр уведомлений,
+  // от ПРАВОЙ половины — центр управления (яркость/фонарик и т.д.).
+  const notifSwipe = useSwipe({
+    threshold: 30,
+    onSwipe: (dir) => {
+      if (dir === 'down') {
+        setControlOpen(false)
+        setNotifOpen(true)
+      }
+    },
+  })
   const controlSwipe = useSwipe({
     threshold: 30,
     onSwipe: (dir) => {
@@ -479,11 +492,19 @@ export default function Home() {
           />
         )}
 
-        {/* верхняя зона-жест: свайп вниз (палец или мышь) или тап — центр управления */}
+        {/* верхние зоны-жесты (как в настоящем телефоне): левая половина —
+            уведомления, правая — центр управления. Тап тоже работает. */}
+        <div
+          role="button"
+          aria-label="Открыть уведомления"
+          className="absolute left-0 top-0 z-[59] h-8 w-1/2 touch-none outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+          onPointerDown={notifSwipe.onPointerDown}
+          onClick={() => { setControlOpen(false); setNotifOpen(true) }}
+        />
         <div
           role="button"
           aria-label="Открыть центр управления"
-          className="absolute left-0 right-16 top-0 z-[59] h-8 touch-none outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+          className="absolute right-0 top-0 z-[59] h-8 w-1/2 touch-none outline-none focus-visible:ring-2 focus-visible:ring-white/50"
           onPointerDown={controlSwipe.onPointerDown}
           onClick={() => { setNotifOpen(false); setControlOpen(true) }}
         />

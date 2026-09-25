@@ -7,7 +7,7 @@
 import { useRef, useState, useSyncExternalStore } from 'react'
 import {
   Bell, CheckCheck, ChevronDown, Crown, Gavel, Info, MessageSquare, Receipt,
-  Settings, ShoppingBag, Trash2, TrendingUp, Truck, Trophy, type LucideIcon,
+  ShoppingBag, Trash2, TrendingUp, Truck, Trophy, type LucideIcon,
 } from 'lucide-react'
 import { useOS, type AppKey } from '@/lib/store'
 import { api } from '@/lib/api'
@@ -183,10 +183,10 @@ export default function NotificationCenter({
           <div className="flex items-center gap-2.5">
             {/* иконка приложения — скруглённый тайл, как на рабочем столе */}
             <span
-              className="ml-1 flex size-9 shrink-0 items-center justify-center rounded-[12px] text-white shadow-sm"
+              className="ml-0.5 flex size-8 shrink-0 items-center justify-center rounded-[10px] text-white shadow-sm"
               style={{ background: meta.bg }}
             >
-              <AppIcon className="size-4.5" aria-hidden="true" />
+              <AppIcon className="size-4" aria-hidden="true" />
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline justify-between gap-2">
@@ -200,12 +200,12 @@ export default function NotificationCenter({
             {unread && <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-emerald-400" />}
           </div>
 
-          <p className={`mt-1.5 pl-[46px] text-[13px] leading-snug text-white/70 ${expanded ? '' : 'line-clamp-2'}`}>
+          <p className={`mt-1 pl-[42px] text-[12.5px] leading-snug text-white/70 ${expanded ? '' : 'line-clamp-2'}`}>
             {n.body}
           </p>
 
           {expanded && (
-            <div className="mt-2.5 flex items-center gap-2 pl-[46px]">
+            <div className="mt-2 flex items-center gap-2 pl-[42px]">
               <button
                 type="button"
                 tabIndex={open ? 0 : -1}
@@ -248,8 +248,9 @@ export default function NotificationCenter({
         {/* мелкий хендл — как в шторке Android 16 */}
         <span aria-hidden="true" className="mx-auto mt-2.5 block h-1 w-14 rounded-full bg-white/30" />
 
-        {/* шапка: дата слева, справа — «прочитать всё», настройки, «Очистить» */}
-        <div className="flex items-center justify-between gap-2 px-5 pb-2 pt-2.5">
+        {/* шапка: дата слева, справа — «прочитать всё», «Очистить», свернуть.
+            Шестерёнку убрали: при 4 кнопках на 390px она наезжала на бейдж «N новых». */}
+        <div className="flex items-center justify-between gap-2 px-4 pb-1.5 pt-2">
           <div className="flex min-w-0 items-center gap-2">
             <span className="shrink-0 whitespace-nowrap text-[13px] font-semibold text-white/85" suppressHydrationWarning>
               {now
@@ -269,35 +270,26 @@ export default function NotificationCenter({
               tabIndex={open ? 0 : -1}
               disabled={unreadItems.length === 0}
               aria-label="Отметить всё прочитанным"
-              className="flex size-11 items-center justify-center rounded-full text-white/65 outline-none transition-colors duration-200 enabled:active:bg-white/10 enabled:hover:text-white disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-white/70"
+              className="flex size-10 items-center justify-center rounded-full text-white/65 outline-none transition-colors duration-200 enabled:active:bg-white/10 enabled:hover:text-white disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-white/70"
             >
               <CheckCheck className="size-[18px]" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              onClick={() => onOpenApp('settings')}
-              tabIndex={open ? 0 : -1}
-              aria-label="Открыть настройки"
-              className="flex size-11 items-center justify-center rounded-full text-white/65 outline-none transition-colors duration-200 active:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/70"
-            >
-              <Settings className="size-[18px]" aria-hidden="true" />
             </button>
             <button
               type="button"
               onClick={clearAll}
               tabIndex={open ? 0 : -1}
               disabled={notifications.length === 0}
-              className="flex h-11 items-center gap-1.5 rounded-full bg-white/[0.08] px-3.5 text-[13px] font-semibold text-white/85 outline-none transition-colors duration-200 enabled:active:bg-white/15 disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-white/70"
+              aria-label="Очистить уведомления"
+              className="flex size-10 items-center justify-center rounded-full text-white/65 outline-none transition-colors duration-200 enabled:active:bg-white/10 enabled:hover:text-white disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-white/70"
             >
-              <Trash2 className="size-4" aria-hidden="true" />
-              Очистить
+              <Trash2 className="size-[18px]" aria-hidden="true" />
             </button>
             <button
               type="button"
               aria-label="Свернуть панель уведомлений"
               onClick={onClose}
               tabIndex={open ? 0 : -1}
-              className="flex size-11 items-center justify-center rounded-full text-white/65 outline-none transition-colors duration-200 active:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/70"
+              className="flex size-10 items-center justify-center rounded-full text-white/65 outline-none transition-colors duration-200 active:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/70"
             >
               <ChevronDown className="size-5" aria-hidden="true" />
             </button>
@@ -306,11 +298,6 @@ export default function NotificationCenter({
 
         {/* Медиа-виджет: что играет сейчас (глобальный плеер ОС) */}
         <NowPlayingShade onOpenApp={onOpenApp} />
-
-        {/* Одноразовая подсказка: как убрать карточку из шторки */}
-        {notifications.length > 0 && (
-          <p className="px-5 pb-1 text-[11px] text-white/35">Смахните карточку, чтобы удалить</p>
-        )}
 
         {notifications.length === 0 ? (
           <div className="flex flex-col items-center px-5 py-10">

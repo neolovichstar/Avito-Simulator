@@ -16,7 +16,10 @@ export default function PhoneFrame({ children }: { children: React.ReactNode }) 
           aria-hidden="true"
           className="absolute -right-[3px] top-[196px] h-[56px] w-[3px] rounded-r-md bg-[#181d1a] ring-1 ring-white/10 max-[500px]:hidden"
         />
-        <div className="relative h-[844px] w-[390px] overflow-hidden rounded-[2.4rem] bg-black ring-1 ring-white/[0.06] max-[500px]:h-full max-[500px]:w-full max-[500px]:rounded-none max-[500px]:ring-0">
+        {/* zoom 0.9 на мобиле: весь интерфейс ОС становится компактнее на ~10%
+            (жалоба «всё огромное»). w-full/h-full при zoom уже заполняют
+            родительский фрейм ровно на весь экран. */}
+        <div className="relative h-[844px] w-[390px] overflow-hidden rounded-[2.4rem] bg-black ring-1 ring-white/[0.06] max-[500px]:h-full max-[500px]:w-full max-[500px]:[zoom:0.9] max-[500px]:rounded-none max-[500px]:ring-0">
           {children}
           {/* Punch-hole камера */}
           <div

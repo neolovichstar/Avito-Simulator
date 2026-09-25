@@ -6,7 +6,8 @@
 // из реестра public/img/cards (30 градиентов) + пикер «Оформление карты» (bottom-sheet,
 // выбор каждой карты сохраняется в localStorage); белый блок «Карты» radius 20;
 // быстрые действия — 4 белых круга 48px с зелёными иконками; «История» с цветными
-// кругами-категориями (поступления +зелёные, списания чёрные); промо-баннер #D8E9FA;
+// кругами-категориями (поступления +зелёные, списания чёрные) и схлопыванием
+// подряд идущих одинаковых операций в строку с мультипликатором ×N;
 // нижний таб-бар Главный/Платежи/История/Ещё (активный #21A03A, неактивный #9AA0A8).
 // Вся бизнес-логика (api.bank/takeLoan/repayLoan/depositOp, поиск, аналитика, CSV,
 // нижние листы, touch-action свайпов) сохранена 1:1.
@@ -25,6 +26,7 @@ import { TX_TYPE_LABEL } from '@/lib/types'
 import type { BankData, SessionUser, TransactionDTO } from '@/lib/types'
 import { DEPOSIT_RATE_PER_HOUR, cardNumberFor, creditLabel } from '@/lib/economy'
 import { useCountUp } from '@/lib/use-count-up'
+import { usePrefs } from '@/lib/prefs'
 import { Slider } from '@/components/ui/slider'
 import { sound } from '@/lib/sound'
 import {
@@ -133,6 +135,36 @@ function buildCats(txs: TransactionDTO[], mode: 'out' | 'in'): AggCat[] {
   return arr
 }
 
+// ---- Схлопывание подряд идущих одинаковых операций (×N) ----
+interface MergedTx {
+  tx: TransactionDTO
+  count: number // сколько раз подряд повторилась операция
+  total: number // суммарный результат: amount × count
+}
+
+// История приходит отсортированной по дате desc; соседние транзакции с одинаковыми
+// (type, amount, counterpartyName, note) схлопываем в одну строку с мультипликатором,
+// чтобы повторяющиеся операции («спам») не заполняли весь список.
+function mergeTxs(txs: TransactionDTO[]): MergedTx[] {
+  const out: MergedTx[] = []
+  for (const t of txs) {
+    const last = out[out.length - 1]
+    if (
+      last &&
+      last.tx.type === t.type &&
+      last.tx.amount === t.amount &&
+      (last.tx.counterpartyName ?? null) === (t.counterpartyName ?? null) &&
+      (last.tx.note ?? null) === (t.note ?? null)
+    ) {
+      last.count += 1
+      last.total += t.amount
+    } else {
+      out.push({ tx: t, count: 1, total: t.amount })
+    }
+  }
+  return out
+}
+
 // ---- Светлые UI-примитивы (Сбер) ----
 
 function Toggle({ checked, onCheckedChange, label }: {
@@ -209,10 +241,13 @@ function ProductRow({ icon: Icon, color, name, num, amount, amountCls, onClick, 
   )
 }
 
-// Ряд операции: цветной круг 44px (категория), название 15, дата 12, сумма (+зелёная / чёрная)
-function TxRow({ t }: { t: TransactionDTO }) {
+// Ряд операции: цветной круг 44px (категория), название 15, дата 12, сумма (+зелёная / чёрная).
+// Принимает схлопнутую операцию (mergeTxs): при count > 1 рядом с названием бейдж-пилюля ×N,
+// основная сумма — итог всех повторов, под ней мелко «×N · сумма одной операции».
+function TxRow({ m }: { m: MergedTx }) {
+  const { tx: t, count, total } = m
   const { icon: Icon, color } = catMeta(t)
-  const positive = t.amount >= 0
+  const positive = total >= 0
   return (
     <div className="flex items-center gap-3 py-3">
       <span
@@ -223,20 +258,63 @@ function TxRow({ t }: { t: TransactionDTO }) {
         <Icon className="size-[18px]" strokeWidth={2.1} />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[15px] font-medium text-[#1A1A1A]">{TX_TYPE_LABEL[t.type] ?? t.type}</div>
+        <div className="flex items-center gap-1.5">
+          <span className="min-w-0 truncate text-[15px] font-medium text-[#1A1A1A]">{TX_TYPE_LABEL[t.type] ?? t.type}</span>
+          {count > 1 && (
+            <span className="shrink-0 rounded-full bg-[#21A03A]/10 px-2 text-[11px] font-bold leading-5 text-[#21A03A]">
+              ×{count}
+            </span>
+          )}
+        </div>
         <div className="truncate text-[12px] text-[#9AA0A8]">
           {t.counterpartyName ?? t.note ?? '—'} · {timeAgo(t.createdAt)}
         </div>
       </div>
-      <div className={`shrink-0 text-[15px] font-bold tabular-nums ${positive ? 'text-[#21A03A]' : 'text-[#1A1A1A]'}`}>
-        {positive ? '+' : ''}
-        {fmtMoney(t.amount)}
+      <div className="shrink-0 text-right">
+        <div className={`text-[15px] font-bold tabular-nums ${positive ? 'text-[#21A03A]' : 'text-[#1A1A1A]'}`}>
+          {positive ? '+' : ''}
+          {fmtMoney(total)}
+        </div>
+        {count > 1 && (
+          <div className="text-[11px] tabular-nums text-[#9AA0A8]">
+            ×{count} · {fmtMoney(t.amount)}
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
-// Плитка в нижних листах (QR / Ещё)
+// Полноширинный ряд списка в нижнем листе «Ещё» (Сбер-стиль):
+// цветной квадрат-иконка 40px, лейбл 15px, шеврон справа. Нажатие — лёгкое
+// затемнение active:bg-black/[0.04]: работает и в светлой, и в тёмной теме
+// (глобальный маппинг .theme-dark не знает вариант active:bg-[#F5F6FA]).
+function MoreRow({ icon: Icon, label, color, onClick }: {
+  icon: LucideIcon
+  label: string
+  color: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex min-h-[56px] w-full items-center gap-3 px-4 text-left transition active:bg-black/[0.04]"
+    >
+      <span
+        className="flex size-10 shrink-0 items-center justify-center rounded-xl"
+        style={{ backgroundColor: `${color}1A`, color }}
+        aria-hidden="true"
+      >
+        <Icon className="size-5" strokeWidth={2.1} />
+      </span>
+      <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-[#1A1A1A]">{label}</span>
+      <ChevronRight className="size-5 shrink-0 text-[#9AA0A8]" aria-hidden="true" />
+    </button>
+  )
+}
+
+// Плитка в нижних листах (QR)
 function SheetTile({ icon: Icon, label, color, onClick }: {
   icon: LucideIcon
   label: string
@@ -456,8 +534,11 @@ export default function BankApp() {
   const [depositInput, setDepositInput] = useState('1000')
   const [searchQ, setSearchQ] = useState('')
   const [searchFocus, setSearchFocus] = useState(false)
-  const [pinOn, setPinOn] = useState(true)
-  const [opsNotifOn, setOpsNotifOn] = useState(true)
+  // Переключатели безопасности — глобальный prefs-стор (zustand + localStorage):
+  // раньше жили в локальном useState и сбрасывались при каждом открытии банка.
+  const pinOn = usePrefs((s) => s.bankPin)
+  const opsNotifOn = usePrefs((s) => s.bankOpsNotif)
+  const setPref = usePrefs((s) => s.setPref)
   const [analyticsMode, setAnalyticsMode] = useState<'out' | 'in'>('out')
   const [chartMode, setChartMode] = useState<ChartMode>('inc')
   const [cardSlide, setCardSlide] = useState(0)
@@ -780,12 +861,14 @@ export default function BankApp() {
     { icon: Send, label: 'Переводы', sub: 'Людям по имени', color: '#7B61FF' },
   ]
 
-  // Лист «Ещё»: реальные секции приложения + переходы в другие приложения
-  const moreActions: { icon: LucideIcon; label: string; color: string; run: () => void }[] = [
+  // Лист «Ещё» — полноширинные строки по секциям (Сбер-стиль)
+  const moreOps: { icon: LucideIcon; label: string; color: string; run: () => void }[] = [
     { icon: PieChart, label: 'Анализ финансов', color: '#7B61FF', run: () => { setSheet(null); setScreen('analytics') } },
     { icon: PiggyBank, label: 'Вклад «Копилка»', color: GREEN, run: () => setSheet('deposit') },
     { icon: Landmark, label: data?.activeLoan ? 'Погасить кредит' : 'Кредит', color: '#F8A13A', run: () => setSheet('loan') },
     { icon: QrCode, label: 'Оплата по QR', color: '#12A594', run: () => setSheet('qr') },
+  ]
+  const moreServices: { icon: LucideIcon; label: string; color: string; run: () => void }[] = [
     { icon: Receipt, label: 'Оплатить налоги', color: '#E5584B', run: () => { setSheet(null); openApp('taxes') } },
     { icon: ShoppingBag, label: 'Сделки', color: GREEN, run: () => { setSheet(null); openApp('avito') } },
     { icon: Gavel, label: 'Аукцион', color: '#F8A13A', run: () => { setSheet(null); openApp('auction') } },
@@ -1037,32 +1120,13 @@ export default function BankApp() {
                         <p className="py-4 text-[12px] text-[#9AA0A8]">Операций пока нет — купите или продайте что-нибудь.</p>
                       ) : (
                         <div className="divide-y divide-[#F0F1F5]">
-                          {data.transactions.slice(0, 4).map((t) => (
-                            <TxRow key={t.id} t={t} />
+                          {mergeTxs(data.transactions).slice(0, 4).map((m) => (
+                            <TxRow key={`m-${m.tx.id}`} m={m} />
                           ))}
                         </div>
                       )}
                     </div>
                   </div>
-
-                  {/* ПРОМО-БАННЕР (зелёный — фирменный Сбер) */}
-                  <button
-                    type="button"
-                    onClick={() => openApp('taxes')}
-                    aria-label="Перейти в приложение Налоги"
-                    className="flex w-full items-center gap-3 rounded-[20px] bg-[#E7F5EA] p-4 text-left transition active:scale-[0.99]"
-                  >
-                    <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white" aria-hidden="true">
-                      <Receipt className="size-5 text-[#1B8A30]" strokeWidth={2.1} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[15px] font-bold text-[#17632B]">Налоговый календарь</span>
-                      <span className="block text-[12px] leading-snug text-[#3E7A4C]">
-                        Проверьте начисления и оплатите вовремя — без пени и блокировки продаж
-                      </span>
-                    </span>
-                    <ChevronRight className="size-5 shrink-0 text-[#1B8A30]" aria-hidden="true" />
-                  </button>
 
                   {/* БЕЗОПАСНОСТЬ */}
                   <div className={`${CARD} px-4 py-3.5`}>
@@ -1075,7 +1139,7 @@ export default function BankApp() {
                           <div className="text-[11px] text-[#9AA0A8]">Код при входе в банк</div>
                         </div>
                       </div>
-                      <Toggle checked={pinOn} onCheckedChange={setPinOn} label="Вход по пину" />
+                      <Toggle checked={pinOn} onCheckedChange={(v) => setPref('bankPin', v)} label="Вход по пину" />
                     </div>
                     <div className="flex items-center justify-between border-t border-[#F0F1F5] py-2.5">
                       <div className="flex items-center gap-2.5">
@@ -1085,7 +1149,7 @@ export default function BankApp() {
                           <div className="text-[11px] text-[#9AA0A8]">Пуш после каждой операции</div>
                         </div>
                       </div>
-                      <Toggle checked={opsNotifOn} onCheckedChange={setOpsNotifOn} label="Уведомления об операциях" />
+                      <Toggle checked={opsNotifOn} onCheckedChange={(v) => setPref('bankOpsNotif', v)} label="Уведомления об операциях" />
                     </div>
                     <div className="flex items-center justify-between border-t border-[#F0F1F5] pt-2.5">
                       <div className="flex items-center gap-2.5">
@@ -1223,8 +1287,8 @@ export default function BankApp() {
                         <p className="py-4 text-[12px] text-[#9AA0A8]">Операций пока нет.</p>
                       ) : (
                         <div className="divide-y divide-[#F0F1F5]">
-                          {data.transactions.slice(0, 8).map((t) => (
-                            <TxRow key={t.id} t={t} />
+                          {mergeTxs(data.transactions).slice(0, 8).map((m) => (
+                            <TxRow key={`m-${m.tx.id}`} m={m} />
                           ))}
                         </div>
                       )}
@@ -1455,8 +1519,8 @@ export default function BankApp() {
                       <div key={g.label}>
                         <div className="px-1 pb-1.5 text-[12px] font-semibold text-[#9AA0A8]" suppressHydrationWarning>{g.label}</div>
                         <div className={`divide-y divide-[#F0F1F5] ${CARD} px-4 py-1`}>
-                          {g.items.map((t) => (
-                            <TxRow key={t.id} t={t} />
+                          {mergeTxs(g.items).map((m) => (
+                            <TxRow key={`m-${m.tx.id}`} m={m} />
                           ))}
                         </div>
                       </div>
@@ -1493,10 +1557,23 @@ export default function BankApp() {
       {/* ===== НИЖНИЕ ЛИСТЫ (светлые) ===== */}
       {sheet === 'more' && data && (
         <Sheet title="Ещё" onClose={() => setSheet(null)}>
-          <div className="grid grid-cols-2 gap-3">
-            {moreActions.map((a) => (
-              <SheetTile key={a.label} icon={a.icon} label={a.label} color={a.color} onClick={a.run} />
-            ))}
+          <div className="space-y-4">
+            <div>
+              <div className="px-1 pb-1.5 text-[12px] font-semibold uppercase tracking-wide text-[#9AA0A8]">Операции</div>
+              <div className={`divide-y divide-[#F0F1F5] ${CARD} py-1`}>
+                {moreOps.map((a) => (
+                  <MoreRow key={a.label} icon={a.icon} label={a.label} color={a.color} onClick={a.run} />
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="px-1 pb-1.5 text-[12px] font-semibold uppercase tracking-wide text-[#9AA0A8]">Сервисы</div>
+              <div className={`divide-y divide-[#F0F1F5] ${CARD} py-1`}>
+                {moreServices.map((a) => (
+                  <MoreRow key={a.label} icon={a.icon} label={a.label} color={a.color} onClick={a.run} />
+                ))}
+              </div>
+            </div>
           </div>
         </Sheet>
       )}

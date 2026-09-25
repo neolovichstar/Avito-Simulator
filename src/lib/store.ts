@@ -16,7 +16,7 @@ export type NetKind = 'offline' | 'slow' | '3g' | '4g' | 'wifi'
 
 // Виджеты домашнего экрана / рабочего стола ПК
 export type WidgetKey = 'clock' | 'wallet' | 'online' | 'quest' | 'delivery'
-export const ALL_WIDGETS: WidgetKey[] = ['clock', 'wallet', 'online', 'quest', 'delivery']
+export const ALL_WIDGETS: WidgetKey[] = ['clock', 'online', 'quest', 'delivery']
 
 /** Верхняя кромка обоев — для слияния рамки Telegram с фоном экрана. */
 export const WALLPAPER_TOP: Record<string, string> = {
@@ -116,7 +116,7 @@ export const useOS = create<OSState>((set, get) => ({
   brightness: 1,
   theme: 'light',
   wallpaper: 'resale',
-  widgets: ['clock', 'wallet', 'online'],
+  widgets: ['clock', 'online'],
 
   setBooted: (v) => set({ booted: v }),
   setLocked: (v) => set({ locked: v }),
@@ -166,7 +166,7 @@ export const useOS = create<OSState>((set, get) => ({
   setTheme: (t) => set({ theme: t }),
   toggleTheme: () => set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
   setWallpaper: (id) => set({ wallpaper: id }),
-  setWidgets: (w) => set({ widgets: w.length ? w : ['clock', 'wallet', 'online'] }),
+  setWidgets: (w) => set({ widgets: w.length ? w.filter((k) => k !== 'wallet') : ['clock', 'online'] }),
   refreshSession: (u) => {
     const s = get()
     if (!s.session) return

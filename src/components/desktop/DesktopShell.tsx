@@ -160,17 +160,6 @@ export default function DesktopShell({ locked, onUnlock, renderApp, theme }: Pro
             </p>
           </div>
         )}
-        {widgets.includes('wallet') && (
-          <button
-            type="button"
-            onClick={() => openWindow('bank')}
-            className="rounded-2xl border border-white/15 bg-black/35 p-4 text-left backdrop-blur-xl transition hover:bg-black/45 active:scale-[0.98]"
-          >
-            <p className="text-[10px] uppercase tracking-wider text-white/60">Кошелёк</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums text-white">{fmtMoney(session?.balance ?? 0)}</p>
-            <p className="mt-0.5 text-[11px] text-white/50">Нажмите, чтобы открыть Банк</p>
-          </button>
-        )}
         {widgets.includes('online') && (
           <div className="flex items-center gap-2.5 rounded-2xl border border-white/15 bg-black/35 p-4 backdrop-blur-xl">
             <span className="relative flex h-2.5 w-2.5" aria-hidden="true">

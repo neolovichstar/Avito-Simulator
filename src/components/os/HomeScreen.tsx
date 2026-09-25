@@ -140,6 +140,9 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
   const online = useOS((s) => s.online)
   const wallpaper = useOS((s) => s.wallpaper)
   const widgets = useOS((s) => s.widgets)
+  // «Кошелёк» убран из ОС: дублировал приложение «Банк» (решение юзера).
+  // Фильтр нужен, чтобы у старых игроков виджет не приезжал из localStorage.
+  const shownWidgets = widgets.filter((w) => w !== 'wallet')
   const now = useClock()
   const day = useDayData()
 
@@ -206,10 +209,10 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
           {/* ─── Страница 1: компактные виджеты + основные приложения ─── */}
           <section className="flex h-full w-1/2 flex-col" aria-label="Страница 1 — приложения" aria-hidden={page !== 0}>
             <div className="flex items-stretch gap-2 px-5">
-              {widgets.filter((w) => w === 'clock').map((w) => (
+              {shownWidgets.filter((w) => w === 'clock').map((w) => (
                 <Widget key={w} w={w} now={now} online={online} balance={balance} data={day} onOpenApp={onOpenApp} />
               ))}
-              {widgets.filter((w) => w !== 'clock').slice(0, 3).map((w) => (
+              {shownWidgets.filter((w) => w !== 'clock').slice(0, 3).map((w) => (
                 <Widget key={w} w={w} now={now} online={online} balance={balance} data={day} onOpenApp={onOpenApp} />
               ))}
             </div>

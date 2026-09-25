@@ -6,15 +6,16 @@
 // Главный герой — правильный M3Switch: track 52×32, thumb 24px с иконкой-галочкой
 // (M3 Expressive), переход 200ms cubic-bezier(0.2,0,0,1). ВСЕ тогглы настроек — через него.
 // Реальные настройки ОС: dnd, тема, яркость, обои, виджеты, вибро-отклик, зарядка, сеть.
-// Визуальные (локальный state): Wi-Fi, мобильные данные, Bluetooth, автоповорот,
-// уведомления приложений, громкость.
-import { useEffect, useRef, useState } from 'react'
+// Устройство (с сохранением в prefs-сторе): Wi-Fi, мобильные данные, Bluetooth,
+// автоповорот, уведомления приложений. Громкость — локальный state.
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import {
   Bell, Bluetooth, Check, ChevronRight, Fingerprint, LayoutGrid, Moon, MoonStar, Palette,
   Search, Signal, Smartphone, Sparkles, Sun, User, Vibrate, Volume2, Wifi, X, Zap,
 } from 'lucide-react'
 import { useOS, ALL_WIDGETS, WIDGET_LABEL, type AppKey, type NetKind, type WidgetKey } from '@/lib/store'
+import { usePrefs } from '@/lib/prefs'
 import { WALLPAPERS, wallpaperPreviewStyle } from '@/lib/wallpapers'
 import { APP_TILE } from '@/components/os/app-logos'
 import { sound } from '@/lib/sound'
@@ -242,16 +243,22 @@ export default function SettingsApp() {
   const widgets = useOS((s) => s.widgets)
   const setWidgets = useOS((s) => s.setWidgets)
   const openApp = useOS((s) => s.openApp)
-  // вибро-отклик (единственный отклик ОС — звуки полностью убраны)
-  const [vibro, setVibro] = useState(sound.isEnabled())
-  useEffect(() => sound.subscribe(setVibro), [])
+  // вибро-отклик (единственный отклик ОС — звуки полностью убраны).
+  // useSyncExternalStore — живой источник истины (общий с центром управления).
+  const vibro = useSyncExternalStore(
+    (cb) => sound.subscribe(cb),
+    () => sound.isEnabled(),
+    () => true,
+  )
 
-  // визуальные тогглы (локальный state, приятная анимация)
-  const [wifiOn, setWifiOn] = useState(true)
-  const [mobileData, setMobileData] = useState(true)
-  const [btOn, setBtOn] = useState(false)
-  const [autoRotate, setAutoRotate] = useState(false)
-  const [notifOn, setNotifOn] = useState(true)
+  // Свитчи устройства — ГЛОБАЛЬНЫЙ prefs-стор: состояние сохраняется между
+  // открытиями приложения и перезагрузками (раньше слетало — «свитчи сломаны»).
+  const wifiOn = usePrefs((s) => s.wifi)
+  const mobileData = usePrefs((s) => s.mobileData)
+  const btOn = usePrefs((s) => s.bt)
+  const autoRotate = usePrefs((s) => s.rotate)
+  const notifOn = usePrefs((s) => s.appNotif)
+  const setPref = usePrefs((s) => s.setPref)
   const [volume, setVolume] = useState(0.65)
 
   // поиск по настройкам
@@ -281,8 +288,8 @@ export default function SettingsApp() {
       icon: <Wifi className="size-5" />,
       label: 'Wi-Fi',
       desc: wifiOn ? (netOnline ? NET_LABEL[netKind] : 'Сеть без доступа к интернету') : 'Выключено',
-      right: <M3Switch checked={wifiOn} onChange={setWifiOn} label="Wi-Fi" />,
-      onClick: () => setWifiOn((v) => !v),
+      right: <M3Switch checked={wifiOn} onChange={(v) => setPref('wifi', v)} label="Wi-Fi" />,
+      onClick: () => setPref('wifi', !wifiOn),
     },
     {
       key: 'mobile',
@@ -290,8 +297,8 @@ export default function SettingsApp() {
       icon: <Signal className="size-5" />,
       label: 'Мобильные данные',
       desc: mobileData ? 'Фоновая передача данных включена' : 'Только Wi-Fi',
-      right: <M3Switch checked={mobileData} onChange={setMobileData} label="Мобильные данные" />,
-      onClick: () => setMobileData((v) => !v),
+      right: <M3Switch checked={mobileData} onChange={(v) => setPref('mobileData', v)} label="Мобильные данные" />,
+      onClick: () => setPref('mobileData', !mobileData),
     },
   ].filter((r) => hit(`${r.label} ${r.desc ?? ''}`))
 
@@ -302,8 +309,8 @@ export default function SettingsApp() {
       icon: <Bluetooth className="size-5" />,
       label: 'Bluetooth',
       desc: btOn ? 'Доступен для устройств рядом' : 'Выключено',
-      right: <M3Switch checked={btOn} onChange={setBtOn} label="Bluetooth" />,
-      onClick: () => setBtOn((v) => !v),
+      right: <M3Switch checked={btOn} onChange={(v) => setPref('bt', v)} label="Bluetooth" />,
+      onClick: () => setPref('bt', !btOn),
     },
   ].filter((r) => hit(`${r.label} ${r.desc ?? ''}`))
 
@@ -342,8 +349,8 @@ export default function SettingsApp() {
       icon: <Bell className="size-5" />,
       label: 'Уведомления приложений',
       desc: notifOn ? 'Всплывающие карточки на экране' : 'Только в шторке уведомлений',
-      right: <M3Switch checked={notifOn} onChange={setNotifOn} label="Уведомления приложений" />,
-      onClick: () => setNotifOn((v) => !v),
+      right: <M3Switch checked={notifOn} onChange={(v) => setPref('appNotif', v)} label="Уведомления приложений" />,
+      onClick: () => setPref('appNotif', !notifOn),
     },
   ].filter((r) => hit(`${r.label} ${r.desc ?? ''}`))
 
@@ -381,8 +388,8 @@ export default function SettingsApp() {
       icon: <Smartphone className="size-5" />,
       label: 'Автоповорот',
       desc: autoRotate ? 'Экран следует за рукой' : 'Только портретная ориентация',
-      right: <M3Switch checked={autoRotate} onChange={setAutoRotate} label="Автоповорот" />,
-      onClick: () => setAutoRotate((v) => !v),
+      right: <M3Switch checked={autoRotate} onChange={(v) => setPref('rotate', v)} label="Автоповорот" />,
+      onClick: () => setPref('rotate', !autoRotate),
     },
   ].filter((r) => hit(`${r.label} ${r.desc ?? ''}`))
 

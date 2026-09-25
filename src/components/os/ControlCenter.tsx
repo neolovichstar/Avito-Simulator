@@ -5,12 +5,13 @@
 // горизонтальный слайдер-капсула яркости, внизу — дата, батарея и мелкие
 // кнопки настроек/питания. Фонарик — настоящая вспышка (Torch API),
 // вибро — реальный тумблер тактильного отклика (sound.ts).
-import { useRef, useState, useSyncExternalStore } from 'react'
+import { useRef, useSyncExternalStore } from 'react'
 import {
   BatteryCharging, Bluetooth, ChevronDown, Flashlight, Moon, MoonStar, Power,
   RotateCw, Settings, Sun, Vibrate, Wallet, Wifi, WifiOff, Zap,
 } from 'lucide-react'
 import { useOS, type AppKey } from '@/lib/store'
+import { usePrefs } from '@/lib/prefs'
 import { setTorch } from '@/lib/torch'
 import { sound } from '@/lib/sound'
 import { useDrag } from '@/lib/use-swipe'
@@ -49,21 +50,21 @@ function Tile({
       aria-label={sub ? `${label}: ${sub}` : label}
       disabled={disabled}
       style={{ animationDelay: `${delay}ms` }}
-      className={`m3-rise-stagger flex h-[64px] items-center gap-3 rounded-[26px] px-3.5 text-left outline-none transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:ring-2 focus-visible:ring-white/70 ${
+      className={`m3-rise-stagger flex h-14 items-center gap-2.5 rounded-[22px] px-3 text-left outline-none transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:ring-2 focus-visible:ring-white/70 ${
         disabled ? 'cursor-default opacity-70' : 'active:scale-[0.96]'
       } ${active ? 'bg-[#21A038] text-white shadow-[0_10px_26px_-10px_rgba(33,160,56,0.75)]' : 'bg-white/10 text-white'}`}
     >
       <span
-        className={`flex size-10 shrink-0 items-center justify-center rounded-full transition-colors duration-200 ${
+        className={`flex size-9 shrink-0 items-center justify-center rounded-full transition-colors duration-200 ${
           active ? 'bg-white/20' : 'bg-white/15'
         }`}
       >
         {icon}
       </span>
       <span className="min-w-0">
-        <span className="block truncate text-[12px] font-bold leading-tight">{label}</span>
+        <span className="block truncate text-[11.5px] font-bold leading-tight">{label}</span>
         {sub && (
-          <span className={`mt-0.5 block truncate text-[10.5px] leading-tight ${active ? 'text-white/80' : 'text-white/55'}`}>
+          <span className={`mt-0.5 block truncate text-[10px] leading-tight ${active ? 'text-white/80' : 'text-white/55'}`}>
             {sub}
           </span>
         )}
@@ -96,11 +97,12 @@ export default function ControlCenter({
   const toggleTheme = useOS((s) => s.toggleTheme)
   const now = useClock()
 
-  // Визуальные переключатели Wi-Fi/Bluetooth/автоповорота (в симуляторе
-  // сеть устройства реальная — плитка лишь отражает выбор пользователя).
-  const [wifiOn, setWifiOn] = useState(true)
-  const [btOn, setBtOn] = useState(false)
-  const [rotateOn, setRotateOn] = useState(true)
+  // Визуальные переключатели Wi-Fi/Bluetooth/автоповорота — ГЛОБАЛЬНЫЙ prefs-стор:
+  // состояние переживает закрытие шторки и перезагрузку (раньше слетало — «свитчи сломаны»).
+  const wifiOn = usePrefs((s) => s.wifi)
+  const btOn = usePrefs((s) => s.bt)
+  const rotateOn = usePrefs((s) => s.rotate)
+  const setPref = usePrefs((s) => s.setPref)
 
   // Вибро-отклик — реальный тумблер (общий с Настройками через sound.ts).
   // useSyncExternalStore: без setState-в-эффекте и без рассинхрона гидрации.
@@ -201,22 +203,22 @@ export default function ControlCenter({
           </div>
 
           {/* плитки-пилюли 2 колонки */}
-          <div className="mt-2.5 grid grid-cols-2 gap-2.5">
+          <div className="mt-2 grid grid-cols-2 gap-2">
             <Tile
               delay={0}
               active={wifiOn}
-              icon={<Wifi className="size-[18px]" aria-hidden="true" />}
+              icon={<Wifi className="size-[17px]" aria-hidden="true" />}
               label="Wi-Fi"
               sub={wifiOn ? netLabel : 'Выключено'}
-              onClick={() => setWifiOn((v) => !v)}
+              onClick={() => setPref('wifi', !wifiOn)}
             />
             <Tile
               delay={30}
               active={btOn}
-              icon={<Bluetooth className="size-[18px]" aria-hidden="true" />}
+              icon={<Bluetooth className="size-[17px]" aria-hidden="true" />}
               label="Bluetooth"
               sub={btOn ? 'Включено' : 'Выключено'}
-              onClick={() => setBtOn((v) => !v)}
+              onClick={() => setPref('bt', !btOn)}
             />
             <Tile
               delay={60}
@@ -248,7 +250,7 @@ export default function ControlCenter({
               icon={<RotateCw className="size-[18px]" aria-hidden="true" />}
               label="Автоповорот"
               sub={rotateOn ? 'Включён' : 'Портрет'}
-              onClick={() => setRotateOn((v) => !v)}
+              onClick={() => setPref('rotate', !rotateOn)}
             />
             <Tile
               delay={180}
