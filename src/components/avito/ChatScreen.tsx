@@ -3,20 +3,106 @@
 // Чат с продавцом/покупателем — светлый дизайн 1:1 как настоящий Авито:
 // белая шапка, пузыри (входящие белые, исходящие #CDEFD3), зелёная кнопка Send.
 // Всё решение — в переписке: счёты, торг, ИИ-собеседник. Логика не тронута.
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import {
-  ChevronLeft, Send, Receipt, Loader2, Star, CheckCheck, Banknote, X, Phone,
+  ChevronLeft, Send, Receipt, Loader2, Star, CheckCheck, Banknote, X, Phone, Truck, PackageCheck, CheckCircle2,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
 import { sound } from '@/lib/sound'
-import { useCall } from '@/lib/call'
+import { useCall, startOsLiveCall } from '@/lib/call'
+import { ensureConnected } from '@/lib/live-call'
 import { botDigits, formatNumber } from '@/lib/phone'
 import { getSocket } from '@/lib/use-realtime'
 import { fmtMoney, fmtTime, initials, hueColor } from '@/lib/format'
 import { CONDITION_LABEL } from '@/lib/catalog-types'
 import { useDrag } from '@/lib/use-swipe'
-import type { ChatDetailData, ChatMessageDTO } from '@/lib/types'
+import type { ChatDetailData, ChatDeliveryDTO, ChatMessageDTO } from '@/lib/types'
+
+// Тик 1с — прогресс посылки в чате живой
+function useTick(intervalMs = 1000): number {
+  return useSyncExternalStore(
+    (cb) => {
+      const id = setInterval(cb, intervalMs)
+      return () => clearInterval(id)
+    },
+    () => Math.floor(Date.now() / intervalMs),
+    () => 0,
+  )
+}
+
+// ─── Статус-строка посылки в чате сделки (28-b) ───
+// После оплаты: «Продавец собирает товар…» → «В пути» с прогрессом → «Прибыл — заберите».
+// Для продавца: «Курьер забирает ваш товар…» → деньги после доставки.
+function DeliveryLine({ d }: { d: ChatDeliveryDTO }) {
+  useTick(1000)
+  const openApp = useOS((s) => s.openApp)
+  const now = Date.now()
+  const start = new Date(d.createdAt).getTime()
+  const end = new Date(d.eta).getTime()
+  const pct = Math.min(100, Math.max(3, Math.round(((now - start) / Math.max(1, end - start)) * 100)))
+  const etaLeft = end - now
+
+  const phase = (() => {
+    if (d.status === 'collecting') {
+      return d.kind === 'sale'
+        ? { icon: PackageCheck, label: 'Курьер забирает ваш товар…', tone: '#B25E09', bg: '#FFF4E5' }
+        : { icon: PackageCheck, label: 'Продавец собирает товар…', tone: '#B25E09', bg: '#FFF4E5' }
+    }
+    if (d.status === 'in_transit') {
+      return d.kind === 'sale'
+        ? { icon: Truck, label: `Товар в пути к покупателю${etaLeft > 0 ? ` · ${Math.max(1, Math.ceil(etaLeft / 60000))} мин` : ''}`, tone: '#B25E09', bg: '#FFF4E5' }
+        : { icon: Truck, label: `В пути${etaLeft > 0 ? ` · прибудет через ${Math.max(1, Math.ceil(etaLeft / 60000))} мин` : ''}`, tone: '#B25E09', bg: '#FFF4E5' }
+    }
+    if (d.status === 'arrived') {
+      return { icon: PackageCheck, label: 'Прибыл — заберите в Доставках', tone: '#067A47', bg: '#E6F9EF' }
+    }
+    if (d.status === 'returned') {
+      return { icon: Truck, label: 'Посылка возвращена · деньги на счёте', tone: '#D14343', bg: '#FDEBEB' }
+    }
+    return d.kind === 'sale'
+      ? { icon: CheckCircle2, label: 'Доставлено · деньги зачислены', tone: '#067A47', bg: '#E6F9EF' }
+      : { icon: CheckCircle2, label: 'Получено · вещь в инвентаре', tone: '#067A47', bg: '#E6F9EF' }
+  })()
+  const Icon = phase.icon
+  const running = d.status === 'collecting' || d.status === 'in_transit' || d.status === 'arrived'
+
+  return (
+    <button
+      type="button"
+      onClick={() => openApp('delivery')}
+      aria-label={`Открыть Доставки: ${phase.label}`}
+      className="mx-3 mb-2 flex w-[calc(100%-24px)] items-center gap-2 rounded-xl border border-[#EBEDF0] bg-white p-2.5 text-left active:bg-[#F7F8FA]"
+    >
+      <span
+        className="flex size-9 shrink-0 items-center justify-center rounded-full"
+        style={{ backgroundColor: phase.bg, color: phase.tone }}
+        aria-hidden
+      >
+        <Icon size={17} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[12.5px] font-bold" style={{ color: phase.tone }}>
+          {phase.label}
+        </span>
+        {running && (
+          <span className="mt-1 flex items-center gap-2">
+            <span className="h-1 flex-1 overflow-hidden rounded-full bg-[#F0F1F5]">
+              <span
+                className="block h-full rounded-full transition-[width] duration-700 ease-linear"
+                style={{ width: `${pct}%`, backgroundColor: d.status === 'arrived' ? '#067A47' : '#E8A020' }}
+              />
+            </span>
+            <span className="shrink-0 text-[10px] font-semibold tabular-nums text-[#8B8F99]">
+              {d.status === 'arrived' ? 'ПВЗ' : `${pct}%`}
+            </span>
+          </span>
+        )}
+      </span>
+      <span className="shrink-0 text-[10px] font-semibold text-[#8B8F99]">{fmtMoney(d.price)}</span>
+    </button>
+  )
+}
 
 // контекстные быстрые ответы: свои для покупки, свои для продажи
 const QUICK = {
@@ -32,6 +118,32 @@ const QUICK = {
     { label: `Скидка до ${fmtMoney(Math.round(price * 0.95))}`, text: `За быстрый выход готов отдать за ${fmtMoney(Math.round(price * 0.95))}` },
     { label: 'Самовывоз сегодня', text: 'Самовывоз сегодня — забирайте' },
   ],
+}
+
+// Быстрые реплики-чипы для торга с ботом (28-a): 2-3 живые подсказки, честные —
+// показывают, ЧТО можно сделать прямо сейчас (согласиться на цену бота, сбить, уточнить).
+function botChips(chat: ChatDetailData): { label: string; text: string }[] {
+  const price = chat.listing.price
+  if (chat.role === 'buyer') {
+    const offer = chat.lastBotOffer
+    if (offer && offer > 0) {
+      return [
+        { label: 'А конечная цена?', text: 'А какая конечная цена? Без торга' },
+        { label: `Заберу сегодня за ${fmtMoney(offer)}`, text: `Заберу сегодня за ${fmtMoney(offer)} — по рукам` },
+        { label: 'А если наличкой?', text: 'А если наличкой — скинешь?' },
+      ]
+    }
+    return [
+      { label: 'Ещё актуально?', text: 'Здравствуйте! Ещё актуально?' },
+      { label: 'Последняя цена?', text: 'Какая ваша последняя цена?' },
+      { label: 'А если наличкой?', text: 'А если наличкой — скинешь?' },
+    ]
+  }
+  return [
+    { label: 'Да, продаётся', text: 'Да, ещё продаётся' },
+    { label: 'Сколько даёшь?', text: 'Сколько даёте? Самовывоз сегодня' },
+    { label: `Отдам за ${fmtMoney(Math.round(price * 0.95))}`, text: `Готов отдать за ${fmtMoney(Math.round(price * 0.95))}, если заберёте сегодня` },
+  ]
 }
 
 export default function ChatScreen({ id, onBack }: { id: string; onBack: () => void }) {
@@ -95,6 +207,12 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
   }, [draftKey])
 
   useEffect(() => { load() }, [load])
+
+  // пока открыт чат с живым игроком — держим сигналинг онлайна (входящие звонки,
+  // 27-e). Хук — до early-return'ов загрузки (правила хуков).
+  useEffect(() => {
+    if (chat && !chat.counterpart.isBot) void ensureConnected()
+  }, [chat])
 
   // realtime: подписка на канал чата + индикатор печати
   useEffect(() => {
@@ -171,7 +289,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
       const res = await api.payInvoice(id, invoiceId)
       refreshSession({ balance: res.balance, xp: res.xp, level: res.level })
       sound.success()
-      pushToast('Resale', 'Счёт оплачен. Товар ваш!')
+      pushToast('Resale', 'Счёт оплачен — посылка собирается, следите в Доставках')
       await load()
     } catch (e) {
       setMsg(e instanceof ApiError ? e.message : 'Не удалось оплатить')
@@ -206,6 +324,20 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
       number: formatNumber(botDigits(chat.counterpart.id)),
       peerUserId: chat.counterpart.id,
       personaId: null, // сервер вычислит личность по боту
+      listingTitle: chat.listing.title,
+      listingPrice: chat.listing.price,
+    })
+  }
+
+  // LIVE P2P (27-e): собеседник — РЕАЛЬНЫЙ игрок. Звонок через сигналинг :3303
+  // + WebRTC: входящий экран появится у него поверх всей ОС. Логика ботов не тронута.
+  const callLiveUser = () => {
+    sound.tap()
+    void startOsLiveCall({
+      name: chat.counterpart.displayName,
+      number: '', // у живых игроков нет телефонного номера — только имя
+      peerUserId: chat.counterpart.id,
+      live: true,
       listingTitle: chat.listing.title,
       listingPrice: chat.listing.price,
     })
@@ -257,6 +389,10 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="text-[15px] font-bold text-black truncate">{chat.counterpart.displayName}</span>
+              {/* честный индикатор настроения бота (28-a) — считает сервер */}
+              {chat.counterpart.isBot && chat.mood && (
+                <span aria-label={`Настроение: ${chat.mood.label}`} title={chat.mood.label}>{chat.mood.emoji}</span>
+              )}
               {chat.counterpart.online && <span className="w-2 h-2 rounded-full bg-[#0AC760] shrink-0" aria-label="Онлайн" />}
             </div>
             <div className="text-[11px] text-[#8B8F99] flex items-center gap-1">
@@ -279,9 +415,16 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-white text-[#8B8F99] font-bold">ПРОДАНО</span>
           )}
         </div>
+        {/* тонкая строка настроения — только когда состояние заметное (28-a) */}
+        {chat.counterpart.isBot && chat.mood && chat.mood.state !== 'neutral' && (
+          <p className="px-4 -mt-0.5 pb-1.5 text-[10px] text-[#8B8F99]" role="status">
+            {chat.mood.emoji} {chat.mood.label}
+          </p>
+        )}
       </div>
 
       {/* сообщения: входящие белые, исходящие #CDEFD3 */}
+      {chat.delivery && <DeliveryLine d={chat.delivery} />}
       <div className="flex-1 overflow-y-auto [scrollbar-width:thin] p-3 space-y-1.5">
         {chat.messages.map((m) => {
           if (m.senderType === 'system') {
@@ -347,10 +490,10 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
 
       {msg && <div className="shrink-0 px-4 pb-1 text-xs text-[#D14343]">{msg}</div>}
 
-      {/* быстрые ответы: подсказки-чипы, пока поле ввода пустое */}
+      {/* быстрые ответы: у ботов — живые реплики торга (28-a), с живыми людьми — базовые */}
       {!text.trim() && (
         <div className="shrink-0 flex gap-1.5 overflow-x-auto px-2.5 pb-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" style={{ touchAction: 'pan-x' }}>
-          {QUICK[chat.role === 'buyer' ? 'buy' : 'sell'](chat.listing.price).map((q) => (
+          {(chat.counterpart.isBot ? botChips(chat) : QUICK[chat.role === 'buyer' ? 'buy' : 'sell'](chat.listing.price)).map((q) => (
             <button
               key={q.label}
               onClick={() => { setDraft(q.text); sound.tap() }}
@@ -362,13 +505,20 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
         </div>
       )}
 
-      {/* ввод: звонок + счёт + белая пилюля + зелёная круглая кнопка отправки */}
+      {/* ввод: звонок + счёт + белая пилюля + зелёная круглая кнопка отправки.
+          Звонок: бот-продавцу (26-d, ИИ-разговор) или живому игроку (27-e, P2P). */}
       <div className="shrink-0 bg-[#F7F8FA] border-t border-[#EBEDF0] p-2.5 flex items-center gap-2">
-        {chat.counterpart.isBot && chat.role === 'buyer' && chat.listing.status !== 'sold' && (
+        {(chat.counterpart.isBot
+          ? chat.role === 'buyer' && chat.listing.status !== 'sold'
+          : true) && (
           <button
-            onClick={callSeller}
-            aria-label={`Позвонить продавцу ${chat.counterpart.displayName} по товару`}
-            title="Позвонить продавцу"
+            onClick={chat.counterpart.isBot ? callSeller : callLiveUser}
+            aria-label={
+              chat.counterpart.isBot
+                ? `Позвонить продавцу ${chat.counterpart.displayName} по товару`
+                : `Позвонить ${chat.counterpart.displayName}`
+            }
+            title={chat.counterpart.isBot ? 'Позвонить продавцу' : 'Позвонить'}
             className="w-11 h-11 rounded-full bg-[#F0F1F5] flex items-center justify-center text-[#0AC760] shrink-0 active:scale-95 transition-transform"
           >
             <Phone size={19} aria-hidden />

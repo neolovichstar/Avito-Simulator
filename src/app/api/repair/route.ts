@@ -1,17 +1,39 @@
 import { db } from '@/lib/db'
 import { getSessionUser, unauthorized } from '@/lib/session'
 import { repairCost, repairMinutes, nextCondition } from '@/lib/economy'
-import { notifyUser, bumpStats, bumpQuests, checkAchievements } from '@/lib/deals'
-import { CONDITION_LABEL } from '@/lib/catalog-types'
+import { bumpQuests } from '@/lib/deals'
 import { fmtMoney } from '@/lib/format'
 import type { RepairOrderDTO, InventoryItemDTO } from '@/lib/types'
 import { itemImage } from '@/lib/item-images'
+import {
+  workshopItemDto, stockMapFor, toolsDto, stockDto, workDiscount,
+} from '@/lib/repair-server'
 
 export const dynamic = 'force-dynamic'
 
+// mode=workshop — данные вкладки «Мастерская» (Task 28-c).
+// Без mode — легаси-ответ (заказы мастера + ремонтопригодные вещи).
 export async function GET(req: Request) {
   const user = await getSessionUser(req)
   if (!user) return unauthorized()
+  const url = new URL(req.url)
+  const mode = url.searchParams.get('mode')
+
+  if (mode === 'workshop') {
+    const items = await db.item.findMany({ where: { ownerId: user.id }, orderBy: { createdAt: 'desc' } })
+    const stockMap = await stockMapFor(user.id)
+    const list = await Promise.all(items.map((i) => workshopItemDto(user.id, i, stockMap)))
+    const [tools, stock] = await Promise.all([toolsDto(user.id), Promise.resolve(stockDto(stockMap))])
+    return Response.json({
+      items: list,
+      orders: [],
+      tools,
+      stock,
+      level: user.level,
+      workDiscount: workDiscount(user.level),
+    })
+  }
+
   const orders = await db.repairOrder.findMany({
     where: { userId: user.id, status: { in: ['in_progress', 'ready'] } },
     orderBy: { startedAt: 'desc' },

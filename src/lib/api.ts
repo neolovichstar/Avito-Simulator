@@ -5,8 +5,8 @@ import type {
   SessionUser, FeedListing, ListingDetailData, ChatListItem, ChatDetailData, ChatMessageDTO,
   BankData, TaxData, MarketStats, NotificationDTO, InventoryItemDTO, ProfileData,
   RepairOrderDTO, RepairQuoteDTO, DeliveryDTO, AuctionData, AuctionLotDTO, CareerData, QuestDTO,
-  SavedSearchDTO, SellerProfile, BonusState, PulseItemDTO, RivalsData, BlockedSellerDTO,
-  LoanHistoryItem,
+  SavedSearchDTO, SellerProfile, BonusState, PulseItemDTO, MarketPulseDTO, RivalsData, BlockedSellerDTO,
+  LoanHistoryItem, WorkshopDataDTO, JobConfigDTO, JobResultDTO, StockDTO, TransitItemDTO,
 } from '@/lib/types'
 import type { CatalogItem, CategoryKey } from '@/lib/catalog-types'
 
@@ -110,7 +110,7 @@ export const api = {
 
   // каталог и инвентарь
   catalog: () => req<{ items: CatalogItem[] }>('/api/catalog'),
-  inventory: () => req<{ items: InventoryItemDTO[] }>('/api/inventory'),
+  inventory: () => req<{ items: InventoryItemDTO[]; inTransit?: TransitItemDTO[]; inTransitCount?: number }>('/api/inventory'),
 
   // чаты
   chats: () => req<{ items: ChatListItem[] }>('/api/chats'),
@@ -138,8 +138,27 @@ export const api = {
   repairPickup: (orderId: string) =>
     post<{ ok: boolean; item: InventoryItemDTO }>('/api/repair/pickup', { orderId }),
 
-  // доставки (курьер)
+  // ─── Мастерская 28-c: запчасти, инструменты, мини-игры ───
+  workshop: () => req<WorkshopDataDTO>('/api/repair?mode=workshop'),
+  diagnose: (itemId: string) =>
+    post<{ ok: boolean; balance: number; faults: WorkshopDataDTO['items'][number]['faults'] }>('/api/repair/diagnose', { itemId }),
+  jobStart: (body: { itemId: string; kind: 'repair' | 'install'; partKey?: string }) =>
+    post<{ ok: boolean; balance: number; job: JobConfigDTO; warranty: boolean }>('/api/repair/start', body),
+  jobFinish: (jobId: string, score: number) =>
+    post<JobResultDTO>('/api/repair/finish', { jobId, score }),
+  jobCancel: (jobId: string) =>
+    post<{ ok: boolean; balance: number }>('/api/repair/cancel', { jobId }),
+  partBuy: (partKey: string, used: boolean) =>
+    post<{ ok: boolean; balance: number; stock: StockDTO[] }>('/api/repair/parts', { partKey, used }),
+  partSell: (partKey: string) =>
+    post<{ ok: boolean; balance: number; stock: StockDTO[] }>('/api/repair/parts', { partKey, sell: true }),
+  toolBuy: (toolKey: string) =>
+    post<{ ok: boolean; balance: number; tools: WorkshopDataDTO['tools'] }>('/api/repair/tools', { toolKey }),
+
+  // доставки (логистика 28-b)
   deliveries: () => req<{ items: DeliveryDTO[] }>('/api/deliveries'),
+  pickupDelivery: (deliveryId: string) =>
+    post<{ ok: boolean; itemId?: string; balance: number; xp?: number; level?: number }>('/api/deliveries/pickup', { deliveryId }),
 
   // аукцион
   auction: () => req<AuctionData>('/api/auction'),
@@ -152,8 +171,8 @@ export const api = {
   auctionAutoBidCancel: (lotId: string) =>
     req<{ ok: boolean }>(`/api/auction/autobid?lotId=${encodeURIComponent(lotId)}`, { method: 'DELETE' }),
 
-  // пульс рынка: движения цен за час
-  marketPulse: () => req<PulseItemDTO[]>('/api/market/pulse'),
+  // пульс рынка: топ-движения из индекса + новостная строка волн (28-a)
+  marketPulse: () => req<MarketPulseDTO>('/api/market/pulse'),
   // конкуренты по товару (для шита цены)
   listingRivals: (listingId: string) => req<RivalsData>(`/api/listings/${listingId}/rivals`),
 

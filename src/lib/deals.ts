@@ -1,14 +1,28 @@
 // Ядро сделок: покупки, налоги, инвентарь, квесты, ачивки, уведомления.
 // Используется и API-роутами, и движком ботов.
+// Логистика (28-b): покупки игроков идут через доставку («Собираем» → «В пути» → «Прибыл» →
+// игрок забирает), продажи игроков — через курьера (деньги после вручения). Боты живут по-старому.
 import { db } from '@/lib/db'
 import { emitTo } from '@/lib/realtime-emit'
-import { TAX_RATE, DELIVERY_FEE, courierDefectChance, deliveryEtaSeconds, nextCondition, levelFromXp } from '@/lib/economy'
+import {
+  TAX_RATE, DELIVERY_FEE, courierDefectChance, nextCondition, levelFromXp,
+  collectSecondsFor, pickupSecondsFor, deliveryTransitSeconds, deliveryEtaFor,
+  RETURN_COMMISSION, PICKUP_WINDOW_MS,
+} from '@/lib/economy'
 import { achievedIds, ACHIEVEMENTS, parseStats, defaultStats, type PlayerStats, type QuestKind } from '@/lib/quests'
 import { PERSONAS } from '@/lib/personas-data'
 import { CONDITION_ORDER } from '@/lib/economy'
 import { cache } from '@/lib/cache'
 import { fmtMoney } from '@/lib/format'
 import type { User } from '@prisma/client'
+
+export type DeliveryMode = 'courier' | 'pickup' | 'chat'
+export type DeliveryKind = 'purchase' | 'sale'
+export type DeliveryStatus = 'collecting' | 'in_transit' | 'arrived' | 'delivered' | 'returned'
+
+export const ACTIVE_DELIVERY_STATUSES: DeliveryStatus[] = ['collecting', 'in_transit', 'arrived']
+
+const COURIERS = ['Пони-Экспресс', 'Синяя Точка', 'Resale Доставка', 'Курьер Сразу']
 
 export async function notifyUser(userId: string, kind: string, title: string, body: string) {
   const n = await db.notification.create({
@@ -98,7 +112,10 @@ export async function completeSale(opts: {
   buyer: User
   price: number
   via: 'buy' | 'chat' | 'engine'
+  /** легаси-флаг: courier=true ⇔ mode 'courier'. Новые вызовы передают mode. */
   courier?: boolean
+  /** способ получения: курьер / самовывоз / счёт в чате (дистанционно, без сбора) */
+  mode?: DeliveryMode
   chatId?: string
 }): Promise<SaleResult> {
   const listing = await db.listing.findUnique({ where: { id: opts.listingId } })
@@ -115,26 +132,19 @@ export async function completeSale(opts: {
   if (!opts.buyer.isBot && opts.buyer.debt > 30_000) {
     return { ok: false, error: 'Сначала погасите кредит в банке' }
   }
+  const mode: DeliveryMode = opts.mode ?? (opts.courier ? 'courier' : 'pickup')
 
   // двигаем деньги
   await db.user.update({ where: { id: opts.buyer.id }, data: { balance: { decrement: price } } })
-  await db.user.update({ where: { id: seller.id }, data: { balance: { increment: price } } })
+  // деньги продавца — эскроу: игрок получает их после вручения (см. settleSaleDelivery),
+  // боты-продавцы, как и раньше, сразу
+  if (seller.isBot) {
+    await db.user.update({ where: { id: seller.id }, data: { balance: { increment: price } } })
+  }
   await db.listing.update({
     where: { id: listing.id },
     data: { status: 'sold', soldAt: new Date() },
   })
-
-  // налог с продавца-игрока
-  if (!seller.isBot && price > 0) {
-    const tax = Math.round(price * TAX_RATE)
-    await db.user.update({ where: { id: seller.id }, data: { taxDebt: { increment: tax } } })
-    await db.taxBill.create({
-      data: {
-        userId: seller.id, amount: tax, reason: `Налог 4%: продажа «${listing.title}»`,
-        dueAt: new Date(Date.now() + 3 * 86_400_000),
-      },
-    })
-  }
 
   // транзакции
   if (!opts.buyer.isBot && price > 0) {
@@ -146,56 +156,76 @@ export async function completeSale(opts: {
       },
     })
   }
-  if (!seller.isBot && price > 0) {
-    await db.transaction.create({
-      data: {
-        userId: seller.id, type: 'sale', amount: price,
-        counterpartyId: opts.buyer.id, counterpartyName: opts.buyer.displayName,
-        listingId: listing.id, note: listing.title,
-      },
-    })
-  }
+  // транзакция/налог продажи игрока переезжают в момент выплаты (settleSaleDelivery)
 
   // инвентарь / доставка
+  // Вещь уходит у продавца сразу (владелец → покупатель), но у покупателя она появится
+  // в инвентаре только после получения посылки (pickupDelivery): инвентарь прячет вещи
+  // под активной доставкой (см. /api/inventory).
   let itemId: string | undefined
   let deliveryId: string | undefined
   let downgraded = false
   const buyerIsPlayer = !opts.buyer.isBot
 
-  if (buyerIsPlayer || opts.buyer.isBot) {
-    if (listing.itemId) {
-      // передача существующей вещи игрока-продавца
-      await db.item.update({ where: { id: listing.itemId }, data: { ownerId: opts.buyer.id } })
-      itemId = listing.itemId
-    }
+  if (listing.itemId) {
+    await db.item.update({ where: { id: listing.itemId }, data: { ownerId: opts.buyer.id } })
+    itemId = listing.itemId
   }
-  if (!itemId) {
-    if (opts.courier && buyerIsPlayer) {
-      const defect = Math.random() < courierDefectChance(personaTrust(seller.personaId))
-      const realCond = defect
-        ? CONDITION_ORDER[Math.max(0, CONDITION_ORDER.indexOf(listing.condition) - 1)]
-        : listing.condition
-      downgraded = defect
-      const d = await db.delivery.create({
-        data: {
-          userId: opts.buyer.id, listingId: listing.id, title: listing.title, image: listing.image,
-          price: price + DELIVERY_FEE, itemKey: listing.itemKey, category: listing.category,
-          listedCondition: listing.condition, realCondition: realCond, baseValue: listing.baseValue,
-          courier: ['Пони-Экспресс', 'Синяя Точка', 'Resale Доставка', 'Курьер Сразу'][Math.floor(Math.random() * 4)],
-          eta: new Date(Date.now() + deliveryEtaSeconds() * 1000),
-        },
-      })
-      deliveryId = d.id
-    } else if (buyerIsPlayer || opts.buyer.isBot) {
-      const item = await db.item.create({
-        data: {
-          ownerId: opts.buyer.id, itemKey: listing.itemKey, title: listing.title,
-          category: listing.category, condition: listing.condition, image: listing.image,
-          baseValue: listing.baseValue, purchasePrice: price, fromUserId: seller.id,
-        },
-      })
-      itemId = item.id
-    }
+
+  if (buyerIsPlayer) {
+    // ПОСЫЛКА покупателя: «Собираем» → «В пути» → «Прибыл» → игрок забирает.
+    // Дефект возможен только у дистанционных покупок у ботов (осмотр на самовывозе исключён).
+    const defect = !itemId && mode !== 'pickup' && Math.random() < courierDefectChance(personaTrust(seller.personaId))
+    const realCond = defect
+      ? CONDITION_ORDER[Math.max(0, CONDITION_ORDER.indexOf(listing.condition) - 1)]
+      : listing.condition
+    downgraded = defect
+    const sameCity = listing.city === opts.buyer.city
+    const transitSec = deliveryTransitSeconds(listing.category, sameCity, mode)
+    const created = await db.delivery.create({
+      data: {
+        userId: opts.buyer.id, listingId: listing.id, title: listing.title, image: listing.image,
+        price: mode === 'courier' ? price + DELIVERY_FEE : price,
+        itemKey: listing.itemKey, category: listing.category,
+        listedCondition: listing.condition, realCondition: realCond, baseValue: listing.baseValue,
+        courier: COURIERS[Math.floor(Math.random() * COURIERS.length)],
+        kind: 'purchase', status: 'collecting',
+        eta: deliveryEtaFor(Date.now(), 0, transitSec),
+      },
+    })
+    // фаза «Собираем» детерминирована по id посылки — фиксируем точный eta вторым апдейтом
+    const eta = deliveryEtaFor(created.createdAt.getTime(), collectSecondsFor(created.id), transitSec)
+    const final = await db.delivery.update({ where: { id: created.id }, data: { eta } })
+    deliveryId = final.id
+  } else if (!itemId) {
+    // бот-покупатель: вещь сразу (невидимая механика рынка, без логистики)
+    const item = await db.item.create({
+      data: {
+        ownerId: opts.buyer.id, itemKey: listing.itemKey, title: listing.title,
+        category: listing.category, condition: listing.condition, image: listing.image,
+        baseValue: listing.baseValue, purchasePrice: price, fromUserId: seller.id,
+      },
+    })
+    itemId = item.id
+  }
+
+  // ПРОДАЖА игрока: посылка «курьер забирает → везёт покупателю → деньги зачислены».
+  // Деньги продавца в эскроу — выплата в settleSaleDelivery после вручения.
+  if (!seller.isBot) {
+    const sameCity = listing.city === opts.buyer.city
+    const transitSec = deliveryTransitSeconds(listing.category, sameCity, 'courier')
+    const created = await db.delivery.create({
+      data: {
+        userId: seller.id, listingId: listing.id, title: listing.title, image: listing.image,
+        price, itemKey: listing.itemKey, category: listing.category,
+        listedCondition: listing.condition, realCondition: listing.condition, baseValue: listing.baseValue,
+        courier: COURIERS[Math.floor(Math.random() * COURIERS.length)],
+        kind: 'sale', status: 'collecting',
+        eta: deliveryEtaFor(Date.now(), 0, transitSec),
+      },
+    })
+    const eta = deliveryEtaFor(created.createdAt.getTime(), pickupSecondsFor(created.id), transitSec)
+    await db.delivery.update({ where: { id: created.id }, data: { eta } })
   }
 
   // статистика, квесты, ачивки
@@ -206,18 +236,16 @@ export async function completeSale(opts: {
   const bigNow = price >= 100_000
   if (buyerIsPlayer) {
     const patch: Partial<PlayerStats> = {
-      dealsBuy: 1, dealsTotal: 1, spent: price,
-      ...(opts.courier ? { courierBuys: 1 } : {}),
+      // счётчик покупок/халявы/курьерских переезжает в момент получения вещи (pickupDelivery),
+      // здесь — факт сделки и потраченные деньги
+      dealsTotal: 1, spent: price,
       ...(price > 0 && price <= estVal * 0.7 ? { bargains: 1 } : {}),
       ...(opts.via === 'chat' && price <= listing.price * 0.95 ? { haggles: 1 } : {}),
       ...(nightNow ? { nightDeals: 1 } : {}),
       ...(bigNow ? { bigDeals: 1 } : {}),
     }
     await bumpStats(opts.buyer.id, patch)
-    await bumpQuests(opts.buyer.id, 'buy')
     await bumpQuests(opts.buyer.id, 'spend', price)
-    if (opts.courier) await bumpQuests(opts.buyer.id, 'courier')
-    if (price === 0) await bumpQuests(opts.buyer.id, 'free')
     await addXp(opts.buyer.id, Math.max(10, Math.round(price * 0.004)))
     await checkAchievements(opts.buyer.id)
   } else if (opts.buyer.isBot) {
@@ -288,19 +316,19 @@ export async function completeSale(opts: {
 
   // уведомления
   if (buyerIsPlayer) {
+    const how = mode === 'pickup'
+      ? 'Самовывоз — заберите посылку через приложение Доставки'
+      : 'Продавец собирает посылку. Отслеживайте в приложении Доставки'
     await notifyUser(
-      opts.buyer.id, 'deal',
-      opts.courier ? 'Товар отправлен курьером' : 'Покупка совершена',
-      opts.courier
-        ? `«${listing.title}» уже в пути. Отслеживайте в приложении Доставки`
-        : `«${listing.title}» за ${fmtMoney(price)} — теперь в вашем инвентаре`,
+      opts.buyer.id, 'deal', 'Оплата прошла',
+      `«${listing.title}» за ${fmtMoney(mode === 'courier' ? price + DELIVERY_FEE : price)}. ${how}`,
     )
     await emitTo(`user:${opts.buyer.id}`, 'deal', { title: listing.title, price, role: 'buyer' })
   }
   if (!seller.isBot) {
     await notifyUser(
-      seller.id, 'deal', 'Продажа совершена',
-      `«${listing.title}» продан за ${fmtMoney(price)}`,
+      seller.id, 'deal', 'Продажа оформлена',
+      `«${listing.title}» продан за ${fmtMoney(price)}. Курьер заберёт товар, деньги придут после доставки`,
     )
     await emitTo(`user:${seller.id}`, 'deal', { title: listing.title, price, role: 'seller' })
   }
@@ -309,34 +337,179 @@ export async function completeSale(opts: {
   return { ok: true, itemId, deliveryId, downgraded }
 }
 
-// Доставка: выдать товар из-под курьера
+// ───────────────────────── ЛОГИСТИКА: ТИК СТАТУСОВ (28-b) ─────────────────────────
+// Прогоняет все «живые» посылки по жизненному циклу. Вызывается движком раз в 15с
+// и лениво из GET /api/deliveries — статусы едут даже без открытого приложения.
+//
+//  purchase: collecting → in_transit → arrived → (игрок забрал) delivered
+//                                            └→ (24ч не забрал) returned + возврат 95%
+//  sale:     collecting → in_transit → delivered (+ выплата денег продавцу)
+
+// Доставка: выдать товар из-под курьера / продвинуть статусы / вернуть невостребованное
 export async function deliverDue(): Promise<number> {
-  const due = await db.delivery.findMany({
-    where: { status: 'in_transit', eta: { lte: new Date() } },
-    take: 10,
+  const now = new Date()
+  const live = await db.delivery.findMany({
+    where: { status: { in: ACTIVE_DELIVERY_STATUSES } },
+    orderBy: { createdAt: 'asc' },
+    take: 40,
   })
-  for (const d of due) {
-    await db.item.create({
+  let touched = 0
+  for (const d of live) {
+    const collectEnd = new Date(d.createdAt.getTime() + (d.kind === 'sale' ? pickupSecondsFor(d.id) : collectSecondsFor(d.id)) * 1000)
+    try {
+      if (d.status === 'collecting' && now >= collectEnd) {
+        await db.delivery.update({ where: { id: d.id }, data: { status: 'in_transit' } })
+        if (d.kind === 'sale') {
+          await notifyUser(d.userId, 'deal', 'Курьер забрал ваш товар', `«${d.title}» в пути к покупателю. Деньги придут после вручения`)
+        } else {
+          await notifyUser(d.userId, 'deal', 'Посылка в пути', `«${d.title}» отправлен. Прибудет примерно ${fmtTimeLeft(d.eta.getTime() - now.getTime())}`)
+        }
+        touched++
+      }
+      if (d.status === 'in_transit' && now >= d.eta) {
+        if (d.kind === 'sale') {
+          await settleSaleDelivery(d.id)
+        } else {
+          await db.delivery.update({ where: { id: d.id }, data: { status: 'arrived' } })
+          await notifyUser(d.userId, 'deal', 'Доставка прибыла', `«${d.title}» ждёт в пункте выдачи — заберите в приложении Доставки. Хранение 24 ч`)
+        }
+        touched++
+        continue // дальше по этой посылке делать нечего в этом тике
+      }
+      if (d.status === 'arrived' && new Date(d.eta.getTime() + PICKUP_WINDOW_MS) <= now) {
+        await returnDelivery(d.id)
+        touched++
+      }
+    } catch (e) {
+      console.error('[deals] delivery tick error:', d.id, e)
+    }
+  }
+  return touched
+}
+
+function fmtTimeLeft(ms: number): string {
+  const min = Math.max(1, Math.round(ms / 60_000))
+  if (min >= 60) return `через ~${Math.round(min / 60 * 10) / 10} ч`
+  return `через ~${min} мин`
+}
+
+// Вручение состоялось: деньги продавцу-игроку (эскроу → счёт), транзакция и налог — здесь
+async function settleSaleDelivery(deliveryId: string): Promise<void> {
+  const d = await db.delivery.findUnique({ where: { id: deliveryId } })
+  if (!d || d.kind !== 'sale' || d.status === 'delivered' || d.status === 'returned') return
+  const now = new Date()
+  await db.delivery.update({ where: { id: d.id }, data: { status: 'delivered', deliveredAt: now } })
+  await db.user.update({ where: { id: d.userId }, data: { balance: { increment: d.price } } })
+  // контрагент — покупатель: находим чат по лоту (единственное место, где покупатель известен)
+  const chat = await db.chat.findFirst({ where: { listingId: d.listingId, buyerId: { not: d.userId } } })
+  const buyer = chat ? await db.user.findUnique({ where: { id: chat.buyerId } }) : null
+  if (d.price > 0) {
+    await db.transaction.create({
       data: {
-        ownerId: d.userId, itemKey: d.itemKey, title: d.title, category: d.category,
+        userId: d.userId, type: 'sale', amount: d.price,
+        counterpartyId: buyer?.id ?? null, counterpartyName: buyer?.displayName ?? null,
+        listingId: d.listingId, note: `Продажа · ${d.title} · доставка`,
+      },
+    })
+  }
+  // налог самозанятого начисляется при фактической выплате
+  const seller = await db.user.findUnique({ where: { id: d.userId } })
+  if (seller && !seller.isBot && d.price > 0) {
+    const tax = Math.round(d.price * TAX_RATE)
+    await db.user.update({ where: { id: seller.id }, data: { taxDebt: { increment: tax } } })
+    await db.taxBill.create({
+      data: {
+        userId: seller.id, amount: tax, reason: `Налог 4%: продажа «${d.title}»`,
+        dueAt: new Date(now.getTime() + 3 * 86_400_000),
+      },
+    })
+  }
+  await notifyUser(
+    d.userId, 'deal', 'Продажа завершена',
+    `«${d.title}» вручён покупателю, ${fmtMoney(d.price)} зачислены на счёт`,
+  )
+  await emitTo(`user:${d.userId}`, 'deal', { title: d.title, price: d.price, role: 'seller' })
+}
+
+// Посылку не забрали за 24 ч: курьер возвращает вещь продавцу, игроку — возврат денег минус 5%
+async function returnDelivery(deliveryId: string): Promise<void> {
+  const d = await db.delivery.findUnique({ where: { id: deliveryId } })
+  if (!d || d.kind !== 'purchase' || d.status !== 'arrived') return
+  await db.delivery.update({ where: { id: d.id }, data: { status: 'returned' } })
+  // вещь живого продавца едет обратно к нему (может выставить снова).
+  // Дойти сюда она могла только в статусе 'arrived' — полученные посылки не возвращаются.
+  const listing = await db.listing.findUnique({ where: { id: d.listingId } })
+  if (listing?.itemId) {
+    await db.item.updateMany({ where: { id: listing.itemId, ownerId: d.userId }, data: { ownerId: listing.sellerId } })
+  }
+  const refund = Math.round(d.price * (1 - RETURN_COMMISSION))
+  if (refund > 0) {
+    await db.user.update({ where: { id: d.userId }, data: { balance: { increment: refund } } })
+    await db.transaction.create({
+      data: {
+        userId: d.userId, type: 'purchase', amount: refund, listingId: d.listingId,
+        note: `Возврат: ${d.title} (не забрали, комиссия ${Math.round(RETURN_COMMISSION * 100)}%)`,
+      },
+    })
+  }
+  await notifyUser(
+    d.userId, 'deal', 'Посылка возвращена',
+    `«${d.title}» не забрали за 24 ч — курьер вернул отправление. Возврат ${fmtMoney(refund)} (комиссия ${Math.round(RETURN_COMMISSION * 100)}%)`,
+  )
+}
+
+// Игрок забрал посылку из пункта выдачи: вещь попадает в инвентарь, квесты/ачивки — после факта
+export async function pickupDelivery(userId: string, deliveryId: string): Promise<{ ok: boolean; error?: string; itemId?: string }> {
+  const d = await db.delivery.findUnique({ where: { id: deliveryId } })
+  if (!d || d.userId !== userId) return { ok: false, error: 'Посылка не найдена' }
+  if (d.kind !== 'purchase') return { ok: false, error: 'Эту посылку забирает получатель' }
+  if (d.status !== 'arrived') return { ok: false, error: 'Посылка ещё в пути' }
+
+  const now = new Date()
+  // вещь живого продавца уже существует (владелец — покупатель): раскрываем её в инвентаре
+  const listing = await db.listing.findUnique({ where: { id: d.listingId } })
+  let itemId: string | undefined
+  if (listing?.itemId) {
+    const item = await db.item.findUnique({ where: { id: listing.itemId } })
+    if (item && item.ownerId === userId) {
+      // применяем реальное состояние (дефект виден при получении)
+      if (item.condition !== d.realCondition) {
+        await db.item.update({ where: { id: item.id }, data: { condition: d.realCondition } })
+      }
+      itemId = item.id
+    }
+  }
+  if (!itemId) {
+    const item = await db.item.create({
+      data: {
+        ownerId: userId, itemKey: d.itemKey, title: d.title, category: d.category,
         condition: d.realCondition, image: d.image, baseValue: d.baseValue,
         purchasePrice: d.price, fromUserId: null,
       },
     })
-    await db.delivery.update({
-      where: { id: d.id },
-      data: { status: 'delivered', deliveredAt: new Date() },
-    })
-    const worse = CONDITION_ORDER.indexOf(d.realCondition) < CONDITION_ORDER.indexOf(d.listedCondition)
-    await notifyUser(
-      d.userId, 'deal',
-      'Доставка прибыла',
-      worse
-        ? `«${d.title}» доставлен. Осторожно: состояние хуже, чем было в объявлении`
-        : `«${d.title}» доставлен. Состояние как в описании`,
-    )
+    itemId = item.id
   }
-  return due.length
+  await db.delivery.update({ where: { id: d.id }, data: { status: 'delivered', deliveredAt: now } })
+
+  // квест-хуки и счётчики — ПОСЛЕ фактического получения вещи игроком
+  const worse = CONDITION_ORDER.indexOf(d.realCondition) < CONDITION_ORDER.indexOf(d.listedCondition)
+  await bumpStats(userId, {
+    dealsBuy: 1,
+    ...(d.price > 0 ? { courierBuys: 1 } : {}),
+    ...(d.price === 0 ? { freePicked: 1 } : {}),
+  })
+  await bumpQuests(userId, 'buy')
+  if (d.price > 0) await bumpQuests(userId, 'courier')
+  if (d.price === 0) await bumpQuests(userId, 'free')
+  await checkAchievements(userId)
+  await notifyUser(
+    userId, 'deal', 'Посылка получена',
+    worse
+      ? `«${d.title}» забран. Осторожно: состояние хуже, чем было в объявлении`
+      : `«${d.title}» забран — вещь уже в инвентаре`,
+  )
+  await emitTo(`user:${userId}`, 'deal', { title: d.title, price: d.price, role: 'buyer' })
+  return { ok: true, itemId }
 }
 
 // Условная рыночная оценка с учётом состояния

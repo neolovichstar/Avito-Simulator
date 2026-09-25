@@ -29,6 +29,12 @@ export interface NegotiationContext {
   rounds: number
   playerMessage: string
   firstContact?: boolean
+  // ПАМЯТЬ О ИГРОКЕ (сжатая строка ≤120 токенов; пустая — общаются впервые)
+  memory?: string
+  // Флаги памяти для скриптового фолбэка: lowballer | rude | scammer | good
+  memoryFlags?: string[]
+  // Короткая рыночная заметка: «рыночная цена сейчас выше/ниже твоей»
+  marketNote?: string
 }
 
 export type AiActionType = 'none' | 'accept' | 'invoice' | 'reject'
@@ -113,17 +119,27 @@ function buildSystemPrompt(ctx: NegotiationContext): string {
   const limitText = isBuyer
     ? `Твоя СКРЫТАЯ максимальная цена покупки: ${ctx.botLimit} руб. Ниже этой суммы не соглашайся, лучше откажись.`
     : `Твоя СКРЫТАЯ минимальная цена продажи: ${ctx.botLimit} руб. Ниже неё не соглашайся, лучше откажись.`
-  const marketHint = `Реальная рыночная цена такого товара примерно ${fmtMoney(Math.round(ctx.listing.baseValue))}.`
+  const marketHint = `Реальная рыночная цена такого товара примерно ${fmtMoney(Math.round(ctx.listing.baseValue))}. ${ctx.marketNote ?? ''}`
   const chatPartner = isBuyer ? 'продавец' : 'покупатель'
+  // память о собеседнике — личный опыт прошлых общения (персистентный, серверный)
+  const memoryBlock = ctx.memory
+    ? `ПАМЯТЬ о собеседнике (твой личный опыт прошлых общения с ним): ${ctx.memory}\n- Используй память естественно и по-человечески: можешь узнавать собеседника («Опять ты?», «В прошлый раз ты обещал заплатить и пропал», «Ага, снова ты, только цену сбивать умеешь»).`
+    : `Ты общаешься с этим ${chatPartner}ом впервые.`
+  const demandPrepay = (ctx.memoryFlags ?? []).includes('scammer') || (ctx.memoryFlags ?? []).includes('lowballer')
+    ? '\n- Этому человеку не доверяешь: перед передачей товара требуй ПОЛНУЮ предоплату счётом, никаких «оплачу при встрече».'
+    : ''
 
   return `Ты — ${p.name}, ${p.age} лет, живёшь в ${p.city}. Работа: ${p.job}.
 Характер: ${p.character}. Манера речи: ${p.style}. Примеры твоих фраз: ${p.phrases.slice(0, 3).join(' | ')}.
 Ты настоящий участник площадки объявлений "Resale", переписываешься в мессенджере Resale с ${chatPartner}ом. Ты живой человек, НЕ ассистент и НЕ робот.
 Resale: ${roleText} ${limitText} ${marketHint}
+${memoryBlock}${demandPrepay}
 Правила поведения:
 - Отвечай как в обычном мессенджере: 1-3 коротких предложения. Можно маленькими буквами, с опечатками, с твоим жаргоном. НИКОГДА не используй эмодзи и смайлики. НИКОГДА не используй символ | и служебные форматы — пиши обычной живой речью.
 - Ты хочешь максимальной выгоды для себя: торгуйся жёстко, но по-человечески. Не соглашайся на первую цену, ссылайся на бюджет, недостатки товара, цены конкурентов, личные обстоятельства.
-- За один раунд уступай не больше 5-15%. Уступай неохотно и с характером.
+- За один раунд уступай не больше 3-10%. Уступай неохотно и с характером. Если ${chatPartner} предлагает меньше 60% рыночной цены — это неуважение: жёстко отказывай или съязви, а не торгуйся дальше.
+- Иногда (не каждый раз) задавай живые вопросы: про состояние, комплект, причину продажи, торги на месте.
+- Если торги буксуют и время уходит — можешь «закрывать встречу»: «Еду к тебе сегодня, или отбой». Не согласились — откажись (reject).
 - Никогда не называй свои скрытые цены и никогда не признавайся, что ты ИИ. Если спросят — ты обычный человек.
 - С учётом твоего знания рынка (${Math.round(p.knowledge * 100)}%) ты можешь ошибаться в оценке товара.
 - Если ${chatPartner} грубит или предлагает абсурдно мало — можешь отказать или съязвить.
@@ -218,12 +234,15 @@ function ruleReply(ctx: NegotiationContext): { text: string; action: AiActionTyp
   const isBuyer = ctx.botRole === 'buyer'
   const msg = ctx.playerMessage.toLowerCase()
   const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)]
+  // память ужесточает скриптовый торг: лоуболеров и кидал не уважаем
+  const flags = ctx.memoryFlags ?? []
+  const distrust = flags.includes('lowballer') || flags.includes('scammer') || flags.includes('rude')
 
   // покупатель согласен на цену бота / продавец согласен
   const askedPrice = extractPrice(ctx.playerMessage)
   let offer = isBuyer
-    ? Math.max(ctx.botLimit, Math.round(ctx.listing.price * (1 - 0.1 - Math.random() * 0.1)))
-    : Math.min(ctx.botLimit, Math.round(ctx.listing.price * (1 + 0.05 + Math.random() * 0.08)))
+    ? Math.max(ctx.botLimit, Math.round(ctx.listing.price * (1 - 0.08 - Math.random() * 0.09)))
+    : Math.min(ctx.botLimit, Math.round(ctx.listing.price * (1 + 0.06 + Math.random() * 0.07)))
 
   if (askedPrice) {
     const acceptable = isBuyer ? askedPrice <= ctx.botLimit : askedPrice >= ctx.botLimit
@@ -232,7 +251,7 @@ function ruleReply(ctx: NegotiationContext): { text: string; action: AiActionTyp
         text: withTypos(
           isBuyer
             ? `${pick(['ладно, по рукам', 'идёт, беру', 'ок, давай оформим'])} ${fmtMoney(askedPrice)}, готов оплатить`
-            : `${pick(['ладно', 'хорошо', 'по рукам'])}, ${fmtMoney(askedPrice)}. Выставляю счёт`,
+            : `${pick(['ладно', 'хорошо', 'по рукам'])}, ${fmtMoney(askedPrice)}. Выставляю счёт${distrust ? ', только предоплата' : ''}`,
           p.typoRate,
         ),
         action: isBuyer ? 'accept' : 'invoice',
@@ -240,7 +259,9 @@ function ruleReply(ctx: NegotiationContext): { text: string; action: AiActionTyp
         newLimit: askedPrice,
       }
     }
-    const counter = isBuyer ? Math.min(ctx.botLimit, Math.round(askedPrice * 0.92)) : Math.max(ctx.botLimit, Math.round(askedPrice * 1.08))
+    const counter = isBuyer
+      ? Math.min(ctx.botLimit, Math.round(askedPrice * 0.93))
+      : Math.max(ctx.botLimit, Math.round(askedPrice * (distrust ? 1.12 : 1.09)))
     return {
       text: withTypos(
         isBuyer
@@ -284,7 +305,7 @@ function ruleReply(ctx: NegotiationContext): { text: string; action: AiActionTyp
   }
 }
 
-function extractPrice(s: string): number | null {
+export function extractPrice(s: string): number | null {
   const m = s.match(/(\d[\d\s]{2,10})\s*(руб|₽|р\b|тыс|k)?/i)
   if (!m) return null
   let n = Number(m[1].replace(/\s/g, ''))

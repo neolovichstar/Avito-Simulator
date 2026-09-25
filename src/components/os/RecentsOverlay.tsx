@@ -188,6 +188,11 @@ export default function RecentsOverlay({
   }
 
   // ── геометрия слоя ─────────────────────────────────────────────────────────
+  // scale() работает вокруг ЦЕНТРА слоя, поэтому чтобы получить карточку с
+  // левым-верхним углом в (X, Y), translate надо уменьшить на (1-scale)*size/2.
+  const originShiftX = ((1 - CARD_SCALE) * box.w) / 2
+  const originShiftY = ((1 - CARD_SCALE) * box.h) / 2
+
   const styleFor = (key: AppKey): CSSProperties => {
     const i = Math.max(0, openApps.indexOf(key))
     const isFlying = flying.includes(key)
@@ -195,9 +200,9 @@ export default function RecentsOverlay({
     const isDrag = dragCard?.key === key
 
     if (open) {
-      const x = cx + (i - anchor) * pitch + clampedStrip
+      const x = cx + (i - anchor) * pitch + clampedStrip - originShiftX
       const dy = isDrag ? Math.min(0, dragCard.dy) : 0
-      const y = cy + dy - (gone ? box.h * 0.95 : 0)
+      const y = cy + dy - (gone ? box.h * 0.95 : 0) - originShiftY
       const opacity = gone ? 0 : isDrag ? Math.max(0, 1 + dy / 280) : 1
       const noTransition = isDrag || (stripping && !gone)
       return {

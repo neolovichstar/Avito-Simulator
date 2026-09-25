@@ -10,6 +10,8 @@ import { botOpener, winBackSweep } from '@/lib/chat-engine'
 import { auctionStep } from '@/lib/economy'
 import { emitTo } from '@/lib/realtime-emit'
 import { onListingCreated, notifyPriceDrop } from '@/lib/market-hooks'
+import { getItemIndex, recordSale } from '@/lib/market-index'
+import { noteDeal } from '@/lib/bot-memory'
 import { botComebackOffers } from '@/lib/price-war'
 import { isBlocked } from '@/lib/blocked'
 import { fireAutoBids, clearAutoBids } from '@/lib/autobid'
@@ -286,7 +288,11 @@ async function botsTick(tick: number) {
     const mult = await getCategoryMult(item.category)
     const persona = personaOfId(bot.personaId)
     const base = item.basePrice * (1 + (Math.random() - 0.5) * 2 * item.jitter)
-    let price = Math.round(base * (CONDITION_MULT[cond] ?? 0.8) * mult * (0.86 + persona.greed * 0.3 + Math.random() * 0.15))
+    // 28-a: стартовая цена бота учитывает динамический индекс товара (узкий коридор,
+    // чтобы не задваивать динамику с категорийным индексом БД)
+    const itemIdx = await getItemIndex(item.key).catch(() => 1)
+    const itemFactor = Math.max(0.92, Math.min(1.12, 1 + (itemIdx - 1) * 0.4))
+    let price = Math.round(base * (CONDITION_MULT[cond] ?? 0.8) * mult * itemFactor * (0.86 + persona.greed * 0.3 + Math.random() * 0.15))
     const isJunk = item.key.startsWith('trash-') || item.basePrice < 500
     if (isJunk && freeActive < 3 && Math.random() < 0.4) {
       price = 0
@@ -390,7 +396,17 @@ async function botsTick(tick: number) {
       if (l.price > est * 0.82) continue
       const bot = await randomBot()
       if (!bot || bot.id === l.sellerId) continue
-      await completeSale({ listingId: l.id, buyer: bot, price: l.price, via: 'engine' })
+      const res = await completeSale({ listingId: l.id, buyer: bot, price: l.price, via: 'engine' })
+      if (res.ok) {
+        // 28-a: цена сделки — в рыночный индекс; сделка — в память бота об игроке
+        await recordSale({ itemKey: l.itemKey, category: l.category, price: l.price, condition: l.condition }).catch(() => {})
+        if (!l.seller.isBot) {
+          await noteDeal(l.sellerId, bot.id, {
+            price: l.price, listingPrice: l.price,
+            category: catLabel(l.category), itemTitle: l.title,
+          }).catch(() => {})
+        }
+      }
       break // максимум одна движка-покупка за тик
     }
   }

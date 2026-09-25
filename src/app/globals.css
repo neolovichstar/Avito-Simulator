@@ -829,3 +829,93 @@
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
   cursor: pointer;
 }
+
+/* ── Task 29: блокировка ориентации — оверлей «поверни телефон» ── */
+@keyframes orient-tilt {
+  0%, 14% { transform: rotate(-90deg); }
+  46%, 68% { transform: rotate(0deg); }
+  100% { transform: rotate(-90deg); }
+}
+.orient-hint-phone {
+  animation: orient-tilt 2.6s cubic-bezier(0.6, 0.05, 0.3, 1) infinite;
+  box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.06), 0 18px 40px -12px rgba(0, 0, 0, 0.8);
+}
+
+/* ── Task 27-a: приложение «Номера» ────────────────────────────────────────
+   Глобально скроллбары ОС скрыты; для истории прокруток нужен видимый
+   тонкий скроллбар — класс-исключение. */
+.nice-scroll {
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(23, 24, 26, 0.18) transparent;
+}
+.nice-scroll::-webkit-scrollbar {
+  width: 4px !important;
+  height: 4px !important;
+  display: block !important;
+}
+.nice-scroll::-webkit-scrollbar-thumb {
+  background: rgba(23, 24, 26, 0.16);
+  border-radius: 9999px;
+}
+.nice-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ============================================================
+   ТЁМНАЯ ТЕМА v6 — ДОЖИМАЕМ «ЧЁРНЫЙ ТЕКСТ/ИКОНКИ»
+   Виновники, остававшиеся чёрными в тёмной теме:
+   1) text-black (122 использования: авито/доставка/карьера/локскрин…)
+   2) полупрозрачный чернильный text-[#17181A]/NN и text-[#1A1A1A]/NN
+      (точный класс text-[#17181A] маппился, а варианты со слэшем — нет)
+   3) text-black/NN
+   4) SVG-атрибуты stroke/fill="#1A1A1A" (шкала кредитного рейтинга)
+   5) мелочь: text-[#8A8F98], text-[#0D4CD3]
+   Иконки Lucide наследуют currentColor → фиксятся теми же правилами.
+   ============================================================ */
+
+/* --- 1) Массовый text-black → светлый --- */
+.theme-dark .text-black { color: #edf0f3; }
+.theme-dark .text-black\/40 { color: rgba(237, 240, 243, 0.46); }
+.theme-dark .text-black\/50 { color: rgba(237, 240, 243, 0.55); }
+.theme-dark .text-black\/60 { color: rgba(237, 240, 243, 0.65); }
+.theme-dark .text-black\/70 { color: rgba(237, 240, 243, 0.75); }
+
+/* --- 2) Полупрозрачный чернильный текст --- */
+.theme-dark .text-\[\#17181A\]\/25 { color: rgba(237, 240, 243, 0.34); }
+.theme-dark .text-\[\#17181A\]\/30 { color: rgba(237, 240, 243, 0.38); }
+.theme-dark .text-\[\#17181A\]\/35 { color: rgba(237, 240, 243, 0.42); }
+.theme-dark .text-\[\#17181A\]\/40 { color: rgba(237, 240, 243, 0.46); }
+.theme-dark .text-\[\#17181A\]\/45 { color: rgba(237, 240, 243, 0.52); }
+.theme-dark .text-\[\#17181A\]\/50 { color: rgba(237, 240, 243, 0.56); }
+.theme-dark .text-\[\#17181A\]\/60 { color: rgba(237, 240, 243, 0.66); }
+.theme-dark .text-\[\#17181A\]\/65 { color: rgba(237, 240, 243, 0.70); }
+.theme-dark .text-\[\#1A1A1A\]\/50 { color: rgba(237, 240, 243, 0.56); }
+.theme-dark .text-\[\#1A1A1A\]\/70 { color: rgba(237, 240, 243, 0.76); }
+.theme-dark .text-\[\#1A1A1A\]\/80 { color: rgba(237, 240, 243, 0.85); }
+
+/* --- 3) Одиночные цвета, не имевшие маппинга --- */
+.theme-dark .text-\[\#8A8F98\] { color: #99a0ab; }
+.theme-dark .text-\[\#0D4CD3\] { color: #7ea6f5; }
+
+/* --- 4) SVG-атрибуты заливки/обводки чернильного цвета
+       (стрелка кредитного рейтинга в Банке; #17181A у миниигр ремонта
+       лежит на собственных тёмных холстах — намеренно НЕ трогаем) --- */
+.theme-dark [stroke="#1A1A1A"] { stroke: #edf0f3; }
+.theme-dark [fill="#1A1A1A"] { fill: #edf0f3; }
+
+/* --- 5) Страховка: text-black на ярких светлых заливках остаётся тёмным
+       (жёлтые CTA-плашки, зелёные чипы) — и на самом элементе, и у потомков --- */
+.theme-dark [class*="bg-[#FFD53D]"][class*="text-black"],
+.theme-dark [class*="bg-[#FFD53D]"] .text-black,
+.theme-dark [class*="bg-[#FFB800]"][class*="text-black"],
+.theme-dark [class*="bg-[#FFB800]"] .text-black,
+.theme-dark [class*="bg-[#F8A13A]"][class*="text-black"],
+.theme-dark [class*="bg-[#F8A13A]"] .text-black,
+.theme-dark [class*="bg-[#3ED598]"][class*="text-black"],
+.theme-dark [class*="bg-[#3ED598]"] .text-black,
+.theme-dark [class*="bg-yellow-3"][class*="text-black"],
+.theme-dark [class*="bg-yellow-4"][class*="text-black"],
+.theme-dark [class*="bg-amber-2"][class*="text-black"],
+.theme-dark [class*="bg-amber-3"][class*="text-black"],
+.theme-dark [class*="bg-lime-3"][class*="text-black"],
+.theme-dark [class*="bg-emerald-4"][class*="text-black"] { color: #17181a; }

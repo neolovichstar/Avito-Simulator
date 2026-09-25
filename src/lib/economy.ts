@@ -94,6 +94,54 @@ export function deliveryEtaSeconds(): number {
   return 45 + Math.floor(Math.random() * 105) // 45-150 секунд
 }
 
+// ───────────────────────── ЛОГИСТИКА (Task 28-b) ─────────────────────────
+// Покупка больше не даёт вещь мгновенно: «Собираем» → «В пути» → «Прибыл» → игрок забирает.
+// Продажа игрока: курьер забирает → везёт покупателю → деньги зачисляются после вручения.
+
+// Комиссия площадки при возврате не забранной посылки (5%)
+export const RETURN_COMMISSION = 0.05
+// Сколько посылка ждёт в пункте выдачи, прежде чем курьер вернёт её продавцу
+export const PICKUP_WINDOW_MS = 24 * 3_600_000
+
+// Габарит категории: диван едет заметно дольше айфона
+export const CATEGORY_SIZE_MULT: Record<string, number> = {
+  phones: 1, clothes: 0.9, sneakers: 0.9, books: 0.9, auto: 1.05, hobby: 1,
+  music: 1.1, laptops: 1.2, electronics: 1.2, kids: 1.3, sport: 1.4,
+  appliances: 1.8, furniture: 1.9,
+}
+
+// Детерминированная «случайная» величина из id — чтобы фаза «Собираем»
+// не хранить в БД, а вычислять одинаково на сервере (id стабилен)
+export function seededSeconds(id: string, minSec: number, maxSec: number): number {
+  let h = 5381
+  for (let i = 0; i < id.length; i++) h = ((h * 33) ^ id.charCodeAt(i)) >>> 0
+  return minSec + (h % Math.max(1, maxSec - minSec + 1))
+}
+
+// «Собираем»: продавец собирает заказ (покупка) — 2-4 минуты
+export function collectSecondsFor(id: string): number {
+  return seededSeconds(id, 120, 240)
+}
+
+// «Курьер забирает товар» у игрока-продавца — 5-15 минут
+export function pickupSecondsFor(id: string): number {
+  return seededSeconds(id, 300, 900)
+}
+
+// Основное ожидание «В пути» (мин → сек). Курьер: ~25-60 мин за телефон в один город,
+// габарит и межгород множат. Самовывоз — игрок сам едет, это быстрее.
+export function deliveryTransitSeconds(category: string, sameCity: boolean, mode: 'courier' | 'pickup' | 'chat'): number {
+  const size = CATEGORY_SIZE_MULT[category] ?? 1.1
+  const baseMin = mode === 'pickup' ? 4 + Math.random() * 6 : 25 + Math.random() * 35
+  const cityK = sameCity ? 1 : mode === 'pickup' ? 1.6 : 1.5
+  return Math.round(baseMin * size * cityK * 60)
+}
+
+// Итоговый eta доставки: createdAt + сбор + путь
+export function deliveryEtaFor(createdAtMs: number, collectSec: number, transitSec: number): Date {
+  return new Date(createdAtMs + (collectSec + transitSec) * 1000)
+}
+
 export function cardNumberFor(userId: string): string {
   let h = 0
   for (let i = 0; i < userId.length; i++) h = (h * 31 + userId.charCodeAt(i)) >>> 0

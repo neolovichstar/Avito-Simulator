@@ -299,6 +299,30 @@ export function GosLogo() {
   )
 }
 
+// Номера: три барабана с цифрами (прокрутка красивых номеров).
+export function NumbersLogo() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+      {[7, 24, 41].map((x, i) => (
+        <g key={x}>
+          <rect x={x - 7} y={12} width={14} height={24} rx={3.5} fill="#ffffff" opacity={i === 1 ? 0.95 : 0.75} />
+          <text
+            x={x}
+            y={29.5}
+            textAnchor="middle"
+            fontSize={15}
+            fontWeight="700"
+            fontFamily="Arial, sans-serif"
+            fill={i === 1 ? '#FFB800' : '#17181A'}
+          >
+            7
+          </text>
+        </g>
+      ))}
+    </svg>
+  )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Реестр плиток: градиент фона + логотип + подпись для каждого AppKey.
 // image — вырезанный логотип из фирменного пака (public/img/apps/*.png):
@@ -420,6 +444,12 @@ export const APP_TILE: Record<AppKey, { label: string; background: string; image
     image: '/img/apps/gosuslugi.png',
     icon: <GosLogo />,
   },
+  numbers: {
+    label: 'Номера',
+    background: 'linear-gradient(145deg, #2B2D33, #15161A)',
+    image: '/img/apps/numbers.png',
+    icon: <NumbersLogo />,
+  },
 }
 
 /** Иконка-картинка приложения: логотип из пака, заполняет плитку целиком. */
@@ -459,6 +489,7 @@ export const HOME_GRID: AppKey[] = [
   'settings',
   'browser',
   'phone',
+  'numbers',
   'gosuslugi',
 ]
 

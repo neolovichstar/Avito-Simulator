@@ -6,12 +6,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   Loader2, Star, Package, Tag, Zap, Trash2, ChevronRight, MessageSquareText, Wallet,
-  TrendingUp, ShoppingBag, PenLine, BadgeCheck, Pencil, Swords, Heart,
+  TrendingUp, ShoppingBag, PenLine, BadgeCheck, Pencil, Swords, Heart, Truck, PackageCheck,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
 import { fmtNum, fmtMoney, timeAgo, initials, hueColor } from '@/lib/format'
-import type { ProfileData, FeedListing, InventoryItemDTO, RivalsData } from '@/lib/types'
+import type { ProfileData, FeedListing, InventoryItemDTO, RivalsData, TransitItemDTO } from '@/lib/types'
 import { getFavs } from './FeedScreen'
 import { ConditionBadge } from './AvitoApp'
 
@@ -28,6 +28,7 @@ export default function ProfileScreen({ onOpenListing, onGoSell, onGoFavorites }
 }) {
   const [data, setData] = useState<ProfileData | null>(null)
   const [items, setItems] = useState<InventoryItemDTO[]>([])
+  const [inTransit, setInTransit] = useState<TransitItemDTO[]>([])
   const [myListings, setMyListings] = useState<FeedListing[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -53,6 +54,7 @@ export default function ProfileScreen({ onOpenListing, onGoSell, onGoFavorites }
       ])
       setData(profile)
       setItems(inv.items)
+      setInTransit(inv.inTransit ?? [])
       setMyListings(feed.items)
       setError('')
     } catch (e) {
@@ -278,14 +280,69 @@ export default function ProfileScreen({ onOpenListing, onGoSell, onGoFavorites }
           )
         )}
 
-        {subTab === 'inventory' && (items.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#C4C8CF] bg-white p-8 text-center">
-            <p className="text-sm text-[#5C616B]">Инвентарь пуст</p>
-            <p className="text-xs text-[#8B8F99] mt-1">Купите товары на главной — или ловите «Отдам даром»</p>
-          </div>
-        ) : (
-          <div className="space-y-2.5">
-            {items.map((i) => {
+        {subTab === 'inventory' && (
+          items.length === 0 && inTransit.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-[#C4C8CF] bg-white p-8 text-center">
+              <p className="text-sm text-[#5C616B]">Инвентарь пуст</p>
+              <p className="text-xs text-[#8B8F99] mt-1">Купите товары на главной — или ловите «Отдам даром»</p>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {/* ЛОГИСТИКА (28-b): вещи, которые ещё едут, — серой секцией с ETA. Тап → Доставки */}
+              {inTransit.length > 0 && (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => useOS.getState().openApp('delivery')}
+                    aria-label={`В пути ${inTransit.length} — открыть Доставки`}
+                    className="mb-2 flex w-full items-center gap-2 rounded-2xl bg-[#EFF0F4] p-3 text-left active:opacity-80"
+                  >
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white text-[#8B8F99]" aria-hidden>
+                      <Truck size={17} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[13.5px] font-bold text-[#5C616B]">В пути ({inTransit.length})</span>
+                      <span className="block truncate text-[11px] text-[#8B8F99]">
+                        {inTransit[0].title}
+                        {inTransit.length > 1 ? ` и ещё ${inTransit.length - 1}` : ''} · заберите в Доставках
+                      </span>
+                    </span>
+                    <ChevronRight size={16} className="shrink-0 text-[#C4C8CF]" aria-hidden />
+                  </button>
+                  <div className="space-y-2">
+                    {inTransit.slice(0, 3).map((t) => {
+                      const etaLeft = new Date(t.eta).getTime() - Date.now()
+                      const label =
+                        t.status === 'collecting'
+                          ? 'Собираем'
+                          : t.status === 'in_transit'
+                            ? etaLeft > 0 ? `Прибудет через ~${Math.max(1, Math.ceil(etaLeft / 60000))} мин` : 'Курьер рядом'
+                            : 'Прибыл — заберите'
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => useOS.getState().openApp('delivery')}
+                          aria-label={`${t.title}: ${label}. Открыть Доставки`}
+                          className="flex w-full items-center gap-3 rounded-2xl bg-[#F5F6F9] p-3 text-left opacity-80 transition active:opacity-60"
+                        >
+                          <img loading="lazy" decoding="async" src={t.image} alt="" className="h-12 w-12 shrink-0 rounded-xl bg-[#EBEDF2] object-cover grayscale" />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[13px] font-semibold text-[#5C616B]">{t.title}</span>
+                            <span className={`mt-0.5 block text-[11px] font-medium ${t.status === 'arrived' ? 'text-[#067A47]' : 'text-[#8B8F99]'}`}>
+                              {label}
+                            </span>
+                          </span>
+                          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white text-[#8B8F99]" aria-hidden>
+                            {t.status === 'arrived' ? <PackageCheck size={15} /> : <Truck size={15} />}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+              {items.map((i) => {
               const profit = i.estValue - i.purchasePrice
               return (
                 <div key={i.id} className="rounded-2xl bg-white p-3 flex gap-3">

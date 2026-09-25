@@ -104,6 +104,12 @@ export interface PulseItemDTO {
   moves: number // сколько смен цены за час
 }
 
+// Пульс рынка (28-a): топ-движения из индекса цен + новостная строка волн
+export interface MarketPulseDTO {
+  moves: PulseItemDTO[]
+  headline: string | null
+}
+
 // Конкуренты по тому же товару (для шита изменения цены)
 export interface RivalRow {
   id: string
@@ -163,7 +169,13 @@ export interface ChatDetailData {
   listing: { id: string; title: string; price: number; image: string; status: string; condition: string }
   counterpart: { id: string; displayName: string; isBot: boolean; online: boolean; rating: number; ratingCount: number }
   role: 'buyer' | 'seller'
+  // посылка этой сделки (28-b): статус-строка «Курьер забирает товар…» с прогрессом
+  delivery?: ChatDeliveryDTO | null
   messages: ChatMessageDTO[]
+  // честный индикатор настроения бота (28-a): сервер считает по meta + память бота
+  mood?: { state: 'neutral' | 'annoyed' | 'angry' | 'happy' | 'cold' | 'gone'; emoji: string; label: string }
+  // последняя цена, предложенная ботом (для быстрых реплик-чипов)
+  lastBotOffer?: number | null
 }
 
 export interface TransactionDTO {
@@ -268,19 +280,142 @@ export interface RepairOrderDTO {
   readyAt: string
 }
 
-// Доставки (курьер)
+// ─── Мастерская: запчасти, инструменты, рабочие наряды (Task 28-c) ───
+
+// Неисправность из диагностики
+export interface FaultDTO {
+  code: string
+  label: string
+  wear: number
+  partKey?: string
+}
+
+// Вещь в мастерской (расширенная)
+export interface WorkshopItemDTO extends InventoryItemDTO {
+  faults: FaultDTO[] | null // есть диагностика
+  suggestedPartKey: string | null
+  hasPartInStock: boolean
+  warrantyUntil: string | null
+  game: string // мини-игра по умолчанию
+  activeJob: ActiveJobDTO | null
+  installedParts: { partKey: string; title: string; wear: number }[]
+}
+
+// Незавершённая работа (продолжить мини-игру)
+export interface ActiveJobDTO {
+  id: string
+  kind: 'repair' | 'install'
+  game: string
+  difficulty: 'easy' | 'normal' | 'hard'
+  partKey: string | null
+  cost: number
+  hasTool: boolean // инструмент жив на момент продолжения
+}
+
+// Инструмент в мастерской
+export interface ToolDTO {
+  key: string
+  title: string
+  price: number
+  uses: number
+  durability: number
+  game: string
+  hint: string
+}
+
+// Запчасть на складе
+export interface StockDTO {
+  partKey: string
+  qty: number
+  wearAvg: number
+}
+
+// Ответ GET /api/repair
+export interface WorkshopDataDTO {
+  items: WorkshopItemDTO[]
+  orders: RepairOrderDTO[]
+  tools: ToolDTO[]
+  stock: StockDTO[]
+  level: number
+  workDiscount: number
+}
+
+// Конфиг работы из start — передаётся в мини-игру
+export interface JobConfigDTO {
+  jobId: string
+  kind: 'repair' | 'install'
+  game: string
+  difficulty: 'easy' | 'normal' | 'hard'
+  itemTitle: string
+  itemImage: string
+  partKey: string | null
+  partTitle: string | null
+  cost: number
+  warranty: boolean
+  hasTool: boolean
+}
+
+// Результат мини-игры из finish
+export interface JobResultDTO {
+  ok: boolean
+  success: boolean
+  perfect: boolean
+  score: number
+  item: InventoryItemDTO | null
+  valueAdd: number
+  partWasted: boolean
+  warrantyUntil: string | null
+  xp: number
+  message: string
+}
+
+// Доставки (логистика 28-b):
+//   purchase: collecting («Собираем») → in_transit («В пути») → arrived («Прибыл» в ПВЗ) →
+//             → delivered (игрок забрал) | returned (24 ч не забрал — возврат денег минус 5%)
+//   sale:     collecting («Курьер забирает») → in_transit («Везём покупателю») → delivered (деньги зачислены)
+export type DeliveryStatusDTO = 'collecting' | 'in_transit' | 'arrived' | 'delivered' | 'returned'
+
 export interface DeliveryDTO {
   id: string
+  kind: 'purchase' | 'sale'
+  listingId: string
   title: string
   image: string
   price: number
   courier: string
-  status: 'in_transit' | 'delivered'
+  status: DeliveryStatusDTO
   listedCondition: string
   realCondition: string | null
   createdAt: string
+  /** конец фазы «Собираем/Курьер забирает» — детерминирован по id посылки */
+  collectEndsAt: string
   eta: string
+  /** после этого срока невостребованную посылку возвращает (только purchase) */
+  pickupDeadline: string | null
   deliveredAt: string | null
+}
+
+// Компактный блок посылки для статус-строки в чате сделки
+export interface ChatDeliveryDTO {
+  id: string
+  kind: 'purchase' | 'sale'
+  status: DeliveryStatusDTO
+  title: string
+  price: number
+  createdAt: string
+  collectEndsAt: string
+  eta: string
+  pickupDeadline: string | null
+}
+
+// «В пути (N)» в инвентаре: вещи, которые ещё едут к игроку
+export interface TransitItemDTO {
+  id: string
+  title: string
+  image: string
+  price: number
+  status: Extract<DeliveryStatusDTO, 'collecting' | 'in_transit' | 'arrived'>
+  eta: string
 }
 
 // Аукцион

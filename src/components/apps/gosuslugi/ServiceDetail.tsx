@@ -1,9 +1,10 @@
 'use client'
 
-// ServiceDetail (Task 26-b) — детальный экран сервиса Госуслуг.
+// ServiceDetail (Task 26-b, чистка 27-b) — детальный экран сервиса Госуслуг.
 // Три внутренних состояния (описание → заявление → отправлено), локальный стейт.
-// Особые сервисы: «Проверить задолженности» ведёт к штрафам, «Оплата налогов»
-// подсказывает открыть приложение «Налоги» (тост).
+// Минимум текста: чипы цены/срока, 3 коротких шага, документы списком.
+// Особые сервисы: «Штрафы ГИБДД» ведёт к штрафам, «Оплата налогов» — тост
+// про приложение «Налоги».
 
 import { useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -96,9 +97,8 @@ export default function ServiceDetail({
                   </div>
                 </div>
                 <div className="mt-3.5 flex flex-wrap gap-1.5">
-                  <MetaChip>{service.category}</MetaChip>
                   <MetaChip>{service.price}</MetaChip>
-                  <MetaChip>Около {service.duration}</MetaChip>
+                  <MetaChip>{service.duration}</MetaChip>
                 </div>
               </div>
 
@@ -131,11 +131,9 @@ export default function ServiceDetail({
               </div>
 
               {service.special === 'taxes' && (
-                <div className="flex items-start gap-3 rounded-[18px] bg-[#F8A13A]/10 p-4">
-                  <Wallet className="mt-0.5 size-[18px] shrink-0 text-[#B25E09]" strokeWidth={2} />
-                  <p className="text-[12.5px] leading-relaxed text-[#B25E09]">
-                    Оплата происходит в приложении «Налоги» — там видны начисления и долг самозанятого.
-                  </p>
+                <div className="flex items-center gap-2.5 rounded-[18px] bg-[#F8A13A]/10 p-4">
+                  <Wallet className="size-[18px] shrink-0 text-[#B25E09]" strokeWidth={2} />
+                  <p className="text-[12.5px] font-medium text-[#B25E09]">Оплата проходит в приложении «Налоги»</p>
                 </div>
               )}
 
@@ -153,8 +151,8 @@ export default function ServiceDetail({
                   }}
                   className="flex h-12 w-full items-center justify-center gap-2 rounded-[14px] bg-[#0D4CD3] text-[15px] font-semibold text-white shadow-[0_6px_16px_rgba(13,76,211,0.28)] transition active:scale-[0.985]"
                 >
-                  {service.special === 'debts' && 'Проверить задолженности'}
-                  {service.special === 'taxes' && 'Перейти к налогам'}
+                  {service.special === 'debts' && 'Открыть штрафы'}
+                  {service.special === 'taxes' && 'Перейти в «Налоги»'}
                   {!service.special && 'Начать оформление'}
                 </button>
               </div>

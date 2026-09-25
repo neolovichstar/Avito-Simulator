@@ -7,12 +7,16 @@
 // всего, стейт — глобальный useCall (звонок переживает выход из приложения).
 //
 // Два режима:
-//  • ИИ-продавец (personaId/peerUserId): настоящий голосовой разговор.
+//  • ИИ-продавец (personaId/peerUserId, НЕ live): настоящий голосовой разговор.
 //    PTT «зажал — говоришь — отпустил»: MediaRecorder (webm/opus, кап 45с) →
 //    POST /api/calls/turn (ASR → LLM → TTS) → ответ проигрывается как звонковая
 //    аудиодорожка (volume=1, НЕ медиа-громкость). Диалог дублируется пузырьками.
 //    Нет микрофона / отказ в доступе (песочница!) → авто-фолбэк «Текстовый
 //    режим»: печать текстом, LLM-ответ всё равно озвучивается.
+//  • LIVE P2P (peer.live, 27-e): настоящий разговор игрок↔игрок через WebRTC
+//    (медиа живёт в lib/live-call.ts, сюда приходит только стейт). Статусы:
+//    «Вызов…» / «Соединение…» / таймер / «Связь потеряна». mute глушит трек
+//    микрофона через стор (applyMute в live-call).
 //  • Фейковый контакт: как в 26-a — таймер, mute/speaker визуально, иногда
 //    «не отвечает».
 // ─────────────────────────────────────────────────────────────────────────────
@@ -69,6 +73,7 @@ export default function CallScreen() {
   const endReason = useCall((s) => s.endReason)
   const muted = useCall((s) => s.muted)
   const speaker = useCall((s) => s.speaker)
+  const peerLost = useCall((s) => s.peerLost)
   const toggleMute = useCall((s) => s.toggleMute)
   const toggleSpeaker = useCall((s) => s.toggleSpeaker)
   const endCall = useCall((s) => s.endCall)
@@ -76,7 +81,9 @@ export default function CallScreen() {
   const hideMine = usePrefs((s) => s.hideNumber)
 
   const tick = useTick()
-  const isAi = !!(peer?.personaId || peer?.peerUserId)
+  // live P2P-звонок (27-e) — НЕ ИИ: пузырьки/PTT продавца к нему не относятся
+  const isLive = !!peer?.live
+  const isAi = !isLive && !!(peer?.personaId || peer?.peerUserId)
 
   // ── голосовой движок (только для ИИ-звонков) ──
   const [voice, setVoice] = useState<Voice>('idle')
@@ -327,11 +334,13 @@ export default function CallScreen() {
 
   if (!peer) return null
 
-  const inCall = phase === 'dialing' || phase === 'ringing' || phase === 'active'
+  const inCall =
+    phase === 'dialing' || phase === 'ringing-out' || phase === 'ringing' || phase === 'active' || phase === 'active-live'
   const pttDisabled = phase !== 'active' || muted
 
   const statusLine = (() => {
     if (phase === 'dialing') return 'Вызов…'
+    if (phase === 'ringing-out') return 'Вызов…'
     if (phase === 'ringing') return 'Соединение…'
     if (phase === 'active') {
       if (!isAi) return `${pad2(Math.floor(secs / 60))}:${pad2(secs % 60)}`
@@ -339,6 +348,10 @@ export default function CallScreen() {
       if (voice === 'thinking') return 'Думаю…'
       if (voice === 'speaking') return 'Собеседник говорит…'
       return hint ?? (textMode ? 'Текстовый режим' : 'Зажмите микрофон и говорите')
+    }
+    if (phase === 'active-live') {
+      if (peerLost) return 'Связь потеряна…'
+      return `${pad2(Math.floor(secs / 60))}:${pad2(secs % 60)}`
     }
     return ''
   })()
@@ -348,7 +361,15 @@ export default function CallScreen() {
       ? 'Абонент не отвечает'
       : endReason === 'failed'
         ? 'Сбой связи'
-        : 'Звонок завершён'
+        : endReason === 'rejected'
+          ? 'Абонент отклонил вызов'
+          : endReason === 'busy'
+            ? 'Абонент занят'
+            : endReason === 'offline'
+              ? 'Абонент не в сети'
+              : endReason === 'missed'
+                ? 'Пропущенный звонок'
+                : 'Звонок завершён'
 
   return (
     <div className="flex h-full flex-col bg-[linear-gradient(180deg,#07130D,#050D09)] text-white">
@@ -471,7 +492,7 @@ export default function CallScreen() {
               onClick={() => {
                 toggleMute()
               }}
-              disabled={phase !== 'active'}
+              disabled={isLive ? phase !== 'active-live' : phase !== 'active'}
               aria-pressed={muted}
               aria-label={muted ? 'Включить микрофон' : 'Выключить микрофон'}
               className={
@@ -567,7 +588,7 @@ export default function CallScreen() {
               onClick={() => {
                 toggleSpeaker()
               }}
-              disabled={phase !== 'active'}
+              disabled={isLive ? phase !== 'active-live' : phase !== 'active'}
               aria-pressed={speaker}
               aria-label={speaker ? 'Выключить громкую связь' : 'Включить громкую связь'}
               className={
@@ -585,7 +606,7 @@ export default function CallScreen() {
 
           {/* нижний ряд: свернуть/текст-режим + сброс */}
           <div className="mt-4 flex shrink-0 flex-col items-center gap-3 pb-12">
-            {phase === 'active' && (
+            {(phase === 'active' || phase === 'active-live') && (
               <div className="flex items-center gap-2">
                 {isAi && (
                   <button

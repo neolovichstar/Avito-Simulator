@@ -16,22 +16,16 @@ export async function purgeExpiredReserves(): Promise<void> {
   })
 }
 
-/** Лимит одновновременных броней: если превышен — самые старые уходят. */
+/** Лимит одновременных броней (только платные, buyPrice>0): лишние уходят. */
 async function enforceReserveCap(tx: Tx, userId: string): Promise<void> {
   const reserves = await tx.phoneNumber.findMany({
-    where: { userId, status: 'reserved' },
+    where: { userId, status: 'reserved', buyPrice: { gt: 0 } },
     orderBy: { createdAt: 'asc' },
     select: { id: true },
   })
   if (reserves.length < MAX_RESERVES) return
   const drop = reserves.slice(0, reserves.length - MAX_RESERVES + 1).map((r) => r.id)
   await tx.phoneNumber.deleteMany({ where: { id: { in: drop } } })
-}
-
-/** Есть ли у игрока основной номер. */
-export async function hasMainPhone(tx: Tx, userId: string): Promise<boolean> {
-  const main = await tx.phoneNumber.findFirst({ where: { userId, isMain: true }, select: { id: true } })
-  return main !== null
 }
 
 export interface RolledPhone {
@@ -41,21 +35,27 @@ export interface RolledPhone {
 
 /**
  * Прокрутка: генерирует случайный номер региона с перегенерацией при коллизии
- * digits/number (unique index). Обычный (basic) сразу активируется — он входит
- * в цену прокрутки; красивый ставится на бронь 48ч с ценой выкупа.
+ * digits/number (unique index). ЛЮБОЙ выпавший номер ставится на бронь 48ч —
+ * обычный (basic) с buyPrice=0 («забрать бесплатно»), красивый — с ценой
+ * выкупа. Ничего не сохраняется автоматически: номер становится своим только
+ * через POST /api/phones/buy. Невыкупленные обычные номера не копятся — перед
+ * новой прокруткой они удаляются (номер возвращается в общий пул).
  * Вызывается ВНУТРИ $transaction после списания цены прокрутки.
  */
 export async function rollNumber(tx: Tx, userId: string, region: Region): Promise<RolledPhone> {
+  // Невыкупленные обычные брони не копятся в инвентаре.
+  await tx.phoneNumber.deleteMany({ where: { userId, status: 'reserved', buyPrice: 0 } })
+
   let lastErr: unknown = null
   for (let attempt = 0; attempt < 6; attempt++) {
     const digits = generateDigits(region)
     const score = beautyScore(digits.slice(-7))
     const tier = tierFromScore(score)
-    const free = tier === 'basic'
+    const premium = tier !== 'basic' // buyPrice > 0 — платная бронь
 
-    if (!free) await enforceReserveCap(tx, userId)
+    // Кап одновременных броней считается только по платным.
+    if (premium) await enforceReserveCap(tx, userId)
 
-    const noMain = !(await hasMainPhone(tx, userId))
     try {
       const phone = await tx.phoneNumber.create({
         data: {
@@ -66,14 +66,14 @@ export async function rollNumber(tx: Tx, userId: string, region: Region): Promis
           regionName: region.name,
           tier,
           beautyScore: score,
-          status: free ? 'active' : 'reserved',
-          reservedFor: free ? null : userId,
-          holdUntil: free ? null : new Date(Date.now() + RESERVE_HOURS * 3600_000),
-          buyPrice: free ? 0 : buyPriceFor(score, region.prestige),
-          isMain: free && noMain, // первый обычный номер сразу становится основным
+          status: 'reserved',
+          reservedFor: userId,
+          holdUntil: new Date(Date.now() + RESERVE_HOURS * 3600_000),
+          buyPrice: premium ? buyPriceFor(score, region.prestige) : 0,
+          isMain: false, // основным станет только после «Забрать»
         },
       })
-      return { phone, activated: free }
+      return { phone, activated: false }
     } catch (err) {
       // P2002 — коллизия уникальности digits/number: перегенерируем
       lastErr = err

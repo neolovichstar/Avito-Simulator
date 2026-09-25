@@ -93,6 +93,7 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
   const [city, setCity] = useState<string>('all')
   const [cities, setCities] = useState<{ city: string; count: number }[]>([])
   const [pulse, setPulse] = useState<PulseItemDTO[]>([])
+  const [pulseHeadline, setPulseHeadline] = useState<string | null>(null)
   const [pulseFlash, setPulseFlash] = useState(false)
   // умные подсказки: недавние запросы пользователя
   const [recentQ, setRecentQ] = useState<string[]>([])
@@ -131,7 +132,10 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
   const loadSaved = useCallback(() => {
     api.savedSearches().then((r) => setSaved(r.searches)).catch(() => {})
     api.feedCities().then((r) => setCities(r.cities.filter((c) => c.count > 0).slice(0, 12))).catch(() => {})
-    api.marketPulse().then((r) => setPulse(Array.isArray(r) ? r : [])).catch(() => {})
+    api.marketPulse().then((r) => {
+      setPulse(Array.isArray(r?.moves) ? r.moves : [])
+      setPulseHeadline(r?.headline ?? null)
+    }).catch(() => {})
   }, [])
   useEffect(() => { loadSaved() }, [loadSaved])
 
@@ -151,7 +155,8 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
         if (timer) clearTimeout(timer)
         timer = setTimeout(() => {
           api.marketPulse().then((r) => {
-            setPulse(Array.isArray(r) ? r : [])
+            setPulse(Array.isArray(r?.moves) ? r.moves : [])
+            setPulseHeadline(r?.headline ?? null)
             setPulseFlash(true)
             setTimeout(() => setPulseFlash(false), 1600)
           }).catch(() => {})
@@ -490,10 +495,11 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
             onClear={() => { clearViewed(); setViewed([]) }}
           />
         )}
-        {/* Пульс рынка — живые движения цен за час */}
-        {!favoritesMode && !query && category === 'all' && pulse.length > 0 && !loading && (
+        {/* Пульс рынка — блок «Рынок»: новость волн + топ-5 движений цен (час+день) */}
+        {!favoritesMode && !query && category === 'all' && (pulse.length > 0 || pulseHeadline) && !loading && (
           <MarketPulseStrip
             items={pulse}
+            headline={pulseHeadline}
             flash={pulseFlash}
             onPick={(t) => { setQ(t); setQuery(t) }}
           />
@@ -779,11 +785,12 @@ export function ListingCard({ listing: l, onOpen, onFav, fav, comparing, onCompa
   )
 }
 
-// ПУЛЬС РЫНКА: белая карточка с заголовком и горизонтальным скроллом товаров,
-// чья цена заметно двигалась за последний час. Тап — применяем поиск по товару.
-// deltaPct < 0 — подешевел (зелёный), > 0 — подорожал (красный).
-function MarketPulseStrip({ items, flash, onPick }: {
+// ПУЛЬС РЫНКА (28-a): белая карточка — новостная строка волн рынка сверху,
+// затем горизонтальный скролл топ-5 движений цен (за час + за день из индекса).
+// Тап — применяем поиск по товару. deltaPct < 0 — подешевел (зелёный), > 0 — дороже (красный).
+function MarketPulseStrip({ items, headline, flash, onPick }: {
   items: PulseItemDTO[]
+  headline: string | null
   flash: boolean
   onPick: (query: string) => void
 }) {
@@ -798,8 +805,8 @@ function MarketPulseStrip({ items, flash, onPick }: {
     >
       <div className="flex items-baseline gap-2 px-3 pt-3 pb-1">
         <Activity size={15} className="text-[#0AC760] self-center" aria-hidden />
-        <h2 className="text-[16px] font-bold text-black leading-none">Пульс рынка</h2>
-        <span className="text-[12px] text-[#8B8F99]">за час</span>
+        <h2 className="text-[16px] font-bold text-black leading-none">Рынок</h2>
+        <span className="text-[12px] text-[#8B8F99]">час · индекс</span>
         {flash && (
           <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-[#067A47]">
             <span className="relative flex h-1.5 w-1.5" aria-hidden>
@@ -810,6 +817,12 @@ function MarketPulseStrip({ items, flash, onPick }: {
           </span>
         )}
       </div>
+      {headline && (
+        <p className="px-3 pb-1.5 text-[11px] leading-snug text-[#5C616B] flex items-start gap-1">
+          <span className="shrink-0" aria-hidden>📰</span>
+          <span>{headline}</span>
+        </p>
+      )}
       <div className="flex gap-2 overflow-x-auto px-2.5 pb-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((p) => {
           const down = p.deltaPct < 0

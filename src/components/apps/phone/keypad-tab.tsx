@@ -7,8 +7,7 @@ import { useState } from 'react'
 import { Delete, Hash, Phone } from 'lucide-react'
 import { formatDialInput } from '@/lib/phone'
 import { sound } from '@/lib/sound'
-import { TierBadge } from './numbers-tab'
-import type { PhoneDTO } from './shared'
+import { TierBadge, type PhoneDTO } from './shared'
 
 const KEYS: { d: string; sub?: string; label: string }[] = [
   { d: '1', label: 'Цифра 1' },
@@ -28,10 +27,11 @@ const KEYS: { d: string; sub?: string; label: string }[] = [
 interface Props {
   mainNumber: PhoneDTO | null
   onCall: (name: string | null, number: string, peerUserId?: string | null) => void
-  onGoNumbers: () => void
+  /** Чип «Ваш номер» → отдельное приложение «Номера». */
+  onOpenNumbers: () => void
 }
 
-export default function KeypadTab({ mainNumber, onCall, onGoNumbers }: Props) {
+export default function KeypadTab({ mainNumber, onCall, onOpenNumbers }: Props) {
   const [raw, setRaw] = useState('')
   const display = formatDialInput(raw)
 
@@ -50,7 +50,7 @@ export default function KeypadTab({ mainNumber, onCall, onGoNumbers }: Props) {
       {/* Основной номер игрока */}
       <button
         type="button"
-        onClick={onGoNumbers}
+        onClick={onOpenNumbers}
         className="mx-auto mb-1 mt-1 flex max-w-full items-center gap-1.5 rounded-full bg-white/[0.05] px-3 py-1 text-[11px] text-white/45 transition-colors active:bg-white/[0.09]"
       >
         <Hash className="size-3 shrink-0" aria-hidden="true" />
@@ -59,7 +59,7 @@ export default function KeypadTab({ mainNumber, onCall, onGoNumbers }: Props) {
             Ваш: {mainNumber.number}
           </span>
         ) : (
-          <span className="truncate text-emerald-400/80">Выбейте себе номер в разделе «Номера»</span>
+          <span className="truncate text-emerald-400/80">Выбей номер в приложении «Номера»</span>
         )}
         {mainNumber && <TierBadge tier={mainNumber.tier} />}
       </button>

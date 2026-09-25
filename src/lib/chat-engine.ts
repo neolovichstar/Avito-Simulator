@@ -1,13 +1,21 @@
-// Переговорный движок чатов: бот отвечает на сообщения игрока через ИИ
+// Переговорный движок чатов: бот отвечает на сообщения игрока через ИИ.
+// 28-a: у ботов ПАМЯТЬ об игроке (bot-memory, персистентная в User.stats),
+// сигналы переписки (лоубол/грубость/похвала/кидалово), кулдаун «закрыл встречу»,
+// живые паузы перед ответом, запись цен сделок в рыночный индекс.
 import { db } from '@/lib/db'
 import { emitTo } from '@/lib/realtime-emit'
-import { aiNegotiate, type AiHistoryItem } from '@/lib/ai'
+import { aiNegotiate, extractPrice, type AiHistoryItem } from '@/lib/ai'
 import { PERSONAS } from '@/lib/personas-data'
 import { CATEGORY_LABEL, CONDITION_LABEL, CONDITION_MULT } from '@/lib/catalog-types'
 import { fmtMoney, stripEmoji } from '@/lib/format'
 import { completeSale } from '@/lib/deals'
 import { bumpStats, bumpQuests } from '@/lib/deals'
 import { isBlocked } from '@/lib/blocked'
+import { recordSale, getMarketValue } from '@/lib/market-index'
+import {
+  getBotMemoryEntry, noteDeal, noteSignal, setBotCooldown, hasActiveCooldown,
+  memoryPromptLine, type BotMemoryEntry,
+} from '@/lib/bot-memory'
 import type { Chat, Listing, User } from '@prisma/client'
 
 export interface ChatMeta {
@@ -18,6 +26,10 @@ export interface ChatMeta {
   lastOffer?: number
   patience?: number // сколько раундов бот выдерживает до финальной уступки
   finalDone?: boolean // финальная уступка уже была
+  lowballStreak?: number // подряд идущие лоуболы игрока (для бота-продавца)
+  invoicePending?: boolean // бот выставил счёт и ждёт оплату (для ловли «согласился и передумал»)
+  praiseDone?: boolean // похвалу в этом чате уже засчитывали
+  cold?: boolean // холодный opener при кулдауне памяти
 }
 
 export function parseChatMeta(raw: string | null | undefined): ChatMeta {
@@ -31,6 +43,10 @@ export function parseChatMeta(raw: string | null | undefined): ChatMeta {
       lastOffer: m.lastOffer,
       patience: m.patience,
       finalDone: m.finalDone,
+      lowballStreak: m.lowballStreak,
+      invoicePending: m.invoicePending,
+      praiseDone: m.praiseDone,
+      cold: m.cold,
     }
   } catch {
     return { botRole: 'buyer', botLimit: 0, rounds: 0 }
@@ -49,6 +65,11 @@ export function botOpener(chat: Chat, listing: Listing, bot: User): { text: stri
   const est = Math.round(listing.baseValue * mult)
   const isBuyer = meta.botRole === 'buyer'
 
+  // холодный opener: у бота кулдаун памяти на этого игрока
+  if (meta.cold) {
+    return { text: coldOpenerLine(), offer: listing.price, limit: meta.botLimit || Math.round(listing.price * 0.97) }
+  }
+
   if (isBuyer) {
     const discount = 0.08 + p.greed * 0.18 + Math.random() * 0.1
     const offer = Math.max(Math.round(est * 0.4), Math.round(listing.price * (1 - discount)))
@@ -57,6 +78,53 @@ export function botOpener(chat: Chat, listing: Listing, bot: User): { text: stri
   }
   const greet = p.greetings[Math.floor(Math.random() * p.greetings.length)]
   return { text: greet, offer: listing.price, limit: meta.botLimit || Math.round(listing.price * 0.9) }
+}
+
+// ---------- СИГНАЛЫ ПЕРЕПИСКИ ----------
+
+const RUDE_RE = /(дурак|дура\b|идиот|туп(ой|ая|ица|ак)|дебил|чмо|\bloх\b|мудак|мраз|тварь|сволоч|урод|псих|отвали|отъеб|пош[её]л на|иди в жоп|нахуй|бля(д|ть)|пизд|хуй|ебан|asshole)/i
+const PRAISE_SUBJECT_RE = /(состояни|выглядит|комплект|товар|вещь|вид|фото)/i
+const PRAISE_QUALITY_RE = /(отличн|идеальн|прекрасн|замечательн|как новый|как из коробк|имба|супер|крут|огонь)/i
+
+interface PlayerSignals {
+  rude: boolean
+  praise: boolean
+  lowballOffer: number | null // предложено <40% цены (только для бота-продавца)
+}
+
+function analyzePlayerMessage(text: string, invoice: number | undefined, listingPrice: number, botIsSeller: boolean): PlayerSignals {
+  const t = (text ?? '').toLowerCase()
+  const rude = RUDE_RE.test(t)
+  const praise = !rude && PRAISE_SUBJECT_RE.test(t) && PRAISE_QUALITY_RE.test(t)
+  let lowballOffer: number | null = null
+  if (botIsSeller) {
+    const offer = invoice !== undefined && invoice > 0 ? invoice : extractPrice(t)
+    if (offer && listingPrice > 0 && offer < listingPrice * 0.4) lowballOffer = offer
+  }
+  return { rude, praise, lowballOffer }
+}
+
+// ---------- ЖЁСТКИЕ ФРАЗЫ ВЫХОДА / ХОЛОДНЫЕ ОТВЕТЫ ----------
+
+const WALK_LINES_SELLER = [
+  'всё, я такое не обсуждаю. Ищем другого покупателя',
+  'хватит. Еду к тебе или отбой? Больше в переписку не торгуюсь',
+  'всё, закрыли тему. В другой раз без таких цен заходи',
+  'мне время дороже. Отбой',
+]
+const WALK_LINES_COOLDOWN = [
+  'всё, я на тебя время тратить не буду. В другой раз',
+  'знаешь, общаться расхотел. Пиши когда серьёзно',
+  'так, я пас. Не хочу больше этот вопрос обсуждать',
+]
+const COLD_OPENERS = [
+  'Опять ты. Товар продаётся, но цену я не обсуждаю',
+  'Мы уже общались, я помню. Актуально, но торг будет короткий',
+  'Ну здрасте. Помню прошлый раз, так что сразу к делу: цена на карточке',
+]
+
+export function coldOpenerLine(): string {
+  return COLD_OPENERS[Math.floor(Math.random() * COLD_OPENERS.length)]
 }
 
 const AGREE_PHRASES = ['по рукам', 'окей', 'идёт', 'ладно', 'договорились']
@@ -83,9 +151,32 @@ async function historyOf(chatId: string, viewerBotId: string): Promise<AiHistory
   }))
 }
 
+// Записать сделку в рыночный индекс (цена) и в память бота об игроке
+async function onDealCompleted(opts: {
+  listing: Listing
+  buyerBotId?: string | null // если покупатель — бот
+  sellerBotId?: string | null // если продавец — бот
+  player: User
+  price: number
+}): Promise<void> {
+  const { listing, buyerBotId, sellerBotId, player, price } = opts
+  await recordSale({
+    itemKey: listing.itemKey, category: listing.category,
+    price, condition: listing.condition,
+  }).catch(() => {})
+  // память ведёт бот о игроке (оба бота — пропускаем)
+  const botId = buyerBotId ?? sellerBotId ?? null
+  if (!botId || player.isBot) return
+  await noteDeal(player.id, botId, {
+    price, listingPrice: listing.price,
+    category: CATEGORY_LABEL[listing.category] ?? listing.category,
+    itemTitle: listing.title,
+  }).catch(() => {})
+}
+
 // Основной ответ бота на сообщение/счёт игрока.
-// Обёртка: пока бот «думает», событие typing повторяется каждые 2.5с —
-// индикатор поймают и открытый чат, и список чатов, даже подписавшись посреди размышления
+// Обёртка: пока бот «думает», событие typing повторяется —
+// индикатор поймают и открытый чат, и список чатов.
 export async function botReply(chatId: string, playerMsg: { text?: string; invoice?: number }): Promise<void> {
   let typingName: string | null = null
   let finished = false
@@ -117,7 +208,7 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
   if (!player) return
 
   const persona = personaOf(bot)
-  const meta = parseChatMeta(chat.meta)
+  let meta = parseChatMeta(chat.meta)
   const isBuyer = meta.botRole === 'buyer'
   const playerMessage = playerMsg.invoice
     ? `Собеседник выставил счёт на ${fmtMoney(playerMsg.invoice)} (предлагает цену ${fmtMoney(playerMsg.invoice)})`
@@ -129,9 +220,71 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
     return
   }
 
-  // печатает... (дальше событие повторяется keepalive-циклом обёртки)
+  // ---------- ПАМЯТЬ: опыт этого бота с игроком ----------
+  const memory: BotMemoryEntry | null = player.isBot ? null : await getBotMemoryEntry(player.id, bot.id)
+
+  // кулдаун: бот «закрыл встречу» после грязного торга — серверная память, перезаход не сбрасывает
+  if (hasActiveCooldown(memory) && !player.isBot) {
+    await db.chat.update({ where: { id: chat.id }, data: { meta: JSON.stringify({ ...meta, closed: true }) } })
+    await saveAndEmit(chat.id, bot, pick(WALK_LINES_COOLDOWN), persona.typoRate)
+    return
+  }
+
+  // ---------- СИГНАЛЫ ПЕРЕПИСКИ ----------
+  const signals = analyzePlayerMessage(playerMsg.text ?? '', playerMsg.invoice, listing.price, !isBuyer)
+  const freshMeta: ChatMeta = { ...meta }
+
+  if (signals.rude && !player.isBot) {
+    const e = await noteSignal(player.id, bot.id, 'rude')
+    if (e && (e.rudeCount ?? 0) >= 2) {
+      // систематическая грубость — кулдаун
+      await setBotCooldown(player.id, bot.id, (20 + Math.random() * 30) * 60_000, 'грубил в переписке')
+      await db.chat.update({ where: { id: chat.id }, data: { meta: JSON.stringify({ ...freshMeta, closed: true }) } })
+      await saveAndEmit(chat.id, bot, pick(WALK_LINES_COOLDOWN), persona.typoRate)
+      return
+    }
+  }
+  if (signals.praise && !player.isBot && !meta.praiseDone) {
+    await noteSignal(player.id, bot.id, 'praise')
+    freshMeta.praiseDone = true
+  }
+  // «согласился и передумал»: счёт висит неоплаченным, а игрок продолжает писать
+  if (meta.invoicePending && !player.isBot && !isBuyer) {
+    await noteSignal(player.id, bot.id, 'scamBail')
+    freshMeta.invoicePending = false
+  }
+
+  // лоубол: только для бота-продавца (игрок сбивает цену)
+  if (signals.lowballOffer && !player.isBot) {
+    freshMeta.lowballStreak = (meta.lowballStreak ?? 0) + 1
+    await noteSignal(player.id, bot.id, 'lowball', `${Math.round((signals.lowballOffer / Math.max(1, listing.price)) * 100)}% от цены`)
+    if (freshMeta.lowballStreak >= 2 && Math.random() < 0.75) {
+      // второй лоубол подряд — бот закрывает встречу и уходит в кулдаун
+      await setBotCooldown(player.id, bot.id, (30 + Math.random() * 45) * 60_000, 'выжил терпение лоуболами')
+      await db.chat.update({ where: { id: chat.id }, data: { meta: JSON.stringify({ ...freshMeta, closed: true }) } })
+      const line = (memory?.flags.includes('lowballer') || (memory?.lowballs ?? 0) >= 3)
+        ? `${pick(WALK_LINES_COOLDOWN)}`
+        : pick(WALK_LINES_SELLER)
+      await saveAndEmit(chat.id, bot, line, persona.typoRate)
+      return
+    }
+  }
+
+  if (freshMeta.lowballStreak !== meta.lowballStreak || freshMeta.invoicePending !== meta.invoicePending || freshMeta.praiseDone !== meta.praiseDone) {
+    await db.chat.update({ where: { id: chat.id }, data: { meta: JSON.stringify(freshMeta) } })
+    meta = freshMeta
+  }
+
+  // печатает... (дальше событие повторяется keepalive-циклом обёртки).
+  // Пауза живая: злой бот отвечает дольше, довольный — быстрее.
   setTypingName(bot.displayName)
-  await new Promise((r) => setTimeout(r, 600 + Math.random() * 900))
+  const delayMs = 500
+    + Math.random() * 1_300
+    + (signals.rude ? 900 : 0)
+    + (signals.lowballOffer ? 500 : 0)
+    + (signals.praise ? -200 : 0)
+    + (memory && hasActiveCooldown(memory) ? 600 : 0)
+  await new Promise((r) => setTimeout(r, Math.max(400, delayMs)))
 
   const history = await historyOf(chat.id, bot.id)
   const condLabel = CONDITION_LABEL[listing.condition] ?? listing.condition
@@ -148,10 +301,11 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
         // бот-продавец выставляет счёт ровно на обещанную цену
         const invoiceId = `inv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
         await saveAndEmit(
-          chat.id, bot, `${pickAgree()} ${fmtMoney(meta.lastOffer)}. Ставлю счёт`, persona.typoRate,
+          chat.id, bot, `${pickAgree()} ${fmtMoney(meta.lastOffer)}. Ставлю счёт${memory?.flags.includes('scammer') ? ', оплата вперёд' : ''}`, persona.typoRate,
           { kind: 'invoice', amount: meta.lastOffer, invoiceId },
         )
         await saveSystem(chat.id, `Счёт от продавца: ${fmtMoney(meta.lastOffer)}. Оплатите, чтобы получить товар.`)
+        await db.chat.update({ where: { id: chat.id }, data: { meta: JSON.stringify({ ...meta, invoicePending: true }) } })
         return
       }
       // бот-покупатель платит игроку-продавцу сразу
@@ -159,6 +313,7 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
         listingId: listing.id, buyer: bot, price: meta.lastOffer, via: 'chat', chatId: chat.id,
       })
       if (res.ok) {
+        await onDealCompleted({ listing, buyerBotId: bot.id, player, price: meta.lastOffer })
         await saveAndEmit(chat.id, bot, `${pickAgree()} оплатил, глянь`, persona.typoRate)
         return
       }
@@ -172,16 +327,21 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
   const patience = meta.patience ?? persona.patience
   if (!meta.closed && meta.rounds >= patience) {
     if (meta.rounds >= patience + 2 || meta.finalDone) {
-      // устал: терпение кончилось — вежливо/грубо закрываем сделку
+      // устал: терпение кончилось — закрываем встречу; грязный след в памяти → кулдаун
+      const dirt = (memory?.flags.includes('lowballer') || memory?.flags.includes('scammer') || (meta.lowballStreak ?? 0) >= 2) && !player.isBot
+      if (dirt) await setBotCooldown(player.id, bot.id, (25 + Math.random() * 50) * 60_000, 'выжил терпение в торге')
       await db.chat.update({ where: { id: chat.id }, data: { meta: JSON.stringify({ ...meta, closed: true, patience }) } })
       const bye = isBuyer
         ? pick(['ну всё, больше не дам, удачи в поисках', 'всё, потолок, до связи', 'не могу больше, пас'])
-        : pick(['всё, больше не уступлю, думай', 'последняя цена была — дальше никак, до связи', 'всё, я своё сказал, пас'])
+        : dirt
+          ? pick([...WALK_LINES_COOLDOWN, 'всё, я своё сказал. Пас'])
+          : pick(['всё, больше не уступлю, думай', 'последняя цена была — дальше никак, до связи', 'всё, я своё сказал, пас'])
       await saveAndEmit(chat.id, bot, bye, persona.typoRate)
       return
     }
     if (!meta.finalDone) {
-      // финальная уступка: открывает свою нижнюю границу один раз
+      // финальная уступка: открывает свою нижнюю границу один раз.
+      // Память о лоуболере/кидале — уступка меньше (лимит ужесточён заранее).
       const finalPrice = isBuyer ? Math.max(meta.botLimit, Math.round(meta.botLimit * 1.02)) : meta.botLimit
       const text = isBuyer
         ? `${pick(['ну окей, всё что есть', 'ладно, ты победил'])}: ${fmtMoney(finalPrice)}, больше не дам`
@@ -195,6 +355,21 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
     }
   }
   // ---------- /ХАРАКТЕР ----------
+
+  // ---------- РЫНОК: заметка об индексе цен ----------
+  const marketValue = await getMarketValue(listing.baseValue, listing.itemKey, listing.condition).catch(() => 0)
+  let marketNote = ''
+  if (marketValue > 0) {
+    if (marketValue > listing.price * 1.08) {
+      marketNote = isBuyer
+        ? `Рынок сейчас горячий: такие уходят около ${fmtMoney(marketValue)}, за бесценок никто не отдаст.`
+        : `Рынок сейчас горячий: такие уходят около ${fmtMoney(marketValue)} — не отдавай дешевле рыночной.`
+    } else if (marketValue < listing.price * 0.88) {
+      marketNote = isBuyer
+        ? `Рынок просел: такие сейчас стоят около ${fmtMoney(marketValue)}, не переплачивай.`
+        : `Рынок просел: такие сейчас стоят около ${fmtMoney(marketValue)}.`
+    }
+  }
 
   const reply = await aiNegotiate({
     persona,
@@ -213,6 +388,9 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
     rounds: meta.rounds,
     playerMessage,
     firstContact: history.length <= 1,
+    memory: memoryPromptLine(memory, meta.botRole),
+    memoryFlags: memory?.flags ?? [],
+    marketNote,
   })
 
   await db.chat.update({
@@ -228,6 +406,7 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
         listingId: listing.id, buyer: bot, price: reply.price, via: 'chat', chatId: chat.id,
       })
       if (res.ok) {
+        await onDealCompleted({ listing, buyerBotId: bot.id, player, price: reply.price })
         if (!player.isBot) await bumpStats(bot.id, {})
         await saveAndEmit(chat.id, bot, `${reply.text}`, persona.typoRate)
         return
@@ -242,10 +421,16 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
       { kind: 'invoice', amount: reply.price, invoiceId },
     )
     await saveSystem(chat.id, `Счёт от продавца: ${fmtMoney(reply.price)}. Оплатите, чтобы получить товар.`)
+    await db.chat.update({ where: { id: chat.id }, data: { meta: JSON.stringify({ ...meta, invoicePending: true }) } })
     return
   }
 
   if (reply.action === 'reject') {
+    // 28-a: ИИ закрыл встречу сам (абсурдная цена/грубость). Если перед этим
+    // игрок лоуболил подряд — память ставит кулдаун на этого продавца (таймер в stats).
+    if (!player.isBot && (meta.lowballStreak ?? 0) >= 2) {
+      await setBotCooldown(player.id, bot.id, (25 + Math.random() * 45) * 60_000, 'закрыл встречу после лоуболов')
+    }
     await db.chat.update({ where: { id: chat.id }, data: { meta: JSON.stringify({ ...meta, closed: true }) } })
     await saveAndEmit(chat.id, bot, reply.text, persona.typoRate)
     return
@@ -334,7 +519,7 @@ async function saveSystem(chatId: string, text: string) {
   })
 }
 
-// Игрок оплатил счёт бота-продавца
+// Игрок оплатил счёт бота-продавца: сделка → индекс цен + память продавца об игроке
 export async function payInvoice(chatId: string, invoiceId: string, player: User) {
   const invoice = await db.message.findFirst({
     where: { chatId, invoiceId, kind: 'invoice', paid: null },
@@ -349,12 +534,21 @@ export async function payInvoice(chatId: string, invoiceId: string, player: User
   if (!listing || listing.status !== 'active') return { ok: false as const, error: 'Товар уже продан' }
 
   await db.message.update({ where: { id: invoice.id }, data: { paid: true } })
+  // 28-b: счёт в чате = дистанционная сделка → товар едет посылкой («Собираем» → «В пути» → ПВЗ)
   const res = await completeSale({
-    listingId: listing.id, buyer: player, price: invoice.amount, via: 'chat', chatId,
+    listingId: listing.id, buyer: player, price: invoice.amount, via: 'chat', chatId, mode: 'chat',
   })
   if (!res.ok) {
     await db.message.update({ where: { id: invoice.id }, data: { paid: null } })
     return { ok: false as const, error: res.error ?? 'Сделка не состоялась' }
+  }
+  if (!player.isBot) {
+    await onDealCompleted({ listing, sellerBotId: chat.sellerId, player, price: invoice.amount })
+    // счёт закрыт — снимаем флаг ожидания оплаты
+    const meta = parseChatMeta(chat.meta)
+    if (meta.invoicePending) {
+      await db.chat.update({ where: { id: chat.id }, data: { meta: JSON.stringify({ ...meta, invoicePending: false }) } })
+    }
   }
   await bumpQuests(player.id, 'chat')
   return { ok: true as const }
@@ -391,6 +585,9 @@ export async function winBackSweep(): Promise<void> {
       const seller = await db.user.findUnique({ where: { id: chat.sellerId } })
       if (!buyer || !seller || buyer.isBot || !seller.isBot) continue
       if (await isBlocked(buyer.id, seller.id)) continue
+      // память: лоуболерам и кидалам бот навстречу не идёт
+      const mem = await getBotMemoryEntry(buyer.id, seller.id)
+      if (mem && (mem.flags.includes('lowballer') || mem.flags.includes('scammer'))) continue
 
       const listing = await db.listing.findUnique({ where: { id: chat.listingId } })
       if (!listing || listing.status !== 'active') continue

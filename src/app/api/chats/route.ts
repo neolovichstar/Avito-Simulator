@@ -1,9 +1,11 @@
 import { db } from '@/lib/db'
 import { getSessionUser, unauthorized } from '@/lib/session'
 import { isOnline } from '@/lib/dto'
-import { botOpener, personaOf } from '@/lib/chat-engine'
+import { botOpener, personaOf, parseChatMeta, coldOpenerLine } from '@/lib/chat-engine'
 import { CONDITION_MULT } from '@/lib/catalog-types'
 import { getCategoryMult } from '@/lib/engine'
+import { getMarketValue } from '@/lib/market-index'
+import { getBotMemoryEntry, hasActiveCooldown, memoryLimitShift, computeMood } from '@/lib/bot-memory'
 import type { ChatListItem } from '@/lib/types'
 import { itemImage } from '@/lib/item-images'
 
@@ -75,32 +77,58 @@ export async function POST(req: Request) {
   })
 
   if (!chat && listing.seller.isBot) {
+    // ---------- ПАМЯТЬ (28-a): продавец-бот знает свою историю с этим игроком ----------
+    const memory = await getBotMemoryEntry(user.id, listing.seller.id)
+    const cooldown = hasActiveCooldown(memory)
+    const persona = personaOf(listing.seller)
+
     const mult = await getCategoryMult(listing.category)
-    const est = listing.baseValue * (CONDITION_MULT[listing.condition] ?? 0.8) * mult
+    // рынок (28-a): динамический индекс цен — горячий товар дороже, бот это знает
+    const marketValue = await getMarketValue(listing.baseValue, listing.itemKey, listing.condition).catch(() => 0)
+    const est = Math.max(
+      listing.baseValue * (CONDITION_MULT[listing.condition] ?? 0.8) * mult,
+      marketValue,
+    )
     // Сложность ботов растёт с уровнем игрока: опытному торговцу бот уступает меньше.
-    // Ур. 1 — базовая жадность, ур. 15+ — +5 п.п. к скрытому минимуму (но не дороже 97% цены).
+    // 28-a: базовая уступка срезана (0.87+0.07 → 0.90+0.06) — перекупство тяжелее.
     const levelFactor = Math.min(0.05, Math.max(0, (user.level - 1) * 0.0035))
     // Характер личности: жадные держат цену (+), доверчивые уступают раньше (−)
-    const persona = personaOf(listing.seller)
     const greedShift = (persona.greed - 0.5) * 0.06
     const trustShift = (0.5 - persona.trust) * 0.04
+    // Память: лоуболеры/кидалы/грубияны торгуются хуже, чистые игроки — чуть лучше
+    const memShift = cooldown ? 0.2 : memoryLimitShift(memory)
     const limit = Math.max(
-      Math.round(est * 0.35),
-      Math.min(Math.round(listing.price * 0.97), Math.round(listing.price * (0.87 + Math.random() * 0.07 + levelFactor + greedShift + trustShift))),
+      Math.round(est * (cooldown ? 0.6 : 0.45)),
+      Math.min(Math.round(listing.price * 0.97), Math.round(listing.price * (0.90 + Math.random() * 0.06 + levelFactor + greedShift + trustShift + memShift))),
     )
     chat = await db.chat.create({
       data: {
         listingId: listing.id, buyerId: user.id, sellerId: listing.sellerId,
-        meta: JSON.stringify({ botRole: 'seller', botLimit: limit, rounds: 0, patience: persona.patience }),
+        meta: JSON.stringify({
+          botRole: 'seller', botLimit: limit, rounds: 0,
+          patience: cooldown ? Math.max(1, persona.patience - 2) : persona.patience,
+          cold: cooldown,
+        }),
       },
     })
-    const opener = botOpener(chat, listing, listing.seller)
-    await db.message.create({
-      data: {
-        chatId: chat.id, senderType: 'bot', senderId: listing.seller.id,
-        senderName: listing.seller.displayName, kind: 'text', text: opener.text,
-      },
-    })
+    // холодный opener: бот помнит обиды и не здоровается по-доброму
+    const openerText = cooldown ? coldOpenerLine() : null
+    if (openerText) {
+      await db.message.create({
+        data: {
+          chatId: chat.id, senderType: 'bot', senderId: listing.seller.id,
+          senderName: listing.seller.displayName, kind: 'text', text: openerText,
+        },
+      })
+    } else {
+      const opener = botOpener(chat, listing, listing.seller)
+      await db.message.create({
+        data: {
+          chatId: chat.id, senderType: 'bot', senderId: listing.seller.id,
+          senderName: listing.seller.displayName, kind: 'text', text: opener.text,
+        },
+      })
+    }
   } else if (!chat) {
     chat = await db.chat.create({
       data: { listingId: listing.id, buyerId: user.id, sellerId: listing.sellerId, meta: JSON.stringify({}) },
@@ -117,6 +145,20 @@ export async function POST(req: Request) {
     data: { readAt: new Date() },
   })
 
+  // настроение бота (честный индикатор) + последняя цена бота для чипов
+  const chatMeta = parseChatMeta(chat.meta)
+  const memory = listing.seller.isBot && !user.isBot ? await getBotMemoryEntry(user.id, listing.seller.id) : null
+  const mood = listing.seller.isBot
+    ? computeMood({
+        closed: chatMeta.closed,
+        rounds: chatMeta.rounds,
+        patience: chatMeta.patience ?? personaOf(listing.seller).patience,
+        lowballStreak: chatMeta.lowballStreak,
+        entry: memory,
+        listingSold: listing.status === 'sold',
+      })
+    : undefined
+
   return Response.json({
     id: chat.id,
     listing: {
@@ -130,6 +172,8 @@ export async function POST(req: Request) {
       ratingCount: listing.seller.ratingCount,
     },
     role: 'buyer' as const,
+    mood,
+    lastBotOffer: chatMeta.lastOffer ?? null,
     messages: messages.map((m) => ({
       id: m.id, senderType: m.senderType as 'user' | 'bot' | 'system', senderId: m.senderId,
       senderName: m.senderName, kind: m.kind as 'text' | 'invoice' | 'system', text: m.text,

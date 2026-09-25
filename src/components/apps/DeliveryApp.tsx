@@ -3,20 +3,19 @@
 // Приложение «Доставки» — светлая система (как Resale/Сбер):
 // фон #F5F6FA, белые карточки radius 20 (тень 0 2px 8px rgba(0,0,0,0.04)),
 // акцент изумрудный #0AA06E, «в пути» — янтарный #E8A020, вторичный текст #9AA0A8.
-// Детали посылки: ВЕРТИКАЛЬНЫЙ таймлайн статусов (точки + линии:
-// заказан → собран → в пути → доставлен; активный шаг изумрудный пульсирующий,
-// пройденные — заполненные, будущие — серые), трек-номер моно, карта маршрута.
-// Логика (api.deliveries, тихий refetch 5с, useTick ETA, поиск/фильтры, copyTrack,
-// карта-переключатель, осмотр при получении) — без изменений.
+// ЛОГИСТИКА (28-b): две вкладки (Активные / История), живой прогресс-бар + ETA мин,
+// фазы «Собираем → В пути → Прибыл в ПВЗ → Получено», возврат невостребованного за 24 ч.
+// Покупки И продажи игрока: у продаж — «Курьер забирает → Деньги зачислены».
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import {
-  AlertTriangle, Check, CheckCircle2, ChevronLeft, ChevronRight, Copy, Home, Package,
+  AlertTriangle, Banknote, Check, CheckCircle2, ChevronLeft, ChevronRight, Copy, Home, Package,
   PackageCheck, PackageOpen, Plus, Search, Star, Truck, X,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { fmtMoney, fmtDateTime, timeAgo } from '@/lib/format'
 import { CONDITION_LABEL, CONDITION_MULT } from '@/lib/catalog-types'
 import { useOS } from '@/lib/store'
+import { sound } from '@/lib/sound'
 import type { DeliveryDTO } from '@/lib/types'
 
 // Токены светлой системы
@@ -24,14 +23,7 @@ const EMERALD = '#0AA06E'
 const AMBER = '#E8A020'
 const CARD = 'rounded-[20px] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.04)]'
 
-type FilterKey = 'all' | 'in_transit' | 'delivered' | 'returns'
-
-const FILTERS: { key: FilterKey; label: string }[] = [
-  { key: 'all', label: 'Все' },
-  { key: 'in_transit', label: 'В пути' },
-  { key: 'delivered', label: 'Доставлены' },
-  { key: 'returns', label: 'Возвраты' },
-]
+type TabKey = 'active' | 'history'
 
 // Тик раз в секунду через useSyncExternalStore — ETA-таймер живой, без setState внутри эффектов
 function useTick(intervalMs = 1000): number {
@@ -47,6 +39,7 @@ function useTick(intervalMs = 1000): number {
 
 function fmtRemain(ms: number): string {
   const s = Math.max(0, Math.ceil(ms / 1000))
+  if (s >= 3600) return `${Math.floor(s / 3600)} ч ${Math.floor((s % 3600) / 60)} мин`
   if (s >= 60) return `${Math.floor(s / 60)} мин`
   return `${s} с`
 }
@@ -70,54 +63,244 @@ function hueOf(key: string): number {
 function isWorse(d: DeliveryDTO): boolean {
   return (
     d.status === 'delivered' &&
+    d.kind === 'purchase' &&
     d.realCondition != null &&
     (CONDITION_MULT[d.realCondition] ?? 1) < (CONDITION_MULT[d.listedCondition] ?? 1)
   )
 }
 
-// Прогресс по 4 стадиям из существующих полей (status/createdAt/eta), без новых статусов
-function stageProgress(d: DeliveryDTO, nowMs: number): number {
-  if (d.status === 'delivered') return 4
+const isActive = (d: DeliveryDTO) => d.status === 'collecting' || d.status === 'in_transit' || d.status === 'arrived'
+
+// Общий прогресс 0..1 от создания до eta (живая полоска)
+function progressOf(d: DeliveryDTO, nowMs: number): number {
   const start = new Date(d.createdAt).getTime()
   const end = new Date(d.eta).getTime()
-  if (!(end > start)) return 1
-  const frac = Math.min(1, Math.max(0, (nowMs - start) / (end - start)))
-  return 1 + Math.min(2, Math.floor(frac * 3))
+  if (!(end > start)) return d.status === 'collecting' ? 0.05 : 1
+  return Math.min(1, Math.max(0.02, (nowMs - start) / (end - start)))
 }
 
-const STAGES = [
-  { label: 'Заказан', icon: PackageCheck },
-  { label: 'Собран', icon: Package },
-  { label: 'В пути', icon: Truck },
-  { label: 'Доставлен', icon: Home },
-]
+// Стадии жизненного цикла (kind-aware): для деталей — вертикальный таймлайн
+function stagesOf(d: DeliveryDTO): { label: string; icon: typeof Package }[] {
+  if (d.kind === 'sale') {
+    return [
+      { label: 'Продано', icon: PackageCheck },
+      { label: 'Курьер забирает', icon: Package },
+      { label: 'В пути к покупателю', icon: Truck },
+      { label: 'Деньги зачислены', icon: Banknote },
+    ]
+  }
+  return [
+    { label: 'Заказан', icon: PackageCheck },
+    { label: 'Собираем', icon: Package },
+    { label: 'В пути', icon: Truck },
+    { label: 'Прибыл в пункт выдачи', icon: Home },
+    { label: 'Получено', icon: CheckCircle2 },
+  ]
+}
+
+// Индекс текущей стадии (0-based), -1 если всё пройдено
+function stageIndex(d: DeliveryDTO): number {
+  if (d.kind === 'sale') {
+    if (d.status === 'collecting') return 1
+    if (d.status === 'in_transit') return 2
+    return -1 // delivered
+  }
+  if (d.status === 'collecting') return 1
+  if (d.status === 'in_transit') return 2
+  if (d.status === 'arrived') return 3
+  return -1 // delivered / returned
+}
+
+// ---------- стилизованная светлая SVG-карта с изумрудным пунктирным маршрутом ----------
+function RouteMap() {
+  return (
+    <div className="overflow-hidden rounded-[20px] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+      <svg viewBox="0 0 320 140" className="h-36 w-full" role="img" aria-label="Карта маршрута курьера">
+        <rect width="320" height="140" fill="#F0F1F5" />
+        {/* «кварталы» — едва заметные белые улицы */}
+        <g stroke="#FFFFFF" strokeOpacity="0.9" strokeWidth="8" strokeLinecap="round">
+          <path d="M-10 40 H330" />
+          <path d="M-10 96 H330" />
+          <path d="M70 -10 V150" />
+          <path d="M180 -10 V150" />
+          <path d="M262 -10 V150" />
+        </g>
+        {/* маршрут: сортировочный центр → адрес */}
+        <path
+          d="M34 108 C 92 100, 96 52, 150 50 S 246 66, 284 34"
+          fill="none"
+          stroke={EMERALD}
+          strokeWidth="2.5"
+          strokeDasharray="6 7"
+          strokeLinecap="round"
+        />
+        {/* точка старта */}
+        <circle cx="34" cy="108" r="5" fill={EMERALD} />
+        <circle cx="34" cy="108" r="9" fill="none" stroke={EMERALD} strokeOpacity="0.35" strokeWidth="2" />
+        {/* курьер в пути */}
+        <circle cx="178" cy="57" r="6" fill={EMERALD} stroke="#FFFFFF" strokeWidth="2" className="animate-pulse" />
+        {/* адрес */}
+        <circle cx="284" cy="34" r="6" fill="none" stroke={EMERALD} strokeWidth="2" className="animate-pulse" />
+        <text x="22" y="130" fill="#9AA0A8" fontSize="10">Сортировочный центр</text>
+        <text x="222" y="20" fill="#9AA0A8" fontSize="10">Пункт выдачи</text>
+      </svg>
+    </div>
+  )
+}
+
+function StatusBadge({ d }: { d: DeliveryDTO }) {
+  if (d.status === 'returned') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-[#FDEEEE] px-2.5 py-1 text-[11px] font-semibold text-[#B3382E]">
+        <AlertTriangle className="size-3" aria-hidden />
+        Возврат
+      </span>
+    )
+  }
+  const label =
+    d.status === 'collecting'
+      ? d.kind === 'sale' ? 'Курьер забирает' : 'Собираем'
+      : d.status === 'in_transit'
+        ? 'В пути'
+        : d.status === 'arrived'
+          ? 'Прибыл — заберите'
+          : d.kind === 'sale' ? 'Доставлено' : 'Доставлено'
+  const color = d.status === 'in_transit' || d.status === 'collecting' ? AMBER : EMERALD
+  const dark = d.status === 'in_transit' || d.status === 'collecting' ? '#9A6B10' : EMERALD
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+      style={{ backgroundColor: `${color}1F`, color: dark }}
+    >
+      <span className="size-1.5 animate-pulse rounded-full" style={{ backgroundColor: color }} aria-hidden />
+      {label}
+    </span>
+  )
+}
+
+function KindBadge({ d }: { d: DeliveryDTO }) {
+  return d.kind === 'sale' ? (
+    <span className="inline-flex items-center gap-1 rounded-full bg-[#F0F1F5] px-2 py-1 text-[10px] font-bold text-[#5C616B]">
+      <Banknote className="size-3" aria-hidden /> Продажа
+    </span>
+  ) : null
+}
+
+function DefectBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-[#FDEEEE] px-2.5 py-1 text-[11px] font-semibold text-[#B3382E]">
+      <AlertTriangle className="size-3" aria-hidden />
+      Есть дефекты
+    </span>
+  )
+}
+
+function SectionHeader({ title, sub }: { title: string; sub?: string }) {
+  return (
+    <div className="px-1">
+      <h2 className="text-[18px] font-bold text-[#1A1A1A]">{title}</h2>
+      {sub && <p className="mt-0.5 text-[12px] text-[#9AA0A8]">{sub}</p>}
+    </div>
+  )
+}
+
+// ---------- строка-посылка: прогресс-бар + ETA + фаза ----------
+function ParcelRow({ d, onOpen, nowMs }: { d: DeliveryDTO; onOpen: () => void; nowMs: number }) {
+  const pct = Math.round(progressOf(d, nowMs) * 100)
+  const etaLeft = new Date(d.eta).getTime() - nowMs
+  const arrivedWait = new Date(d.pickupDeadline ?? d.eta).getTime() - nowMs
+  const sub =
+    d.status === 'collecting'
+      ? d.kind === 'sale' ? 'Курьер выехал к вам за товаром' : 'Продавец собирает посылку'
+      : d.status === 'in_transit'
+        ? etaLeft > 0
+          ? `Прибудет через ${fmtRemain(etaLeft)}`
+          : 'Курьер уже совсем рядом'
+        : d.status === 'arrived'
+          ? arrivedWait > 0
+            ? `Ждёт в пункте выдачи · ${fmtRemain(arrivedWait)}`
+            : 'Курьер оформляет возврат…'
+          : d.status === 'returned'
+            ? 'Возврат: деньги вернулись на счёт'
+            : d.kind === 'sale' ? 'Деньги зачислены на счёт' : 'Получено'
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={`Открыть посылку ${d.title}`}
+      className={`${CARD} w-full p-3 text-left transition-transform active:scale-[0.99]`}
+    >
+      <div className="flex items-center gap-3">
+        <img loading="lazy" decoding="async" src={d.image} alt="" className="size-14 shrink-0 rounded-xl bg-[#F0F1F5] object-cover"/>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-[14px] font-semibold text-[#1A1A1A]">{d.title}</span>
+          </div>
+          <div className="mt-0.5 truncate font-mono text-[11px] text-[#9AA0A8]">{trackOf(d.id)} · {d.courier}</div>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <StatusBadge d={d} />
+            <KindBadge d={d} />
+            {isWorse(d) && <DefectBadge />}
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1 self-stretch py-0.5">
+          <span className="text-[13px] font-bold tabular-nums text-[#1A1A1A]">
+            {d.kind === 'sale' ? '+' : ''}{fmtMoney(d.price)}
+          </span>
+          <span className="text-[11px] text-[#9AA0A8]">{timeAgo(d.createdAt)}</span>
+          <ChevronRight className="mt-auto size-4 text-[#C1C5CB]" />
+        </div>
+      </div>
+      {isActive(d) && (
+        <div className="mt-2.5 flex items-center gap-2">
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#F0F1F5]">
+            <div
+              className="h-full rounded-full transition-[width] duration-700 ease-linear"
+              style={{ width: `${pct}%`, backgroundColor: d.status === 'arrived' ? EMERALD : AMBER }}
+            />
+          </div>
+          <span className="shrink-0 text-[11px] font-semibold tabular-nums text-[#5C616B]">
+            {d.status === 'arrived' ? 'готово' : d.status === 'in_transit' ? fmtRemain(etaLeft) : `${pct}%`}
+          </span>
+        </div>
+      )}
+    </button>
+  )
+}
 
 // ---------- ВЕРТИКАЛЬНЫЙ таймлайн статусов: точки + линии ----------
 function VerticalTimeline({ d, nowMs }: { d: DeliveryDTO; nowMs: number }) {
-  const p = stageProgress(d, nowMs)
-  const inTransit = d.status === 'in_transit'
-  const remain = new Date(d.eta).getTime() - nowMs
-  // подзаголовки шагов — из существующих полей createdAt/eta/deliveredAt
-  const subs: string[] = [
-    fmtDateTime(d.createdAt),
-    p >= 2 ? 'Курьер забрал товар' : 'Готовится к отправке',
-    inTransit
-      ? remain > 0
-        ? `Прибудет в город — ${fmtDateTime(d.eta)}`
-        : 'Курьер уже в вашем городе'
-      : p >= 3
-        ? 'Прибыл в ваш город'
-        : 'Направляется в ваш город',
-    d.status === 'delivered'
-      ? `Вручение ${fmtDateTime(d.deliveredAt ?? d.eta)}`
-      : `ожидается ${fmtDateTime(d.eta)}`,
-  ]
+  const stages = stagesOf(d)
+  const cur = stageIndex(d)
+  const returned = d.status === 'returned'
+  const etaLeft = new Date(d.eta).getTime() - nowMs
+  const deadline = new Date(d.pickupDeadline ?? d.eta).getTime()
+  const subs = stages.map((s, i) => {
+    const done = cur === -1 || i < cur
+    const base = fmtDateTime(d.createdAt)
+    if (i === 0) return base
+    if (i === 1) {
+      return d.status === 'collecting'
+        ? d.kind === 'sale' ? 'Курьер выехал к вам' : 'Готовится к отправке'
+        : `Забран · ${fmtDateTime(d.collectEndsAt)}`
+    }
+    if (i === 2) {
+      if (d.status === 'in_transit') return etaLeft > 0 ? `Прибудет через ${fmtRemain(etaLeft)}` : 'Курьер уже в вашем городе'
+      return done ? `Прибыл · ${fmtDateTime(d.eta)}` : `Ожидается ${fmtDateTime(d.eta)}`
+    }
+    if (i === 3 && d.kind === 'purchase') {
+      if (d.status === 'arrived') return deadline > nowMs ? `Хранится ещё ${fmtRemain(deadline - nowMs)}` : 'Возврат…'
+      return returned ? 'Не забрали за 24 ч — вернули продавцу' : `Заберите до ${fmtDateTime(d.pickupDeadline ?? d.eta)}`
+    }
+    if (d.status === 'delivered' || d.status === 'returned') return d.deliveredAt ? `Вручение · ${fmtDateTime(d.deliveredAt)}` : '—'
+    return 'Ожидается'
+  })
   return (
     <ol className="flex flex-col" aria-label="Статусы доставки">
-      {STAGES.map((s, i) => {
-        const done = i < p
-        const active = i === p && inTransit
-        const isLast = i === STAGES.length - 1
+      {stages.map((s, i) => {
+        const done = cur === -1 || i < cur
+        const active = i === cur
+        const isLast = i === stages.length - 1
         return (
           <li key={s.label} className="relative flex gap-3 pb-5 last:pb-0">
             {/* линия к следующей точке: пройденный участок — изумрудный, будущий — серый */}
@@ -161,132 +344,28 @@ function VerticalTimeline({ d, nowMs }: { d: DeliveryDTO; nowMs: number }) {
           </li>
         )
       })}
+      {returned && (
+        <li className="flex gap-2 rounded-xl bg-[#FDEEEE] p-3">
+          <AlertTriangle className="size-4 shrink-0 text-[#B3382E]" aria-hidden />
+          <p className="text-[11px] leading-relaxed text-[#B3382E]">
+            Посылку не забрали за 24 ч — курьер вернул её. Возврат {fmtMoney(Math.round(d.price * 0.95))} (комиссия 5%).
+          </p>
+        </li>
+      )}
     </ol>
   )
 }
 
-// ---------- стилизованная светлая SVG-карта с изумрудным пунктирным маршрутом ----------
-function RouteMap() {
-  return (
-    <div className="overflow-hidden rounded-[20px] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-      <svg viewBox="0 0 320 140" className="h-36 w-full" role="img" aria-label="Карта маршрута курьера">
-        <rect width="320" height="140" fill="#F0F1F5" />
-        {/* «кварталы» — едва заметные белые улицы */}
-        <g stroke="#FFFFFF" strokeOpacity="0.9" strokeWidth="8" strokeLinecap="round">
-          <path d="M-10 40 H330" />
-          <path d="M-10 96 H330" />
-          <path d="M70 -10 V150" />
-          <path d="M180 -10 V150" />
-          <path d="M262 -10 V150" />
-        </g>
-        {/* маршрут: сортировочный центр → адрес */}
-        <path
-          d="M34 108 C 92 100, 96 52, 150 50 S 246 66, 284 34"
-          fill="none"
-          stroke={EMERALD}
-          strokeWidth="2.5"
-          strokeDasharray="6 7"
-          strokeLinecap="round"
-        />
-        {/* точка старта */}
-        <circle cx="34" cy="108" r="5" fill={EMERALD} />
-        <circle cx="34" cy="108" r="9" fill="none" stroke={EMERALD} strokeOpacity="0.35" strokeWidth="2" />
-        {/* курьер в пути */}
-        <circle cx="178" cy="57" r="6" fill={EMERALD} stroke="#FFFFFF" strokeWidth="2" className="animate-pulse" />
-        {/* адрес */}
-        <circle cx="284" cy="34" r="6" fill="none" stroke={EMERALD} strokeWidth="2" className="animate-pulse" />
-        <text x="22" y="130" fill="#9AA0A8" fontSize="10">Сортировочный центр</text>
-        <text x="222" y="20" fill="#9AA0A8" fontSize="10">Ваш адрес</text>
-      </svg>
-    </div>
-  )
-}
-
-function StatusBadge({ d }: { d: DeliveryDTO }) {
-  return d.status === 'in_transit' ? (
-    <span
-      className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
-      style={{ backgroundColor: `${AMBER}1F`, color: '#9A6B10' }}
-    >
-      <span className="size-1.5 animate-pulse rounded-full" style={{ backgroundColor: AMBER }} aria-hidden />
-      В пути
-    </span>
-  ) : (
-    <span
-      className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
-      style={{ backgroundColor: `${EMERALD}1A`, color: EMERALD }}
-    >
-      <CheckCircle2 className="size-3" aria-hidden />
-      Доставлено
-    </span>
-  )
-}
-
-function DefectBadge() {
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-[#FDEEEE] px-2.5 py-1 text-[11px] font-semibold text-[#B3382E]">
-      <AlertTriangle className="size-3" aria-hidden />
-      Есть дефекты
-    </span>
-  )
-}
-
-function SectionHeader({ title, onAll }: { title: string; onAll?: () => void }) {
-  return (
-    <div className="flex items-baseline justify-between px-1">
-      <h2 className="text-[18px] font-bold text-[#1A1A1A]">{title}</h2>
-      {onAll && (
-        <button type="button" onClick={onAll} className="text-[13px] text-[#9AA0A8] active:opacity-70">
-          Все ›
-        </button>
-      )}
-    </div>
-  )
-}
-
-// ---------- строка-посылка в списке (с мини-точками стадий) ----------
-function ParcelRow({ d, onOpen }: { d: DeliveryDTO; onOpen: () => void }) {
-  const p = stageProgress(d, Date.now())
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      aria-label={`Открыть посылку ${d.title}`}
-      className={`${CARD} flex w-full items-center gap-3 p-3 text-left transition-transform active:scale-[0.99]`}
-    >
-      <img loading="lazy" decoding="async" src={d.image} alt="" className="size-14 shrink-0 rounded-xl bg-[#F0F1F5] object-cover"/>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-[14px] font-semibold text-[#1A1A1A]">{d.title}</div>
-        <div className="mt-0.5 truncate font-mono text-[11px] text-[#9AA0A8]">{trackOf(d.id)}</div>
-        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-          <StatusBadge d={d} />
-          {isWorse(d) && <DefectBadge />}
-        </div>
-      </div>
-      <div className="flex shrink-0 flex-col items-end gap-1.5 self-stretch py-0.5">
-        <span className="text-[11px] text-[#9AA0A8]">{timeAgo(d.createdAt)}</span>
-        {/* мини-точки стадий: заказан → собран → в пути → доставлен */}
-        <span className="mt-auto flex items-center gap-1" aria-hidden>
-          {STAGES.map((s, i) => (
-            <span
-              key={s.label}
-              className={'size-1.5 rounded-full ' + (i === p && d.status === 'in_transit' ? 'animate-pulse' : '')}
-              style={{ backgroundColor: i < p ? EMERALD : i === p && d.status === 'in_transit' ? EMERALD : '#E0E3E8' }}
-            />
-          ))}
-          <ChevronRight className="ml-0.5 size-4 text-[#C1C5CB]" />
-        </span>
-      </div>
-    </button>
-  )
-}
-
 // ---------- экран деталей посылки ----------
-function ParcelDetails({ d, onBack, nowMs }: { d: DeliveryDTO; onBack: () => void; nowMs: number }) {
+function ParcelDetails({ d, onBack, nowMs, onPicked }: { d: DeliveryDTO; onBack: () => void; nowMs: number; onPicked: () => void }) {
   const [copied, setCopied] = useState(false)
   const [mapOpen, setMapOpen] = useState(true)
-  const remain = new Date(d.eta).getTime() - nowMs
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const etaLeft = new Date(d.eta).getTime() - nowMs
+  const deadline = new Date(d.pickupDeadline ?? d.eta).getTime() - nowMs
   const worse = isWorse(d)
+  const canPickup = d.status === 'arrived' && d.kind === 'purchase'
 
   const copyTrack = () => {
     try {
@@ -294,6 +373,23 @@ function ParcelDetails({ d, onBack, nowMs }: { d: DeliveryDTO; onBack: () => voi
     } catch { /* не критично */ }
     setCopied(true)
     setTimeout(() => setCopied(false), 1600)
+  }
+
+  const pickup = async () => {
+    if (busy) return
+    setBusy(true)
+    setErr('')
+    try {
+      const res = await api.pickupDelivery(d.id)
+      sound.success()
+      pushToastSafe('Resale Доставка', `«${d.title}» — посылка получена, вещь в инвентаре`)
+      if (typeof res.balance === 'number') refreshBalance(res.balance)
+      onPicked()
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Не удалось получить посылку')
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -308,7 +404,9 @@ function ParcelDetails({ d, onBack, nowMs }: { d: DeliveryDTO; onBack: () => voi
         >
           <ChevronLeft className="size-5" aria-hidden />
         </button>
-        <span className="truncate text-[16px] font-bold text-[#1A1A1A]">Посылка</span>
+        <span className="truncate text-[16px] font-bold text-[#1A1A1A]">
+          {d.kind === 'sale' ? 'Продажа · доставка' : 'Посылка'}
+        </span>
       </div>
 
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto bg-[#F5F6FA] p-4 [scrollbar-width:thin]">
@@ -318,9 +416,12 @@ function ParcelDetails({ d, onBack, nowMs }: { d: DeliveryDTO; onBack: () => voi
             <img loading="lazy" decoding="async" src={d.image} alt="" className="size-20 shrink-0 rounded-xl bg-[#F0F1F5] object-cover"/>
             <div className="min-w-0 flex-1">
               <div className="line-clamp-2 text-[14px] font-semibold text-[#1A1A1A]">{d.title}</div>
-              <div className="mt-1 text-[18px] font-bold tabular-nums text-[#1A1A1A]">{fmtMoney(d.price)}</div>
+              <div className="mt-1 text-[18px] font-bold tabular-nums text-[#1A1A1A]">
+                {d.kind === 'sale' ? '+' : ''}{fmtMoney(d.price)}
+              </div>
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 <StatusBadge d={d} />
+                <KindBadge d={d} />
                 {worse && <DefectBadge />}
               </div>
             </div>
@@ -376,7 +477,23 @@ function ParcelDetails({ d, onBack, nowMs }: { d: DeliveryDTO; onBack: () => voi
             <div className="mt-3 flex items-center gap-2 rounded-xl bg-[#F8F1E3] px-3 py-2.5">
               <Truck className="size-4 shrink-0" style={{ color: AMBER }} aria-hidden />
               <p className="text-[12px] font-semibold text-[#9A6B10]">
-                {remain <= 0 ? 'Курьер уже близко' : `Прибудет через ${fmtRemain(remain)}`}
+                {etaLeft <= 0 ? 'Курьер уже близко' : `Прибудет через ${fmtRemain(etaLeft)}`}
+              </p>
+            </div>
+          )}
+          {d.status === 'collecting' && (
+            <div className="mt-3 flex items-center gap-2 rounded-xl bg-[#F8F1E3] px-3 py-2.5">
+              <Package className="size-4 shrink-0" style={{ color: AMBER }} aria-hidden />
+              <p className="text-[12px] font-semibold text-[#9A6B10]">
+                {d.kind === 'sale' ? 'Курьер забирает товар у вас' : 'Продавец собирает посылку'}
+              </p>
+            </div>
+          )}
+          {d.status === 'arrived' && (
+            <div className="mt-3 flex items-center gap-2 rounded-xl bg-[#E7F5EA] px-3 py-2.5">
+              <Home className="size-4 shrink-0" style={{ color: EMERALD }} aria-hidden />
+              <p className="text-[12px] font-semibold" style={{ color: EMERALD }}>
+                Ждёт в пункте выдачи{deadline > 0 ? ` · ещё ${fmtRemain(deadline)}` : ''}
               </p>
             </div>
           )}
@@ -394,7 +511,27 @@ function ParcelDetails({ d, onBack, nowMs }: { d: DeliveryDTO; onBack: () => voi
         </button>
         {mapOpen && <RouteMap />}
 
-        {d.status === 'in_transit' ? (
+        {/* КНОПКА ПОЛУЧЕНИЯ — главная фаза логистики */}
+        {canPickup && (
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => void pickup()}
+              disabled={busy}
+              className="flex h-14 w-full items-center justify-center gap-2 rounded-xl text-[16px] font-bold text-white transition-transform active:scale-[0.98] disabled:opacity-60"
+              style={{ backgroundColor: EMERALD }}
+            >
+              <PackageCheck className="size-5" aria-hidden />
+              {busy ? 'Оформляем…' : 'Забрать посылку'}
+            </button>
+            <p className="text-center text-[10px] text-[#9AA0A8]">
+              Не забрали за 24 ч — курьер вернёт товар, возврат денег минус 5%
+            </p>
+          </div>
+        )}
+        {err && <p className="text-center text-[12px] font-medium text-[#B3382E]">{err}</p>}
+
+        {d.status === 'in_transit' && d.kind === 'purchase' && (
           // предупреждение о риске (логика сохранена)
           <div className="flex gap-2 rounded-[20px] bg-[#F8F1E3] p-3.5">
             <AlertTriangle className="size-4 shrink-0" style={{ color: AMBER }} aria-hidden />
@@ -402,24 +539,30 @@ function ParcelDetails({ d, onBack, nowMs }: { d: DeliveryDTO; onBack: () => voi
               Осмотр при получении невозможен. Курьерская доставка — риск скрытых дефектов.
             </p>
           </div>
-        ) : (
+        )}
+
+        {(d.status === 'delivered' || d.status === 'returned') && d.kind === 'purchase' && (
           // итог осмотра (логика сохранена)
           <div className={`${CARD} p-4`}>
             <div
               className={
                 'flex items-center justify-between gap-2 rounded-xl p-3 ' +
-                (worse ? 'bg-[#FDEEEE]' : 'bg-[#E7F5EA]')
+                (worse || d.status === 'returned' ? 'bg-[#FDEEEE]' : 'bg-[#E7F5EA]')
               }
             >
               <div className="flex items-center gap-2">
-                {worse ? (
+                {worse || d.status === 'returned' ? (
                   <>
                     <span className="flex size-8 items-center justify-center rounded-full bg-white text-[#B3382E]" aria-hidden>
                       <AlertTriangle className="size-4" />
                     </span>
                     <div>
-                      <div className="text-[13px] font-semibold text-[#B3382E]">Есть дефекты</div>
-                      <div className="text-[10px] text-[#9AA0A8]">Продавец приукрасил состояние</div>
+                      <div className="text-[13px] font-semibold text-[#B3382E]">
+                        {d.status === 'returned' ? 'Возвращено продавцу' : 'Есть дефекты'}
+                      </div>
+                      <div className="text-[10px] text-[#9AA0A8]">
+                        {d.status === 'returned' ? 'Комиссия 5% удержана' : 'Продавец приукрасил состояние'}
+                      </div>
                     </div>
                   </>
                 ) : (
@@ -436,7 +579,7 @@ function ParcelDetails({ d, onBack, nowMs }: { d: DeliveryDTO; onBack: () => voi
               </div>
               <span className="shrink-0 text-[10px] text-[#9AA0A8]">{d.deliveredAt ? timeAgo(d.deliveredAt) : null}</span>
             </div>
-            {d.realCondition && (
+            {!worse && d.status === 'delivered' && d.realCondition && (
               <div className="mt-2 px-1 text-[11px] text-[#9AA0A8]">
                 Фактическое состояние:{' '}
                 <span className="font-medium text-[#1A1A1A]">{CONDITION_LABEL[d.realCondition] ?? d.realCondition}</span>
@@ -451,17 +594,35 @@ function ParcelDetails({ d, onBack, nowMs }: { d: DeliveryDTO; onBack: () => voi
   )
 }
 
+// тост/баланс через стор ОС (без импорт-циклов в хелперах)
+function pushToastSafe(title: string, body: string) {
+  try {
+    useOS.getState().pushToast(title, body)
+  } catch { /* стор не готов — не критично */ }
+}
+function refreshBalance(balance: number) {
+  try {
+    const s = useOS.getState()
+    if (s.session) s.refreshSession({ balance })
+  } catch { /* не критично */ }
+}
+
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'active', label: 'Активные' },
+  { key: 'history', label: 'История' },
+]
+
 export default function DeliveryApp() {
   const [data, setData] = useState<DeliveryDTO[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [filter, setFilter] = useState<FilterKey>('all')
+  const [tab, setTab] = useState<TabKey>('active')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [q, setQ] = useState('')
   const pushToast = useOS((s) => s.pushToast)
 
-  useTick(1000) // живой отсчёт ETA
+  useTick(1000) // живой отсчёт ETA и прогресс-бара
 
   const load = useCallback(async (silent = false) => {
     try {
@@ -493,9 +654,8 @@ export default function DeliveryApp() {
   const sorted = [...items].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   )
-  const inTransitCount = sorted.filter((d) => d.status === 'in_transit').length
-  const deliveredCount = sorted.length - inTransitCount
-  const returnsCount = sorted.filter(isWorse).length
+  const active = sorted.filter(isActive)
+  const history = sorted.filter((d) => !isActive(d))
 
   // локальный поиск по названию/треку — чисто UI, данные те же
   const needle = q.trim().toLowerCase()
@@ -504,31 +664,19 @@ export default function DeliveryApp() {
         (d) => d.title.toLowerCase().includes(needle) || trackOf(d.id).toLowerCase().includes(needle),
       )
     : sorted
-
-  const active = searched.filter((d) => d.status === 'in_transit')
-  const history = searched.filter((d) => d.status === 'delivered')
-  const counts: Record<FilterKey, number> = {
-    all: searched.length,
-    in_transit: inTransitCount,
-    delivered: deliveredCount,
-    returns: returnsCount,
-  }
-
-  const filtered: DeliveryDTO[] | null =
-    filter === 'all'
-      ? null
-      : filter === 'in_transit'
-        ? active
-        : filter === 'delivered'
-          ? history
-          : searched.filter(isWorse)
+  const list = tab === 'active' ? searched.filter(isActive) : searched.filter((d) => !isActive(d))
 
   const selected = selectedId ? sorted.find((d) => d.id === selectedId) ?? null : null
 
   return (
     <div className="flex h-full flex-col bg-[#F5F6FA]">
       {selected ? (
-        <ParcelDetails d={selected} onBack={() => setSelectedId(null)} nowMs={nowMs} />
+        <ParcelDetails
+          d={selected}
+          onBack={() => setSelectedId(null)}
+          nowMs={nowMs}
+          onPicked={() => { setSelectedId(null); void load() }}
+        />
       ) : (
         <>
           {/* ---------- шапка: заголовок bold 22 + подзаголовок 13 + Search + Plus ---------- */}
@@ -540,7 +688,7 @@ export default function DeliveryApp() {
               <div className="min-w-0 flex-1">
                 <h1 className="text-[22px] font-bold leading-tight text-[#1A1A1A]">Доставки</h1>
                 <p className="mt-0.5 text-[13px] text-[#9AA0A8]">
-                  {inTransitCount > 0 ? `${inTransitCount} в пути — обновляем сами` : 'Посылки от продавцов'}
+                  {active.length > 0 ? `${active.length} едут — обновляем сами` : 'Посылки и выплаты с продаж'}
                 </p>
               </div>
               <button
@@ -558,8 +706,8 @@ export default function DeliveryApp() {
               </button>
               <button
                 type="button"
-                onClick={() => pushToast('Доставки', 'Посылка появится здесь после покупки с курьером')}
-                aria-label="Как получить посылку"
+                onClick={() => pushToast('Доставки', 'Посылка появится здесь после покупки или продажи')}
+                aria-label="Как работает доставка"
                 className="flex size-10 shrink-0 items-center justify-center rounded-full text-white transition-transform active:scale-95"
                 style={{ backgroundColor: EMERALD }}
               >
@@ -590,36 +738,32 @@ export default function DeliveryApp() {
               </div>
             )}
 
-            {/* ---------- чипы-фильтры со счётчиками ---------- */}
-            <div
-              className="mt-3 flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              role="tablist"
-              aria-label="Фильтры доставок"
-            >
-              {FILTERS.map((f) => {
-                const isActive = filter === f.key
-                const count = counts[f.key]
+            {/* ---------- 2 вкладки: Активные / История ---------- */}
+            <div className="mt-3 flex gap-2" role="tablist" aria-label="Разделы доставок">
+              {TABS.map((t) => {
+                const isActiveTab = tab === t.key
+                const count = t.key === 'active' ? active.length : history.length
                 return (
                   <button
-                    key={f.key}
+                    key={t.key}
                     type="button"
                     role="tab"
-                    aria-selected={isActive}
-                    onClick={() => setFilter(f.key)}
+                    aria-selected={isActiveTab}
+                    onClick={() => setTab(t.key)}
                     className={
-                      'flex h-9 shrink-0 items-center gap-1.5 rounded-full px-4 text-[13px] transition-colors active:scale-[0.97] ' +
-                      (isActive
+                      'flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full px-4 text-[13px] transition-colors active:scale-[0.97] ' +
+                      (isActiveTab
                         ? 'font-semibold text-white'
                         : 'bg-white font-medium text-black/70 shadow-[0_2px_8px_rgba(0,0,0,0.04)]')
                     }
-                    style={isActive ? { backgroundColor: EMERALD } : undefined}
+                    style={isActiveTab ? { backgroundColor: EMERALD } : undefined}
                   >
-                    {f.label}
+                    {t.label}
                     {count > 0 && (
                       <span
                         className={
                           'inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums ' +
-                          (isActive ? 'bg-white/25 text-white' : 'bg-black/5 text-black/60')
+                          (isActiveTab ? 'bg-white/25 text-white' : 'bg-black/5 text-black/60')
                         }
                       >
                         {count}
@@ -636,9 +780,8 @@ export default function DeliveryApp() {
             {loading && !data ? (
               <div className="flex flex-col gap-3">
                 <div className="h-9 animate-pulse rounded-full bg-white" />
-                <div className="h-20 animate-pulse rounded-[20px] bg-white" />
-                <div className="h-20 animate-pulse rounded-[20px] bg-white" />
-                <div className="h-20 animate-pulse rounded-[20px] bg-white" />
+                <div className="h-24 animate-pulse rounded-[20px] bg-white" />
+                <div className="h-24 animate-pulse rounded-[20px] bg-white" />
               </div>
             ) : error && !data ? (
               <div className="flex flex-col items-center gap-3 rounded-[20px] bg-[#FDEEEE] p-6 text-center">
@@ -659,66 +802,33 @@ export default function DeliveryApp() {
                 </div>
                 <div className="mt-3 text-[15px] font-semibold text-[#1A1A1A]">Доставок пока нет</div>
                 <div className="mt-1 max-w-64 text-[13px] leading-relaxed text-[#9AA0A8]">
-                  Курьером можно получить товар при покупке в Resale — выберите доставку при оплате.
+                  Каждая покупка едет посылкой: собираем → в пути → забирайте в пункте выдачи.
                 </div>
               </div>
-            ) : needle && searched.length === 0 ? (
+            ) : list.length === 0 ? (
               <div className="flex flex-col items-center rounded-[20px] bg-white px-4 py-10 text-center shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
                 <div className="flex size-14 items-center justify-center rounded-full bg-[#F0F1F5]">
-                  <Search className="size-6 text-[#9AA0A8]" aria-hidden />
+                  <PackageOpen className="size-6 text-[#9AA0A8]" aria-hidden />
                 </div>
-                <div className="mt-3 text-[15px] font-semibold text-[#1A1A1A]">Ничего не нашлось</div>
-                <div className="mt-1 text-[13px] text-[#9AA0A8]">Попробуйте другое название или трек-номер</div>
+                <div className="mt-3 text-[15px] font-semibold text-[#1A1A1A]">
+                  {tab === 'active' ? 'Всё доставлено' : 'История пуста'}
+                </div>
+                <div className="mt-1 text-[13px] text-[#9AA0A8]">
+                  {tab === 'active' ? 'Активных посылок нет — загляните в историю' : 'Завершённые доставки появятся здесь'}
+                </div>
               </div>
-            ) : filter === 'all' ? (
-              <>
-                {active.length > 0 && (
-                  <>
-                    <SectionHeader title="Активные" />
-                    <div className="flex flex-col gap-2.5">
-                      {active.map((d) => (
-                        <ParcelRow key={d.id} d={d} onOpen={() => setSelectedId(d.id)} />
-                      ))}
-                    </div>
-                  </>
-                )}
-                {history.length > 0 && (
-                  <>
-                    <SectionHeader title="История доставок" />
-                    <div className="flex flex-col gap-2.5">
-                      {history.map((d) => (
-                        <ParcelRow key={d.id} d={d} onOpen={() => setSelectedId(d.id)} />
-                      ))}
-                    </div>
-                  </>
-                )}
-              </>
-            ) : filtered && filtered.length > 0 ? (
+            ) : (
               <>
                 <SectionHeader
-                  title={FILTERS.find((f) => f.key === filter)?.label ?? ''}
-                  onAll={() => setFilter('all')}
+                  title={tab === 'active' ? 'Едут к вам' : 'История доставок'}
+                  sub={tab === 'active' ? 'Статусы обновляются сами' : undefined}
                 />
                 <div className="flex flex-col gap-2.5">
-                  {filtered.map((d) => (
-                    <ParcelRow key={d.id} d={d} onOpen={() => setSelectedId(d.id)} />
+                  {list.map((d) => (
+                    <ParcelRow key={d.id} d={d} onOpen={() => setSelectedId(d.id)} nowMs={nowMs} />
                   ))}
                 </div>
               </>
-            ) : (
-              <div className="flex flex-col items-center rounded-[20px] bg-white px-4 py-10 text-center shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-                <div className="flex size-14 items-center justify-center rounded-full bg-[#F0F1F5]">
-                  <PackageOpen className="size-7 text-[#9AA0A8]" aria-hidden />
-                </div>
-                <div className="mt-3 text-[15px] font-semibold text-[#1A1A1A]">
-                  {filter === 'returns' ? 'Возвратов нет' : 'Здесь пока пусто'}
-                </div>
-                <div className="mt-1 text-[13px] text-[#9AA0A8]">
-                  {filter === 'returns'
-                    ? 'Все полученные посылки соответствуют описанию'
-                    : 'Смените фильтр, чтобы увидеть другие посылки'}
-                </div>
-              </div>
             )}
 
             {sorted.length > 0 && (

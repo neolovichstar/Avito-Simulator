@@ -21,6 +21,7 @@ import VolumePlate from '@/components/os/VolumePlate'
 import CallOverlay from '@/components/os/CallOverlay'
 import RecentsOverlay from '@/components/os/RecentsOverlay'
 import DesktopShell from '@/components/desktop/DesktopShell'
+import OrientationGate from '@/components/os/OrientationGate'
 import AvitoApp from '@/components/avito/AvitoApp'
 import BankApp from '@/components/apps/BankApp'
 import TaxesApp from '@/components/apps/TaxesApp'
@@ -40,6 +41,7 @@ import GalleryApp from '@/components/apps/GalleryApp'
 import MusicApp from '@/components/apps/MusicApp'
 import PhoneApp from '@/components/apps/PhoneApp'
 import GosuslugiApp from '@/components/apps/GosuslugiApp'
+import NumbersApp from '@/components/apps/NumbersApp'
 
 const BATTERY_KEY = 'avito_sim_battery'
 const THEME_KEY = 'avito_sim_theme'
@@ -72,7 +74,7 @@ function getDeviceId(): string | null {
 // Приложения со СВЕТЛОЙ темой интерфейса. Когда открыто одно из них, хром ОС
 // подстраивается: иконки статус-бара становятся тёмными, а рамки Telegram —
 // светлыми. Все остальные приложения и лончер остаются тёмными.
-const LIGHT_APPS: Partial<Record<AppKey, true>> = { avito: true, bank: true, taxes: true, auction: true, repair: true, career: true, delivery: true, leaderboard: true, music: true, gosuslugi: true }
+const LIGHT_APPS: Partial<Record<AppKey, true>> = { avito: true, bank: true, taxes: true, auction: true, repair: true, career: true, delivery: true, leaderboard: true, music: true, gosuslugi: true, numbers: true }
 
 // Экран «нет связи с сервером» — показывается после 3 неудачных попыток авторизации.
 function OfflineScreen({ onRetry, compact = false }: { onRetry: () => void; compact?: boolean }) {
@@ -411,6 +413,7 @@ export default function Home() {
       case 'music': return <MusicApp />
       case 'phone': return <PhoneApp />
       case 'gosuslugi': return <GosuslugiApp />
+      case 'numbers': return <NumbersApp />
       default: return null
     }
   }
@@ -419,6 +422,8 @@ export default function Home() {
   if (isDesktop) {
     return (
       <main className="min-h-[100dvh] bg-neutral-950">
+        {/* портрет-лок: нативный screen.orientation.lock + оверлей-страховка (Task 29) */}
+        <OrientationGate />
         {!session ? (
           authError ? (
             <OfflineScreen onRetry={doAuth} />
@@ -450,6 +455,8 @@ export default function Home() {
   // ---------- ТЕЛЕФОН ----------
   return (
     <main className="min-h-[100dvh] flex items-center justify-center bg-neutral-950">
+      {/* портрет-лок: нативный screen.orientation.lock + оверлей-страховка (Task 29) */}
+      <OrientationGate />
       <PhoneFrame>
         {/* статус-бар: тёмные иконки на тёмных экранах,
             над светлыми приложениями (Resale/Банк) — тёмные иконки на светлой полосе */}

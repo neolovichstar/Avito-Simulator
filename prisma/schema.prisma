@@ -59,6 +59,10 @@ model User {
   telegramCodes TelegramCode[]
   phoneNumbers  PhoneNumber[]
   callLogs      CallLog[]
+  partsStock    PartStock[]
+  workshopTools WorkshopTool[]
+  repairJobs    RepairJob[]
+  installedParts InstalledPart[]
 }
 
 model Listing {
@@ -240,7 +244,9 @@ model Delivery {
   realCondition String
   baseValue   Int
   courier     String
-  status      String   @default("in_transit") // in_transit | delivered
+  // kind: purchase (покупка игрока: курьер/самовывоз → ПВЗ → забрал) | sale (продажа игрока: курьер забрал → деньги после вручения)
+  kind        String   @default("purchase")
+  status      String   @default("in_transit") // collecting | in_transit | arrived | delivered | returned
   createdAt   DateTime @default(now())
   eta         DateTime
   deliveredAt DateTime?
@@ -419,4 +425,74 @@ model CallLog {
   durationSec Int      @default(0)
   aiPersonaId String? // если звонили продавцу-боту
   createdAt   DateTime @default(now())
+}
+
+// ───────────────────────── Мастерская (запчасти и ремонт) ─────────────────────────
+
+// Склад запчастей игрока: счётчик по ключу запчасти.
+// wearSum — сумма износа купленных б/у единиц (средний износ = wearSum / qty).
+model PartStock {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  partKey   String
+  qty       Int      @default(0)
+  wearSum   Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, partKey])
+  @@index([userId])
+}
+
+// Инструменты мастера: покупаются, имеют прочность (расход 1 за ремонт).
+model WorkshopTool {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  toolKey    String
+  durability Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, toolKey])
+  @@index([userId])
+}
+
+// Рабочий наряд мастера: диагностика (мгновенная) или ремонт/установка
+// запчасти с мини-игрой. score — результат мини-игры 0..100.
+model RepairJob {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  itemId        String
+  kind          String // diagnose | repair | install
+  game          String? // seam | solder | bolt | simon | gauge
+  difficulty    String    @default("normal") // easy | normal | hard
+  partKey       String? // запчасть для установки (repair/install)
+  partWear      Int? // износ установленной б/у детали, %
+  faults        String    @default("[]") // JSON: результат диагностики
+  score         Int?
+  cost          Int       @default(0) // работа (уплачена при старте)
+  warrantyUntil DateTime? // гарантия на работу (бесплатный повтор)
+  status        String    @default("in_progress") // in_progress | done | cancelled
+  startedAt     DateTime  @default(now())
+  finishedAt    DateTime?
+
+  @@index([userId, itemId])
+  @@index([userId, status])
+}
+
+// Журнал установленных запчастей: что стоит в вещи, износ и вклад в цену.
+model InstalledPart {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  itemId    String
+  partKey   String
+  title     String
+  kind      String
+  wear      Int      @default(0)
+  valueAdd  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([userId, itemId])
 }

@@ -121,8 +121,12 @@ function useDayData() {
     }).catch(() => {})
     api.deliveries().then((d: { items: DeliveryDTO[] }) => {
       if (!alive) return
-      const act = d.items.find((x) => x.status === 'in_transit')
-      if (act) setDelivery({ status: 'В пути' })
+      // 28-b: любая «живая» посылка (собираем/в пути/прибыл) — виджет показывает фазу
+      const act = d.items.find((x) => x.status === 'collecting' || x.status === 'in_transit' || x.status === 'arrived')
+      if (act) {
+        const label = act.status === 'collecting' ? 'Собираем' : act.status === 'in_transit' ? 'В пути' : 'Прибыл!'
+        setDelivery({ status: label })
+      }
     }).catch(() => {})
     api.leaderboard().then((b) => {
       if (!alive) return

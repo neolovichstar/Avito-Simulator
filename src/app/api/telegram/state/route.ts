@@ -22,7 +22,8 @@ export async function GET(req: Request) {
   if (!link) return Response.json({ linked: false })
   const u = link.user
   const [deliveries, activeBids] = await Promise.all([
-    db.delivery.count({ where: { userId: u.id, status: 'in_transit' } }),
+    // 28-b: «живые» посылки — сбор/путь/ожидание в ПВЗ
+    db.delivery.count({ where: { userId: u.id, status: { in: ['collecting', 'in_transit', 'arrived'] } } }),
     db.auctionBid.findMany({
       where: { userId: u.id },
       orderBy: { createdAt: 'desc' },

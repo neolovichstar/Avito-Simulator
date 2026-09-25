@@ -1,16 +1,20 @@
 'use client'
 
-// Приложение «Госуслуги» (Task 26-b) — виртуальный портал госуслуг с документами.
+// Приложение «Госуслуги» (Task 27-b) — виртуальный портал госуслуг с документами.
+// Первый экран: компактный профиль (ФИО + СНИЛС), «Документы» горизонтальной каруселью,
+// «Штрафы» с красным бейджем суммы, короткий список «Услуги» (название + 1 строка).
 // Фирменный стиль: синий #0D4CD3, фон #F5F6F8, красный штрафов #EE3F58, светлый UI.
 // Документы и штрафы приходят из /api/gosuslugi (детерминированы из userId),
 // оплата штрафа — POST /api/gosuslugi/pay (списание через ту же схему, что банк/налоги).
 // Оплаченные штрафы дублируются в localStorage (зеркало User.stats на сервере).
+// Сеть: загрузка переживает мелкие сбои — до 3 тихих ретраев с задержкой,
+// экран ошибки только после этого (и вручную по «Повторить»).
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  AlertTriangle, BadgeCheck, Bell, Car, CheckCircle2, ChevronRight, Clock3, Landmark, Loader2,
-  ReceiptText, Search, Wallet, X,
+  AlertTriangle, BadgeCheck, Car, CheckCircle2, ChevronRight, Loader2,
+  ReceiptText, Search, X,
 } from 'lucide-react'
 import { ApiError, getToken } from '@/lib/api'
 import { useOS } from '@/lib/store'
@@ -18,7 +22,7 @@ import { fmtMoney, fmtDateTime } from '@/lib/format'
 import { fineAmountDue } from '@/lib/gos-docs'
 import type { GosData, GosDoc, GosFineDTO, GosService } from '@/lib/gos-docs'
 import {
-  CARD, DOC_ICONS, DocPreviewCard, GosAvatar, GosLogo, SectionTitle, ServiceRow, SubHeader,
+  CARD, DOC_ICONS, DocPreviewCard, GosAvatar, SectionTitle, ServiceRow, SubHeader,
 } from './gosuslugi/ui'
 import DocumentFull from './gosuslugi/DocumentFull'
 import ServiceDetail from './gosuslugi/ServiceDetail'
@@ -31,9 +35,8 @@ type View =
   | { k: 'search' }
   | { k: 'service'; id: string }
 
-const CATEGORIES = ['Все', 'Документы', 'Платежи', 'Здоровье', 'Семья'] as const
 const LS_PAID_KEY = 'resale_gos_fines_paid_v1'
-const POPULAR_QUERIES = ['Паспорт', 'Штрафы', 'Врач', 'Детский сад', 'ИНН', 'Регистрация']
+const POPULAR_QUERIES = ['Паспорт', 'Штрафы', 'ИНН', 'Права', 'Регистрация']
 
 function readLsPaid(): string[] {
   try {
@@ -65,14 +68,6 @@ async function gosFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const json = (await res.json().catch(() => ({}))) as T & { error?: string }
   if (!res.ok) throw new ApiError(res.status, json?.error ?? `Ошибка ${res.status}`)
   return json
-}
-
-function hello(): string {
-  const h = new Date().getHours()
-  if (h < 5) return 'Доброй ночи'
-  if (h < 12) return 'Доброе утро'
-  if (h < 18) return 'Добрый день'
-  return 'Добрый вечер'
 }
 
 function fmtDay(iso: string): string {
@@ -127,7 +122,7 @@ function ErrorScreen({ message, onRetry }: { message: string; onRetry: () => voi
 }
 
 // ---------------------------------------------------------------------------
-// Главный экран
+// Главный экран: профиль → Документы → Штрафы → Услуги
 // ---------------------------------------------------------------------------
 
 function HomeScreen({
@@ -143,168 +138,95 @@ function HomeScreen({
   onOpenService: (id: string) => void
   onGo: (v: View) => void
 }) {
-  const [cat, setCat] = useState<(typeof CATEGORIES)[number]>('Все')
-  const firstName = data.user.displayName.split(' ')[0] ?? data.user.displayName
-  const services = useMemo(
-    () => (cat === 'Все' ? data.services : data.services.filter((s) => s.category === cat)),
-    [cat, data.services],
-  )
   const unpaidTotal = unpaid.reduce((s, f) => s + fineAmountDue(f), 0)
+  const snils = data.docs.find((d) => d.id === 'snils')?.number
 
   return (
     <div className="flex h-full flex-col">
-      {/* шапка */}
-      <header className="shrink-0 px-4 pb-1 pt-3">
-        <div className="flex items-center gap-2.5">
-          <GosLogo className="size-8" />
-          <div className="min-w-0 flex-1">
-            <div className="text-[17px] font-extrabold leading-none tracking-tight text-[#17181A]">Госуслуги</div>
-            <div className="mt-1 truncate text-[11px] text-[#9AA0A8]">{data.user.city} · личный кабинет</div>
-          </div>
-          <button
-            type="button"
-            onClick={() => onGo({ k: 'fines' })}
-            aria-label="Уведомления и штрафы"
-            className="relative flex size-10 items-center justify-center rounded-full transition active:bg-black/[0.06]"
-          >
-            <Bell className="size-[21px] text-[#17181A]" strokeWidth={2} />
-            {unpaid.length > 0 && (
-              <span className="absolute right-1.5 top-1.5 size-2.5 rounded-full border-2 border-[#F5F6F8] bg-[#EE3F58]" aria-hidden="true" />
+      {/* компактный профиль: ФИО + СНИЛС, тап → личный кабинет */}
+      <header className="flex shrink-0 items-center gap-2 px-4 pb-1 pt-3">
+        <button
+          type="button"
+          onClick={() => onGo({ k: 'profile' })}
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-[20px] p-1.5 text-left transition active:bg-black/[0.04]"
+          aria-label="Личный кабинет"
+        >
+          <GosAvatar name={data.user.displayName} photoUrl={data.user.photoUrl} className="size-11" />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[16.5px] font-bold leading-tight tracking-tight text-[#17181A]">
+              {data.user.displayName}
+            </span>
+            {snils && (
+              <span className="mt-0.5 block truncate text-[12px] tabular-nums text-[#9AA0A8]">СНИЛС {snils}</span>
             )}
-          </button>
-          <button
-            type="button"
-            onClick={() => onGo({ k: 'profile' })}
-            aria-label="Личный кабинет"
-            className="transition active:scale-95"
-          >
-            <GosAvatar name={data.user.displayName} photoUrl={data.user.photoUrl} className="size-9" />
-          </button>
-        </div>
-
-        {/* поиск */}
+          </span>
+          <ChevronRight className="size-5 shrink-0 text-[#9AA0A8]" strokeWidth={2} />
+        </button>
         <button
           type="button"
           onClick={() => onGo({ k: 'search' })}
-          className="mt-3 flex h-11 w-full items-center gap-2.5 rounded-full bg-white px-4 shadow-[0_1px_5px_rgba(15,35,95,0.06)]"
-          aria-label="Поиск по сервисам"
+          aria-label="Поиск"
+          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white shadow-[0_1px_5px_rgba(15,35,95,0.06)] transition active:scale-95"
         >
-          <Search className="size-[18px] text-[#9AA0A8]" strokeWidth={2.1} />
-          <span className="text-[14px] text-[#9AA0A8]">Поиск по сервисам</span>
+          <Search className="size-[19px] text-[#17181A]" strokeWidth={2.1} />
         </button>
       </header>
 
       <div className="flex-1 overflow-y-auto overscroll-contain pb-7">
-        {/* вкладки-карусель */}
-        <div className="mt-3 flex gap-2 overflow-x-auto px-4 pb-4">
-          {CATEGORIES.map((c) => {
-            const active = c === cat
-            return (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setCat(c)}
-                aria-pressed={active}
-                className={
-                  'h-9 shrink-0 rounded-full px-4 text-[13px] font-semibold transition active:scale-[0.97] ' +
-                  (active ? 'bg-[#0D4CD3] text-white shadow-[0_4px_10px_rgba(13,76,211,0.25)]' : 'bg-white text-[#5C616B]')
-                }
-              >
-                {c}
-              </button>
-            )
-          })}
-        </div>
-
-        {/* герой */}
-        <div className="px-4">
-          <div
-            className="relative overflow-hidden rounded-[24px] p-5 text-white shadow-[0_10px_24px_rgba(13,76,211,0.28)]"
-            style={{ background: 'linear-gradient(130deg,#0D4CD3 0%,#2E6FE0 55%,#377FF3 100%)' }}
-          >
-            <div className="absolute -right-8 -top-10 size-36 rounded-full bg-white/10" aria-hidden="true" />
-            <div className="absolute -bottom-12 left-16 size-28 rounded-full bg-white/[0.07]" aria-hidden="true" />
-            <div className="absolute right-4 top-4 flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-[12px] font-semibold">
-              <Wallet className="size-3.5" strokeWidth={2.2} />
-              {fmtMoney(data.user.balance)}
-            </div>
-            <div className="relative">
-              <div className="text-[20px] font-bold leading-tight">{hello()}, {firstName}!</div>
-              <div className="mt-1 max-w-[210px] text-[12.5px] leading-snug text-white/75">
-                Документы, платежи и записи — всегда под рукой
-              </div>
-              <div className="mt-4 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => onGo({ k: 'docs' })}
-                  className="h-10 rounded-full bg-white px-4 text-[13px] font-bold text-[#0D4CD3] transition active:scale-[0.97]"
-                >
-                  Мои документы
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onGo({ k: 'fines' })}
-                  className="flex h-10 items-center rounded-full bg-white/15 px-4 text-[13px] font-semibold text-white transition active:scale-[0.97]"
-                >
-                  Штрафы
-                  {unpaid.length > 0 && (
-                    <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#EE3F58] px-1 text-[11px] font-bold">
-                      {unpaid.length}
-                    </span>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* задолженности */}
-        {unpaid.length > 0 ? (
-          <button
-            type="button"
-            onClick={() => onGo({ k: 'fines' })}
-            className="mx-4 mt-3 flex w-[calc(100%-32px)] items-center gap-3 rounded-[20px] bg-[#EE3F58]/[0.08] p-4 text-left ring-1 ring-[#EE3F58]/20 transition active:bg-[#EE3F58]/[0.14]"
-          >
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#EE3F58]/12">
-              <ReceiptText className="size-5 text-[#EE3F58]" strokeWidth={2} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[14px] font-bold text-[#17181A]">
-                Штрафы и начисления · {fmtMoney(unpaidTotal)}
-              </span>
-              <span className="mt-0.5 block truncate text-[12px] text-[#9AA0A8]">
-                {unpaid.length === 1 ? '1 неоплаченный счёт' : `${unpaid.length} неоплаченных счёта`} · действует скидка 50%
-              </span>
-            </span>
-            <ChevronRight className="size-5 shrink-0 text-[#9AA0A8]" strokeWidth={2} />
-          </button>
-        ) : (
-          <div className="mx-4 mt-3 flex items-center gap-3 rounded-[20px] bg-[#0AC760]/[0.08] p-4 ring-1 ring-[#0AC760]/20">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#0AC760]/12">
-              <CheckCircle2 className="size-5 text-[#067A47]" strokeWidth={2} />
-            </span>
-            <div className="min-w-0">
-              <div className="text-[14px] font-bold text-[#17181A]">Задолженностей нет</div>
-              <div className="mt-0.5 text-[12px] text-[#9AA0A8]">Все начисления оплачены вовремя</div>
-            </div>
-          </div>
-        )}
-
-        {/* документы */}
-        <div className="mt-6">
+        {/* Документы: крупные карточки, горизонтальный скролл */}
+        <section className="mt-4">
           <SectionTitle title="Документы" action="Все" onAction={() => onGo({ k: 'docs' })} />
-          <div className="flex gap-3 overflow-x-auto px-4 pb-1">
+          <div className="flex gap-3 overflow-x-auto px-5 pb-1">
             {data.docs.map((d) => (
               <DocPreviewCard key={d.id} doc={d} onClick={() => onOpenDoc(d.id)} />
             ))}
           </div>
-        </div>
+        </section>
 
-        {/* популярное */}
-        <div className="mt-6">
-          <SectionTitle title="Популярное" />
-          <div className="mx-4 divide-y divide-[#F0F1F5] overflow-hidden rounded-[22px] bg-white shadow-[0_2px_10px_rgba(15,35,95,0.05)]">
-            {services.map((s) => (
+        {/* Штрафы: красный бейдж суммы, если есть */}
+        <section className="mt-6">
+          <SectionTitle title="Штрафы" />
+          <div className="px-5">
+            {unpaid.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => onGo({ k: 'fines' })}
+                className={CARD + ' flex w-full items-center gap-3.5 p-4 text-left transition active:bg-black/[0.03]'}
+              >
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[#EE3F58]/10">
+                  <ReceiptText className="size-[21px] text-[#EE3F58]" strokeWidth={2} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[15px] font-bold text-[#17181A]">Штрафы ГИБДД</span>
+                  <span className="mt-0.5 block truncate text-[12px] text-[#9AA0A8]">
+                    {unpaid.length === 1 ? '1 счёт' : unpaid.length < 5 ? `${unpaid.length} счёта` : `${unpaid.length} счетов`}
+                    {' · '}
+                    скидка 50%
+                  </span>
+                </span>
+                <span className="shrink-0 rounded-full bg-[#EE3F58] px-3 py-1.5 text-[13px] font-bold tabular-nums text-white">
+                  {fmtMoney(unpaidTotal)}
+                </span>
+              </button>
+            ) : (
+              <div className={CARD + ' flex items-center gap-3.5 p-4'}>
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[#0AC760]/10">
+                  <CheckCircle2 className="size-[21px] text-[#067A47]" strokeWidth={2} />
+                </span>
+                <div className="min-w-0">
+                  <div className="text-[15px] font-bold text-[#17181A]">Штрафов нет</div>
+                  <div className="mt-0.5 text-[12px] text-[#9AA0A8]">Все начисления оплачены</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Услуги: название + одна строка описания */}
+        <section className="mt-6">
+          <SectionTitle title="Услуги" />
+          <div className="mx-5 divide-y divide-[#F0F1F5] overflow-hidden rounded-[20px] bg-white shadow-[0_2px_10px_rgba(15,35,95,0.05)]">
+            {data.services.map((s) => (
               <ServiceRow
                 key={s.id}
                 service={s}
@@ -313,11 +235,7 @@ function HomeScreen({
               />
             ))}
           </div>
-        </div>
-
-        <p className="mt-6 px-8 text-center text-[11px] leading-relaxed text-[#B9BDC7]">
-          Портал Госуслуг · Resale OS 2.6 · все документы и начисления вымышлены
-        </p>
+        </section>
       </div>
     </div>
   )
@@ -328,14 +246,12 @@ function HomeScreen({
 // ---------------------------------------------------------------------------
 
 function FinesView({
-  data,
   unpaid,
   paid,
   paying,
   onPay,
   onPayAll,
 }: {
-  data: GosData
   unpaid: GosFineDTO[]
   paid: GosFineDTO[]
   paying: string | null
@@ -436,13 +352,6 @@ function FinesView({
           </div>
         </div>
       )}
-
-      <div className="mt-4 flex items-start gap-2.5 rounded-[18px] bg-white p-4 shadow-[0_2px_10px_rgba(15,35,95,0.05)]">
-        <Clock3 className="mt-0.5 size-[17px] shrink-0 text-[#9AA0A8]" strokeWidth={2} />
-        <p className="text-[12px] leading-relaxed text-[#9AA0A8]">
-          Начисления формируются раз в сутки. Всего оплачено через портал: {fmtMoney(data.paidTotal)}.
-        </p>
-      </div>
     </div>
   )
 }
@@ -458,14 +367,6 @@ function DocsView({ docs, onOpenDoc }: { docs: GosDoc[]; onOpenDoc: (id: string)
         {docs.map((d) => (
           <DocPreviewCard key={d.id} doc={d} large onClick={() => onOpenDoc(d.id)} />
         ))}
-      </div>
-      <div className="mt-4 flex items-start gap-2.5 rounded-[18px] bg-white p-4 shadow-[0_2px_10px_rgba(15,35,95,0.05)]">
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#0D4CD3]/10">
-          <Landmark className="size-4 text-[#0D4CD3]" strokeWidth={2} />
-        </span>
-        <p className="text-[12px] leading-relaxed text-[#9AA0A8]">
-          Документы подтверждены порталом. Нажмите на карточку, чтобы показать QR-код и реквизиты.
-        </p>
       </div>
     </div>
   )
@@ -572,7 +473,7 @@ function SearchView({
 
         {query && services.length > 0 && (
           <div className="mt-4">
-            <div className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-[#9AA0A8]">Сервисы</div>
+            <div className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-[#9AA0A8]">Услуги</div>
             <div className="divide-y divide-[#F0F1F5] overflow-hidden rounded-[20px] bg-white shadow-[0_2px_10px_rgba(15,35,95,0.05)]">
               {services.map((s) => (
                 <ServiceRow key={s.id} service={s} onClick={() => onOpenService(s.id)} />
@@ -587,7 +488,7 @@ function SearchView({
               <Search className="size-6 text-[#9AA0A8]" strokeWidth={2} />
             </span>
             <div className="mt-3 text-[15px] font-semibold text-[#17181A]">Ничего не нашлось</div>
-            <p className="mt-1 text-[13px] text-[#9AA0A8]">Попробуйте «паспорт», «штрафы» или «врач»</p>
+            <p className="mt-1 text-[13px] text-[#9AA0A8]">Попробуйте «паспорт» или «штрафы»</p>
           </div>
         )}
       </div>
@@ -670,14 +571,14 @@ function ProfileView({
         <SectionTitle title="Платежи" />
         <div className={CARD + ' divide-y divide-[#F0F1F5]'}>
           <DataRow label="Баланс счёта" value={fmtMoney(data.user.balance)} />
-          <DataRow label="Оплачено штрафов" value={fmtMoney(data.paidTotal)} />
+          <DataRow label="Оплачено через портал" value={fmtMoney(data.paidTotal)} />
         </div>
         <button
           type="button"
           onClick={onGoFines}
           className="mt-3 flex h-12 w-full items-center justify-center rounded-[14px] bg-[#0D4CD3] text-[15px] font-semibold text-white shadow-[0_6px_16px_rgba(13,76,211,0.28)] transition active:scale-[0.985]"
         >
-          Штрафы и начисления
+          Штрафы ГИБДД
         </button>
       </div>
     </div>
@@ -705,25 +606,46 @@ export default function GosuslugiApp() {
   const [docOpen, setDocOpen] = useState<string | null>(null)
   const [paying, setPaying] = useState<string | null>(null)
   const [lsPaid, setLsPaid] = useState<string[]>([])
+  const retryTimer = useRef<number | null>(null)
   const pushToast = useOS((s) => s.pushToast)
   const refreshSession = useOS((s) => s.refreshSession)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+  // Загрузка с мягким ретраем: первые 3 неудачи (холодный старт, пересборка dev,
+  // пропавший интернет) повторяются тихо с растущей задержкой, скелет остаётся на
+  // экране; «Портал недоступен» показываем только после всех ретраев.
+  const load = useCallback(async (attempt = 0): Promise<void> => {
+    if (attempt === 0) {
+      setLoading(true)
+      setError(null)
+    }
     try {
       const d = await gosFetch<GosData>('/api/gosuslugi')
       setData(d)
       setLsPaid(readLsPaid())
+      setError(null)
+      setLoading(false)
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Не удалось связаться с порталом')
-    } finally {
+      if (attempt < 3) {
+        if (retryTimer.current) window.clearTimeout(retryTimer.current)
+        retryTimer.current = window.setTimeout(() => void load(attempt + 1), 800 + attempt * 900)
+        return
+      }
+      setError(
+        e instanceof ApiError
+          ? e.status >= 500 || e.status === 401
+            ? 'Сервис временно недоступен'
+            : e.message
+          : 'Не удалось связаться с порталом',
+      )
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
     void load()
+    return () => {
+      if (retryTimer.current) window.clearTimeout(retryTimer.current)
+    }
   }, [load])
 
   // объединяем статус оплаты: сервер (User.stats) + зеркало localStorage
@@ -806,13 +728,7 @@ export default function GosuslugiApp() {
             {view.k !== 'home' && view.k !== 'search' && view.k !== 'service' && (
               <SubHeader
                 title={
-                  view.k === 'docs'
-                    ? 'Мои документы'
-                    : view.k === 'fines'
-                      ? 'Штрафы и задолженности'
-                      : view.k === 'profile'
-                        ? 'Личный кабинет'
-                        : 'Сервис'
+                  view.k === 'docs' ? 'Документы' : view.k === 'fines' ? 'Штрафы ГИБДД' : 'Профиль'
                 }
                 onBack={() => setView({ k: 'home' })}
               />
@@ -823,7 +739,6 @@ export default function GosuslugiApp() {
             {view.k === 'docs' && <DocsView docs={data.docs} onOpenDoc={openDoc} />}
             {view.k === 'fines' && (
               <FinesView
-                data={data}
                 unpaid={unpaid}
                 paid={paid}
                 paying={paying}

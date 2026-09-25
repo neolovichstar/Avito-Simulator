@@ -5,8 +5,9 @@ import { purgeExpiredReserves, serializePhone, makeMainPhone } from '@/lib/phone
 export const dynamic = 'force-dynamic'
 
 /**
- * POST /api/phones/buy { id } — выкуп номера из брони (48ч).
- * Если на счету не хватает — номер остаётся в брони, можно накопить.
+ * POST /api/phones/buy { id } — «Забрать» номер из брони (48ч).
+ * buyPrice=0 (обычный) — активируется бесплатно; платный выкупается по цене
+ * брони. Если на счету не хватает — номер остаётся в брони, можно накопить.
  */
 export async function POST(req: Request) {
   const user = await getSessionUser(req)
@@ -35,18 +36,22 @@ export async function POST(req: Request) {
       if (!freshTx || freshTx.balance < phone.buyPrice) {
         throw new BuyError('Недостаточно средств — номер держим за вами ещё 48 часов')
       }
-      await tx.user.update({
-        where: { id: user.id },
-        data: { balance: { decrement: phone.buyPrice } },
-      })
-      await tx.transaction.create({
-        data: {
-          userId: user.id,
-          type: 'phone',
-          amount: -phone.buyPrice,
-          note: `Выкуп номера ${phone.number}`,
-        },
-      })
+      // Бесплатное «Забрать» (buyPrice=0) не трогает баланс и не пишет
+      // нулевую операцию в историю банка.
+      if (phone.buyPrice > 0) {
+        await tx.user.update({
+          where: { id: user.id },
+          data: { balance: { decrement: phone.buyPrice } },
+        })
+        await tx.transaction.create({
+          data: {
+            userId: user.id,
+            type: 'phone',
+            amount: -phone.buyPrice,
+            note: `Выкуп номера ${phone.number}`,
+          },
+        })
+      }
       await tx.phoneNumber.update({
         where: { id: phone.id },
         data: { status: 'active', buyPrice: 0, holdUntil: null, reservedFor: null },

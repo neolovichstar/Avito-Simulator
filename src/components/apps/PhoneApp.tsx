@@ -1,32 +1,30 @@
 'use client'
 
-// Телефон ОС Resale: клавиатура, недавние (журнал CallLog из БД), вкладка
-// «Номера» (выбивание красивых номеров как в GTA5 RP) и контакты
-// (локальные + продавцы-боты). Экран звонка — системный CallOverlay
+// Телефон ОС Resale: клавиатура, недавние (журнал CallLog из БД) и контакты
+// (локальные + продавцы-боты). Выбивание номеров — отдельное приложение
+// «Номера» (openApp('numbers')). Экран звонка — системный CallOverlay
 // (useCall), звонки продавцам-ботам — живые голосовые разговоры.
 
 import { useCallback, useEffect, useState } from 'react'
-import { Clock, Grid3x3, Hash, Phone, Users } from 'lucide-react'
+import { Clock, Grid3x3, Phone, Users } from 'lucide-react'
 import { useOS } from '@/lib/store'
 import { sound } from '@/lib/sound'
 import { useCall } from '@/lib/call'
 import { usePhone } from './phone/use-phone'
 import KeypadTab from './phone/keypad-tab'
 import RecentsTab from './phone/recents-tab'
-import NumbersTab from './phone/numbers-tab'
 import ContactsTab from './phone/contacts-tab'
 
-type Tab = 'keypad' | 'recents' | 'numbers' | 'contacts'
+type Tab = 'keypad' | 'recents' | 'contacts'
 
 const TABS: { key: Tab; label: string; icon: typeof Phone }[] = [
   { key: 'keypad', label: 'Клавиатура', icon: Grid3x3 },
   { key: 'recents', label: 'Недавние', icon: Clock },
-  { key: 'numbers', label: 'Номера', icon: Hash },
   { key: 'contacts', label: 'Контакты', icon: Users },
 ]
 
 export default function PhoneApp() {
-  const pushToast = useOS((s) => s.pushToast)
+  const openApp = useOS((s) => s.openApp)
   const phone = usePhone()
   const [tab, setTab] = useState<Tab>('keypad')
 
@@ -35,12 +33,6 @@ export default function PhoneApp() {
     if (tab === 'recents') void phone.loadCalls()
     if (tab === 'contacts') void phone.loadContacts()
   }, [tab])
-
-
-  const toast = useCallback(
-    (title: string, body: string) => pushToast(title, body),
-    [pushToast],
-  )
 
   // Звонок — состояние ОС (useCall): экран рисует системный CallOverlay, поэтому
   // звонок переживает выход из приложения. Локального стейта больше нет.
@@ -66,10 +58,10 @@ export default function PhoneApp() {
     <div className="flex h-full flex-col bg-[#050D09] text-white">
       <header className="flex h-14 shrink-0 items-center gap-3 px-5">
         <h1 className="text-[17px] font-semibold">Телефон</h1>
-        {phone.reserves.length > 0 && tab !== 'numbers' && (
+        {phone.reserves.length > 0 && (
           <button
             type="button"
-            onClick={() => setTab('numbers')}
+            onClick={() => openApp('numbers')}
             className="ml-auto rounded-full bg-amber-400/15 px-2.5 py-1 text-[11px] font-medium text-amber-300 transition-transform active:scale-95"
           >
             Бронь номера · {phone.reserves.length}
@@ -81,13 +73,11 @@ export default function PhoneApp() {
         <KeypadTab
           mainNumber={phone.mainNumber}
           onCall={startCall}
-          onGoNumbers={() => setTab('numbers')}
+          onOpenNumbers={() => openApp('numbers')}
         />
       )}
 
       {tab === 'recents' && <RecentsTab calls={phone.calls} onCall={startCall} />}
-
-      {tab === 'numbers' && <NumbersTab phone={phone} toast={toast} />}
 
       {tab === 'contacts' && (
         <ContactsTab contacts={phone.contacts} loading={phone.loading} onCall={startCall} />

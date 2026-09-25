@@ -98,7 +98,11 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
       refreshSession({ balance: res.balance, xp: res.xp, level: res.level })
       sound.success()
       setBuyOpen(false)
-      setOkMsg(courier ? 'Курьер уже забирает товар — следите в приложении Доставки' : 'Товар ваш! Проверьте инвентарь в профиле')
+      // ЛОГИСТИКА (28-b): товар больше не попадает в инвентарь мгновенно — едет посылкой
+      setOkMsg(courier
+        ? 'Оплачено! Продавец собирает посылку — следите в Доставках'
+        : 'Оплачено! Заберите товар через приложение Доставки')
+      pushToast('Resale', courier ? 'Посылка собирается — следите в Доставках' : 'Заберите товар через Доставки')
       await load()
     } catch (e) {
       setMsg(e instanceof ApiError ? e.message : 'Не удалось купить')

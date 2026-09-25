@@ -71,6 +71,37 @@ export function tierMeta(tier: string): TierMeta {
   return TIER_META[(tier as Tier) in TIER_META ? (tier as Tier) : 'basic']
 }
 
+/** Мелкий бейдж тира. variant 'light' — заполненная пилюля для светлых экранов. */
+export function TierBadge({
+  tier,
+  size = 'sm',
+  variant = 'dark',
+}: {
+  tier: string
+  size?: 'sm' | 'lg'
+  variant?: 'dark' | 'light'
+}) {
+  const meta = tierMeta(tier)
+  const Icon = meta.icon
+  const light = variant === 'light'
+  return (
+    <span
+      className={
+        'inline-flex shrink-0 items-center gap-1 rounded-full font-medium ' +
+        (size === 'lg' ? 'px-2.5 py-1 text-[12px]' : 'px-2 py-0.5 text-[10.5px]')
+      }
+      style={
+        light
+          ? { backgroundColor: meta.color, color: '#17181A' }
+          : { backgroundColor: `${meta.color}1f`, color: meta.color }
+      }
+    >
+      <Icon className={size === 'lg' ? 'size-3.5' : 'size-3'} aria-hidden="true" />
+      {meta.label}
+    </span>
+  )
+}
+
 /** Тик раз в секунду — таймеры брони и длительности вызова. */
 export function useTick(): number {
   return useSyncExternalStore(

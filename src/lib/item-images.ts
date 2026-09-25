@@ -19,6 +19,8 @@ const PRODUCT_IMAGES: Record<string, string> = {
   'apple-watch-7': '/img/p/apple-watch-7.jpg',
   'yandex-station-mini': '/img/p/yandex-station-mini.jpg',
   'macbook-air-2020': '/img/p/macbook-air-2020.jpg',
+  'pc-i5-build': '/img/p/pc-i5-build.jpg',
+  'pc-r5-build': '/img/p/pc-r5-build.jpg',
   'thinkpad-t480': '/img/p/thinkpad-t480.jpg',
   'lenovo-ideapad-3': '/img/p/lenovo-ideapad-3.jpg',
   'acer-nitro-5': '/img/p/acer-nitro-5.jpg',

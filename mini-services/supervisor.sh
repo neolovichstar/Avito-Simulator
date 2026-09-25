@@ -1,5 +1,6 @@
 #!/bin/bash
-# Супервизор мини-сервисов Resale: держит живыми realtime (:3003) и telegram-bot (:3004).
+# Супервизор мини-сервисов Resale: держит живыми realtime (:3003), telegram-bot (:3004)
+# и call-service (:3303, P2P-сигналинг звонков — Task 27-e).
 # Проверка раз в 20 с; если health не отвечает — рестартит процесс (setsid bun run dev).
 # Запуск: setsid nohup bash mini-services/supervisor.sh >> mini-services/supervisor.log 2>&1 &
 
@@ -27,6 +28,10 @@ while true; do
   if ! check http://127.0.0.1:3004/health; then
     echo "[$(date '+%F %T')] telegram-bot :3004 down — restarting" >> "$LOG"
     start_service "$ROOT/telegram-bot" "$ROOT/telegram-bot/bot.log" "telegram-bot"
+  fi
+  if ! check http://127.0.0.1:3303/health; then
+    echo "[$(date '+%F %T')] call-service :3303 down — restarting" >> "$LOG"
+    start_service "$ROOT/call-service" "$ROOT/call-service/call-service.log" "call-service"
   fi
   HB=$((HB+1))
   if [ $((HB % 30)) -eq 0 ]; then
