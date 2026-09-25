@@ -919,3 +919,34 @@
 .theme-dark [class*="bg-amber-3"][class*="text-black"],
 .theme-dark [class*="bg-lime-3"][class*="text-black"],
 .theme-dark [class*="bg-emerald-4"][class*="text-black"] { color: #17181a; }
+
+/* ============================================================
+   ТЁМНАЯ ТЕМА v7 + КРУТИЛКА «НОМЕРА» (Task 30)
+   ГТА-плашка (рамка) и барабаны-окошки с риской и растворением
+   цифр у краёв. Светлые значения — база, тёмные — пары.
+   ============================================================ */
+.plate-frame {
+  border: 2.5px solid rgba(23, 24, 26, 0.82);
+  box-shadow: 0 12px 30px rgba(23, 24, 26, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+.theme-dark .plate-frame {
+  border-color: rgba(237, 240, 243, 0.4);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.reel-cell {
+  background: linear-gradient(180deg, #fcfdfe 0%, #eef0f4 100%);
+  box-shadow: inset 0 1px 3px rgba(23, 24, 26, 0.1), 0 0 0 1px rgba(23, 24, 26, 0.07);
+}
+.theme-dark .reel-cell {
+  background: linear-gradient(180deg, #2b3037 0%, #21252b 100%);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+.reel-fade-t { background: linear-gradient(180deg, #fcfdfe, transparent); }
+.reel-fade-b { background: linear-gradient(180deg, transparent, #eef0f4); }
+.theme-dark .reel-fade-t { background: linear-gradient(180deg, #2b3037, transparent); }
+.theme-dark .reel-fade-b { background: linear-gradient(180deg, transparent, #21252b); }
+
+.reel-line { background: rgba(23, 24, 26, 0.07); }
+.theme-dark .reel-line { background: rgba(255, 255, 255, 0.07); }

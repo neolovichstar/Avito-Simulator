@@ -12,6 +12,8 @@ export type Tier = 'basic' | 'silver' | 'gold' | 'platinum' | 'diamond'
 export interface Region {
   id: string
   name: string
+  /** Короткое имя для штампа на плашке (город/аббревиатура). */
+  short: string
   /** Городские/мобильные коды, доступные в регионе (без +7). */
   codes: string[]
   /** Престиж: влияет на шанс паттернов и цену выкупа красивых номеров. */
@@ -26,16 +28,113 @@ function range(from: number, to: number): string[] {
   return out
 }
 
+/**
+ * Все субъекты РФ: топ-3 (Москва/СПб/федеральные мобильные) впереди,
+ * дальше миллионники и областные центры по убыванию престижа, в конце —
+ * национальные республики и дальневосточная глубинка.
+ */
 export const REGIONS: Region[] = [
-  { id: 'msk', name: 'Москва', codes: ['495', '499'], prestige: 1.2, rollPrice: 700 },
-  { id: 'spb', name: 'Санкт-Петербург', codes: ['812'], prestige: 1.1, rollPrice: 650 },
-  { id: 'mob', name: 'Мобильные федеральные', codes: range(900, 999), prestige: 1.0, rollPrice: 600 },
-  { id: 'kzn', name: 'Казань', codes: ['843'], prestige: 1.0, rollPrice: 600 },
-  { id: 'mo', name: 'Московская область', codes: ['498'], prestige: 0.9, rollPrice: 550 },
-  { id: 'krd', name: 'Краснодар', codes: ['861'], prestige: 0.9, rollPrice: 550 },
-  { id: 'ekb', name: 'Екатеринбург', codes: ['343'], prestige: 0.9, rollPrice: 550 },
-  { id: 'rnd', name: 'Ростов-на-Дону', codes: ['863'], prestige: 0.85, rollPrice: 500 },
-  { id: 'nsk', name: 'Новосибирск', codes: ['383'], prestige: 0.8, rollPrice: 500 },
+  { id: 'msk', name: 'Москва', short: 'Москва', codes: ['495', '499'], prestige: 1.2, rollPrice: 700 },
+  { id: 'spb', name: 'Санкт-Петербург', short: 'СПб', codes: ['812'], prestige: 1.1, rollPrice: 650 },
+  { id: 'mob', name: 'Мобильные федеральные', short: 'Мобильные', codes: range(900, 999), prestige: 1.0, rollPrice: 600 },
+
+  // миллионники и крупные центры
+  { id: 'kzn', name: 'Казань', short: 'Казань', codes: ['843'], prestige: 1.0, rollPrice: 600 },
+  { id: 'ekb', name: 'Екатеринбург', short: 'Екатеринбург', codes: ['343'], prestige: 1.0, rollPrice: 600 },
+  { id: 'nsk', name: 'Новосибирск', short: 'Новосибирск', codes: ['383'], prestige: 1.0, rollPrice: 600 },
+  { id: 'krd', name: 'Краснодар', short: 'Краснодар', codes: ['861'], prestige: 1.0, rollPrice: 600 },
+  { id: 'kry', name: 'Крым', short: 'Крым', codes: ['365'], prestige: 0.95, rollPrice: 600 },
+  { id: 'nng', name: 'Нижний Новгород', short: 'Н.Новгород', codes: ['831'], prestige: 0.95, rollPrice: 600 },
+  { id: 'vrn', name: 'Воронеж', short: 'Воронеж', codes: ['473'], prestige: 0.95, rollPrice: 600 },
+  { id: 'sam', name: 'Самара', short: 'Самара', codes: ['846'], prestige: 0.95, rollPrice: 600 },
+  { id: 'ufa', name: 'Уфа', short: 'Уфа', codes: ['347'], prestige: 0.95, rollPrice: 600 },
+  { id: 'rnd', name: 'Ростов-на-Дону', short: 'Ростов', codes: ['863'], prestige: 0.95, rollPrice: 600 },
+  { id: 'kras', name: 'Красноярск', short: 'Красноярск', codes: ['391'], prestige: 0.95, rollPrice: 600 },
+  { id: 'pri', name: 'Приморский край', short: 'Владивосток', codes: ['423'], prestige: 0.9, rollPrice: 550 },
+  { id: 'chb', name: 'Челябинск', short: 'Челябинск', codes: ['351'], prestige: 0.9, rollPrice: 550 },
+  { id: 'omsk', name: 'Омск', short: 'Омск', codes: ['381'], prestige: 0.9, rollPrice: 550 },
+  { id: 'perm', name: 'Пермь', short: 'Пермь', codes: ['342'], prestige: 0.9, rollPrice: 550 },
+  { id: 'vgd', name: 'Волгоград', short: 'Волгоград', codes: ['844'], prestige: 0.9, rollPrice: 550 },
+  { id: 'sev', name: 'Севастополь', short: 'Севастополь', codes: ['869'], prestige: 0.9, rollPrice: 550 },
+  { id: 'kld', name: 'Калининградская область', short: 'Кёниг', codes: ['401'], prestige: 0.9, rollPrice: 550 },
+  { id: 'mo', name: 'Московская область', short: 'МО', codes: ['498'], prestige: 0.9, rollPrice: 550 },
+  { id: 'irk', name: 'Иркутская область', short: 'Иркутск', codes: ['395'], prestige: 0.85, rollPrice: 550 },
+  { id: 'tyu', name: 'Тюменская область', short: 'Тюмень', codes: ['345'], prestige: 0.85, rollPrice: 550 },
+  { id: 'hma', name: 'ХМАО — Югра', short: 'ХМАО', codes: ['346'], prestige: 0.85, rollPrice: 550 },
+  { id: 'lo', name: 'Ленинградская область', short: 'Лен. обл.', codes: ['813'], prestige: 0.85, rollPrice: 550 },
+
+  // Центральная Россия
+  { id: 'vld', name: 'Владимирская область', short: 'Владимир', codes: ['492'], prestige: 0.85, rollPrice: 550 },
+  { id: 'ryz', name: 'Рязанская область', short: 'Рязань', codes: ['491'], prestige: 0.85, rollPrice: 550 },
+  { id: 'tvr', name: 'Тверская область', short: 'Тверь', codes: ['482'], prestige: 0.85, rollPrice: 550 },
+  { id: 'tul', name: 'Тульская область', short: 'Тула', codes: ['487'], prestige: 0.85, rollPrice: 550 },
+  { id: 'yar', name: 'Ярославская область', short: 'Ярославль', codes: ['485'], prestige: 0.85, rollPrice: 550 },
+  { id: 'klg', name: 'Калужская область', short: 'Калуга', codes: ['484'], prestige: 0.85, rollPrice: 550 },
+  { id: 'blg', name: 'Белгородская область', short: 'Белгород', codes: ['472'], prestige: 0.85, rollPrice: 550 },
+  { id: 'brn', name: 'Брянская область', short: 'Брянск', codes: ['483'], prestige: 0.8, rollPrice: 500 },
+  { id: 'ivn', name: 'Ивановская область', short: 'Иваново', codes: ['493'], prestige: 0.8, rollPrice: 500 },
+  { id: 'kos', name: 'Костромская область', short: 'Кострома', codes: ['494'], prestige: 0.8, rollPrice: 500 },
+  { id: 'krs', name: 'Курская область', short: 'Курск', codes: ['471'], prestige: 0.8, rollPrice: 500 },
+  { id: 'lpc', name: 'Липецкая область', short: 'Липецк', codes: ['474'], prestige: 0.8, rollPrice: 500 },
+  { id: 'smr', name: 'Смоленская область', short: 'Смоленск', codes: ['481'], prestige: 0.8, rollPrice: 500 },
+  { id: 'orl', name: 'Орловская область', short: 'Орёл', codes: ['486'], prestige: 0.75, rollPrice: 500 },
+  { id: 'tmb', name: 'Тамбовская область', short: 'Тамбов', codes: ['475'], prestige: 0.75, rollPrice: 500 },
+
+  // Северо-Запад
+  { id: 'arh', name: 'Архангельская область', short: 'Архангельск', codes: ['818'], prestige: 0.75, rollPrice: 500 },
+  { id: 'vlg', name: 'Вологодская область', short: 'Вологда', codes: ['817'], prestige: 0.75, rollPrice: 500 },
+  { id: 'mur', name: 'Мурманская область', short: 'Мурманск', codes: ['815'], prestige: 0.75, rollPrice: 500 },
+  { id: 'nov', name: 'Новгородская область', short: 'Новгород', codes: ['816'], prestige: 0.75, rollPrice: 500 },
+  { id: 'kar', name: 'Республика Карелия', short: 'Карелия', codes: ['814'], prestige: 0.75, rollPrice: 500 },
+  { id: 'psk', name: 'Псковская область', short: 'Псков', codes: ['811'], prestige: 0.7, rollPrice: 450 },
+  { id: 'kom', name: 'Республика Коми', short: 'Коми', codes: ['821'], prestige: 0.7, rollPrice: 450 },
+
+  // Юг и Кавказ
+  { id: 'ast', name: 'Астраханская область', short: 'Астрахань', codes: ['851'], prestige: 0.75, rollPrice: 500 },
+  { id: 'sta', name: 'Ставропольский край', short: 'Ставрополь', codes: ['865'], prestige: 0.8, rollPrice: 500 },
+  { id: 'dag', name: 'Республика Дагестан', short: 'Дагестан', codes: ['872'], prestige: 0.8, rollPrice: 500 },
+  { id: 'che', name: 'Чеченская Республика', short: 'Чечня', codes: ['871'], prestige: 0.7, rollPrice: 450 },
+  { id: 'ose', name: 'Северная Осетия', short: 'Осетия', codes: ['867'], prestige: 0.65, rollPrice: 450 },
+  { id: 'kbr', name: 'Кабардино-Балкария', short: 'КБР', codes: ['866'], prestige: 0.65, rollPrice: 450 },
+  { id: 'adg', name: 'Республика Адыгея', short: 'Адыгея', codes: ['877'], prestige: 0.7, rollPrice: 450 },
+  { id: 'kcr', name: 'Карачаево-Черкесия', short: 'КЧР', codes: ['878'], prestige: 0.6, rollPrice: 450 },
+  { id: 'ing', name: 'Республика Ингушетия', short: 'Ингушетия', codes: ['873'], prestige: 0.6, rollPrice: 450 },
+  { id: 'klm', name: 'Республика Калмыкия', short: 'Калмыкия', codes: ['847'], prestige: 0.6, rollPrice: 450 },
+
+  // Поволжье
+  { id: 'ore', name: 'Оренбургская область', short: 'Оренбург', codes: ['353'], prestige: 0.75, rollPrice: 500 },
+  { id: 'sar', name: 'Саратовская область', short: 'Саратов', codes: ['845'], prestige: 0.75, rollPrice: 500 },
+  { id: 'kir', name: 'Кировская область', short: 'Киров', codes: ['833'], prestige: 0.7, rollPrice: 450 },
+  { id: 'uly', name: 'Ульяновская область', short: 'Ульяновск', codes: ['842'], prestige: 0.7, rollPrice: 450 },
+  { id: 'udm', name: 'Удмуртская Республика', short: 'Удмуртия', codes: ['341'], prestige: 0.65, rollPrice: 450 },
+  { id: 'chv', name: 'Чувашская Республика', short: 'Чувашия', codes: ['835'], prestige: 0.65, rollPrice: 450 },
+  { id: 'pnz', name: 'Пензенская область', short: 'Пенза', codes: ['841'], prestige: 0.65, rollPrice: 450 },
+  { id: 'mri', name: 'Республика Марий Эл', short: 'Марий Эл', codes: ['836'], prestige: 0.6, rollPrice: 450 },
+  { id: 'mrd', name: 'Республика Мордовия', short: 'Мордовия', codes: ['834'], prestige: 0.6, rollPrice: 450 },
+
+  // Урал
+  { id: 'yna', name: 'ЯНАО', short: 'ЯНАО', codes: ['349'], prestige: 0.75, rollPrice: 500 },
+  { id: 'kgn', name: 'Курганская область', short: 'Курган', codes: ['352'], prestige: 0.6, rollPrice: 450 },
+
+  // Сибирь
+  { id: 'altk', name: 'Алтайский край', short: 'Барнаул', codes: ['385'], prestige: 0.75, rollPrice: 500 },
+  { id: 'kem', name: 'Кемеровская область — Кузбасс', short: 'Кемерово', codes: ['384'], prestige: 0.75, rollPrice: 500 },
+  { id: 'tom', name: 'Томская область', short: 'Томск', codes: ['382'], prestige: 0.75, rollPrice: 500 },
+  { id: 'alt', name: 'Республика Алтай', short: 'Горный Алтай', codes: ['388'], prestige: 0.65, rollPrice: 450 },
+  { id: 'hak', name: 'Республика Хакасия', short: 'Хакасия', codes: ['390'], prestige: 0.6, rollPrice: 450 },
+  { id: 'tyv', name: 'Республика Тыва', short: 'Тыва', codes: ['394'], prestige: 0.55, rollPrice: 450 },
+
+  // Дальний Восток
+  { id: 'hab', name: 'Хабаровский край', short: 'Хабаровск', codes: ['421'], prestige: 0.75, rollPrice: 500 },
+  { id: 'sak', name: 'Республика Саха — Якутия', short: 'Якутия', codes: ['411'], prestige: 0.7, rollPrice: 450 },
+  { id: 'shl', name: 'Сахалинская область', short: 'Сахалин', codes: ['424'], prestige: 0.7, rollPrice: 450 },
+  { id: 'amu', name: 'Амурская область', short: 'Благовещенск', codes: ['416'], prestige: 0.65, rollPrice: 450 },
+  { id: 'bry', name: 'Республика Бурятия', short: 'Бурятия', codes: ['301'], prestige: 0.65, rollPrice: 450 },
+  { id: 'kam', name: 'Камчатский край', short: 'Камчатка', codes: ['415'], prestige: 0.65, rollPrice: 450 },
+  { id: 'zab', name: 'Забайкальский край', short: 'Чита', codes: ['302'], prestige: 0.6, rollPrice: 450 },
+  { id: 'mag', name: 'Магаданская область', short: 'Магадан', codes: ['413'], prestige: 0.55, rollPrice: 450 },
+  { id: 'evr', name: 'Еврейская автономная область', short: 'ЕАО', codes: ['426'], prestige: 0.5, rollPrice: 450 },
+  { id: 'chuk', name: 'Чукотский автономный округ', short: 'Чукотка', codes: ['427'], prestige: 0.5, rollPrice: 450 },
 ]
 
 export function regionById(id: string): Region | undefined {
