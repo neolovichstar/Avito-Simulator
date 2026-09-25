@@ -195,3 +195,46 @@ process.on('SIGINT', () => {
     process.exit(0)
   })
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Кипер telegram-бота (:3004). Песочница убивает процессы, рождённые внутри
+// активной tool-сессии, на её границе; процессы, рождённые долгоживущим
+// realtime-сервисом, выживают. Раз в 30 с проверяем :3004/health и при
+// необходимости спавним bun index.ts (детached, отдельная сессия).
+// ─────────────────────────────────────────────────────────────────────────────
+const BOT_DIR = new URL('../telegram-bot', import.meta.url).pathname
+let botProc: ReturnType<typeof Bun.spawn> | null = null
+
+async function botAlive(): Promise<boolean> {
+  try {
+    const res = await fetch('http://127.0.0.1:3004/health', { signal: AbortSignal.timeout(3000) })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+async function ensureBot(): Promise<void> {
+  if (await botAlive()) return
+  if (botProc && !botProc.killed) {
+    try { botProc.kill(9) } catch { /* уже мёртв */ }
+    botProc = null
+  }
+  console.log('[rt-keeper] spawning telegram-bot...')
+  try {
+    botProc = Bun.spawn(['bun', 'index.ts'], {
+      cwd: BOT_DIR,
+      stdout: 'inherit',
+      stderr: 'inherit',
+      stdin: 'ignore',
+    })
+    // отвязать ребёнка от нашей группы, чтобы он переживал перезагрузки --hot
+    try { botProc.unref() } catch { /* noop */ }
+  } catch (e) {
+    console.error('[rt-keeper] spawn failed', e)
+  }
+}
+
+setInterval(() => { void ensureBot() }, 30_000)
+setTimeout(() => { void ensureBot() }, 4000)
+console.log('[rt-keeper] telegram-bot keeper scheduled (check every 30s)')

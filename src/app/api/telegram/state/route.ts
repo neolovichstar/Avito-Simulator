@@ -1,11 +1,13 @@
 import { db } from '@/lib/db'
+// Если REALTIME_SECRET на сервере не задан (напр. Vercel), принимаем канонический дефолт
+const EXPECTED_SECRET = process.env.REALTIME_SECRET ?? 'avito-sim-rt-2024-secret'
 
 export const dynamic = 'force-dynamic'
 
 // Сервисный роут для бота: состояние аккаунта по chatId (команды /balance, /start).
 function serviceOk(req: Request): boolean {
   const secret = req.headers.get('x-service-secret')
-  return !!secret && secret === process.env.REALTIME_SECRET
+  return !!secret && secret === EXPECTED_SECRET
 }
 
 export async function GET(req: Request) {
