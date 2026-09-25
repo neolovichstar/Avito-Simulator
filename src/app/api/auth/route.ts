@@ -17,9 +17,15 @@ export async function POST(req: Request) {
   // 1. Пробуем Telegram initData
   if (body.initData && botToken) {
     const tg = validateInitData(body.initData, botToken)
+    if (!tg) {
+      // Диагностика: запрос из Telegram дошёл, но подпись не совпала —
+      // это значит, что BotFather-приложение открылось с чужим токеном.
+      console.warn('[auth] initData INVALID: hash mismatch или устарел; длина =', body.initData.length)
+    }
     if (tg) {
       const username = tg.username ? `@${tg.username}` : `tg_${tg.id}`
       const displayName = [tg.first_name, tg.last_name].filter(Boolean).join(' ') || 'Игрок'
+      console.log('[auth] Telegram login:', username, '| tgId:', tg.id)
       user = await db.user.upsert({
         where: { telegramId: String(tg.id) },
         update: { displayName, photoUrl: tg.photo_url ?? undefined, lastSeenAt: new Date() },
