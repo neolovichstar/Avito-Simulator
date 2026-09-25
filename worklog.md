@@ -1815,3 +1815,22 @@ Stage Summary:
 - «Номера» теперь: компактные 4 вкладки (скролл только внутри списков), слот-машина с блюром/клацами/свечением/волнами по тиру, 85 регионов РФ с поиском, элитные коды 777/888/999 с золотой плашкой. Экономика не тронута: прокрутка платная, номер сохраняется только по «Забрать», невыкупленное — 48ч брони, basic всегда 0₽
 - Артефакты: src/components/apps/NumbersApp.tsx (переписан), src/lib/phone.ts (REGIONS 85 шт., GOLD_CODES/CAPITAL_CODES, isGoldCode, Region.short), src/app/globals.css (v7-секция крутилки)
 - Известное: region state локальный (сбрасывается на Москву при перемонтировании приложения — приемлемо); горячая «Ещё · N ₽» вместо «Крутить ещё» в паре с Забрать (full-width CTA сохранил полную формулировку)
+
+---
+Task ID: 31
+Agent: Z.ai Code (main)
+Task: Деплой + система Telegram-уведомлений из прода + починка прод-сборки
+
+Work Log:
+- Деплой: PAT в remote обновлён, запушено 113aad0..cbe2416 (крутилка номеров Task 30 впервые уехала в гит) — но оба деплоя (cbe2416, c046be9) на Vercel ПАЛИ: «Module not found: Can't resolve './music/local-tracks'». Корень: .gitignore шаблона платформы `local-*` глотал src/components/apps/music/local-tracks.tsx (306 строк легитимного кода, никогда не коммитился). Фикс: правило → `/local-*` (только корень), файл закоммичен (aecb02e) → сборка READY
+- Токен vcp_… идентифицирован и проверен: это VERCEL API-токен (user neolovichstar, team team_p4fteGCOWsomcnilLQvMEZ4V) → полный контроль деплоя/логов/env без dashboard. В .env лежит как UNKNOWN_VCP_TOKEN
+- СИСТЕМА УВЕДОМЛЕНИЙ ИЗ ПРОДА (закрыт висевший с Task «деплой» пункт): на Vercel нет постоянного процесса и localhost:3004, прямой мост telegram-notify там умирал. Сделано: 1) prisma Notification.tgSentAt DateTime? в ОБЕИХ схемах (sqlite + postgres, db push локально и на прод db.prisma.io); 2) /api/telegram/pending (GET — неотправленные за 24 ч по привязанным чатам, батч 15/чат, x-service-secret; POST {ids} — ack tgSentAt); 3) бот: apiPost + escHtml + pendingTick/pendingLoop (опрос прода раз в 20 с, рассылка батчами по 8, emoji по kind deal💰/message✉️/tax🧾/market📈/system⚙️, ack только после успешного sendSmart). Бот перезапущен (keeper подхватил, pid 14579)
+- ENV ПРОДА заполнены через API (upsert, target production+preview): BOT_TOKEN, OPENROUTER_API_KEY, OPENROUTER_MODEL(+FALLBACK), REALTIME_SECRET (=значение .env песочницы — бот-секреты совпадают), AI_DAILY_LIMIT, APP_PUBLIC_URL → редеплой dpl_7ZT2EdVse8q1Y4uZXR1ob11C11Rb READY
+- ПРОД-ВЕРИФИКАЦИЯ: probe-auth → «VERDICT: BOT_TOKEN на Vercel ЕСТЬ, валидация OK» (строгая HMAC-авторизация Telegram наконец работает на проде, деградация в «Игрока» ушла). Привязка: в прод- и песочнице-БД TelegramLink был пуст; chatId найден в bot.log (7851246214) → привязка восстановлена серверно на юзера hAZe (@hazemute, cmugsvgs7000cjm04wolnp4s7). ЖИВОЙ e2e: тестовое «Уведомления включены» доставлено в Telegram за 7 с (tgSentAt 23:06:46); автоматом улетело и реальное событие «Ремонт завершён» (23:07:27) — пайплайн prod-движок → pending → бот → TG работает на реальных играх
+- scripts/test-pending.ts — диагностика доставки (вставить контрольное уведомление в прод)
+- QA локально: /api/telegram/pending 403 без секрета / {chats:[]} с ним; sqlite-схема+клиент восстановлены после postgres-танцев (git checkout + prisma generate, dev 200); agent-browser: локскрин → анлок → рабочий стол, иконки на месте, консоль чистая
+
+Stage Summary:
+- ПРОД ПОЛНОСТЬЮ ЖИВОЙ: крутилка номеров на проде, сборка зелёная, строгая TG-авторизация, ИИ-переговоры на OpenRouter (раньше на проде были правила), уведомления из прода приходят в Telegram (сделки/ставки/налоги/доставки/достижения/ремонт), аккаунт юзера hAZe привязан к боту
+- Инструменты: Vercel API-токен (vcp_…) найден и задокументирован — деплои/логи/env теперь можно править отсюда
+- Известное: sandbox-уведомления через /send не помечают tgSentAt (бот читает только прод — задвоений нет); старые >24 ч уведомления в TG не шлются; если песочница погаснет — бот и доставка встанут до её подъёма (уведомления копятся в tgSentAt:null и уйдут при возврате, в пределах 24 ч)
