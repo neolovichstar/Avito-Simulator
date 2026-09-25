@@ -10,7 +10,11 @@ export async function POST(req: Request) {
   if (!rateLimit(`auth:${ip}`, 60, 60_000)) {
     return Response.json({ error: 'Слишком часто. Подождите минуту' }, { status: 429 })
   }
-  const body = (await req.json().catch(() => ({}))) as { initData?: string | null; devName?: string }
+  const body = (await req.json().catch(() => ({}))) as {
+    initData?: string | null
+    deviceId?: string | null
+    devName?: string
+  }
   const botToken = process.env.BOT_TOKEN ?? ''
   let user: Awaited<ReturnType<typeof db.user.findUnique>> = null
 
@@ -50,13 +54,23 @@ export async function POST(req: Request) {
     }
   }
 
-  // 2. Fallback: dev-режим без бота
+  // 2. Fallback: вход без Telegram. ФИКС «СБРОСОВ ПРОГРЕССА»: раньше все
+  // клиенты без initData попадали на ОДИН общий аккаунт player_<hash('Игрок')>,
+  // и прогресс «конфликтовал»/«сбрасывался». Теперь клиент шлёт стабильный
+  // deviceId (localStorage), и каждый девайс получает свой отдельный аккаунт.
+  // Если deviceId нет (старый клиент) — работает прежнее поведение.
   if (!user) {
+    // стабильный строковый хеш, чтобы кириллица/UUID не схлопывали аккаунты
+    const stableHash = (s: string) => {
+      let h = 5381
+      for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0
+      return h
+    }
+    const rawDeviceId = (body.deviceId ?? '').trim().slice(0, 64).replace(/[^a-zA-Z0-9-_]/g, '')
     const devName = (body.devName ?? 'Игрок').slice(0, 24)
-    // стабильный хеш имени, чтобы кириллица не схлопывала аккаунты
-    let h = 5381
-    for (let i = 0; i < devName.length; i++) h = ((h * 33) ^ devName.charCodeAt(i)) >>> 0
-    const username = `player_${h.toString(36)}`
+    const username = rawDeviceId
+      ? `player_${stableHash(rawDeviceId).toString(36)}`
+      : `player_${stableHash(devName).toString(36)}`
     const existing = await db.user.findUnique({ where: { username } })
     user = existing
       ? await db.user.update({ where: { id: existing.id }, data: { lastSeenAt: new Date() } })

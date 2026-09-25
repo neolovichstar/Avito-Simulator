@@ -56,8 +56,11 @@ const patch = <T,>(path: string, body?: unknown) =>
 
 export const api = {
   // auth
-  auth: (initData: string | null) =>
-    post<{ token: string; user: SessionUser }>('/api/auth', { initData, devName: 'Игрок' }),
+  // deviceId — стабильный идентификатор этого браузера/телефона (localStorage).
+  // Нужен для фолбэк-входа без Telegram: каждый девайс получает СВОЙ аккаунт,
+  // а не общий «player_xxx» на всех (причина «сбросов» прогресса).
+  auth: (initData: string | null, deviceId: string | null) =>
+    post<{ token: string; user: SessionUser }>('/api/auth', { initData, deviceId, devName: 'Игрок' }),
 
   // avito
   feed: (params: { q?: string; category?: CategoryKey | 'all'; sort?: 'new' | 'cheap' | 'expensive'; page?: number; limit?: number; mine?: boolean; city?: string }) => {

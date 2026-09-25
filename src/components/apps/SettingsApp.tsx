@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   BatteryCharging, Ban, Bot, CheckCircle2, ChevronRight, Database, Handshake, Info, Loader2, MapPin, Moon, MoonStar, NotebookText, RefreshCw,
-  Send, Server, Settings as SettingsIcon, Shield, Star, Volume2, Wallet, Zap,
+  Send, Server, Settings as SettingsIcon, Shield, Star, Vibrate, Wallet, Zap,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS, ALL_WIDGETS, WIDGET_LABEL, type WidgetKey } from '@/lib/store'
@@ -99,7 +99,7 @@ export default function SettingsApp() {
   const setWallpaper = useOS((s) => s.setWallpaper)
   const widgets = useOS((s) => s.widgets)
   const setWidgets = useOS((s) => s.setWidgets)
-  // звук интерфейса (WebAudio-синтез + вибрация)
+  // вибро-отклик интерфейса (звуки полностью убраны — остался только haptic)
   const [soundOn, setSoundOn] = useState(sound.isEnabled())
   useEffect(() => sound.subscribe(setSoundOn), [])
 
@@ -334,16 +334,16 @@ export default function SettingsApp() {
               </div>
               <div className="flex items-center gap-3 border-t border-white/[0.06] px-4 py-3">
                 <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400" aria-hidden="true">
-                  <Volume2 className="size-5" />
+                  <Vibrate className="size-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium text-white">Звук и вибрация</div>
-                  <div className="text-xs text-white/50">{soundOn ? 'Системные звуки интерфейса включены' : 'Тихий режим: без звуков и вибрации'}</div>
+                  <div className="text-sm font-medium text-white">Вибро-отклик</div>
+                  <div className="text-xs text-white/50">{soundOn ? 'Вибрация на действия и события включена' : 'Полная тишина: без вибрации'}</div>
                 </div>
                 <Toggle
                   checked={soundOn}
                   onCheckedChange={(v) => sound.setEnabled(v)}
-                  label="Звук и вибрация"
+                  label="Вибро-отклик"
                 />
               </div>
             </SectionCard>

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { RefreshCw, WifiOff } from 'lucide-react'
 import { useOS, type AppKey, WALLPAPER_TOP } from '@/lib/store'
-import { api, setToken } from '@/lib/api'
+import { api, getToken, setToken } from '@/lib/api'
 import { useRealtime } from '@/lib/use-realtime'
 import { useSwipe } from '@/lib/use-swipe'
 import { initDeviceSensors } from '@/lib/device'
@@ -42,6 +42,27 @@ const WALLPAPER_KEY = 'avito_sim_wallpaper_v2' // v2: дефолт — зелё�
 const WIDGETS_KEY = 'avito_sim_widgets'
 const DND_KEY = 'avito_sim_dnd'
 const DESKTOP_MIN_WIDTH = 1024
+const DEVICE_KEY = 'avito_sim_device_id'
+
+// Стабильный id этого браузера/телефона для фолбэк-входа без Telegram.
+// Сервер ключует девиант-аккаунт по нему, поэтому прогресс больше не
+// «сбрасывается»: у каждого устройства — свой постоянный профиль.
+function getDeviceId(): string | null {
+  if (typeof window === 'undefined') return null
+  try {
+    let id = localStorage.getItem(DEVICE_KEY)
+    if (!id) {
+      id =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : Math.random().toString(36).slice(2) + Date.now().toString(36)
+      localStorage.setItem(DEVICE_KEY, id)
+    }
+    return id
+  } catch {
+    return null // приватный режим — сервер создаст общий dev-аккаунт, как раньше
+  }
+}
 
 // Приложения со СВЕТЛОЙ темой интерфейса. Когда открыто одно из них, хром ОС
 // подстраивается: иконки статус-бара становятся тёмными, а рамки Telegram —
@@ -157,12 +178,33 @@ export default function Home() {
     tg?.ready?.()
     tg?.expand?.()
     applyTelegramChrome('#050d09')
+
+    // Быстрый путь: уже есть живой токен прошлой сессии — просто проверяем его
+    // через /api/profile. Это спасает прогресс, когда Telegram SDK один раз
+    // не ответит: без этого клиент падал на общий фолбэк-аккаунт и «терял» сейв.
+    const stored = getToken()
+    if (stored) {
+      try {
+        const p = await api.profile()
+        setSession(p.user)
+        const [stats, notif] = await Promise.all([
+          api.stats().catch(() => ({ online: 0 })),
+          api.notifications().catch(() => ({ items: [] })),
+        ])
+        setOnline(stats.online)
+        setNotifications(notif.items)
+        return
+      } catch {
+        /* токен умер — идём обычным путём полной авторизации */
+      }
+    }
+
     let lastErr: unknown = null
     for (let attempt = 0; attempt < 3; attempt++) {
       if (attempt > 0) await new Promise((r) => setTimeout(r, 700 * attempt))
       try {
         const initData = tg?.initData ?? null
-        const res = await api.auth(initData)
+        const res = await api.auth(initData, getDeviceId())
         setToken(res.token)
         setSession(res.user)
         const [stats, notif] = await Promise.all([

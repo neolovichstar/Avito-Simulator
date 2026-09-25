@@ -10,7 +10,7 @@ import { ChevronUp, MoonStar } from 'lucide-react'
 import { useOS } from '@/lib/store'
 import { sound } from '@/lib/sound'
 import { api } from '@/lib/api'
-import { fmtMoney } from '@/lib/format'
+import { fmtMoney, timeAgo } from '@/lib/format'
 import { useDrag } from '@/lib/use-swipe'
 import { KIND_APP } from './NotificationCenter'
 
@@ -112,6 +112,14 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   }, [unlock])
 
   const previews = notifications.filter((n) => !n.readAt).slice(0, 3)
+  const unreadCount = notifications.filter((n) => !n.readAt).length
+  // «1 уведомление / 2 уведомления / 5 уведомлений» — русские склонения
+  const notifWord = (n: number) =>
+    n % 10 === 1 && n % 100 !== 11
+      ? 'уведомление'
+      : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)
+        ? 'уведомления'
+        : 'уведомлений'
   const DayIcon = KIND_APP.deal.icon
   const dealsLabel =
     day && (day.deals === 1 ? 'сделка' : day.deals < 5 ? 'сделки' : 'сделок')
@@ -173,6 +181,11 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
 
         {/* Превью уведомлений + итоги дня — иконка приложения, заголовок, одна строка */}
         <div className="mt-6 min-h-0 flex-1 space-y-2 overflow-y-auto [scrollbar-width:none]">
+          {unreadCount > 0 && (
+            <p className="px-1 text-[11px] font-semibold uppercase tracking-wider text-white/35">
+              {unreadCount} {notifWord(unreadCount)}
+            </p>
+          )}
           {previews.map((n) => {
             const meta = KIND_APP[n.kind] ?? KIND_APP.system
             const NotifIcon = meta.icon
@@ -183,15 +196,16 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
               >
                 <span
                   aria-hidden="true"
-                  className="flex size-8 shrink-0 items-center justify-center rounded-[10px] text-white shadow-sm"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-[11px] text-white shadow-sm"
                   style={{ background: meta.bg }}
                 >
                   <NotifIcon className="size-4" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-semibold leading-tight text-white">{n.title}</p>
+                  <p className="truncate text-[13px] font-bold leading-tight text-white">{n.title}</p>
                   <p className="mt-0.5 truncate text-[12px] leading-tight text-white/65">{n.body}</p>
                 </div>
+                <span className="shrink-0 text-[11px] text-white/40">{timeAgo(n.createdAt)}</span>
               </div>
             )
           })}

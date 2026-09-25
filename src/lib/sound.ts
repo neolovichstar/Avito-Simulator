@@ -1,8 +1,12 @@
 'use client'
 
-// Звуковая подсистема ОС: синтез на WebAudio (без файлов и сети),
-// вибро-фидбек через Vibration API. Выключатель хранится в localStorage.
-// Все звуки короткие и тихие — «системные», как в настоящем телефоне.
+// Система отклика ОС: только вибро-отклик. Звуки полностью убраны.
+// Все прежние WebAudio-синтезаторы (AudioContext, осцилляторы, tone()) удалены —
+// модуль физически не может издать ни звука. Оставлен тот же публичный API
+// (isEnabled/setEnabled/subscribe/tap/pop/unlock/swipe/success/levelup), чтобы
+// все 15+ файлов-потребителей компилировались без правок: tap/swipe стали
+// тихими no-op, а pop/unlock/success/levelup дают короткую вибрацию.
+// Выключатель хранится в localStorage ('os_sound_v1', по умолчанию включён).
 
 const LS_KEY = 'os_sound_v1'
 
@@ -13,62 +17,18 @@ if (typeof window !== 'undefined') {
   try {
     enabled = localStorage.getItem(LS_KEY) !== '0'
   } catch {
-    /* приватный режим — звук просто включён */
+    /* приватный режим — просто считаем включённым */
   }
 }
 
-let ctx: AudioContext | null = null
 const listeners = new Set<Listener>()
 
-function ac(): AudioContext | null {
-  if (typeof window === 'undefined') return null
-  if (!ctx) {
-    const Ctor =
-      window.AudioContext ??
-      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-    if (!Ctor) return null
-    try {
-      ctx = new Ctor()
-    } catch {
-      return null
-    }
-  }
-  if (ctx.state === 'suspended') void ctx.resume().catch(() => {})
-  return ctx
-}
-
-function tone(
-  freq: number,
-  dur: number,
-  opts: { type?: OscillatorType; gain?: number; delay?: number; slideTo?: number } = {},
-) {
-  const a = ac()
-  if (!a) return
-  try {
-    const t0 = a.currentTime + (opts.delay ?? 0)
-    const osc = a.createOscillator()
-    const g = a.createGain()
-    osc.type = opts.type ?? 'sine'
-    osc.frequency.setValueAtTime(freq, t0)
-    if (opts.slideTo) osc.frequency.exponentialRampToValueAtTime(Math.max(1, opts.slideTo), t0 + dur)
-    const vol = opts.gain ?? 0.06
-    g.gain.setValueAtTime(0.0001, t0)
-    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.012)
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur)
-    osc.connect(g).connect(a.destination)
-    osc.start(t0)
-    osc.stop(t0 + dur + 0.05)
-  } catch {
-    /* аудио не критично */
-  }
-}
-
 function buzz(pattern: number | number[]) {
-  if (!enabled) return
+  if (!enabled || typeof navigator === 'undefined') return
   try {
     navigator.vibrate?.(pattern)
   } catch {
-    /* вибрации может не быть */
+    /* вибрации может не быть — не беда */
   }
 }
 
@@ -85,7 +45,6 @@ export const sound = {
       }
     }
     listeners.forEach((l) => l(v))
-    if (v) sound.tap() // подтверждение включения
   },
 
   subscribe(l: Listener) {
@@ -95,46 +54,33 @@ export const sound = {
     }
   },
 
-  /** Короткий тик: открытие приложения, нажатия. */
+  /** Короткий тик: открытие приложения, нажатия. Звуков нет, вибрации нет. */
   tap() {
-    if (!enabled) return
-    tone(660, 0.05, { type: 'triangle', gain: 0.03 })
+    /* осознанный no-op: тапы не должны дребезжать в руке */
   },
 
-  /** Всплывающее уведомление (heads-up). */
+  /** Всплывающее уведомление (heads-up) — короткий вибро-тычок. */
   pop() {
-    if (!enabled) return
-    tone(520, 0.09, { type: 'sine', gain: 0.05 })
-    tone(780, 0.1, { type: 'sine', gain: 0.04, delay: 0.06 })
     buzz(8)
   },
 
-  /** Разблокировка — восходящий «свуш». */
+  /** Разблокировка — одиночный вибро-щелчок. */
   unlock() {
-    if (!enabled) return
-    tone(340, 0.16, { type: 'triangle', gain: 0.05, slideTo: 720 })
     buzz(12)
   },
 
-  /** Тихий шелест жеста: свайп страницы/вкладки, удаление карточки. */
+  /** Свайп страницы/вкладки, удаление карточки. Звуков нет, вибрации нет. */
   swipe() {
-    if (!enabled) return
-    tone(240, 0.07, { type: 'sine', gain: 0.022, slideTo: 480 })
+    /* осознанный no-op: жесты происходят слишком часто */
   },
 
-  /** Награда/сделка — «ка-чинг». */
+  /** Награда/сделка — двойной «пульс». */
   success() {
-    if (!enabled) return
-    tone(880, 0.08, { type: 'triangle', gain: 0.05 })
-    tone(1320, 0.14, { type: 'triangle', gain: 0.05, delay: 0.07 })
     buzz([10, 40, 10])
   },
 
-  /** Новый уровень — маленькая фанфара. */
+  /** Новый уровень — маленькая «фанфара» из вибро-ударов. */
   levelup() {
-    if (!enabled) return
-    const seq = [523, 659, 784, 1047]
-    seq.forEach((f, i) => tone(f, 0.16, { type: 'triangle', gain: 0.055, delay: i * 0.09 }))
     buzz([15, 60, 15, 60, 25])
   },
 }
