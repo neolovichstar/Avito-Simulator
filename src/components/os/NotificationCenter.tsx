@@ -14,6 +14,7 @@ import { timeAgo } from '@/lib/format'
 import { useDrag } from '@/lib/use-swipe'
 import { sound } from '@/lib/sound'
 import type { NotificationDTO } from '@/lib/types'
+import NowPlayingShade from './NowPlayingShade'
 
 interface NotifApp {
   app: string
@@ -262,6 +263,9 @@ export default function NotificationCenter({
             </button>
           </div>
         </div>
+
+        {/* Медиа-виджет: что играет сейчас (глобальный плеер ОС) */}
+        <NowPlayingShade onOpenApp={onOpenApp} />
 
         {/* Одноразовая подсказка: как убрать карточку из шторки */}
         {notifications.length > 0 && (

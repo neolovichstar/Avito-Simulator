@@ -276,8 +276,8 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
                 ref={inputRef}
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Искать на Авито"
-                aria-label="Искать на Авито"
+                placeholder="Искать на Resale"
+                aria-label="Искать на Resale"
                 className="bg-transparent outline-none text-[15px] w-full text-black placeholder:text-[#8B8F99]"
               />
               {q && (

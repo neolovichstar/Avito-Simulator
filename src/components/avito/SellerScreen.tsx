@@ -131,7 +131,7 @@ export default function SellerScreen({ sellerId, onBack, onOpenListing }: {
                 </div>
                 <div className="flex items-center gap-1 text-xs text-[#8B8F99]">
                   <BadgeCheck size={11} className="text-[#0AC760] shrink-0" aria-hidden />
-                  На Авито с {joined}
+                  На Resale с {joined}
                 </div>
               </div>
             </div>

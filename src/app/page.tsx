@@ -16,6 +16,7 @@ import NotificationCenter from '@/components/os/NotificationCenter'
 import ControlCenter from '@/components/os/ControlCenter'
 import ToastStack from '@/components/os/ToastStack'
 import RecentsOverlay from '@/components/os/RecentsOverlay'
+import MiniPlayer from '@/components/os/MiniPlayer'
 import DesktopShell from '@/components/desktop/DesktopShell'
 import AvitoApp from '@/components/avito/AvitoApp'
 import BankApp from '@/components/apps/BankApp'
@@ -67,7 +68,7 @@ function getDeviceId(): string | null {
 // Приложения со СВЕТЛОЙ темой интерфейса. Когда открыто одно из них, хром ОС
 // подстраивается: иконки статус-бара становятся тёмными, а рамки Telegram —
 // светлыми. Все остальные приложения и лончер остаются тёмными.
-const LIGHT_APPS: Partial<Record<AppKey, true>> = { avito: true, bank: true, taxes: true, auction: true, repair: true, career: true, delivery: true, leaderboard: true }
+const LIGHT_APPS: Partial<Record<AppKey, true>> = { avito: true, bank: true, taxes: true, auction: true, repair: true, career: true, delivery: true, leaderboard: true, music: true }
 
 // Экран «нет связи с сервером» — показывается после 3 неудачных попыток авторизации.
 function OfflineScreen({ onRetry, compact = false }: { onRetry: () => void; compact?: boolean }) {
@@ -437,6 +438,9 @@ export default function Home() {
 
         {/* лок-скрин поверх всего */}
         {locked && <LockScreen onUnlock={unlock} />}
+
+        {/* мини-плеер на дом-экране: музыка играет даже с закрытым приложением */}
+        {!locked && session && !currentApp && <MiniPlayer onOpenApp={openApp} />}
 
         {/* уведомления и тосты */}
         <NotificationCenter open={notifOpen} onClose={() => setNotifOpen(false)} onOpenApp={(a) => { setNotifOpen(false); openApp(a) }} />

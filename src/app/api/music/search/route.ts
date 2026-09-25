@@ -1,28 +1,20 @@
-// Поиск музыки через iTunes Search API. Без ключей, кэш 10 мин на term.
+import { NextResponse } from 'next/server'
+import { searchTracks } from '@/lib/audius'
 
-import { cached, fetchItunes, type Track } from '@/lib/music-types'
-
+export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const SEARCH_TTL_MS = 10 * 60 * 1000
-
+/** Поиск полных треков по Audius (все жанры и языки). */
 export async function GET(req: Request) {
-  const url = new URL(req.url)
-  const term = (url.searchParams.get('term') ?? '').trim()
-  const limitRaw = Number(url.searchParams.get('limit') ?? 25)
-  const limit = Number.isFinite(limitRaw) ? Math.min(50, Math.max(1, Math.floor(limitRaw))) : 25
-
-  if (term.length < 2) return Response.json({ tracks: [] })
-
+  const { searchParams } = new URL(req.url)
+  const q = (searchParams.get('q') ?? '').trim().slice(0, 120)
+  const limit = Math.min(Math.max(Number(searchParams.get('limit')) || 30, 1), 50)
+  if (q.length < 2) return NextResponse.json({ tracks: [] })
   try {
-    const tracks = await cached<Track[]>(
-      `search:${term.toLowerCase()}:${limit}`,
-      SEARCH_TTL_MS,
-      () => fetchItunes(term, limit),
-    )
-    return Response.json({ tracks })
-  } catch {
-    // iTunes недоступен — пустой результат вместо 500, UI честно скажет «ничего не нашлось»
-    return Response.json({ tracks: [] })
+    const tracks = await searchTracks(q, limit)
+    return NextResponse.json({ tracks })
+  } catch (e) {
+    console.error('[music/search] failed', e)
+    return NextResponse.json({ tracks: [] })
   }
 }

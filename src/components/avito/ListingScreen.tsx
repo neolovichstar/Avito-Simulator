@@ -370,7 +370,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
               {joined && (
                 <div className="flex items-center gap-1 text-[12px] text-[#8B8F99] mt-2.5 pt-2.5 border-t border-[#EBEDF0]">
                   <BadgeCheck size={12} className="text-[#0AC760]" aria-hidden />
-                  На Авито с {joined}
+                  На Resale с {joined}
                 </div>
               )}
             </button>

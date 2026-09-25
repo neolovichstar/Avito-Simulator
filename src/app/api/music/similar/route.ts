@@ -1,79 +1,49 @@
-// Рекомендации «Сделано для вас»: по топ-артистам и топ-жанрам слушателя
-// (считаются на клиенте из статистики прослушиваний/лайков) ищем похожее в iTunes.
-// Дедуп по trackId, детерминированный шаффл по ключу, кэш 10 мин.
+import { NextResponse } from 'next/server'
+import { trending, searchTracks, seededShuffle, cached } from '@/lib/audius'
 
-import { cached, dedupeTracks, fetchItunes, type Track } from '@/lib/music-types'
-
+export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const SIMILAR_TTL_MS = 10 * 60 * 1000
-const MAX_PER_QUERY = 8
-const CAP = 24
-
-function parseList(raw: string | null, max: number): string[] {
-  return (raw ?? '')
+/**
+ * Рекомендации «Сделано для вас»: по топ-артистам и жанрам из статистики
+ * прослушиваний клиента. Возвращаем полные треки, стабильные между запросами.
+ * Параметры: artists=Имя1,Имя2&genres=Pop,Rock&exclude=id1,id2
+ */
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url)
+  const artists = (searchParams.get('artists') ?? '')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean)
-    .slice(0, max)
-}
+    .slice(0, 3)
+  const genres = (searchParams.get('genres') ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 2)
+  const exclude = new Set((searchParams.get('exclude') ?? '').split(',').map((s) => s.trim()).filter(Boolean))
 
-function hashString(s: string): number {
-  let h = 2166136261
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i)
-    h = Math.imul(h, 16777619)
-  }
-  return h >>> 0
-}
-
-/** mulberry32 — детерминированный шаффл: одинаковый вход → одинаковый порядок. */
-function seededShuffle<T>(arr: T[], seed: string): T[] {
-  const out = [...arr]
-  let a = hashString(seed) || 1
-  const rnd = () => {
-    a |= 0
-    a = (a + 0x6d2b79f5) | 0
-    let t = Math.imul(a ^ (a >>> 15), 1 | a)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(rnd() * (i + 1))
-    ;[out[i], out[j]] = [out[j]!, out[i]!]
-  }
-  return out
-}
-
-export async function GET(req: Request) {
-  const url = new URL(req.url)
-  const artists = parseList(url.searchParams.get('artists'), 3)
-  const genres = parseList(url.searchParams.get('genres'), 3)
-
-  if (artists.length === 0 && genres.length === 0) {
-    return Response.json({ tracks: [] })
-  }
-
-  const key = `similar:${artists.map((a) => a.toLowerCase()).join('|')}:${genres.map((g) => g.toLowerCase()).join('|')}`
-
+  const key = `sim:${artists.join('|')}:${genres.join('|')}`
   try {
-    const queries: { term: string }[] = [
-      ...artists.map((a) => ({ term: a })),
-      ...genres.map((g) => ({ term: `${g.replace(/\//g, ' ')} hits` })),
-    ]
-    const results = await Promise.allSettled(
-      queries.map((q) =>
-        cached<Track[]>(`similar:${q.term.toLowerCase()}:${MAX_PER_QUERY}`, SIMILAR_TTL_MS, () =>
-          fetchItunes(q.term, MAX_PER_QUERY),
-        ),
-      ),
-    )
-    const merged = dedupeTracks(
-      ...results.map((r) => (r.status === 'fulfilled' ? r.value : [])),
-    )
-    const tracks = seededShuffle(merged, key).slice(0, CAP)
-    return Response.json({ tracks })
-  } catch {
-    return Response.json({ tracks: [] })
+    const tracks = await cached(key, 10 * 60_000, async () => {
+      const perArtist = artists.map((a) => searchTracks(a, 6).catch(() => []))
+      const perGenre = genres.map((g) => trending(g, 'month', 12).catch(() => []))
+      const res = await Promise.allSettled([...perArtist, ...perGenre])
+      const merged = new Map<string, Awaited<ReturnType<typeof searchTracks>>[number]>()
+      for (const r of res) {
+        if (r.status !== 'fulfilled') continue
+        for (const t of r.value) {
+          if (exclude.has(t.id) || merged.has(t.id)) continue
+          merged.set(t.id, t)
+        }
+      }
+      const list = [...merged.values()]
+      if (!list.length) return []
+      return seededShuffle(list, key).slice(0, 24)
+    })
+    return NextResponse.json({ tracks })
+  } catch (e) {
+    console.error('[music/similar] failed', e)
+    return NextResponse.json({ tracks: [] })
   }
 }

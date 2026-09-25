@@ -1,78 +1,78 @@
-// Главная Music-приложения: подборки собираются сервером из iTunes Search API.
-// Стратегия устойчивости: каждый запрос к iTunes — под 7-секундным таймаутом,
-// failed-секция просто пропускается (никогда не 500), всё кэшируется в памяти (TTL 15 мин),
-// при полном фиаско — встроенный офлайн-список, чтобы UI всегда рендерился.
+import { NextResponse } from 'next/server'
+import { trending, cached, seededShuffle, type Track } from '@/lib/audius'
 
-import {
-  cached,
-  dedupeTracks,
-  FALLBACK_TRACKS,
-  fetchItunes,
-  type GenreSection,
-  type HomeData,
-  type Track,
-} from '@/lib/music-types'
-
+export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const HOME_TTL_MS = 15 * 60 * 1000
-
-// Чарт: смесь западных и русских хитов, чтобы в топе были узнаваемые артисты
-const CHART_QUERIES: { term: string; limit: number }[] = [
-  { term: 'top hits 2025', limit: 8 },
-  { term: 'Imagine Dragons', limit: 4 },
-  { term: 'Моргенштерн', limit: 4 },
-  { term: 'Тима Белорусских', limit: 4 },
-]
-
-const NEW_RELEASES_QUERY = { term: 'new music 2025', limit: 12 }
-
-const GENRE_QUERIES: { title: string; term: string }[] = [
-  { title: 'Поп', term: 'pop hits' },
-  { title: 'Хип-хоп', term: 'hip hop hits' },
-  { title: 'Рок', term: 'rock classics' },
-  { title: 'Электронная', term: 'electronic dance' },
-]
-
-async function loadTracks(cacheKey: string, term: string, limit: number): Promise<Track[]> {
-  return cached(cacheKey, HOME_TTL_MS, () => fetchItunes(term, limit))
-}
-
+/**
+ * Главная «Музыки»: курированные секции полных треков всех жанров и языков.
+ * Основа — живые чарты Audius (по жанрам), поэтому подборка всегда «как в
+ * реальном сервисе», а не случайный набор. Всё кэшируется на 20 минут.
+ */
 export async function GET() {
-  const settled = await Promise.allSettled<Track[]>([
-    ...CHART_QUERIES.map((q) => loadTracks(`home:chart:${q.term}:${q.limit}`, q.term, q.limit)),
-    loadTracks(`home:new:${NEW_RELEASES_QUERY.term}`, NEW_RELEASES_QUERY.term, NEW_RELEASES_QUERY.limit),
-    ...GENRE_QUERIES.map((g) => loadTracks(`home:genre:${g.term}`, g.term, 10)),
-  ])
+  try {
+    const sections = await cached('home:v2', 20 * 60_000, async () => {
+      // Чарт недели — все жанры (это и «мировые хиты», и «русские», всё вместе).
+      const chartP = trending(undefined, 'week', 30)
 
-  const takeLists = (from: number, count: number): Track[][] =>
-    settled
-      .slice(from, from + count)
-      .flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []))
+      const genreDefs: { key: string; title: string; subtitle: string; genre: string }[] = [
+        { key: 'pop', title: 'Поп', subtitle: 'Хиты недели', genre: 'Pop' },
+        { key: 'hiphop', title: 'Хип-хоп', subtitle: 'Чарт жанра', genre: 'Hip-Hop/Rap' },
+        { key: 'rock', title: 'Рок', subtitle: 'Лучшее сейчас', genre: 'Rock' },
+        { key: 'electronic', title: 'Электроника', subtitle: 'Танцпол недели', genre: 'Electronic' },
+        { key: 'rnb', title: 'R&B', subtitle: 'Волна настроения', genre: 'R&B/Soul' },
+        { key: 'lofi', title: 'Lo-Fi', subtitle: 'Фон для дел', genre: 'Lo-Fi' },
+      ]
+      const genrePs = genreDefs.map((g) => trending(g.genre, 'week', 20).then((t) => ({ g, tracks: t })))
 
-  const chartCount = CHART_QUERIES.length
-  const chart = dedupeTracks(...takeLists(0, chartCount)).slice(0, 15)
-  const newReleases = (takeLists(chartCount, 1)[0] ?? []).slice(0, 12)
+      const [chart, ...genreRes] = await Promise.allSettled([chartP, ...genrePs])
 
-  const genres: GenreSection[] = []
-  const genreResults = settled.slice(chartCount + 1)
-  genreResults.forEach((r, i) => {
-    if (r.status === 'fulfilled' && r.value.length > 0) {
-      genres.push({ title: GENRE_QUERIES[i]!.title, tracks: r.value })
-    }
-  })
+      const out: { key: string; title: string; subtitle?: string; tracks: Track[] }[] = []
+      const chartTracks = chart.status === 'fulfilled' ? chart.value : []
 
-  // Сеть целиком недоступна — отдаём офлайн-фолбэк (preview пустой, UI умеет это играть «тихо»)
-  if (chart.length === 0 && newReleases.length === 0 && genres.length === 0) {
-    const data: HomeData = {
-      chart: FALLBACK_TRACKS,
-      newReleases: [],
-      genres: [{ title: 'Поп', tracks: FALLBACK_TRACKS }],
-      offline: true,
-    }
-    return Response.json(data)
+      if (chartTracks.length) {
+        out.push({ key: 'chart', title: 'Чарт', subtitle: 'Топ прослушиваний на этой неделе', tracks: chartTracks.slice(0, 20) })
+      }
+
+      const pool: Track[] = [...chartTracks]
+      for (const r of genreRes) {
+        if (r.status !== 'fulfilled' || r.value.tracks.length < 4) continue
+        out.push({ key: r.value.g.key, title: r.value.g.title, subtitle: r.value.g.subtitle, tracks: r.value.tracks })
+        pool.push(...r.value.tracks)
+      }
+
+      // «Новинки»: самые свежие релизы из всего пула (2025-2026 поднимаются наверх).
+      const dated = pool.filter((t) => t.releaseDate)
+      dated.sort((a, b) => (a.releaseDate! < b.releaseDate! ? 1 : -1))
+      const seen = new Set<string>()
+      const fresh: Track[] = []
+      for (const t of dated) {
+        if (seen.has(t.id)) continue
+        seen.add(t.id)
+        fresh.push(t)
+        if (fresh.length >= 15) break
+      }
+      if (fresh.length >= 6) {
+        out.push({ key: 'fresh', title: 'Новинки', subtitle: 'Свежие релизы', tracks: fresh })
+      }
+
+      // «Микс дня»: детерминированный на день шаффл чарта — как персональная волна.
+      if (chartTracks.length >= 8) {
+        const day = new Date().toISOString().slice(0, 10)
+        out.push({
+          key: 'mix',
+          title: 'Микс дня',
+          subtitle: 'Обновляется каждый день',
+          tracks: seededShuffle(chartTracks, `mix:${day}`).slice(0, 15),
+        })
+      }
+
+      return out
+    })
+
+    return NextResponse.json({ sections })
+  } catch (e) {
+    console.error('[music/home] failed', e)
+    return NextResponse.json({ sections: [], offline: true }, { status: 200 })
   }
-
-  const data: HomeData = { chart, newReleases, genres }
-  return Response.json(data)
 }
