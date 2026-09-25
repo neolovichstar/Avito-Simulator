@@ -190,6 +190,7 @@ model Notification {
   title     String
   body      String
   readAt    DateTime?
+  tgSentAt  DateTime? // когда уведомление ушло в Telegram (поллер бота)
   createdAt DateTime  @default(now())
 }
 

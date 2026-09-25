@@ -376,6 +376,26 @@ async function apiGet<T>(path: string): Promise<T | null> {
   }
 }
 
+async function apiPost(path: string, body: unknown): Promise<boolean> {
+  try {
+    const res = await fetch(`${GAME_API}${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-service-secret': SECRET },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(8000),
+    })
+    return res.ok
+  } catch (e) {
+    console.error('[tg-bot] app api POST error', path, e)
+    return false
+  }
+}
+
+// Экранирование HTML (parse_mode: HTML) — заголовки/описания приходят из игры
+function escHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
 // ---------------------------------------------------------------------------
 // Команды
 // ---------------------------------------------------------------------------
@@ -543,6 +563,77 @@ async function pollLoop(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// ДОСТАВКА уведомлений из прода: раз в 20 с опрашиваем /api/telegram/pending,
+// рассылаем в привязанные чаты и подтверждаем (tgSentAt). На Vercel нет
+// постоянного процесса — прямой /send там недоступен, поэтому так.
+// ---------------------------------------------------------------------------
+const KIND_EMOJI: Record<string, string> = {
+  deal: '💰',
+  message: '✉️',
+  tax: '🧾',
+  market: '📈',
+  system: '⚙️',
+}
+
+interface PendingItem {
+  id: string
+  kind: string
+  title: string
+  body: string
+  createdAt: string
+}
+
+let pendingBusy = false
+
+async function pendingTick(): Promise<void> {
+  if (pendingBusy) return
+  pendingBusy = true
+  try {
+    const data = await apiGet<{ chats: Array<{ chatId: string; displayName: string; items: PendingItem[] }> }>(
+      '/api/telegram/pending',
+    )
+    if (!data || !Array.isArray(data.chats) || data.chats.length === 0) return
+    for (const chat of data.chats) {
+      const sent: string[] = []
+      // батчами по 8 — одна пачка = одно сообщение
+      for (let i = 0; i < chat.items.length; i += 8) {
+        const batch = chat.items.slice(i, i + 8)
+        const text = batch
+          .map((n) => {
+            const e = KIND_EMOJI[n.kind] ?? '🔔'
+            const body = n.body ? `\n${escHtml(n.body)}` : ''
+            return `${e} <b>${escHtml(n.title)}</b>${body}`
+          })
+          .join('\n\n')
+        const res = await sendSmart(chat.chatId, text)
+        if (res && res.ok) {
+          for (const n of batch) sent.push(n.id)
+        } else {
+          break // Telegram недоступен — не подтверждаем, попробуем в следующий тик
+        }
+      }
+      if (sent.length > 0) {
+        const ok = await apiPost('/api/telegram/pending', { ids: sent })
+        console.log(`[tg-bot] pending → ${chat.chatId} (${chat.displayName}): sent ${sent.length}/${chat.items.length}, ack ${ok ? 'OK' : 'FAILED'}`)
+      }
+    }
+  } catch (e) {
+    console.error('[tg-bot] pending error', e)
+  } finally {
+    pendingBusy = false
+  }
+}
+
+async function pendingLoop(): Promise<void> {
+  // первый тик через 5 с после старта, дальше раз в 20 с
+  await new Promise((r) => setTimeout(r, 5000))
+  for (;;) {
+    await pendingTick()
+    await new Promise((r) => setTimeout(r, 20_000))
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Настройка бота: имя, описание, команды, кнопка меню (Mini App)
 // ---------------------------------------------------------------------------
 async function setupBot(): Promise<void> {
@@ -644,6 +735,7 @@ export function startTelegramBot(): void {
       console.log(`[tg-bot] listening on :${PORT} (inside next-server), token ${TOKEN ? 'OK' : 'MISSING'}`)
       void setupBot()
       void pollLoop()
+      void pendingLoop()
     })
   } catch (e) {
     g.__resaleBotStarted = false
