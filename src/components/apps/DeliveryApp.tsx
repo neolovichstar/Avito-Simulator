@@ -1,18 +1,28 @@
 'use client'
 
-// Приложение «Доставки» — трекинг посылок Resale Dark (по макету):
-// шапка с зелёным кубиком Package, чипы-фильтры, список посылок,
-// детали: горизонтальный степпер, таймлайн событий, курьер, SVG-карта маршрута.
+// Приложение «Доставки» — светлая система (как Resale/Сбер):
+// фон #F5F6FA, белые карточки radius 20 (тень 0 2px 8px rgba(0,0,0,0.04)),
+// акцент изумрудный #0AA06E, «в пути» — янтарный #E8A020, вторичный текст #9AA0A8.
+// Детали посылки: ВЕРТИКАЛЬНЫЙ таймлайн статусов (точки + линии:
+// заказан → собран → в пути → доставлен; активный шаг изумрудный пульсирующий,
+// пройденные — заполненные, будущие — серые), трек-номер моно, карта маршрута.
+// Логика (api.deliveries, тихий refetch 5с, useTick ETA, поиск/фильтры, copyTrack,
+// карта-переключатель, осмотр при получении) — без изменений.
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import {
-  AlertTriangle, Check, CheckCircle2, ChevronLeft, ChevronRight, Copy, Home, MapPin,
-  Package, PackageCheck, PackageOpen, Plus, Search, Star, Truck, X,
+  AlertTriangle, Check, CheckCircle2, ChevronLeft, ChevronRight, Copy, Home, Package,
+  PackageCheck, PackageOpen, Plus, Search, Star, Truck, X,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { fmtMoney, fmtDateTime, timeAgo } from '@/lib/format'
 import { CONDITION_LABEL, CONDITION_MULT } from '@/lib/catalog-types'
 import { useOS } from '@/lib/store'
 import type { DeliveryDTO } from '@/lib/types'
+
+// Токены светлой системы
+const EMERALD = '#0AA06E'
+const AMBER = '#E8A020'
+const CARD = 'rounded-[20px] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.04)]'
 
 type FilterKey = 'all' | 'in_transit' | 'delivered' | 'returns'
 
@@ -76,122 +86,93 @@ function stageProgress(d: DeliveryDTO, nowMs: number): number {
 }
 
 const STAGES = [
-  { label: 'Принят', icon: PackageCheck },
+  { label: 'Заказан', icon: PackageCheck },
+  { label: 'Собран', icon: Package },
   { label: 'В пути', icon: Truck },
-  { label: 'В городе', icon: MapPin },
-  { label: 'К адресату', icon: Home },
+  { label: 'Доставлен', icon: Home },
 ]
 
-// ---------- горизонтальный степпер 4 стадии ----------
-function Stepper({ d, nowMs }: { d: DeliveryDTO; nowMs: number }) {
+// ---------- ВЕРТИКАЛЬНЫЙ таймлайн статусов: точки + линии ----------
+function VerticalTimeline({ d, nowMs }: { d: DeliveryDTO; nowMs: number }) {
   const p = stageProgress(d, nowMs)
+  const inTransit = d.status === 'in_transit'
+  const remain = new Date(d.eta).getTime() - nowMs
+  // подзаголовки шагов — из существующих полей createdAt/eta/deliveredAt
+  const subs: string[] = [
+    fmtDateTime(d.createdAt),
+    p >= 2 ? 'Курьер забрал товар' : 'Готовится к отправке',
+    inTransit
+      ? remain > 0
+        ? `Прибудет в город — ${fmtDateTime(d.eta)}`
+        : 'Курьер уже в вашем городе'
+      : p >= 3
+        ? 'Прибыл в ваш город'
+        : 'Направляется в ваш город',
+    d.status === 'delivered'
+      ? `Вручение ${fmtDateTime(d.deliveredAt ?? d.eta)}`
+      : `ожидается ${fmtDateTime(d.eta)}`,
+  ]
   return (
-    <div>
-      <div className="flex items-center">
-        {STAGES.map((s, i) => {
-          const done = i < p
-          const active = i === p && d.status === 'in_transit'
-          return (
-            <div key={s.label} className="flex min-w-0 flex-1 items-center last:flex-none">
-              <div className="flex flex-col items-center gap-1.5">
-                <span
-                  className={
-                    'relative flex size-8 shrink-0 items-center justify-center rounded-full transition-colors ' +
-                    (done
-                      ? 'bg-emerald-500 text-[#052E16]'
-                      : active
-                        ? 'border-2 border-emerald-500 bg-[#0B1710] text-emerald-400'
-                        : 'bg-white/[0.06] text-white/30')
-                  }
-                  aria-hidden
-                >
-                  {done ? <Check className="size-4" /> : <s.icon className="size-4" />}
-                  {active && (
-                    <span className="absolute -inset-1 animate-ping rounded-full border border-emerald-400 opacity-50" />
-                  )}
-                </span>
-                <span
-                  className={
-                    'text-[10px] leading-none ' + (done || active ? 'text-white/70' : 'text-white/30')
-                  }
-                >
-                  {s.label}
-                </span>
-              </div>
-              {i < STAGES.length - 1 && (
-                <span
-                  className={
-                    'mx-1 mb-4 h-0.5 min-w-3 flex-1 rounded-full ' +
-                    (i < p ? 'bg-emerald-500' : 'bg-white/10')
-                  }
-                  aria-hidden
-                />
-              )}
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-// ---------- таймлайн событий: иконки в зелёных квадратиках + текст + дата ----------
-type Ev = { icon: typeof Truck; title: string; at: string; done: boolean }
-
-function buildEvents(d: DeliveryDTO, p: number): Ev[] {
-  const created = fmtDateTime(d.createdAt)
-  const evs: Ev[] = [{ icon: PackageCheck, title: 'Посылка оформлена и принята', at: created, done: true }]
-  if (p >= 1) evs.push({ icon: Truck, title: 'Курьер забрал товар', at: created, done: true })
-  if (d.status === 'delivered') {
-    const at = fmtDateTime(d.deliveredAt ?? d.eta)
-    evs.push({ icon: MapPin, title: 'Прибытие в ваш город', at, done: true })
-    evs.push({ icon: CheckCircle2, title: 'Доставлено получателю', at, done: true })
-  } else {
-    const at = `ожидается ${fmtDateTime(d.eta)}`
-    evs.push({ icon: MapPin, title: 'Курьер в пути к вам', at, done: p >= 3 })
-    evs.push({ icon: CheckCircle2, title: 'Вручение адресату', at, done: false })
-  }
-  return evs
-}
-
-function EventTimeline({ d, p }: { d: DeliveryDTO; p: number }) {
-  const evs = buildEvents(d, p)
-  return (
-    <div className="relative">
-      <span className="absolute bottom-3 left-[15px] top-3 w-px bg-white/[0.08]" aria-hidden />
-      <div className="flex flex-col gap-3">
-        {evs.map((e, i) => (
-          <div key={`${e.title}-${i}`} className="relative flex items-center gap-3">
+    <ol className="flex flex-col" aria-label="Статусы доставки">
+      {STAGES.map((s, i) => {
+        const done = i < p
+        const active = i === p && inTransit
+        const isLast = i === STAGES.length - 1
+        return (
+          <li key={s.label} className="relative flex gap-3 pb-5 last:pb-0">
+            {/* линия к следующей точке: пройденный участок — изумрудный, будущий — серый */}
+            {!isLast && (
+              <span
+                className="absolute left-[11px] top-7 h-[calc(100%-28px)] w-0.5 rounded-full"
+                style={{ backgroundColor: done ? EMERALD : '#E8EAED' }}
+                aria-hidden
+              />
+            )}
             <span
               className={
-                'relative z-10 flex size-8 shrink-0 items-center justify-center rounded-lg ' +
-                (e.done ? 'bg-emerald-500/15 text-emerald-400' : 'bg-white/[0.06] text-white/30')
+                'relative z-10 flex size-6 shrink-0 items-center justify-center rounded-full ' +
+                (active ? 'animate-pulse' : '')
               }
+              style={{
+                backgroundColor: done || active ? EMERALD : '#F0F1F5',
+                color: done || active ? '#FFFFFF' : '#C1C5CB',
+              }}
               aria-hidden
             >
-              <e.icon className="size-4" />
+              {active && (
+                <span
+                  className="absolute -inset-1 animate-ping rounded-full opacity-40"
+                  style={{ border: `2px solid ${EMERALD}` }}
+                />
+              )}
+              {done ? <Check className="size-3.5" /> : <s.icon className="size-3.5" />}
             </span>
-            <div className="min-w-0 flex-1">
-              <div className={'text-[13px] font-medium leading-tight ' + (e.done ? 'text-white' : 'text-white/40')}>
-                {e.title}
+            <div className="min-w-0 flex-1 pt-0.5">
+              <div
+                className={
+                  'text-[13px] font-semibold leading-tight ' +
+                  (done || active ? 'text-[#1A1A1A]' : 'text-[#9AA0A8]')
+                }
+              >
+                {s.label}
               </div>
-              <div className={'mt-0.5 text-[11px] ' + (e.done ? 'text-white/40' : 'text-white/30')}>{e.at}</div>
+              <div className="mt-0.5 text-[11px] leading-snug text-[#9AA0A8]">{subs[i]}</div>
             </div>
-          </div>
-        ))}
-      </div>
-    </div>
+          </li>
+        )
+      })}
+    </ol>
   )
 }
 
-// ---------- стилизованная тёмная SVG-карта с зелёным пунктирным маршрутом ----------
+// ---------- стилизованная светлая SVG-карта с изумрудным пунктирным маршрутом ----------
 function RouteMap() {
   return (
-    <div className="overflow-hidden rounded-2xl border border-emerald-500/15 bg-[#0B1710]">
+    <div className="overflow-hidden rounded-[20px] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
       <svg viewBox="0 0 320 140" className="h-36 w-full" role="img" aria-label="Карта маршрута курьера">
-        <rect width="320" height="140" fill="#0B1710" />
-        {/* «кварталы» — едва заметная тёмная сетка улиц */}
-        <g stroke="#FFFFFF" strokeOpacity="0.05" strokeWidth="8" strokeLinecap="round">
+        <rect width="320" height="140" fill="#F0F1F5" />
+        {/* «кварталы» — едва заметные белые улицы */}
+        <g stroke="#FFFFFF" strokeOpacity="0.9" strokeWidth="8" strokeLinecap="round">
           <path d="M-10 40 H330" />
           <path d="M-10 96 H330" />
           <path d="M70 -10 V150" />
@@ -202,37 +183,48 @@ function RouteMap() {
         <path
           d="M34 108 C 92 100, 96 52, 150 50 S 246 66, 284 34"
           fill="none"
-          stroke="#22C55E"
+          stroke={EMERALD}
           strokeWidth="2.5"
           strokeDasharray="6 7"
           strokeLinecap="round"
         />
         {/* точка старта */}
-        <circle cx="34" cy="108" r="5" fill="#22C55E" />
-        <circle cx="34" cy="108" r="9" fill="none" stroke="#22C55E" strokeOpacity="0.35" strokeWidth="2" />
+        <circle cx="34" cy="108" r="5" fill={EMERALD} />
+        <circle cx="34" cy="108" r="9" fill="none" stroke={EMERALD} strokeOpacity="0.35" strokeWidth="2" />
         {/* курьер в пути */}
-        <circle cx="178" cy="57" r="6" fill="#4ADE80" stroke="#052E16" strokeWidth="2" className="animate-pulse" />
+        <circle cx="178" cy="57" r="6" fill={EMERALD} stroke="#FFFFFF" strokeWidth="2" className="animate-pulse" />
         {/* адрес */}
-        <circle cx="284" cy="34" r="6" fill="none" stroke="#4ADE80" strokeWidth="2" className="animate-pulse" />
-        <text x="22" y="130" fill="#FFFFFF" fillOpacity="0.4" fontSize="10">Сортировочный центр</text>
-        <text x="222" y="20" fill="#FFFFFF" fillOpacity="0.4" fontSize="10">Ваш адрес</text>
+        <circle cx="284" cy="34" r="6" fill="none" stroke={EMERALD} strokeWidth="2" className="animate-pulse" />
+        <text x="22" y="130" fill="#9AA0A8" fontSize="10">Сортировочный центр</text>
+        <text x="222" y="20" fill="#9AA0A8" fontSize="10">Ваш адрес</text>
       </svg>
     </div>
   )
 }
 
 function StatusBadge({ d }: { d: DeliveryDTO }) {
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-1 text-[11px] font-semibold text-emerald-300">
-      {d.status === 'in_transit' && <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" aria-hidden />}
-      {d.status === 'in_transit' ? 'В пути' : 'Доставлено'}
+  return d.status === 'in_transit' ? (
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+      style={{ backgroundColor: `${AMBER}1F`, color: '#9A6B10' }}
+    >
+      <span className="size-1.5 animate-pulse rounded-full" style={{ backgroundColor: AMBER }} aria-hidden />
+      В пути
+    </span>
+  ) : (
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+      style={{ backgroundColor: `${EMERALD}1A`, color: EMERALD }}
+    >
+      <CheckCircle2 className="size-3" aria-hidden />
+      Доставлено
     </span>
   )
 }
 
 function DefectBadge() {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2.5 py-1 text-[11px] font-semibold text-red-300">
+    <span className="inline-flex items-center gap-1 rounded-full bg-[#FDEEEE] px-2.5 py-1 text-[11px] font-semibold text-[#B3382E]">
       <AlertTriangle className="size-3" aria-hidden />
       Есть дефекты
     </span>
@@ -242,9 +234,9 @@ function DefectBadge() {
 function SectionHeader({ title, onAll }: { title: string; onAll?: () => void }) {
   return (
     <div className="flex items-baseline justify-between px-1">
-      <h2 className="text-[15px] font-semibold text-white">{title}</h2>
+      <h2 className="text-[18px] font-bold text-[#1A1A1A]">{title}</h2>
       {onAll && (
-        <button type="button" onClick={onAll} className="text-[13px] text-emerald-400 active:opacity-70">
+        <button type="button" onClick={onAll} className="text-[13px] text-[#9AA0A8] active:opacity-70">
           Все ›
         </button>
       )}
@@ -252,27 +244,38 @@ function SectionHeader({ title, onAll }: { title: string; onAll?: () => void }) 
   )
 }
 
-// ---------- строка-посылка в списке ----------
+// ---------- строка-посылка в списке (с мини-точками стадий) ----------
 function ParcelRow({ d, onOpen }: { d: DeliveryDTO; onOpen: () => void }) {
+  const p = stageProgress(d, Date.now())
   return (
     <button
       type="button"
       onClick={onOpen}
       aria-label={`Открыть посылку ${d.title}`}
-      className="flex w-full items-center gap-3 rounded-2xl border border-emerald-500/15 bg-[#0E1F16] p-3 text-left transition-transform active:scale-[0.99]"
+      className={`${CARD} flex w-full items-center gap-3 p-3 text-left transition-transform active:scale-[0.99]`}
     >
-      <img src={d.image} alt="" className="size-14 shrink-0 rounded-xl bg-white/[0.06] object-cover" />
+      <img src={d.image} alt="" className="size-14 shrink-0 rounded-xl bg-[#F0F1F5] object-cover" />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[14px] font-semibold text-white">{d.title}</div>
-        <div className="mt-0.5 truncate font-mono text-[11px] text-white/40">{trackOf(d.id)}</div>
+        <div className="truncate text-[14px] font-semibold text-[#1A1A1A]">{d.title}</div>
+        <div className="mt-0.5 truncate font-mono text-[11px] text-[#9AA0A8]">{trackOf(d.id)}</div>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           <StatusBadge d={d} />
           {isWorse(d) && <DefectBadge />}
         </div>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1.5 self-stretch py-0.5">
-        <span className="text-[11px] text-white/40">{timeAgo(d.createdAt)}</span>
-        <ChevronRight className="mt-auto size-4 text-white/30" aria-hidden />
+        <span className="text-[11px] text-[#9AA0A8]">{timeAgo(d.createdAt)}</span>
+        {/* мини-точки стадий: заказан → собран → в пути → доставлен */}
+        <span className="mt-auto flex items-center gap-1" aria-hidden>
+          {STAGES.map((s, i) => (
+            <span
+              key={s.label}
+              className={'size-1.5 rounded-full ' + (i === p && d.status === 'in_transit' ? 'animate-pulse' : '')}
+              style={{ backgroundColor: i < p ? EMERALD : i === p && d.status === 'in_transit' ? EMERALD : '#E0E3E8' }}
+            />
+          ))}
+          <ChevronRight className="ml-0.5 size-4 text-[#C1C5CB]" />
+        </span>
       </div>
     </button>
   )
@@ -283,7 +286,6 @@ function ParcelDetails({ d, onBack, nowMs }: { d: DeliveryDTO; onBack: () => voi
   const [copied, setCopied] = useState(false)
   const [mapOpen, setMapOpen] = useState(true)
   const remain = new Date(d.eta).getTime() - nowMs
-  const p = stageProgress(d, nowMs)
   const worse = isWorse(d)
 
   const copyTrack = () => {
@@ -296,26 +298,27 @@ function ParcelDetails({ d, onBack, nowMs }: { d: DeliveryDTO; onBack: () => voi
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-center gap-1 border-b border-white/[0.06] px-2 py-2">
+      {/* белая шапка-бар с border-b #E8EAED */}
+      <div className="flex shrink-0 items-center gap-2 border-b border-[#E8EAED] bg-white px-3 py-2.5">
         <button
           type="button"
           onClick={onBack}
           aria-label="Назад к посылкам"
-          className="flex size-11 items-center justify-center rounded-full text-white active:bg-white/10"
+          className="flex size-10 items-center justify-center rounded-full bg-[#F0F1F5] text-[#1A1A1A] transition active:scale-95"
         >
           <ChevronLeft className="size-5" aria-hidden />
         </button>
-        <span className="truncate text-[15px] font-semibold text-white">Посылка</span>
+        <span className="truncate text-[16px] font-bold text-[#1A1A1A]">Посылка</span>
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4 [scrollbar-width:thin]">
-        {/* фото + название + трек */}
-        <div className="rounded-2xl border border-emerald-500/15 bg-[#0E1F16] p-4">
+      <div className="flex flex-1 flex-col gap-3 overflow-y-auto bg-[#F5F6FA] p-4 [scrollbar-width:thin]">
+        {/* фото + название + цена + трек */}
+        <div className={`${CARD} p-4`}>
           <div className="flex gap-3">
-            <img src={d.image} alt="" className="size-20 shrink-0 rounded-xl bg-white/[0.06] object-cover" />
+            <img src={d.image} alt="" className="size-20 shrink-0 rounded-xl bg-[#F0F1F5] object-cover" />
             <div className="min-w-0 flex-1">
-              <div className="line-clamp-2 text-[14px] font-semibold text-white">{d.title}</div>
-              <div className="mt-1 text-base font-bold tabular-nums text-emerald-400">{fmtMoney(d.price)}</div>
+              <div className="line-clamp-2 text-[14px] font-semibold text-[#1A1A1A]">{d.title}</div>
+              <div className="mt-1 text-[18px] font-bold tabular-nums text-[#1A1A1A]">{fmtMoney(d.price)}</div>
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 <StatusBadge d={d} />
                 {worse && <DefectBadge />}
@@ -326,54 +329,53 @@ function ParcelDetails({ d, onBack, nowMs }: { d: DeliveryDTO; onBack: () => voi
             type="button"
             onClick={copyTrack}
             aria-label="Скопировать трек-номер"
-            className="mt-3 flex w-full items-center justify-between rounded-xl bg-white/[0.06] px-3 py-2.5 text-left transition active:scale-[0.98]"
+            className="mt-3 flex w-full items-center justify-between rounded-xl bg-[#F0F1F5] px-3 py-2.5 text-left transition active:scale-[0.98]"
           >
-            <span className="text-[11px] text-white/40">
-              Трек: <span className="font-mono font-semibold text-white">{trackOf(d.id)}</span>
+            <span className="text-[11px] text-[#9AA0A8]">
+              Трек: <span className="font-mono font-semibold text-[#1A1A1A]">{trackOf(d.id)}</span>
             </span>
-            <span className="flex items-center gap-1 text-[10px] font-medium text-emerald-400">
+            <span className="flex items-center gap-1 text-[10px] font-medium" style={{ color: EMERALD }}>
               <Copy className="size-3" aria-hidden />
               {copied ? 'Скопировано' : 'Копировать'}
             </span>
           </button>
         </div>
 
-        {/* степпер 4 стадии */}
-        <div className="rounded-2xl border border-emerald-500/15 bg-[#0E1F16] p-4">
-          <Stepper d={d} nowMs={nowMs} />
-        </div>
-
-        {/* таймлайн событий */}
-        <div className="rounded-2xl border border-emerald-500/15 bg-[#0E1F16] p-4">
-          <h3 className="mb-3 text-[15px] font-semibold text-white">История перемещений</h3>
-          <EventTimeline d={d} p={p} />
+        {/* ВЕРТИКАЛЬНЫЙ таймлайн статусов */}
+        <div className={`${CARD} p-4`}>
+          <h3 className="mb-3 text-[15px] font-bold text-[#1A1A1A]">Движение посылки</h3>
+          <VerticalTimeline d={d} nowMs={nowMs} />
         </div>
 
         {/* курьер: аватар + имя + рейтинг + ETA-баннер */}
-        <div className="rounded-2xl border border-emerald-500/15 bg-[#0E1F16] p-4">
+        <div className={`${CARD} p-4`}>
           <div className="flex items-center gap-3">
             <span
               className="flex size-11 shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-white"
-              style={{ backgroundColor: `hsl(${hueOf(d.courier)} 45% 32%)` }}
+              style={{ backgroundColor: `hsl(${hueOf(d.courier)} 55% 45%)` }}
               aria-hidden
             >
               {initialsOf(d.courier)}
             </span>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-[14px] font-semibold text-white">{d.courier}</div>
-              <div className="mt-0.5 flex items-center gap-1 text-[11px] text-white/40">
-                <Star className="size-3 fill-amber-400 text-amber-400" aria-hidden />
+              <div className="truncate text-[14px] font-semibold text-[#1A1A1A]">{d.courier}</div>
+              <div className="mt-0.5 flex items-center gap-1 text-[11px] text-[#9AA0A8]">
+                <Star className="size-3" style={{ color: AMBER }} fill={AMBER} aria-hidden />
                 4.9 · Курьер Resale
               </div>
             </div>
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400" aria-hidden>
+            <span
+              className="flex size-9 shrink-0 items-center justify-center rounded-full"
+              style={{ backgroundColor: `${EMERALD}1A`, color: EMERALD }}
+              aria-hidden
+            >
               <Truck className="size-4" />
             </span>
           </div>
           {d.status === 'in_transit' && (
-            <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/15 px-3 py-2.5">
-              <Truck className="size-4 shrink-0 text-emerald-400" aria-hidden />
-              <p className="text-[12px] font-semibold text-emerald-300">
+            <div className="mt-3 flex items-center gap-2 rounded-xl bg-[#F8F1E3] px-3 py-2.5">
+              <Truck className="size-4 shrink-0" style={{ color: AMBER }} aria-hidden />
+              <p className="text-[12px] font-semibold text-[#9A6B10]">
                 {remain <= 0 ? 'Курьер уже близко' : `Прибудет через ${fmtRemain(remain)}`}
               </p>
             </div>
@@ -385,7 +387,8 @@ function ParcelDetails({ d, onBack, nowMs }: { d: DeliveryDTO; onBack: () => voi
           type="button"
           onClick={() => setMapOpen((v) => !v)}
           aria-expanded={mapOpen}
-          className="h-12 w-full rounded-2xl bg-[#22C55E] text-[15px] font-bold text-[#052E16] transition-transform active:scale-[0.98]"
+          className="h-12 w-full rounded-xl text-[15px] font-bold text-white transition-transform active:scale-[0.98]"
+          style={{ backgroundColor: EMERALD }}
         >
           {mapOpen ? 'Скрыть карту' : 'Показать на карте'}
         </button>
@@ -393,56 +396,56 @@ function ParcelDetails({ d, onBack, nowMs }: { d: DeliveryDTO; onBack: () => voi
 
         {d.status === 'in_transit' ? (
           // предупреждение о риске (логика сохранена)
-          <div className="flex gap-2 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-3">
-            <AlertTriangle className="size-4 shrink-0 text-amber-400" aria-hidden />
-            <p className="text-[11px] leading-relaxed text-amber-300/90">
+          <div className="flex gap-2 rounded-[20px] bg-[#F8F1E3] p-3.5">
+            <AlertTriangle className="size-4 shrink-0" style={{ color: AMBER }} aria-hidden />
+            <p className="text-[11px] leading-relaxed text-[#8A6116]">
               Осмотр при получении невозможен. Курьерская доставка — риск скрытых дефектов.
             </p>
           </div>
         ) : (
           // итог осмотра (логика сохранена)
-          <div className="rounded-2xl border border-emerald-500/15 bg-[#0E1F16] p-4">
+          <div className={`${CARD} p-4`}>
             <div
               className={
                 'flex items-center justify-between gap-2 rounded-xl p-3 ' +
-                (worse ? 'bg-red-500/10' : 'bg-emerald-500/10')
+                (worse ? 'bg-[#FDEEEE]' : 'bg-[#E7F5EA]')
               }
             >
               <div className="flex items-center gap-2">
                 {worse ? (
                   <>
-                    <span className="flex size-8 items-center justify-center rounded-full bg-red-500/15 text-red-400" aria-hidden>
+                    <span className="flex size-8 items-center justify-center rounded-full bg-white text-[#B3382E]" aria-hidden>
                       <AlertTriangle className="size-4" />
                     </span>
                     <div>
-                      <div className="text-[13px] font-semibold text-red-300">Есть дефекты</div>
-                      <div className="text-[10px] text-white/40">Продавец приукрасил состояние</div>
+                      <div className="text-[13px] font-semibold text-[#B3382E]">Есть дефекты</div>
+                      <div className="text-[10px] text-[#9AA0A8]">Продавец приукрасил состояние</div>
                     </div>
                   </>
                 ) : (
                   <>
-                    <span className="flex size-8 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400" aria-hidden>
+                    <span className="flex size-8 items-center justify-center rounded-full bg-white" style={{ color: EMERALD }} aria-hidden>
                       <CheckCircle2 className="size-4" />
                     </span>
                     <div>
-                      <div className="text-[13px] font-semibold text-emerald-300">Как в описании</div>
-                      <div className="text-[10px] text-white/40">Проверка пройдена</div>
+                      <div className="text-[13px] font-semibold" style={{ color: EMERALD }}>Как в описании</div>
+                      <div className="text-[10px] text-[#9AA0A8]">Проверка пройдена</div>
                     </div>
                   </>
                 )}
               </div>
-              <span className="shrink-0 text-[10px] text-white/40">{d.deliveredAt ? timeAgo(d.deliveredAt) : null}</span>
+              <span className="shrink-0 text-[10px] text-[#9AA0A8]">{d.deliveredAt ? timeAgo(d.deliveredAt) : null}</span>
             </div>
             {d.realCondition && (
-              <div className="mt-2 px-1 text-[11px] text-white/40">
+              <div className="mt-2 px-1 text-[11px] text-[#9AA0A8]">
                 Фактическое состояние:{' '}
-                <span className="font-medium text-white/80">{CONDITION_LABEL[d.realCondition] ?? d.realCondition}</span>
+                <span className="font-medium text-[#1A1A1A]">{CONDITION_LABEL[d.realCondition] ?? d.realCondition}</span>
               </div>
             )}
           </div>
         )}
 
-        <div className="pb-2 text-center text-[10px] text-white/30">Resale Доставка · это игра</div>
+        <div className="pb-2 text-center text-[10px] text-[#9AA0A8]">Resale Доставка · это игра</div>
       </div>
     </div>
   )
@@ -523,22 +526,22 @@ export default function DeliveryApp() {
   const selected = selectedId ? sorted.find((d) => d.id === selectedId) ?? null : null
 
   return (
-    <div className="flex h-full flex-col bg-[#050D09] text-white">
+    <div className="flex h-full flex-col bg-[#F5F6FA]">
       {selected ? (
         <ParcelDetails d={selected} onBack={() => setSelectedId(null)} nowMs={nowMs} />
       ) : (
         <>
-          {/* ---------- шапка: зелёный кубик Package + Search + Plus ---------- */}
-          <div className="shrink-0 px-4 pb-3 pt-3">
+          {/* ---------- шапка: заголовок bold 22 + подзаголовок 13 + Search + Plus ---------- */}
+          <div className="shrink-0 px-4 pb-3 pt-4">
             <div className="flex items-center gap-3">
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15">
-                <Package className="size-5 text-emerald-400" aria-hidden />
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: `${EMERALD}1A`, color: EMERALD }}>
+                <Package className="size-5" aria-hidden />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-[17px] font-bold leading-tight">Доставки</div>
-                <div className="mt-0.5 text-[11px] text-white/40">
+                <h1 className="text-[22px] font-bold leading-tight text-[#1A1A1A]">Доставки</h1>
+                <p className="mt-0.5 text-[13px] text-[#9AA0A8]">
                   {inTransitCount > 0 ? `${inTransitCount} в пути — обновляем сами` : 'Посылки от продавцов'}
-                </div>
+                </p>
               </div>
               <button
                 type="button"
@@ -546,9 +549,10 @@ export default function DeliveryApp() {
                 aria-label="Поиск по посылкам"
                 aria-pressed={searchOpen}
                 className={
-                  'flex size-9 shrink-0 items-center justify-center rounded-full transition-colors active:scale-95 ' +
-                  (searchOpen ? 'bg-emerald-500 text-[#052E16]' : 'bg-white/[0.06] text-white/70')
+                  'flex size-10 shrink-0 items-center justify-center rounded-full transition-colors active:scale-95 ' +
+                  (searchOpen ? 'text-white' : 'bg-white text-[#1A1A1A] shadow-[0_2px_8px_rgba(0,0,0,0.04)]')
                 }
+                style={searchOpen ? { backgroundColor: EMERALD } : undefined}
               >
                 <Search className="size-4.5" aria-hidden />
               </button>
@@ -556,28 +560,29 @@ export default function DeliveryApp() {
                 type="button"
                 onClick={() => pushToast('Доставки', 'Посылка появится здесь после покупки с курьером')}
                 aria-label="Как получить посылку"
-                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#22C55E] text-[#052E16] transition-transform active:scale-95"
+                className="flex size-10 shrink-0 items-center justify-center rounded-full text-white transition-transform active:scale-95"
+                style={{ backgroundColor: EMERALD }}
               >
                 <Plus className="size-4.5" aria-hidden />
               </button>
             </div>
 
             {searchOpen && (
-              <div className="mt-3 flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.06] px-3.5 focus-within:border-emerald-500/50">
-                <Search className="size-4 shrink-0 text-white/40" aria-hidden />
+              <div className="mt-3 flex items-center gap-2 rounded-xl bg-[#F0F1F5] px-3.5">
+                <Search className="size-4 shrink-0 text-[#9AA0A8]" aria-hidden />
                 <input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   placeholder="Название или трек-номер"
                   aria-label="Поиск по посылкам"
-                  className="h-11 w-full bg-transparent text-[14px] text-white outline-none placeholder:text-white/40"
+                  className="h-11 w-full bg-transparent text-[14px] text-[#1A1A1A] outline-none placeholder:text-[#9AA0A8]"
                 />
                 {q && (
                   <button
                     type="button"
                     onClick={() => setQ('')}
                     aria-label="Очистить поиск"
-                    className="flex size-8 shrink-0 items-center justify-center rounded-full text-white/40 active:bg-white/10"
+                    className="flex size-8 shrink-0 items-center justify-center rounded-full text-[#9AA0A8] active:bg-black/5"
                   >
                     <X className="size-4" aria-hidden />
                   </button>
@@ -603,15 +608,18 @@ export default function DeliveryApp() {
                     onClick={() => setFilter(f.key)}
                     className={
                       'flex h-9 shrink-0 items-center gap-1.5 rounded-full px-4 text-[13px] transition-colors active:scale-[0.97] ' +
-                      (isActive ? 'bg-emerald-500 font-semibold text-[#052E16]' : 'bg-white/[0.06] text-white/70')
+                      (isActive
+                        ? 'font-semibold text-white'
+                        : 'bg-white font-medium text-black/70 shadow-[0_2px_8px_rgba(0,0,0,0.04)]')
                     }
+                    style={isActive ? { backgroundColor: EMERALD } : undefined}
                   >
                     {f.label}
                     {count > 0 && (
                       <span
                         className={
                           'inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums ' +
-                          (isActive ? 'bg-[#052E16]/20 text-[#052E16]' : 'bg-white/15 text-white/80')
+                          (isActive ? 'bg-white/25 text-white' : 'bg-black/5 text-black/60')
                         }
                       >
                         {count}
@@ -627,39 +635,40 @@ export default function DeliveryApp() {
           <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4 pt-0 [scrollbar-width:thin]">
             {loading && !data ? (
               <div className="flex flex-col gap-3">
-                <div className="h-9 animate-pulse rounded-full bg-white/[0.06]" />
-                <div className="h-20 animate-pulse rounded-2xl bg-white/[0.06]" />
-                <div className="h-20 animate-pulse rounded-2xl bg-white/[0.06]" />
-                <div className="h-20 animate-pulse rounded-2xl bg-white/[0.06]" />
+                <div className="h-9 animate-pulse rounded-full bg-white" />
+                <div className="h-20 animate-pulse rounded-[20px] bg-white" />
+                <div className="h-20 animate-pulse rounded-[20px] bg-white" />
+                <div className="h-20 animate-pulse rounded-[20px] bg-white" />
               </div>
             ) : error && !data ? (
-              <div className="flex flex-col items-center gap-3 rounded-2xl border border-red-500/20 bg-red-500/10 p-6 text-center">
-                <p className="text-sm font-medium text-red-400">{error}</p>
+              <div className="flex flex-col items-center gap-3 rounded-[20px] bg-[#FDEEEE] p-6 text-center">
+                <p className="text-sm font-medium text-[#B3382E]">{error}</p>
                 <button
                   type="button"
                   onClick={() => void load()}
-                  className="h-11 rounded-2xl bg-[#22C55E] px-6 text-sm font-bold text-[#052E16] transition active:scale-95"
+                  className="h-11 rounded-xl px-6 text-sm font-bold text-white transition active:scale-95"
+                  style={{ backgroundColor: EMERALD }}
                 >
                   Повторить
                 </button>
               </div>
             ) : sorted.length === 0 ? (
-              <div className="flex flex-col items-center rounded-2xl border border-dashed border-white/15 bg-white/[0.03] px-4 py-12 text-center">
-                <div className="flex size-14 items-center justify-center rounded-2xl bg-white/[0.06]">
-                  <PackageOpen className="size-7 text-emerald-400" aria-hidden />
+              <div className="flex flex-col items-center rounded-[20px] bg-white px-4 py-12 text-center shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+                <div className="flex size-14 items-center justify-center rounded-full" style={{ backgroundColor: `${EMERALD}1A` }}>
+                  <PackageOpen className="size-7" style={{ color: EMERALD }} aria-hidden />
                 </div>
-                <div className="mt-3 text-sm font-semibold text-white">Доставок пока нет</div>
-                <div className="mt-1 max-w-64 text-xs leading-relaxed text-white/40">
+                <div className="mt-3 text-[15px] font-semibold text-[#1A1A1A]">Доставок пока нет</div>
+                <div className="mt-1 max-w-64 text-[13px] leading-relaxed text-[#9AA0A8]">
                   Курьером можно получить товар при покупке в Resale — выберите доставку при оплате.
                 </div>
               </div>
             ) : needle && searched.length === 0 ? (
-              <div className="flex flex-col items-center rounded-2xl border border-dashed border-white/15 bg-white/[0.03] px-4 py-10 text-center">
-                <div className="flex size-14 items-center justify-center rounded-2xl bg-white/[0.06]">
-                  <Search className="size-6 text-white/30" aria-hidden />
+              <div className="flex flex-col items-center rounded-[20px] bg-white px-4 py-10 text-center shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+                <div className="flex size-14 items-center justify-center rounded-full bg-[#F0F1F5]">
+                  <Search className="size-6 text-[#9AA0A8]" aria-hidden />
                 </div>
-                <div className="mt-3 text-sm font-semibold text-white">Ничего не нашлось</div>
-                <div className="mt-1 text-xs text-white/40">Попробуйте другое название или трек-номер</div>
+                <div className="mt-3 text-[15px] font-semibold text-[#1A1A1A]">Ничего не нашлось</div>
+                <div className="mt-1 text-[13px] text-[#9AA0A8]">Попробуйте другое название или трек-номер</div>
               </div>
             ) : filter === 'all' ? (
               <>
@@ -697,14 +706,14 @@ export default function DeliveryApp() {
                 </div>
               </>
             ) : (
-              <div className="flex flex-col items-center rounded-2xl border border-dashed border-white/15 bg-white/[0.03] px-4 py-10 text-center">
-                <div className="flex size-14 items-center justify-center rounded-2xl bg-white/[0.06]">
-                  <PackageOpen className="size-7 text-white/30" aria-hidden />
+              <div className="flex flex-col items-center rounded-[20px] bg-white px-4 py-10 text-center shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+                <div className="flex size-14 items-center justify-center rounded-full bg-[#F0F1F5]">
+                  <PackageOpen className="size-7 text-[#9AA0A8]" aria-hidden />
                 </div>
-                <div className="mt-3 text-sm font-semibold text-white">
+                <div className="mt-3 text-[15px] font-semibold text-[#1A1A1A]">
                   {filter === 'returns' ? 'Возвратов нет' : 'Здесь пока пусто'}
                 </div>
-                <div className="mt-1 text-xs text-white/40">
+                <div className="mt-1 text-[13px] text-[#9AA0A8]">
                   {filter === 'returns'
                     ? 'Все полученные посылки соответствуют описанию'
                     : 'Смените фильтр, чтобы увидеть другие посылки'}
@@ -713,7 +722,7 @@ export default function DeliveryApp() {
             )}
 
             {sorted.length > 0 && (
-              <div className="pb-2 pt-1 text-center text-[10px] text-white/30">
+              <div className="pb-2 pt-1 text-center text-[10px] text-[#9AA0A8]">
                 Resale Доставка · осмотр при получении, это игра
               </div>
             )}

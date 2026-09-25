@@ -46,7 +46,7 @@ const DESKTOP_MIN_WIDTH = 1024
 // Приложения со СВЕТЛОЙ темой интерфейса. Когда открыто одно из них, хром ОС
 // подстраивается: иконки статус-бара становятся тёмными, а рамки Telegram —
 // светлыми. Все остальные приложения и лончер остаются тёмными.
-const LIGHT_APPS: Partial<Record<AppKey, true>> = { avito: true, bank: true, taxes: true }
+const LIGHT_APPS: Partial<Record<AppKey, true>> = { avito: true, bank: true, taxes: true, auction: true, repair: true, career: true, delivery: true, leaderboard: true }
 
 // Экран «нет связи с сервером» — показывается после 3 неудачных попыток авторизации.
 function OfflineScreen({ onRetry, compact = false }: { onRetry: () => void; compact?: boolean }) {
