@@ -20,6 +20,7 @@
 
 import { create } from 'zustand'
 import type { Track } from '@/lib/music-types'
+import { hydrateTrackRecord, persistJson, toCompactTrack } from '@/lib/track-store'
 
 export type RepeatMode = 'off' | 'all' | 'one'
 
@@ -184,17 +185,29 @@ function scheduleSave() {
   if (eng.saveTimer) clearTimeout(eng.saveTimer)
   eng.saveTimer = setTimeout(() => {
     eng.saveTimer = null
-    try {
-      const { queue, index, shuffle, repeat } = usePlayer.getState()
-      const payload = {
-        queue: queue.slice(0, PERSIST_MAX_QUEUE),
-        index: Math.min(index, PERSIST_MAX_QUEUE - 1),
+    const { queue, index, shuffle, repeat } = usePlayer.getState()
+    // Компактный формат v2: streamUrl и большая обложка выводятся из id
+    // (track-store) — очередь из 80 треков занимает ~18КБ вместо ~70КБ.
+    const capped = queue.slice(0, PERSIST_MAX_QUEUE)
+    const payload = {
+      v: 2 as const,
+      queue: capped.map(toCompactTrack),
+      index: Math.max(0, Math.min(index, capped.length - 1)),
+      shuffle,
+      repeat,
+    }
+    // При переполнении квоты освобождаем кэш треков (он восстановим из API)
+    // и пишем снова; если тесно всё равно — храним окно из 40 треков вокруг текущего.
+    if (!persistJson(PERSIST_KEY, payload, ['resale_music_trackcache_v1']) && capped.length > 40) {
+      const start = Math.max(0, Math.min(index - 20, capped.length - 40))
+      const sliced = capped.slice(start, start + 40)
+      persistJson(PERSIST_KEY, {
+        v: 2 as const,
+        queue: sliced.map(toCompactTrack),
+        index: Math.max(0, Math.min(index - start, sliced.length - 1)),
         shuffle,
         repeat,
-      }
-      localStorage.setItem(PERSIST_KEY, JSON.stringify(payload))
-    } catch {
-      /* приватный режим — переживаем без сохранения */
+      })
     }
   }, SAVE_THROTTLE_MS)
 }
@@ -204,25 +217,43 @@ function restore(): void {
     const raw = localStorage.getItem(PERSIST_KEY)
     if (!raw) return
     const p = JSON.parse(raw) as {
-      queue?: Track[]
+      v?: number
+      queue?: unknown[]
       index?: number
       shuffle?: boolean
       repeat?: RepeatMode
     }
     if (!Array.isArray(p.queue) || p.queue.length === 0) return
-    const queue = p.queue.filter((t) => t && typeof t.id === 'string' && typeof t.streamUrl === 'string')
+    // Гидратация понимает и компактный v2, и старый полный v1 (миграция на лету).
+    const queue: Track[] = []
+    for (const item of p.queue) {
+      const t = hydrateTrackRecord(item)
+      if (t && t.duration > 0) queue.push(t)
+    }
     if (!queue.length) return
     const index = Math.max(0, Math.min(p.index ?? 0, queue.length - 1))
     eng.queue = queue
     eng.index = index
+    const shuffle = p.shuffle === true
+    const repeat: RepeatMode = p.repeat === 'all' || p.repeat === 'one' ? p.repeat : 'off'
     usePlayer.setState({
       queue,
       index,
       current: queue[index] ?? null,
       isPlaying: false,
-      shuffle: p.shuffle === true,
-      repeat: p.repeat === 'all' || p.repeat === 'one' ? p.repeat : 'off',
+      shuffle,
+      repeat,
     })
+    // Старый v1-формат (~800 Б на трек) сразу перезаписываем компактным (~200 Б).
+    if (p.v !== 2) {
+      persistJson(PERSIST_KEY, {
+        v: 2 as const,
+        queue: queue.slice(0, PERSIST_MAX_QUEUE).map(toCompactTrack),
+        index,
+        shuffle,
+        repeat,
+      })
+    }
   } catch {
     /* битый localStorage — начинаем с пустой очереди */
   }

@@ -14,6 +14,7 @@ import { useOS, type AppKey } from '@/lib/store'
 import { setTorch } from '@/lib/torch'
 import { sound } from '@/lib/sound'
 import { useDrag } from '@/lib/use-swipe'
+import NowPlayingShade from './NowPlayingShade'
 
 function useClock(): Date | null {
   const ts = useSyncExternalStore(
@@ -192,8 +193,15 @@ export default function ControlCenter({
             </span>
           </div>
 
+          {/* МЕДИА-КАРТОЧКА: что играет сейчас — видна вне приложения «Музыка»,
+              управление глобальным плеером ОС (как медиа-контрол Android 16).
+              -mx-4: у карточки свои поля mx-4 — растягиваем на ширину плиток. */}
+          <div className="m3-rise -mx-4 mt-3" style={{ animationDelay: '40ms' }}>
+            <NowPlayingShade onOpenApp={onOpenApp} />
+          </div>
+
           {/* плитки-пилюли 2 колонки */}
-          <div className="mt-4 grid grid-cols-2 gap-2.5">
+          <div className="mt-2.5 grid grid-cols-2 gap-2.5">
             <Tile
               delay={0}
               active={wifiOn}

@@ -793,10 +793,7 @@ export default function BankApp() {
   ]
 
   return (
-    <div
-      className="relative flex h-full flex-col text-[#1A1A1A]"
-      style={{ background: '#F5F6FA' }}
-    >
+    <div className="relative flex h-full flex-col bg-[#F5F6FA] text-[#1A1A1A]">
       <div ref={scrollRef} className="flex-1 overflow-y-auto [scrollbar-width:thin]">
         {loading && !data ? (
           <div className="space-y-3 p-4">
@@ -826,8 +823,8 @@ export default function BankApp() {
             {/* ===== ГЛАВНЫЙ ===== */}
             {screen === 'main' && (
               <div className="pb-2">
-                {/* Хедер: мягкий зелёный градиент Сбера */}
-                <div className="px-4 pb-5 pt-4" style={{ background: 'linear-gradient(180deg,#D3ECD3 0%,#F5F6FA 90%)' }}>
+                {/* Хедер: мягкий зелёный градиент Сбера (в тёмной теме — тёмный градиент) */}
+                <div className="bank-header px-4 pb-5 pt-4" style={{ background: 'linear-gradient(180deg,#D3ECD3 0%,#F5F6FA 90%)' }}>
                   {/* аватар / поиск / микрофон */}
                   <div className="flex items-center gap-2.5">
                     {session?.photoUrl ? (

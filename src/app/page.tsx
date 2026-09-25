@@ -16,7 +16,6 @@ import NotificationCenter from '@/components/os/NotificationCenter'
 import ControlCenter from '@/components/os/ControlCenter'
 import ToastStack from '@/components/os/ToastStack'
 import RecentsOverlay from '@/components/os/RecentsOverlay'
-import MiniPlayer from '@/components/os/MiniPlayer'
 import DesktopShell from '@/components/desktop/DesktopShell'
 import AvitoApp from '@/components/avito/AvitoApp'
 import BankApp from '@/components/apps/BankApp'
@@ -136,20 +135,36 @@ export default function Home() {
 
   // ---------- TELEGRAM: прозрачные рамки — цвет шапки/низа Telegram = цвет верха контента ----------
   const applyTelegramChrome = useCallback((color: string) => {
-    const tg = (window as unknown as { Telegram?: { WebApp?: Record<string, ((v: string) => void) | undefined> } }).Telegram?.WebApp
+    const tg = (
+      window as unknown as {
+        Telegram?: {
+          WebApp?: {
+            version?: string
+            setHeaderColor?: (v: string) => void
+            setBackgroundColor?: (v: string) => void
+            setBottomBarColor?: (v: string) => void
+          }
+        }
+      }
+    ).Telegram?.WebApp
     if (!tg) return
     try {
-      tg.setHeaderColor?.(color) // верхняя панель Telegram сливается с контентом
-      tg.setBackgroundColor?.(color) // фон окна
-      tg.setBottomBarColor?.(color) // нижняя панель (Bot API 9+)
+      // Гвард по версии клиента: старое вебвью на каждый вызов кидает warning
+      // «not supported in version X» и всё равно не применяет цвет — не засоряем
+      // консоль (в дев-оверлее каждая warning считается «Issue»).
+      const ver = Number.parseFloat(tg.version || '0')
+      if (ver >= 6.1) tg.setHeaderColor?.(color) // верхняя панель Telegram сливается с контентом
+      if (ver >= 6.1) tg.setBackgroundColor?.(color) // фон окна
+      if (ver >= 9) tg.setBottomBarColor?.(color) // нижняя панель (Bot API 9+)
     } catch {
       /* старый клиент без поддержки — просто игнорируем */
     }
   }, [])
 
-  // Светлый хром ОС — только когда открыто светлое приложение (Resale/Банк):
+  // Светлый хром ОС — только когда открыто светлое приложение и тема светлая
+  // (в тёмной теме все приложения перекрашиваются в тёмные через .theme-dark):
   // статус-бар получает тёмные иконки на светлой полосе, Telegram — светлые рамки.
-  const lightChrome = !!(session && currentApp && LIGHT_APPS[currentApp])
+  const lightChrome = !!(session && currentApp && LIGHT_APPS[currentApp] && theme !== 'dark')
 
   // Перекрашиваем рамки Telegram под текущий экран: локскрин/загрузка — чёрно-зелёные,
   // дом — верх обоев, тёмные приложения — их фирменный фон #050D09,
@@ -159,10 +174,10 @@ export default function Home() {
     const chrome = locked || !session
       ? '#050d09'
       : currentApp
-        ? (LIGHT_APPS[currentApp] ? '#F7F8FA' : '#050d09')
+        ? (LIGHT_APPS[currentApp] && theme !== 'dark' ? '#F7F8FA' : '#050d09')
         : (WALLPAPER_TOP[wallpaper] ?? '#07130d')
     applyTelegramChrome(chrome)
-  }, [locked, session, currentApp, wallpaper, applyTelegramChrome])
+  }, [locked, session, currentApp, wallpaper, theme, applyTelegramChrome])
 
   // ---------- AUTH (3 ретрая, затем экран повтора) ----------
   const doAuth = useCallback(async () => {
@@ -441,9 +456,6 @@ export default function Home() {
 
         {/* лок-скрин поверх всего */}
         {locked && <LockScreen onUnlock={unlock} />}
-
-        {/* мини-плеер на дом-экране: музыка играет даже с закрытым приложением */}
-        {!locked && session && !currentApp && <MiniPlayer onOpenApp={openApp} />}
 
         {/* уведомления и тосты */}
         <NotificationCenter open={notifOpen} onClose={() => setNotifOpen(false)} onOpenApp={(a) => { setNotifOpen(false); openApp(a) }} />

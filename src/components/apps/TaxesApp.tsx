@@ -316,10 +316,7 @@ export default function TaxesApp() {
   )
 
   return (
-    <div
-      className="relative flex h-full flex-col text-[#1A1A1A]"
-      style={{ background: '#F5F6FA' }}
-    >
+    <div className="relative flex h-full flex-col bg-[#F5F6FA] text-[#1A1A1A]">
       <div className="flex-1 overflow-y-auto [scrollbar-width:thin]">
         {loading && !data ? (
           <div className="space-y-3 p-4 pt-6">
@@ -348,7 +345,7 @@ export default function TaxesApp() {
         ) : data ? (
           <div key={tab} className="screen-enter pb-2">
             {/* ===== ХЕДЕР: мягкий зелёный градиент Сбера ===== */}
-            <div className="px-4 pb-6 pt-4" style={{ background: 'linear-gradient(180deg,#D3ECD3 0%,#F5F6FA 90%)' }}>
+            <div className="bank-header px-4 pb-6 pt-4" style={{ background: 'linear-gradient(180deg,#D3ECD3 0%,#F5F6FA 90%)' }}>
               {/* профиль + действия */}
               <div className="flex items-center gap-2.5">
                 <Avatar name={displayName} photoUrl={session?.photoUrl} />
@@ -653,7 +650,7 @@ export default function TaxesApp() {
 
                   {/* Свидетельство на мягком зелёном градиенте */}
                   <div
-                    className="relative overflow-hidden rounded-[20px] p-4"
+                    className="tax-promo relative overflow-hidden rounded-[20px] p-4"
                     style={{ background: 'linear-gradient(135deg,#D3ECD3 0%,#E7F5EA 60%,#F5F6FA 100%)' }}
                   >
                     <BadgeCheck className="absolute -bottom-4 -right-4 size-28 text-[#21A03A]/10" strokeWidth={1.2} aria-hidden="true" />

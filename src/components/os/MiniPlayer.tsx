@@ -1,8 +1,9 @@
 'use client'
 
-// Плавающий мини-плеер на дом-экране в духе Android 16: стеклянная пилюля
-// над доком. Появляется, когда играет музыка, а приложение «Музыка» закрыто.
-// Тап — открыть приложение, кнопки — управлять глобальным плеером ОС.
+// Мини-плеер на дом-экране в духе Android 16: стеклянная пилюля НАД точками
+// страниц (в потоке лэйаута — никогда не перекрывает док). Появляется, когда
+// играет музыка, а приложение «Музыка» закрыто. Тап — открыть приложение,
+// кнопки — управлять глобальным плеером ОС.
 // Музыка не прерывается никогда: audio-элемент живёт на уровне ОС (player.ts).
 
 import { Pause, Play, SkipForward } from 'lucide-react'
@@ -18,8 +19,8 @@ export default function MiniPlayer({ onOpenApp }: { onOpenApp: (app: AppKey) => 
   if (!current) return null
 
   return (
-    <div className="pointer-events-none absolute inset-x-4 bottom-10 z-30">
-      <div className="pointer-events-auto flex items-center gap-1.5 overflow-hidden rounded-[26px] bg-neutral-900/75 p-1.5 text-white shadow-[0_18px_45px_-14px_rgba(0,0,0,0.8)] ring-1 ring-white/[0.12] backdrop-blur-2xl screen-enter">
+    <div className="relative z-30 mx-4 mb-3">
+      <div className="flex items-center gap-1.5 overflow-hidden rounded-[26px] bg-neutral-900/75 p-1.5 text-white shadow-[0_18px_45px_-14px_rgba(0,0,0,0.8)] ring-1 ring-white/[0.12] backdrop-blur-2xl screen-enter">
         <button
           type="button"
           onClick={() => onOpenApp('music')}

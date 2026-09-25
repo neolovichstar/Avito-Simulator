@@ -7,8 +7,9 @@
 // Никаких паролей — это игра, телефон открывается свайпом вверх или касанием.
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { Camera, Flashlight, MoonStar } from 'lucide-react'
+import { Camera, Flashlight, MoonStar, Pause, Play, SkipForward } from 'lucide-react'
 import { useOS } from '@/lib/store'
+import { usePlayer } from '@/lib/player'
 import { sound } from '@/lib/sound'
 import { api } from '@/lib/api'
 import { fmtMoney, timeAgo } from '@/lib/format'
@@ -31,6 +32,60 @@ function useClock(): Date | null {
 
 const LEAVE_ANIMATION_MS = 400
 const MAX_PREVIEWS = 3 // до трёх превью на локскрине
+
+// Пустой subscribe: mounted-гейт против hydration mismatch (player читает
+// localStorage на клиенте — на сервере current всегда null).
+const emptySubscribe = () => () => {}
+
+// ─── Медиа-карточка локскрина: что играет — видно даже с заблокированного ──
+function LockMedia() {
+  const current = usePlayer((s) => s.current)
+  const isPlaying = usePlayer((s) => s.isPlaying)
+  const toggle = usePlayer((s) => s.toggle)
+  const next = usePlayer((s) => s.next)
+  const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
+  if (!mounted || !current) return null
+  return (
+    <div
+      className="flex items-center gap-3 rounded-[22px] bg-white/[0.08] p-2.5 ring-1 ring-white/[0.08] backdrop-blur-md"
+      role="group"
+      aria-label={`Сейчас играет: ${current.title} — ${current.artist}`}
+    >
+      <span className="relative size-11 shrink-0 overflow-hidden rounded-[13px] bg-white/10">
+        {current.artworkSmall ? (
+          <img src={current.artworkSmall} alt="" className="h-full w-full object-cover" />
+        ) : null}
+        {isPlaying && <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[3px] bg-[#3ED598]" />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[13px] font-bold leading-tight text-white">{current.title}</p>
+        <p className="mt-0.5 truncate text-[12px] leading-tight text-white/60">{current.artist}</p>
+      </div>
+      <button
+        type="button"
+        aria-label={isPlaying ? 'Пауза' : 'Продолжить воспроизведение'}
+        onClick={(e) => {
+          e.stopPropagation()
+          toggle()
+        }}
+        className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-neutral-900 outline-none transition-transform duration-150 active:scale-90"
+      >
+        {isPlaying ? <Pause className="size-5" aria-hidden="true" /> : <Play className="size-5 translate-x-[1px]" aria-hidden="true" />}
+      </button>
+      <button
+        type="button"
+        aria-label="Следующий трек"
+        onClick={(e) => {
+          e.stopPropagation()
+          next()
+        }}
+        className="mr-0.5 flex size-10 shrink-0 items-center justify-center rounded-full text-white/80 outline-none transition-colors active:bg-white/10"
+      >
+        <SkipForward className="size-5" aria-hidden="true" />
+      </button>
+    </div>
+  )
+}
 
 export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   const dnd = useOS((s) => s.dnd)
@@ -267,6 +322,9 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
               </div>
             </div>
           )}
+
+          {/* Медиа: управление плеером без разблокировки телефона */}
+          <LockMedia />
         </div>
 
         {/* ─── Низ: подсказка, круглые shortcut'ы и Android-handle ─── */}

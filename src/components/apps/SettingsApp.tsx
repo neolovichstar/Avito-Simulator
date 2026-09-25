@@ -311,7 +311,15 @@ export default function SettingsApp() {
     key: `app-${key}`,
     color: '#21A038',
     noTile: true,
-    icon: <img src={APP_TILE[key].image} alt="" aria-hidden="true" className="size-10 rounded-xl" />,
+    icon: (
+      <img
+        src={APP_TILE[key].image}
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        className="size-10 select-none rounded-[13px] shadow-[0_3px_10px_-3px_rgba(23,24,26,0.35)]"
+      />
+    ),
     label: APP_TILE[key].label,
     desc: `${role} · системное`,
     chevron: true,

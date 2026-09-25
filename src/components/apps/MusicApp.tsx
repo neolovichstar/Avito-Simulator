@@ -39,6 +39,8 @@ import {
 } from 'lucide-react'
 import { usePlayer } from '@/lib/player'
 import { useSwipe } from '@/lib/use-swipe'
+import { hydrateTrackRecord, toCompactTrack } from '@/lib/track-store'
+import type { CompactTrack } from '@/lib/track-store'
 import type { HomeData, MusicSection, Track } from '@/lib/music-types'
 
 // ---------------------------------------------------------------------------
@@ -53,7 +55,10 @@ const LS = {
 } as const
 
 const RECENT_MAX = 8
+// Кэш хранится в КОМПАКТНОМ формате (~200 Б/трек вместо ~800 Б): cap 200 ≈ 50КБ.
 const CACHE_CAP = 200
+// Статистика прослушиваний тоже капается — не растёт бесконечно.
+const STATS_CAP = 120
 const HOME_TTL_MS = 5 * 60_000
 const SIMILAR_TTL_MS = 5 * 60_000
 
@@ -74,7 +79,6 @@ const TABS: { key: Tab; label: string; icon: typeof Home }[] = [
   { key: 'library', label: 'Библиотека', icon: Library },
 ]
 
-type TrackCache = Record<string, Track>
 type StatsMap = Record<string, { artist: string; genre: string; plays: number }>
 
 /** Публичный API лайков, который получают экраны. */
@@ -136,55 +140,98 @@ function plural(n: number, one: string, few: string, many: string): string {
   return many
 }
 
-/** Кэш треков: держим лайкнутые всегда, остальное — по свежести (cap 200). */
-function trimCache(raw: TrackCache): TrackCache {
-  const keys = Object.keys(raw)
-  if (keys.length <= CACHE_CAP) return raw
+// Кэш треков храним В КОМПАКТНОМ формате (см. src/lib/track-store.ts):
+// ~200 Б вместо ~800 Б на трек — streamUrl и большая обложка выводятся из id
+// при чтении, поэтому в localStorage они не пишутся.
+
+type StoredTrackCache = Record<string, CompactTrack>
+
+/** Читает кэш: гидратированные треки + флаг «в хранилище ещё есть старые полные записи». */
+function readTrackCacheState(): { tracks: Record<string, Track>; legacy: boolean } {
+  const raw = lsGet<Record<string, unknown>>(LS.cache, {})
+  const tracks: Record<string, Track> = {}
+  let legacy = false
+  for (const [id, v] of Object.entries(raw)) {
+    const t = hydrateTrackRecord(v)
+    if (t) {
+      tracks[id] = t
+      if (!legacy && v && typeof v === 'object' && 'title' in (v as object)) legacy = true
+    }
+  }
+  return { tracks, legacy }
+}
+
+/** Читает кэш в полном виде (гидратация, поддерживает и старый v1-формат). */
+function readTrackCache(): Record<string, Track> {
+  return readTrackCacheState().tracks
+}
+
+/** Обрезка: лайкнутые всегда, остальное — последние добавленные (cap). */
+function capCache(store: StoredTrackCache, cap: number): StoredTrackCache {
+  const keys = Object.keys(store)
+  if (keys.length <= cap) return store
   const keep = new Set<string>()
-  for (const id of lsGet<string[]>(LS.likes, [])) if (raw[id]) keep.add(id)
-  for (let i = keys.length - 1; i >= 0 && keep.size < CACHE_CAP; i--) keep.add(keys[i])
-  const next: TrackCache = {}
-  for (const k of keep) next[k] = raw[k]
+  for (const id of lsGet<string[]>(LS.likes, [])) if (store[id]) keep.add(id)
+  for (let i = keys.length - 1; i >= 0 && keep.size < cap; i--) keep.add(keys[i])
+  const next: StoredTrackCache = {}
+  for (const k of keep) next[k] = store[k]
   return next
 }
 
-/** Пополняет кэш экранными треками; true — если что-то добавилось. */
+/** Пишет кэш компактно; при нехватке квоты — режет до 60 записей и пробует снова. */
+function writeTrackCache(raw: Record<string, Track>): void {
+  try {
+    const store: StoredTrackCache = {}
+    for (const [id, t] of Object.entries(raw)) store[id] = toCompactTrack(t)
+    const capped = capCache(store, CACHE_CAP)
+    try {
+      window.localStorage.setItem(LS.cache, JSON.stringify(capped))
+    } catch {
+      // Квота переполнена: жмём кэш до 60 записей и делаем последнюю попытку.
+      window.localStorage.setItem(LS.cache, JSON.stringify(capCache(store, 60)))
+    }
+  } catch {
+    /* приватный режим — живём без кэша */
+  }
+}
+
+/** Пополняет кэш экранными треками; true — если что-то изменилось (включая миграцию старого формата). */
 function cacheTracks(tracks: Track[]): boolean {
   if (!tracks.length) return false
-  try {
-    const raw = lsGet<TrackCache>(LS.cache, {})
-    let changed = false
-    for (const t of tracks) {
-      if (t && t.id && !raw[t.id]) {
-        raw[t.id] = t
-        changed = true
-      }
+  const { tracks: raw, legacy } = readTrackCacheState()
+  let changed = legacy
+  for (const t of tracks) {
+    if (t && t.id && !raw[t.id]) {
+      raw[t.id] = t
+      changed = true
     }
-    if (!changed) return false
-    lsSet(LS.cache, trimCache(raw))
-    return true
-  } catch {
-    return false
   }
+  if (!changed) return false
+  writeTrackCache(raw)
+  return true
 }
 
 function cacheTrack(track: Track): void {
-  try {
-    const raw = lsGet<TrackCache>(LS.cache, {})
-    if (raw[track.id]) return
-    raw[track.id] = track
-    lsSet(LS.cache, trimCache(raw))
-  } catch {
-    /* noop */
-  }
+  const { tracks: raw, legacy } = readTrackCacheState()
+  if (raw[track.id] && !legacy) return
+  raw[track.id] = track
+  writeTrackCache(raw)
 }
 
-/** Статистика прослушиваний: +1 плей при смене текущего трека. */
+/** Статистика прослушиваний: +1 плей при смене текущего трека. Cap — хранилище не забиваем. */
 function recordPlay(track: Track): void {
   try {
     const stats = lsGet<StatsMap>(LS.stats, {})
     const prev = stats[track.id]
     stats[track.id] = { artist: track.artist, genre: track.genre ?? '', plays: (prev?.plays ?? 0) + 1 }
+    const ids = Object.keys(stats)
+    if (ids.length > STATS_CAP) {
+      // Оставляем самые слушаемые; текущий трек не выкидываем.
+      ids.sort((x, y) => stats[y].plays - stats[x].plays)
+      for (const k of ids.slice(STATS_CAP)) {
+        if (k !== track.id) delete stats[k]
+      }
+    }
     lsSet(LS.stats, stats)
   } catch {
     /* noop */
@@ -759,7 +806,7 @@ function LibraryScreen({ likedTracks, likes, onCacheBump, onPlay }: LibraryScree
   // ленивом useState — без синхронных setState в эффектах.
   const [lib] = useState(() => {
     const stats = lsGet<StatsMap>(LS.stats, {})
-    const cache = lsGet<TrackCache>(LS.cache, {})
+    const cache = readTrackCache()
     const entries = Object.entries(stats)
 
     const sorted = entries.slice().sort((a, b) => b[1].plays - a[1].plays)
@@ -1418,7 +1465,7 @@ export default function MusicApp() {
 
   // «Мне нравится» — треки, восстановленные из кэша обложек.
   const likedTracks = useMemo(() => {
-    const cache = lsGet<TrackCache>(LS.cache, {})
+    const cache = readTrackCache()
     // cacheVersion — триггер перерасчёта после cacheTracks().
     return likeStore.likes.map((id) => cache[id]).filter((t): t is Track => !!t)
   }, [likeStore.likes, cacheVersion])

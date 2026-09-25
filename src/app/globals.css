@@ -604,3 +604,165 @@
 @media (prefers-reduced-motion: reduce) {
   .m3-rise, .m3-rise-stagger, .handle-breathe, .lock-clock-in { animation: none !important; }
 }
+
+/* ============================================================
+   ТЁМНАЯ ТЕМА v5 — ПОЛНОЕ ПОКРЫТИЕ HEX-КЛАССОВ ПРИЛОЖЕНИЙ
+   Раньше .theme-dark знал только tailwind-палитру и часть hex:
+   приложения на произвольных hex (#F0F1F5, #9AA0A8, #17181A…)
+   оставались светлыми — получалась «каша: пол белое, пол чёрное».
+   Здесь каждый светлый hex из кода приложений получает тёмную пару.
+   Палитра тёмной темы: страница #121417, карточка #1c2025,
+   чип #22262c, чип-сильный #2a2f36, бордер #262b31.
+   ============================================================ */
+
+/* --- 5.1) Страницы и светлые поверхности приложений --- */
+.theme-dark .bg-\[\#F7F8FA\],
+.theme-dark .bg-\[\#F5F6FA\],
+.theme-dark .bg-\[\#F5F6F8\],
+.theme-dark .bg-\[\#F8F9FA\],
+.theme-dark .bg-\[\#F0F2F5\] { background-color: #121417; }
+
+/* чипы, пилюли, вторичные поверхности */
+.theme-dark .bg-\[\#F0F1F5\],
+.theme-dark .bg-\[\#EBEDF0\],
+.theme-dark .bg-\[\#EBEDF2\],
+.theme-dark .bg-\[\#ECEFEE\],
+.theme-dark .bg-\[\#ECEEF1\],
+.theme-dark .bg-\[\#F1F3F4\] { background-color: #22262c; }
+
+/* сильные чипы (заметно темнее фона и в светлой теме) */
+.theme-dark .bg-\[\#E6E8ED\],
+.theme-dark .bg-\[\#E4E6EB\],
+.theme-dark .bg-\[\#E1E4E9\],
+.theme-dark .bg-\[\#E8EAED\],
+.theme-dark .bg-\[\#D9DCE1\],
+.theme-dark .bg-\[\#C4C8CF\] { background-color: #2a2f36; }
+
+/* тёмные пилюли-кнопки (чёрные на белом) — становятся приподнятым чипом */
+.theme-dark .bg-\[\#1A1A1A\],
+.theme-dark .bg-\[\#17181A\] { background-color: #262b31; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07); }
+
+/* --- 5.2) Тонированные светлые плашки -> альфа-версии --- */
+.theme-dark .bg-\[\#E7F5EA\],
+.theme-dark .bg-\[\#E6F9EF\],
+.theme-dark .bg-\[\#E6F6EC\],
+.theme-dark .bg-\[\#E6F4EA\],
+.theme-dark .bg-\[\#EFF8E6\] { background-color: rgba(16, 185, 129, 0.14); }
+.theme-dark .bg-\[\#FDEEEE\],
+.theme-dark .bg-\[\#FDEBEB\],
+.theme-dark .bg-\[\#FBE9EF\] { background-color: rgba(244, 63, 94, 0.14); }
+.theme-dark .bg-\[\#FFF4DC\],
+.theme-dark .bg-\[\#FFF4E5\],
+.theme-dark .bg-\[\#FDEEE3\],
+.theme-dark .bg-\[\#FFF7DC\],
+.theme-dark .bg-\[\#F8F1E3\],
+.theme-dark .bg-\[\#FFF9EC\],
+.theme-dark .bg-\[\#FDF3E0\] { background-color: rgba(245, 158, 11, 0.13); }
+
+/* --- 5.3) Тёмные тексты приложений -> светлые --- */
+.theme-dark .text-\[\#1A1A1A\],
+.theme-dark .text-\[\#17181A\],
+.theme-dark .text-\[\#333333\] { color: #edf0f3; }
+.theme-dark .text-\[\#44474F\],
+.theme-dark .text-\[\#3C4043\] { color: #c6cbd2; }
+.theme-dark .text-\[\#5C616B\],
+.theme-dark .text-\[\#5C6068\],
+.theme-dark .text-\[\#5F6368\] { color: #a2a9b4; }
+.theme-dark .text-\[\#8B8F99\],
+.theme-dark .text-\[\#9AA0A8\] { color: #99a0ab; }
+.theme-dark .text-\[\#B9BDC7\],
+.theme-dark .text-\[\#C4C8CF\],
+.theme-dark .text-\[\#C9CDD4\],
+.theme-dark .text-\[\#C4C7CD\],
+.theme-dark .text-\[\#C1C5CB\] { color: #c9cfd8; }
+
+/* зелёные акценты — светлеют в темноте */
+.theme-dark .text-\[\#067A47\],
+.theme-dark .text-\[\#157F2A\],
+.theme-dark .text-\[\#17632B\],
+.theme-dark .text-\[\#07843F\],
+.theme-dark .text-\[\#3E7A4C\],
+.theme-dark .text-\[\#4C8A1F\],
+.theme-dark .text-\[\#1B8A30\],
+.theme-dark .text-\[\#0AC760\] { color: #4ade80; }
+.theme-dark .text-\[\#21A03A\],
+.theme-dark .text-\[\#21A038\] { color: #45d062; }
+
+/* красные/бордовые — светлеют */
+.theme-dark .text-\[\#D14343\],
+.theme-dark .text-\[\#E5584B\],
+.theme-dark .text-\[\#B3382E\],
+.theme-dark .text-\[\#C2346B\],
+.theme-dark .text-\[\#B26A63\] { color: #fb7185; }
+
+/* янтарные/золотые — светлеют */
+.theme-dark .text-\[\#B25E09\],
+.theme-dark .text-\[\#A07C08\],
+.theme-dark .text-\[\#9A6B10\],
+.theme-dark .text-\[\#8A6116\],
+.theme-dark .text-\[\#C97B1D\],
+.theme-dark .text-\[\#C2620A\],
+.theme-dark .text-\[\#D9A514\],
+.theme-dark .text-\[\#8A6D1A\] { color: #fbbf24; }
+
+/* синий приглушённый -> светлый */
+.theme-dark .text-\[\#174F7C\] { color: #7eb8f7; }
+/* бирюза */
+.theme-dark .text-\[\#0A8A76\] { color: #2dd4bf; }
+
+/* SVG-заливки, привязанные к тёмным текстам */
+.theme-dark .fill-\[\#17181A\] { fill: #edf0f3; }
+.theme-dark .stroke-\[\#17181A\] { stroke: #edf0f3; }
+
+/* --- 5.4) Границы и разделители --- */
+.theme-dark .border-\[\#EBEDF0\],
+.theme-dark .border-\[\#E8EAED\],
+.theme-dark .border-\[\#F0F1F5\],
+.theme-dark .border-\[\#F5F6FA\],
+.theme-dark .border-\[\#F5F6F8\],
+.theme-dark .border-\[\#F0F2F5\] { border-color: #262b31; }
+.theme-dark .border-\[\#C4C8CF\],
+.theme-dark .border-\[\#C9CDD4\],
+.theme-dark .border-\[\#8B8F99\] { border-color: #3a414b; }
+.theme-dark .border-\[\#21A03A\],
+.theme-dark .border-\[\#21A038\],
+.theme-dark .border-\[\#16A34A\] { border-color: rgba(33, 160, 56, 0.45); }
+.theme-dark .border-\[\#0AC760\] { border-color: rgba(10, 199, 96, 0.45); }
+.theme-dark .border-\[\#E8A020\] { border-color: rgba(232, 160, 32, 0.45); }
+
+.theme-dark .divide-\[\#F0F1F5\] > :not([hidden]) ~ :not([hidden]),
+.theme-dark .divide-\[\#EBEDF0\] > :not([hidden]) ~ :not([hidden]) { border-color: #262b31; }
+
+.theme-dark .ring-\[\#EBEDF0\] { --tw-ring-color: #2a2f36; }
+.theme-dark .ring-\[\#C4C8CF\] { --tw-ring-color: #3a414b; }
+.theme-dark .ring-\[\#F7F8FA\] { --tw-ring-color: #262b31; }
+.theme-dark .ring-\[\#17181A\] { --tw-ring-color: #262b31; }
+.theme-dark .ring-\[\#21A03A\],
+.theme-dark .ring-\[\#21A038\] { --tw-ring-color: rgba(33, 160, 56, 0.6); }
+
+/* --- 5.5) Градиентные стоп-цветы (from-/to-/via- с светлыми hex) --- */
+.theme-dark .from-\[\#F0F1F5\] { --tw-gradient-from: #22262c; }
+.theme-dark .from-\[\#F5F6F8\] { --tw-gradient-from: #121417; }
+.theme-dark .to-\[\#F5F6F8\] { --tw-gradient-to: #121417; }
+.theme-dark .to-\[\#E4E6EB\] { --tw-gradient-to: #1a1e24; }
+
+/* --- 5.6) Светлые тексты на ярких акцентах не трогаем:
+       text-[#052E16], text-[#EBEDF0], fill-[#052e16], fill-[#E8A020],
+       fill-[#F5554A], fill-[#21A038], bg-[#21A03A], bg-[#0AC760],
+       bg-[#FFD53D], bg-[#F8A13A], bg-[#3ED598] остаются как есть. --- */
+
+/* hover на светлых hex-поверхностях в тёмной теме */
+.theme-dark .hover\:bg-\[\#F0F1F5\]:hover { background-color: #262b31 !important; }
+.theme-dark .hover\:bg-\[\#EBEDF0\]:hover { background-color: #262b31 !important; }
+.theme-dark .hover\:bg-\[\#F7F8FA\]:hover { background-color: #1a1e24 !important; }
+.theme-dark .hover\:bg-\[\#F5F6FA\]:hover { background-color: #1a1e24 !important; }
+
+/* --- 5.7) Инлайн-градиенты шапок (Банк/Налоги): inline-style побеждается !important --- */
+.theme-dark .bank-header {
+  background: linear-gradient(180deg, #0d2a1b 0%, #121417 90%) !important;
+}
+.theme-dark .tax-promo {
+  background: linear-gradient(135deg, rgba(33, 160, 56, 0.2) 0%, rgba(33, 160, 56, 0.1) 60%, rgba(18, 20, 23, 0) 100%) !important;
+}
+
+/* theme v5.1 marker */

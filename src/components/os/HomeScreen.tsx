@@ -13,6 +13,7 @@ import { wallpaperClass } from '@/lib/wallpapers'
 import { api } from '@/lib/api'
 import { useDrag } from '@/lib/use-swipe'
 import AppIcon from './AppIcon'
+import MiniPlayer from './MiniPlayer'
 import { APP_TILE, DOCK_APPS, PAGE1_APPS, PAGE2_APPS } from './app-logos'
 import type { CareerData, DeliveryDTO } from '@/lib/types'
 
@@ -310,6 +311,9 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
           </section>
         </div>
       </div>
+
+      {/* Мини-плеер: в потоке лэйаута, над точками страниц — док не перекрывает */}
+      <MiniPlayer onOpenApp={onOpenApp} />
 
       {/* Page-dots: активная страница — пилюля */}
       <div className="z-10 mb-3 flex items-center justify-center gap-1.5" aria-hidden="true">

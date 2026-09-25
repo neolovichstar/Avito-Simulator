@@ -5,9 +5,12 @@
 // ГЛОБАЛЬНЫМ плеером ОС (src/lib/player.ts) — работает независимо от того,
 // открыто приложение «Музыка» или нет.
 
+import { useSyncExternalStore } from 'react'
 import { Pause, Play, SkipBack, SkipForward } from 'lucide-react'
 import { usePlayer } from '@/lib/player'
 import type { AppKey } from '@/lib/store'
+
+const emptySubscribe = () => () => {}
 
 const fmt = (s: number) => {
   if (!Number.isFinite(s) || s < 0) return '0:00'
@@ -25,7 +28,13 @@ export default function NowPlayingShade({ onOpenApp }: { onOpenApp: (app: AppKey
   const next = usePlayer((s) => s.next)
   const prev = usePlayer((s) => s.prev)
 
-  if (!current) return null
+  // Плеер восстанавливает очередь из localStorage при загрузке модуля — на сервере
+  // current всегда null. Без этого гейта виджет рендерится на клиенте при гидрации,
+  // а в серверном HTML его нет → hydration mismatch (Recoverable Error в Next).
+  // useSyncExternalStore: на сервере false, после гидрации true — без setState-в-эффекте.
+  const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
+
+  if (!mounted || !current) return null
   const pct = duration > 0 ? Math.min(100, (position / duration) * 100) : 0
 
   return (
@@ -51,7 +60,7 @@ export default function NowPlayingShade({ onOpenApp }: { onOpenApp: (app: AppKey
             )}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-[10px] font-bold uppercase tracking-[0.08em] text-emerald-300/90">
+            <span className="block truncate whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.08em] text-emerald-300/90">
               Сейчас играет
             </span>
             <span className="block truncate text-[13px] font-bold leading-tight text-white">{current.title}</span>
