@@ -10,10 +10,10 @@
 // нижний таб-бар Главный/Платежи/История/Ещё (активный #21A03A, неактивный #9AA0A8).
 // Вся бизнес-логика (api.bank/takeLoan/repayLoan/depositOp, поиск, аналитика, CSV,
 // нижние листы, touch-action свайпов) сохранена 1:1.
-import { useCallback, useEffect, useMemo, useState, type UIEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from 'react'
 import { AnimatePresence, motion, useDragControls } from 'framer-motion'
 import {
-  AlertTriangle, ArrowLeftRight, Banknote, Bell, Building2, Car, Check, ChevronRight, Clock, CreditCard,
+  AlertTriangle, ArrowLeft, ArrowLeftRight, Banknote, Bell, Building2, Car, Check, ChevronRight, Clock, CreditCard,
   FileDown, Gavel, Home, Info, Landmark, LayoutGrid, Loader2, Mic, Palette, Percent, PieChart,
   PiggyBank, Plus, QrCode, Receipt, Search, Send, ShieldCheck, ShoppingBag, Smartphone, TrendingUp,
   Truck, Undo2, Wifi, X, type LucideIcon,
@@ -32,7 +32,7 @@ import {
   getCardBg, setCardBg, type CardBg, type CardColor,
 } from '@/lib/cards'
 
-type Screen = 'main' | 'payments' | 'analytics' | 'history'
+type Screen = 'main' | 'payments' | 'analytics' | 'history' | 'card'
 type SheetKey = 'deposit' | 'loan' | 'qr' | 'more' | null
 type CardKey = 'debit' | 'credit' | 'savings'
 type ChartMode = 'inc' | 'exp'
@@ -461,6 +461,8 @@ export default function BankApp() {
   const [analyticsMode, setAnalyticsMode] = useState<'out' | 'in'>('out')
   const [chartMode, setChartMode] = useState<ChartMode>('inc')
   const [cardSlide, setCardSlide] = useState(0)
+  // какая карта открыта на экране «Карта»
+  const [cardKey, setCardKey] = useState<CardKey>('debit')
   // фоны карт игрока (реестр /img/cards) + открытый пикер оформления
   const [cardBgs, setCardBgs] = useState<Record<CardKey, CardBg>>(DEFAULT_CARD_BGS)
   const [styleFor, setStyleFor] = useState<CardKey | null>(null)
@@ -498,6 +500,18 @@ export default function BankApp() {
     setCardBg(key, bg)
     sound.pop()
   }, [])
+
+  // Открыть экран конкретной карты (вместо бестолкового тоста)
+  const openCard = useCallback((k: CardKey) => {
+    setCardKey(k)
+    setScreen('card')
+  }, [])
+
+  // При смене экрана — скролл в начало (иначе заголовок уезжает под статус-бар)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 })
+  }, [screen])
 
   // Подстраиваем суммы под актуальные данные банка
   useEffect(() => {
@@ -612,7 +626,7 @@ export default function BankApp() {
           sub: holderName,
           bg: cardBgs.debit,
           aria: `Дебетовая карта ${maskedCard}, доступно ${fmtMoney(data.balance)}`,
-          run: () => pushToast('Дебетовая карта', `Доступно: ${fmtMoney(data.balance)}`),
+          run: () => openCard('debit'),
         },
         {
           key: 'credit',
@@ -647,6 +661,94 @@ export default function BankApp() {
     setCardSlide(max <= 0 ? 0 : Math.round((el.scrollLeft / max) * Math.max(1, cards.length - 1)))
   }
 
+  // Экран «Карта»: герой-карточка выбранного продукта
+  const cardHero = data
+    ? cardKey === 'debit'
+      ? { num: maskedCard, label: 'Доступно', amount: fmtMoney(data.balance), sub: holderName.toUpperCase() }
+      : cardKey === 'credit'
+        ? {
+            num: `•• ${creditLast4}`,
+            label: data.debt > 0 ? 'Задолженность' : 'Лимит',
+            amount: fmtMoney(data.debt > 0 ? data.debt : data.loanLimit),
+            sub: data.activeLoan
+              ? `Погашение до ${new Date(data.activeLoan.dueAt).toLocaleDateString('ru-RU')}`
+              : `Ставка ${data.creditRate ?? 15}%`,
+          }
+        : { num: `•• ${depositLast4}`, label: 'На счёте', amount: fmtMoney(data.deposit), sub: `«Копилка» · ${rate}% в час` }
+    : null
+
+  // Действия на экране карты — свои для каждого продукта
+  const cardActions: { label: string; icon: LucideIcon; run: () => void }[] =
+    cardKey === 'debit'
+      ? [
+          { label: 'Перевести', icon: Send, run: () => setScreen('payments') },
+          { label: 'Оплатить', icon: QrCode, run: () => setSheet('qr') },
+          { label: 'Оформление', icon: Palette, run: () => setStyleFor('debit') },
+          { label: 'История', icon: Clock, run: () => setScreen('history') },
+        ]
+      : cardKey === 'credit'
+        ? [
+            { label: data?.activeLoan ? 'Погасить' : 'Взять', icon: Landmark, run: () => setSheet('loan') },
+            { label: 'Оформление', icon: Palette, run: () => setStyleFor('credit') },
+            { label: 'История', icon: Clock, run: () => setScreen('history') },
+            { label: 'Анализ', icon: PieChart, run: () => setScreen('analytics') },
+          ]
+        : [
+            { label: 'Пополнить', icon: Plus, run: () => setSheet('deposit') },
+            { label: 'Снять', icon: Banknote, run: () => setSheet('deposit') },
+            { label: 'Оформление', icon: Palette, run: () => setStyleFor('savings') },
+            { label: 'Анализ', icon: PieChart, run: () => setScreen('analytics') },
+          ]
+
+  // Инфо-блок на экране карты
+  const cardInfoRows: { k: string; v: string }[] = data
+    ? cardKey === 'debit'
+      ? [
+          { k: 'Номер карты', v: data.cardNumber ?? '—' },
+          { k: 'Держатель', v: holderName.toUpperCase() },
+          { k: 'Платёжная система', v: 'МИР' },
+          { k: 'Банк', v: 'Столичный Банк' },
+        ]
+      : cardKey === 'credit'
+        ? [
+            { k: 'Номер карты', v: `•• ${creditLast4}` },
+            { k: 'Лимит', v: fmtMoney(data.loanLimit) },
+            { k: 'Ставка', v: `${data.creditRate ?? 15}%` },
+            { k: 'Рейтинг', v: `${score} · ${credit.label}` },
+          ]
+        : [
+            { k: 'Номер счёта', v: `•• ${depositLast4}` },
+            { k: 'Ставка', v: `${rate}% в час` },
+            { k: 'Начисление', v: 'Ежечасно' },
+            { k: 'Банк', v: 'Столичный Банк' },
+          ]
+    : []
+
+  // Сторис-ряд (как в Сбере): цветные кольца + быстрые сценарии
+  const stories: { key: string; label: string; icon: LucideIcon; ring: string; run: () => void }[] = [
+    { key: 'savings', label: 'Копилка', icon: PiggyBank, ring: 'conic-gradient(from 140deg,#21A03A,#9BE0A9,#C8EDD2,#21A03A)', run: () => setSheet('deposit') },
+    { key: 'credit', label: 'Кредит', icon: Landmark, ring: 'conic-gradient(from 140deg,#F8A13A,#FBD39E,#FDE7C4,#F8A13A)', run: () => setSheet('loan') },
+    { key: 'tax', label: 'Налоги', icon: Receipt, ring: 'conic-gradient(from 140deg,#E5584B,#F5B7B1,#FAD3CF,#E5584B)', run: () => openApp('taxes') },
+    { key: 'qr', label: 'Оплатить', icon: QrCode, ring: 'conic-gradient(from 140deg,#12A594,#9FDCD4,#D2F0EB,#12A594)', run: () => setSheet('qr') },
+    { key: 'analytics', label: 'Анализ', icon: PieChart, ring: 'conic-gradient(from 140deg,#7B61FF,#C9BCFF,#E4DDFF,#7B61FF)', run: () => setScreen('analytics') },
+  ]
+
+  // История, сгруппированная по дням (Сегодня / Вчера / даты) — как в Сбере
+  const historyGroups = useMemo(() => {
+    const arr: { label: string; items: TransactionDTO[] }[] = []
+    for (const t of data?.transactions ?? []) {
+      const d = new Date(t.createdAt)
+      const start = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+      const diff = Math.round((today - start) / 86_400_000)
+      const label = diff === 0 ? 'Сегодня' : diff === 1 ? 'Вчера' : d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
+      const last = arr[arr.length - 1]
+      if (last && last.label === label) last.items.push(t)
+      else arr.push({ label, items: [t] })
+    }
+    return arr
+  }, [data, now])
+
   // Быстрые действия: белые круги 48px с зелёными иконками — линкуются на реальные секции/листы
   const quickActions: { label: string; icon: LucideIcon; run: () => void }[] = [
     { label: 'Перевести', icon: ArrowLeftRight, run: () => setScreen('payments') },
@@ -663,7 +765,11 @@ export default function BankApp() {
     { key: 'more', icon: LayoutGrid, label: 'Ещё' },
   ]
   const tabActive = (key: Screen | 'more') =>
-    key === 'more' ? screen === 'analytics' || sheet === 'more' : screen === key
+    key === 'more'
+      ? screen === 'analytics' || sheet === 'more'
+      : key === 'main'
+        ? screen === 'main' || screen === 'card'
+        : screen === key
 
   const services: { icon: LucideIcon; label: string; sub: string; color: string; run?: () => void }[] = [
     { icon: Smartphone, label: 'Мобильная связь', sub: 'Сим-карты и связь', color: GREEN },
@@ -691,7 +797,7 @@ export default function BankApp() {
       className="relative flex h-full flex-col text-[#1A1A1A]"
       style={{ background: '#F5F6FA' }}
     >
-      <div className="flex-1 overflow-y-auto [scrollbar-width:thin]">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto [scrollbar-width:thin]">
         {loading && !data ? (
           <div className="space-y-3 p-4">
             <div className="h-10 animate-pulse rounded-full bg-[#ECEFEE]" />
@@ -765,6 +871,14 @@ export default function BankApp() {
                         </div>
                       )}
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setSheet('qr')}
+                      aria-label="Сканировать QR-код"
+                      className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#21A03A] text-white shadow-[0_2px_8px_rgba(33,160,58,0.35)] transition active:scale-95"
+                    >
+                      <QrCode className="size-5" aria-hidden="true" />
+                    </button>
                   </div>
 
                   {/* приветствие */}
@@ -772,6 +886,29 @@ export default function BankApp() {
                     <h1 className="text-[20px] font-bold leading-tight tracking-tight text-[#1A1A1A]">
                       {greeting()}, {firstName}
                     </h1>
+                  </div>
+
+                  {/* сторис-ряд (как в Сбере): цветные кольца + быстрые сценарии */}
+                  <div
+                    role="group"
+                    aria-label="Быстрые сценарии"
+                    className="mt-4 flex gap-1 overflow-x-auto px-0 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  >
+                    {stories.map((s) => (
+                      <button
+                        key={s.key}
+                        type="button"
+                        onClick={s.run}
+                        className="flex w-[70px] shrink-0 flex-col items-center gap-1.5 rounded-2xl py-0.5 transition active:scale-95"
+                      >
+                        <span aria-hidden="true" className="flex size-[56px] items-center justify-center rounded-full p-[2.5px]" style={{ background: s.ring }}>
+                          <span className="flex h-full w-full items-center justify-center rounded-full border-2 border-[#F5F6FA] bg-white">
+                            <s.icon className="size-6 text-[#21A03A]" strokeWidth={2.1} />
+                          </span>
+                        </span>
+                        <span className="max-w-full truncate text-[11px] leading-none text-[#1A1A1A]">{s.label}</span>
+                      </button>
+                    ))}
                   </div>
 
                   {/* карусель карт: фон из реестра /img/cards + затемняющий градиент, белые данные, чип продукта */}
@@ -848,7 +985,7 @@ export default function BankApp() {
                         num={maskedCard}
                         amount={fmtMoney(data.balance)}
                         amountCls="text-[#21A03A]"
-                        onClick={() => pushToast('Дебетовая карта', `Доступно: ${fmtMoney(data.balance)}`)}
+                        onClick={() => openCard('debit')}
                         aria={`Дебетовая карта ${maskedCard}, доступно ${fmtMoney(data.balance)}`}
                       />
                       <ProductRow
@@ -911,23 +1048,23 @@ export default function BankApp() {
                     </div>
                   </div>
 
-                  {/* ПРОМО-БАННЕР (единственный синий элемент) */}
+                  {/* ПРОМО-БАННЕР (зелёный — фирменный Сбер) */}
                   <button
                     type="button"
                     onClick={() => openApp('taxes')}
                     aria-label="Перейти в приложение Налоги"
-                    className="flex w-full items-center gap-3 rounded-[20px] bg-[#D8E9FA] p-4 text-left transition active:scale-[0.99]"
+                    className="flex w-full items-center gap-3 rounded-[20px] bg-[#E7F5EA] p-4 text-left transition active:scale-[0.99]"
                   >
                     <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white" aria-hidden="true">
-                      <Receipt className="size-5 text-[#174F7C]" strokeWidth={2.1} />
+                      <Receipt className="size-5 text-[#1B8A30]" strokeWidth={2.1} />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[15px] font-bold text-[#174F7C]">Налоговый календарь</span>
-                      <span className="block text-[12px] leading-snug text-[#4A708F]">
+                      <span className="block text-[15px] font-bold text-[#17632B]">Налоговый календарь</span>
+                      <span className="block text-[12px] leading-snug text-[#3E7A4C]">
                         Проверьте начисления и оплатите вовремя — без пени и блокировки продаж
                       </span>
                     </span>
-                    <ChevronRight className="size-5 shrink-0 text-[#174F7C]" aria-hidden="true" />
+                    <ChevronRight className="size-5 shrink-0 text-[#1B8A30]" aria-hidden="true" />
                   </button>
 
                   {/* БЕЗОПАСНОСТЬ */}
@@ -967,6 +1104,134 @@ export default function BankApp() {
 
                   <div className="pb-1 pt-1 text-center text-[10px] text-[#9AA0A8]">
                     Столичный Банк · вклады не застрахованы, это игра
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ===== ЭКРАН КАРТЫ (детали продукта) ===== */}
+            {screen === 'card' && data && cardHero && (
+              <div className="pb-3">
+                <div className="flex items-center gap-3 px-4 pb-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setScreen('main')}
+                    aria-label="Назад на главный экран"
+                    className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white text-[#1A1A1A] shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition active:scale-95"
+                  >
+                    <ArrowLeft className="size-5" aria-hidden="true" />
+                  </button>
+                  <h1 className="text-[18px] font-bold tracking-tight text-[#1A1A1A]">{CARD_STYLE_LABEL[cardKey]}</h1>
+                </div>
+
+                <div className="px-4">
+                  {/* герой-карта с фоном игрока */}
+                  <div className="relative h-[168px] overflow-hidden rounded-[22px] text-white">
+                    <img
+                      src={cardBg(cardBgs[cardKey])}
+                      alt=""
+                      draggable={false}
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                    <span className="absolute inset-0" style={{ background: 'linear-gradient(rgba(0,0,0,0.18), rgba(0,0,0,0.42))' }} aria-hidden="true" />
+                    <span className="absolute -right-6 -top-12 size-36 rounded-full bg-white/10" aria-hidden="true" />
+                    <div className="relative flex h-full flex-col justify-between p-4">
+                      <div className="flex items-center justify-between">
+                        <span className="rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-semibold drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">
+                          {CARD_STYLE_LABEL[cardKey]}
+                        </span>
+                        <span className="text-[12px] font-medium tabular-nums tracking-[0.14em] drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">
+                          {cardHero.num}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[11px] text-white/85 drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">{cardHero.label}</span>
+                        <span className="block text-[26px] font-bold leading-tight tabular-nums drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">{cardHero.amount}</span>
+                        <span className="mt-0.5 block truncate text-[11px] uppercase tracking-wide text-white/85 drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">{cardHero.sub}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* действия по карте */}
+                  <div className="mt-4 grid grid-cols-4 gap-2" role="group" aria-label="Действия по карте">
+                    {cardActions.map((a) => (
+                      <button
+                        key={a.label}
+                        type="button"
+                        onClick={a.run}
+                        className="flex flex-col items-center gap-1.5 transition active:scale-95"
+                      >
+                        <span className="flex size-12 items-center justify-center rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+                          <a.icon className="size-[22px] text-[#21A03A]" strokeWidth={2.1} aria-hidden="true" />
+                        </span>
+                        <span className="text-[12px] leading-tight text-[#9AA0A8]">{a.label}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* статус-панель кредита */}
+                  {cardKey === 'credit' && (
+                    data.debt > 0 ? (
+                      <div className="mt-4 rounded-[20px] bg-[#FDEEEE] p-4">
+                        <div className="text-xs text-[#9AA0A8]">К погашению</div>
+                        <div className="text-2xl font-bold tabular-nums text-[#E5584B]">{fmtMoney(data.debt)}</div>
+                        {data.activeLoan && (
+                          <p className="mt-1 text-[12px] leading-snug text-[#B26A63]">
+                            Срок до {new Date(data.activeLoan.dueAt).toLocaleDateString('ru-RU')} · вовремя: рейтинг +40, просрочка: −80
+                          </p>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setSheet('loan')}
+                          className="mt-3 flex h-11 w-full items-center justify-center rounded-xl bg-[#E5584B] text-sm font-semibold text-white transition active:scale-[0.98]"
+                        >
+                          Погасить
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="mt-4 rounded-[20px] bg-[#E7F5EA] p-4">
+                        <div className="text-sm font-semibold text-[#17632B]">Задолженности нет</div>
+                        <p className="mt-0.5 text-[12px] leading-snug text-[#3E7A4C]">
+                          Доступный лимит: {fmtMoney(data.loanLimit)} · ставка {data.creditRate ?? 15}%
+                        </p>
+                      </div>
+                    )
+                  )}
+
+                  {/* статус-панель накопительного счёта */}
+                  {cardKey === 'savings' && (
+                    <div className="mt-4 rounded-[20px] bg-[#E7F5EA] p-4">
+                      <div className="text-sm font-semibold text-[#17632B]">«Копилка» · {rate}% в час</div>
+                      <p className="mt-0.5 text-[12px] leading-snug text-[#3E7A4C]">
+                        Проценты начисляются ежечасно. Деньги на вкладе не тратятся на покупки и ставки.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* инфо о продукте */}
+                  <div className={`${CARD} mt-4 px-4 py-1`}>
+                    {cardInfoRows.map((r) => (
+                      <div key={r.k} className="flex items-center justify-between gap-3 border-b border-[#F0F1F5] py-2.5 last:border-b-0">
+                        <span className="shrink-0 text-[13px] text-[#9AA0A8]">{r.k}</span>
+                        <span className="min-w-0 truncate text-right text-[13px] font-semibold text-[#1A1A1A]">{r.v}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* операции */}
+                  <div className="mt-5 space-y-2">
+                    <SectionHeader title="Операции" onAll={() => setScreen('history')} />
+                    <div className={`${CARD} px-4 py-1`}>
+                      {data.transactions.length === 0 ? (
+                        <p className="py-4 text-[12px] text-[#9AA0A8]">Операций пока нет.</p>
+                      ) : (
+                        <div className="divide-y divide-[#F0F1F5]">
+                          {data.transactions.slice(0, 8).map((t) => (
+                            <TxRow key={t.id} t={t} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1188,9 +1453,16 @@ export default function BankApp() {
                     <p className="text-sm text-[#9AA0A8]">Здесь появятся все ваши покупки, продажи и операции с банком.</p>
                   </div>
                 ) : (
-                  <div className={`divide-y divide-[#F0F1F5] ${CARD} px-4 py-1`}>
-                    {data.transactions.map((t) => (
-                      <TxRow key={t.id} t={t} />
+                  <div className="space-y-3">
+                    {historyGroups.map((g) => (
+                      <div key={g.label}>
+                        <div className="px-1 pb-1.5 text-[12px] font-semibold text-[#9AA0A8]" suppressHydrationWarning>{g.label}</div>
+                        <div className={`divide-y divide-[#F0F1F5] ${CARD} px-4 py-1`}>
+                          {g.items.map((t) => (
+                            <TxRow key={t.id} t={t} />
+                          ))}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}

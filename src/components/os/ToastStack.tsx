@@ -1,12 +1,19 @@
 'use client'
 
-// Всплывающие уведомления (heads-up) в духе Android 16: тёмная стеклянная
-// карточка с радиусом 24px, тайл иконки приложения слева, заголовок/текст,
-// время «сейчас» и тонкий прогресс-бар автозакрытия (4.2с — синхронно с TTL
-// тоста в store). Вход — сверху, как у настоящих heads-up.
-import { Bell, Gavel, MessageSquare, Receipt, ShoppingBag, Trophy, TrendingUp, Truck, Crown, X, type LucideIcon } from 'lucide-react'
+// Heads-up уведомления в духе Android 16: КОМПАКТНАЯ тёмная стеклянная карточка
+// (иконка приложения + имя + «сейчас» + заголовок + 1–2 строки тела).
+// Никаких кнопок на всю ширину: вся карточка тапается → открывает приложение,
+// свайп в сторону смахивает, маленький крестик — тоже. Тонкий прогресс-бар
+// автозакрытия (4.2с — синхронно с TTL тоста в store).
+import { useRef } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import {
+  Bell, Gavel, Landmark, MessageSquare, Receipt, ShoppingBag, Trophy, TrendingUp,
+  Truck, Crown, X, type LucideIcon,
+} from 'lucide-react'
 import { useOS, type AppKey } from '@/lib/store'
 import { openAppForToast } from '@/lib/toast-apps'
+import { sound } from '@/lib/sound'
 
 const APP_META: Record<string, { app: string; icon: LucideIcon; bg: string; openApp: AppKey }> = {
   avito: { app: 'Resale', icon: ShoppingBag, bg: 'linear-gradient(145deg,#4ADE80,#15803D)', openApp: 'avito' },
@@ -18,12 +25,15 @@ const APP_META: Record<string, { app: string; icon: LucideIcon; bg: string; open
   auction: { app: 'Аукцион', icon: Gavel, bg: 'linear-gradient(145deg,#fbbf24,#b45309)', openApp: 'auction' },
   delivery: { app: 'Доставки', icon: Truck, bg: 'linear-gradient(145deg,#34d399,#047857)', openApp: 'delivery' },
   leader: { app: 'Лидеры', icon: Crown, bg: 'linear-gradient(145deg,#fcd34d,#92400e)', openApp: 'leaderboard' },
+  bank: { app: 'Банк', icon: Landmark, bg: 'linear-gradient(145deg,#4ADE80,#166534)', openApp: 'bank' },
   system: { app: 'Система', icon: Bell, bg: 'linear-gradient(145deg,#9ca3af,#4b5563)', openApp: 'settings' },
 }
 
 // Ключевые слова в теле/заголовке — чтобы тост попадал в своё приложение
 function metaFor(title: string, body: string) {
   const s = `${title} ${body}`.toLowerCase()
+  // банк: карты, вклады, кредиты, переводы денег — всё, что про деньги на счетах
+  if (s.includes('банк') || s.includes('карт') || s.includes('вклад') || s.includes('кредит') || s.includes('доступно') || s.includes('задолженност')) return APP_META.bank
   if (s.includes('налог') || s.includes('фнс')) return APP_META.tax
   // карьера: уровни, задания, достижения, бонусы
   if (s.includes('уровен') || s.includes('задан') || s.includes('достижен') || s.includes('квест') || s.includes('стрик') || s.includes('бонус') || s.includes('опыт')) return APP_META.career
@@ -35,7 +45,7 @@ function metaFor(title: string, body: string) {
   if (s.includes('лидер') || s.includes('топ-') || s.includes('рейтинг')) return APP_META.leader
   if (s.includes('счёт') || s.includes('сообщен') || s.includes('чат')) return APP_META.message
   if (s.includes('рынк') || s.includes('цена') || s.includes('событи')) return APP_META.market
-  if (s.includes('покуп') || s.includes('продаж') || s.includes('сделк') || s.includes('avito')) return APP_META.deal
+  if (s.includes('покуп') || s.includes('продаж') || s.includes('сделк') || s.includes('resale')) return APP_META.deal
   return APP_META.system
 }
 
@@ -46,8 +56,7 @@ export default function ToastStack({ variant = 'phone' }: { variant?: 'phone' | 
   const toastQueue = useOS((s) => s.toastQueue)
   const dropToast = useOS((s) => s.dropToast)
   const openApp = useOS((s) => s.openApp)
-
-  if (toastQueue.length === 0) return null
+  const suppressClick = useRef(false)
 
   return (
     <div
@@ -60,62 +69,90 @@ export default function ToastStack({ variant = 'phone' }: { variant?: 'phone' | 
     >
       {/* Кейфрейм прогресс-бара автозакрытия — один раз на весь стек тостов */}
       <style>{`@keyframes toastbar{from{width:100%}to{width:0%}}`}</style>
-      {toastQueue.map((t) => {
-        const meta = metaFor(t.title, t.body)
-        const AppIcon = meta.icon
-        return (
-          <div
-            key={t.id}
-            role="status"
-            className="pointer-events-auto relative flex items-start gap-3 overflow-hidden rounded-[24px] bg-neutral-900/75 p-3.5 text-white shadow-[0_22px_50px_-14px_rgba(0,0,0,0.75)] ring-1 ring-white/[0.12] backdrop-blur-2xl animate-in fade-in slide-in-from-top-3 zoom-in-[98%] duration-300"
-          >
-            {/* тайл иконки приложения — цветовой якорь heads-up */}
-            <span
-              className="flex size-10 shrink-0 items-center justify-center rounded-[13px] text-white shadow-sm"
-              style={{ background: meta.bg }}
-            >
-              <AppIcon className="size-5" aria-hidden="true" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-baseline justify-between gap-2">
-                <p className="truncate text-[10px] font-bold uppercase tracking-[0.08em] text-white/50">{meta.app}</p>
-                <span className="shrink-0 text-[11px] text-white/40">сейчас</span>
-              </div>
-              <p className="truncate text-[13px] font-bold leading-tight">{t.title}</p>
-              <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-white/70">{t.body}</p>
-              <button
-                type="button"
-                aria-label={`Открыть ${meta.app}`}
-                onClick={() => {
+      <AnimatePresence initial={false}>
+        {toastQueue.map((t) => {
+          const meta = metaFor(t.title, t.body)
+          const AppIcon = meta.icon
+          return (
+            <motion.div
+              key={t.id}
+              layout
+              role="button"
+              tabIndex={0}
+              aria-label={`${meta.app}: ${t.title}. ${t.body}. Нажмите, чтобы открыть ${meta.app}.`}
+              drag="x"
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={0.55}
+              onDragStart={() => {
+                suppressClick.current = true
+              }}
+              onDragEnd={(_e, info) => {
+                setTimeout(() => {
+                  suppressClick.current = false
+                }, 120)
+                if (Math.abs(info.offset.x) > 72 || Math.abs(info.velocity.x) > 420) {
+                  sound.swipe()
+                  dropToast(t.id)
+                }
+              }}
+              onClick={() => {
+                if (suppressClick.current) return
+                dropToast(t.id)
+                openApp(openAppForToast(meta.openApp))
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
                   dropToast(t.id)
                   openApp(openAppForToast(meta.openApp))
-                }}
-                className="mt-1.5 flex min-h-[44px] items-center rounded-full bg-white/10 px-4 text-xs font-bold text-emerald-300 outline-none transition-colors active:bg-white/20 focus-visible:ring-2 focus-visible:ring-emerald-400"
-              >
-                Открыть {meta.app}
-              </button>
-            </div>
-            <button
-              type="button"
-              aria-label="Закрыть уведомление"
-              onClick={() => dropToast(t.id)}
-              className="-mr-2 -mt-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/60 outline-none transition-colors hover:text-white active:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70"
+                }
+              }}
+              initial={{ opacity: 0, y: -14, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.16 } }}
+              transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+              className="pointer-events-auto relative flex cursor-pointer touch-pan-y items-start gap-2.5 overflow-hidden rounded-[20px] bg-neutral-900/80 p-3 pl-3 text-white shadow-[0_16px_44px_-12px_rgba(0,0,0,0.7)] ring-1 ring-white/[0.1] backdrop-blur-2xl select-none"
             >
-              <X className="h-4 w-4" aria-hidden="true" />
-            </button>
-            {/* Прогресс автозакрытия: 100% → 0 за 4.2с */}
-            <span
-              aria-hidden="true"
-              className="absolute inset-x-0 bottom-0 h-0.5 bg-white/10"
-            >
+              {/* тайл иконки приложения — цветовой якорь heads-up */}
               <span
-                className="block h-full bg-white/50"
-                style={{ animation: `toastbar ${TOAST_TTL_MS}ms linear forwards` }}
-              />
-            </span>
-          </div>
-        )
-      })}
+                className="flex size-9 shrink-0 items-center justify-center rounded-[11px] text-white shadow-sm"
+                style={{ background: meta.bg }}
+              >
+                <AppIcon className="size-4.5" aria-hidden="true" />
+              </span>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="truncate text-[10px] font-bold uppercase tracking-[0.08em] text-white/50">{meta.app}</p>
+                  <span className="shrink-0 text-[10px] text-white/40">сейчас</span>
+                </div>
+                <p className="truncate text-[13px] font-bold leading-tight">{t.title}</p>
+                <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-white/70">{t.body}</p>
+              </div>
+
+              <button
+                type="button"
+                aria-label="Закрыть уведомление"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  dropToast(t.id)
+                }}
+                className="-mr-1 -mt-1 flex size-7 shrink-0 items-center justify-center rounded-full text-white/50 outline-none transition-colors active:bg-white/15 active:text-white focus-visible:ring-2 focus-visible:ring-white/70"
+              >
+                <X className="size-3.5" aria-hidden="true" />
+              </button>
+
+              {/* Прогресс автозакрытия: 100% → 0 за 4.2с */}
+              <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[3px] overflow-hidden rounded-full">
+                <span
+                  className="block h-full bg-white/45"
+                  style={{ animation: `toastbar ${TOAST_TTL_MS}ms linear forwards` }}
+                />
+              </span>
+            </motion.div>
+          )
+        })}
+      </AnimatePresence>
     </div>
   )
 }

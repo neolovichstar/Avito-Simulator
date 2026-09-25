@@ -43,6 +43,10 @@ export const KIND_APP: Record<string, NotifApp> = {
 const clampX = (x: number) => Math.max(-150, Math.min(150, x))
 const SWIPE_DELETE = 88 // порог смахивания, px
 
+// Винительный падеж для кнопки «Открыть …»: Система → Систему
+const APP_ACC: Record<string, string> = { Система: 'Систему' }
+const accName = (app: string) => APP_ACC[app] ?? app
+
 // Живые тики — для даты в шапке шторки.
 function useClock(): Date | null {
   const ts = useSyncExternalStore(
@@ -212,7 +216,7 @@ export default function NotificationCenter({
                 }}
                 className="min-h-[44px] rounded-full bg-[#21A038] px-5 text-[13px] font-bold text-white outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-emerald-300"
               >
-                Открыть {meta.app}
+                Открыть {accName(meta.app)}
               </button>
             </div>
           )}
@@ -247,9 +251,9 @@ export default function NotificationCenter({
         {/* шапка: дата слева, справа — «прочитать всё», настройки, «Очистить» */}
         <div className="flex items-center justify-between gap-2 px-5 pb-2 pt-2.5">
           <div className="flex min-w-0 items-center gap-2">
-            <span className="truncate text-[13px] font-semibold text-white/85" suppressHydrationWarning>
+            <span className="shrink-0 whitespace-nowrap text-[13px] font-semibold text-white/85" suppressHydrationWarning>
               {now
-                ? now.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' })
+                ? now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
                 : '\u00A0'}
             </span>
             {unreadItems.length > 0 && (
