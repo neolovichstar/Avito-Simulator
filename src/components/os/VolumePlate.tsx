@@ -26,13 +26,15 @@ export default function VolumePlate() {
   const dragging = useRef(false)
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Появление по триггеру + авто-скрытие.
+  // Появление по триггеру + авто-скрытие (setState — только в колбэках таймеров,
+  // не синхронно в теле эффекта: правило react-hooks/set-state-in-effect).
   useEffect(() => {
     if (plateAt === 0) return
-    setVisible(true)
+    const raf = requestAnimationFrame(() => setVisible(true))
     if (hideTimer.current) clearTimeout(hideTimer.current)
     hideTimer.current = setTimeout(() => setVisible(false), AUTOHIDE_MS)
     return () => {
+      cancelAnimationFrame(raf)
       if (hideTimer.current) clearTimeout(hideTimer.current)
     }
   }, [plateAt])

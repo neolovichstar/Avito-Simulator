@@ -26,7 +26,7 @@ function useClock(): Date | null {
   return ts ? new Date(ts) : null
 }
 
-const TASKBAR_H = 48
+const TASKBAR_H = 40
 
 interface Props {
   locked: boolean
@@ -79,10 +79,10 @@ export default function DesktopShell({ locked, onUnlock, renderApp, theme }: Pro
       if (existing) {
         return ws.map((w) => (w.id === app ? { ...w, z: topZ + 1, minimized: false } : w))
       }
-      const maxW = Math.min(1180, window.innerWidth - 200)
-      const maxH = Math.min(760, window.innerHeight - 130)
-      const w = Math.max(620, maxW)
-      const h = Math.max(460, maxH)
+      const maxW = Math.min(860, window.innerWidth - 280)
+      const maxH = Math.min(620, window.innerHeight - 110)
+      const w = Math.max(500, maxW)
+      const h = Math.max(420, maxH)
       const n = winId.current++
       const x = Math.min(90 + n * 36, Math.max(40, window.innerWidth - w - 40))
       const y = Math.min(46 + n * 30, Math.max(20, window.innerHeight - h - 70))
@@ -120,18 +120,18 @@ export default function DesktopShell({ locked, onUnlock, renderApp, theme }: Pro
       >
         <div className="absolute inset-0 bg-black/35 backdrop-blur-[2px]" aria-hidden />
         <div className="relative flex flex-col items-center">
-          <p className="text-lg font-light text-white/85" suppressHydrationWarning>
+          <p className="text-base font-light text-white/85" suppressHydrationWarning>
             {now ? now.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' }) : '\u00A0'}
           </p>
-          <p className="mt-2 text-8xl font-extralight tabular-nums text-white drop-shadow-lg" suppressHydrationWarning>
+          <p className="mt-1 text-6xl font-extralight tabular-nums text-white drop-shadow-lg" suppressHydrationWarning>
             {now ? now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '\u00A0'}
           </p>
           <button
             type="button"
             onClick={onUnlock}
-            className="mt-10 flex h-12 items-center gap-2.5 rounded-full border border-white/25 bg-white/10 px-8 text-sm font-medium text-white backdrop-blur-md outline-none transition hover:bg-white/20 active:scale-95 focus-visible:ring-2 focus-visible:ring-white/70"
+            className="mt-8 flex h-10 items-center gap-2 rounded-full border border-white/25 bg-white/10 px-6 text-[13px] font-medium text-white backdrop-blur-md outline-none transition hover:bg-white/20 active:scale-95 focus-visible:ring-2 focus-visible:ring-white/70"
           >
-            <Lock className="size-4" aria-hidden /> Войти
+            <Lock className="size-3.5" aria-hidden /> Войти
           </button>
         </div>
       </div>
@@ -149,44 +149,44 @@ export default function DesktopShell({ locked, onUnlock, renderApp, theme }: Pro
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/20" aria-hidden />
 
       {/* виджеты справа (стеклянные карточки как в Win11) */}
-      <div className="absolute right-5 top-5 z-[5] flex w-64 flex-col gap-3">
+      <div className="absolute right-4 top-4 z-[5] flex w-52 flex-col gap-2">
         {widgets.includes('clock') && (
-          <div className="rounded-2xl border border-white/15 bg-black/35 p-4 backdrop-blur-xl">
-            <p className="text-4xl font-light tabular-nums text-white" suppressHydrationWarning>
+          <div className="rounded-xl border border-white/15 bg-black/35 p-3 backdrop-blur-xl">
+            <p className="text-2xl font-light tabular-nums text-white" suppressHydrationWarning>
               {now ? now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '\u00A0'}
             </p>
-            <p className="mt-1 text-xs text-white/70" suppressHydrationWarning>
+            <p className="mt-0.5 text-[11px] text-white/70" suppressHydrationWarning>
               {now ? now.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' }) : '\u00A0'}
             </p>
           </div>
         )}
         {widgets.includes('online') && (
-          <div className="flex items-center gap-2.5 rounded-2xl border border-white/15 bg-black/35 p-4 backdrop-blur-xl">
-            <span className="relative flex h-2.5 w-2.5" aria-hidden="true">
+          <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-black/35 p-3 backdrop-blur-xl">
+            <span className="relative flex h-2 w-2" aria-hidden="true">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
             </span>
-            <span className="text-sm font-medium text-white">Сейчас онлайн: <span className="font-bold tabular-nums">{online}</span></span>
+            <span className="text-[13px] font-medium text-white">Сейчас онлайн: <span className="font-bold tabular-nums">{online}</span></span>
           </div>
         )}
         {widgets.includes('quest') && (
           <button
             type="button"
             onClick={() => openWindow('career')}
-            className="rounded-2xl border border-white/15 bg-black/35 p-4 text-left backdrop-blur-xl transition hover:bg-black/45 active:scale-[0.98]"
+            className="rounded-xl border border-white/15 bg-black/35 p-3 text-left backdrop-blur-xl transition hover:bg-black/45 active:scale-[0.98]"
           >
-            <p className="text-[10px] uppercase tracking-wider text-white/60">Задания</p>
-            <p className="mt-1 truncate text-sm font-medium text-white">{questHint ?? 'Все задания выполнены'}</p>
+            <p className="text-[9px] uppercase tracking-wider text-white/60">Задания</p>
+            <p className="mt-0.5 truncate text-[13px] font-medium text-white">{questHint ?? 'Все задания выполнены'}</p>
           </button>
         )}
         {widgets.includes('delivery') && (
           <button
             type="button"
             onClick={() => openWindow('delivery')}
-            className="rounded-2xl border border-white/15 bg-black/35 p-4 text-left backdrop-blur-xl transition hover:bg-black/45 active:scale-[0.98]"
+            className="rounded-xl border border-white/15 bg-black/35 p-3 text-left backdrop-blur-xl transition hover:bg-black/45 active:scale-[0.98]"
           >
-            <p className="text-[10px] uppercase tracking-wider text-white/60">Доставка</p>
-            <p className="mt-1 text-sm font-medium text-white">Открыть список посылок</p>
+            <p className="text-[9px] uppercase tracking-wider text-white/60">Доставка</p>
+            <p className="mt-0.5 text-[13px] font-medium text-white">Открыть список посылок</p>
           </button>
         )}
       </div>
@@ -214,12 +214,12 @@ export default function DesktopShell({ locked, onUnlock, renderApp, theme }: Pro
         <>
           <button aria-label="Закрыть меню Пуск" className="fixed inset-0 z-[60] cursor-default" onClick={() => setStartOpen(false)} />
           <div
-            className="fixed left-1/2 z-[61] w-[560px] -translate-x-1/2 rounded-xl border border-white/15 p-5 shadow-2xl"
+            className="fixed left-1/2 z-[61] w-[440px] -translate-x-1/2 rounded-xl border border-white/15 p-4 shadow-2xl"
             style={{ bottom: TASKBAR_H + 10, background: 'rgba(28,30,38,0.88)', backdropFilter: 'blur(28px)' }}
             role="menu"
             aria-label="Меню Пуск"
           >
-            <div className="mx-auto flex h-9 max-w-sm items-center gap-2 rounded-full border border-white/15 bg-black/30 px-3">
+            <div className="mx-auto flex h-8 max-w-sm items-center gap-2 rounded-full border border-white/15 bg-black/30 px-3">
               <Search className="size-4 text-white/50" aria-hidden />
               <input
                 value={startQuery}
@@ -229,41 +229,41 @@ export default function DesktopShell({ locked, onUnlock, renderApp, theme }: Pro
                 aria-label="Поиск приложений"
               />
             </div>
-            <div className="mt-4 flex items-center justify-between">
-              <p className="text-xs font-semibold text-white/70">Все приложения</p>
+            <div className="mt-3 flex items-center justify-between">
+              <p className="text-[11px] font-semibold text-white/70">Все приложения</p>
               <button
                 onClick={() => setLocked(true)}
-                className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-white/70 transition hover:bg-white/10 hover:text-white"
+                className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-white/70 transition hover:bg-white/10 hover:text-white"
               >
-                <Power className="size-3.5" aria-hidden /> Блокировка
+                <Power className="size-3" aria-hidden /> Блокировка
               </button>
             </div>
-            <div className="mt-2 grid grid-cols-5 gap-1">
+            <div className="mt-1.5 grid grid-cols-6 gap-0.5">
               {filteredApps.map((app) => (
                 <button
                   key={app}
                   onClick={() => openWindow(app)}
-                  className="flex flex-col items-center gap-1.5 rounded-lg px-1 py-3 transition hover:bg-white/10"
+                  className="flex flex-col items-center gap-1 rounded-lg px-0.5 py-2 transition hover:bg-white/10"
                   role="menuitem"
                 >
-                  <span className="flex size-11 items-center justify-center rounded-xl shadow ring-1 ring-black/20">
-                    <AppTileImage app={app} className="h-full w-full rounded-xl" />
+                  <span className="flex size-8 items-center justify-center rounded-lg shadow ring-1 ring-black/20">
+                    <AppTileImage app={app} className="h-full w-full rounded-lg" />
                   </span>
-                  <span className="max-w-full truncate text-[11px] text-white/85">{APP_TILE[app].label}</span>
+                  <span className="max-w-full truncate text-[9px] text-white/85">{APP_TILE[app].label}</span>
                 </button>
               ))}
             </div>
             {session && (
-              <div className="mt-4 flex items-center gap-3 border-t border-white/10 pt-3">
+              <div className="mt-3 flex items-center gap-2 border-t border-white/10 pt-2.5">
                 {session.photoUrl ? (
-                  <img loading="lazy" decoding="async" src={session.photoUrl} alt="" className="size-8 rounded-full object-cover"/>
+                  <img loading="lazy" decoding="async" src={session.photoUrl} alt="" className="size-7 rounded-full object-cover"/>
                 ) : (
-                  <span className="flex size-8 items-center justify-center rounded-full bg-[#16A34A] text-xs font-bold text-white">
+                  <span className="flex size-7 items-center justify-center rounded-full bg-[#16A34A] text-[11px] font-bold text-white">
                     {(session.displayName ?? 'И')[0]}
                   </span>
                 )}
-                <span className="text-sm font-medium text-white">{session.displayName}</span>
-                <span className="ml-auto text-xs text-white/50">{fmtMoney(session.balance)}</span>
+                <span className="text-[13px] font-medium text-white">{session.displayName}</span>
+                <span className="ml-auto text-[11px] text-white/50">{fmtMoney(session.balance)}</span>
               </div>
             )}
           </div>
@@ -275,8 +275,8 @@ export default function DesktopShell({ locked, onUnlock, renderApp, theme }: Pro
         <>
           <button aria-label="Закрыть центр уведомлений" className="fixed inset-0 z-[60] cursor-default" onClick={() => setNotifOpen(false)} />
           <div
-            className="fixed right-3 z-[61] flex w-96 flex-col overflow-hidden rounded-xl border border-white/15 shadow-2xl"
-            style={{ bottom: TASKBAR_H + 10, maxHeight: 'min(560px, 70vh)', background: 'rgba(28,30,38,0.9)', backdropFilter: 'blur(28px)' }}
+            className="fixed right-3 z-[61] flex w-80 flex-col overflow-hidden rounded-xl border border-white/15 shadow-2xl"
+            style={{ bottom: TASKBAR_H + 10, maxHeight: 'min(520px, 68vh)', background: 'rgba(28,30,38,0.9)', backdropFilter: 'blur(28px)' }}
             role="dialog"
             aria-label="Центр уведомлений"
           >
@@ -301,7 +301,7 @@ export default function DesktopShell({ locked, onUnlock, renderApp, theme }: Pro
                 notifications.slice(0, 30).map((n: NotificationDTO) => (
                   <div
                     key={n.id}
-                    className={`mb-2 rounded-lg border p-3 ${n.readAt ? 'border-white/5 bg-white/[0.03]' : 'border-[#16A34A]/30 bg-[#16A34A]/10'}`}
+                    className={`mb-1.5 rounded-lg border p-2.5 ${n.readAt ? 'border-white/5 bg-white/[0.03]' : 'border-[#16A34A]/30 bg-[#16A34A]/10'}`}
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-semibold text-white">{n.title}</span>
@@ -331,12 +331,12 @@ export default function DesktopShell({ locked, onUnlock, renderApp, theme }: Pro
             aria-label="Пуск"
             aria-expanded={startOpen}
             onClick={() => { setStartOpen((v) => !v); setNotifOpen(false) }}
-            className={`group relative flex size-10 items-center justify-center rounded-lg transition hover:bg-white/10 ${startOpen ? 'bg-white/15' : ''}`}
+            className={`group relative flex size-8 items-center justify-center rounded-md transition hover:bg-white/10 ${startOpen ? 'bg-white/15' : ''}`}
           >
             {/* логотип Пуск: 4 квадратика */}
-            <span className="grid grid-cols-2 gap-[3px]" aria-hidden>
+            <span className="grid grid-cols-2 gap-[2.5px]" aria-hidden>
               {[0, 1, 2, 3].map((i) => (
-                <span key={i} className="size-[7px] rounded-[2px] bg-[#16A34A] transition group-hover:bg-[#4ADE80]" />
+                <span key={i} className="size-[6px] rounded-[2px] bg-[#16A34A] transition group-hover:bg-[#4ADE80]" />
               ))}
             </span>
           </button>
@@ -353,19 +353,19 @@ export default function DesktopShell({ locked, onUnlock, renderApp, theme }: Pro
                   if (win && active) patchWin(app, { minimized: true })
                   else openWindow(app)
                 }}
-                className={`relative flex size-10 items-center justify-center rounded-lg transition hover:bg-white/10 ${active ? 'bg-white/15' : ''}`}
+                className={`relative flex size-8 items-center justify-center rounded-md transition hover:bg-white/10 ${active ? 'bg-white/15' : ''}`}
               >
-                <span className="flex size-7 items-center justify-center overflow-hidden rounded-md shadow ring-1 ring-black/20">
+                <span className="flex size-6 items-center justify-center overflow-hidden rounded-[7px] shadow ring-1 ring-black/20">
                   <AppTileImage app={app} className="h-full w-full" />
                 </span>
                 {win && (
                   <span
-                    className={`absolute bottom-0.5 h-[3px] rounded-full transition-all ${active ? 'w-4 bg-[#16A34A]' : 'w-1.5 bg-white/40'}`}
+                    className={`absolute bottom-0 h-[2.5px] rounded-full transition-all ${active ? 'w-3 bg-[#16A34A]' : 'w-1 bg-white/40'}`}
                     aria-hidden
                   />
                 )}
                 {unreadBadge > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#04E061] px-1 text-[9px] font-bold text-white">
+                  <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[#04E061] px-0.5 text-[8px] font-bold text-white">
                     {unreadBadge > 9 ? '9+' : unreadBadge}
                   </span>
                 )}
@@ -380,31 +380,31 @@ export default function DesktopShell({ locked, onUnlock, renderApp, theme }: Pro
             onClick={() => { setNotifOpen((v) => !v); setStartOpen(false) }}
             aria-label="Открыть центр уведомлений"
             aria-expanded={notifOpen}
-            className="flex h-10 items-center gap-3 rounded-lg px-3 text-white/85 transition hover:bg-white/10"
+            className="flex h-8 items-center gap-2.5 rounded-md px-2.5 text-white/85 transition hover:bg-white/10"
           >
             <span className="relative">
-              <ChevronUp className="size-3.5" aria-hidden />
+              <ChevronUp className="size-3" aria-hidden />
               {unreadNotifications > 0 && (
-                <span className="absolute -right-1.5 -top-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[#16A34A] px-0.5 text-[8px] font-bold text-white">
+                <span className="absolute -right-1.5 -top-1.5 flex h-3 min-w-3 items-center justify-center rounded-full bg-[#16A34A] px-0.5 text-[7px] font-bold text-white">
                   {unreadNotifications > 9 ? '9+' : unreadNotifications}
                 </span>
               )}
             </span>
-            <Wifi className="size-4" aria-hidden />
-            <Volume2 className="size-4" aria-hidden />
-            <span className="flex items-center gap-1 tabular-nums">
-              <BatteryMedium className="size-4" aria-hidden />
+            <Wifi className="size-3.5" aria-hidden />
+            <Volume2 className="size-3.5" aria-hidden />
+            <span className="flex items-center gap-0.5 text-[11px] tabular-nums">
+              <BatteryMedium className="size-3.5" aria-hidden />
               {battery}%
             </span>
             <span className="flex flex-col items-end leading-tight" suppressHydrationWarning>
-              <span className="text-xs font-medium tabular-nums">
+              <span className="text-[11px] font-medium tabular-nums">
                 {now ? now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '\u00A0'}
               </span>
-              <span className="text-[10px] text-white/60 tabular-nums">
+              <span className="text-[9px] text-white/60 tabular-nums">
                 {now ? now.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '\u00A0'}
               </span>
             </span>
-            {unreadNotifications > 0 && <Bell className="size-4 text-[#4ADE80]" aria-hidden />}
+            {unreadNotifications > 0 && <Bell className="size-3.5 text-[#4ADE80]" aria-hidden />}
           </button>
         </div>
       </div>

@@ -103,7 +103,7 @@ export default function WindowFrame({ win, focused, onFocus, onClose, onMinimize
     >
       {/* заголовок */}
       <div
-        className={`flex h-9 shrink-0 select-none items-center gap-2 border-b border-white/10 pl-3 pr-1 ${
+        className={`flex h-8 shrink-0 select-none items-center gap-2 border-b border-white/10 pl-3 pr-1 ${
           dragging ? 'cursor-grabbing' : 'cursor-grab'
         } ${win.maximized ? '' : 'touch-none'}`}
         style={{ background: 'linear-gradient(180deg,#1a1c24,#141519)' }}
@@ -121,21 +121,21 @@ export default function WindowFrame({ win, focused, onFocus, onClose, onMinimize
           <button
             aria-label="Свернуть"
             onClick={onMinimize}
-            className="flex h-9 w-11 items-center justify-center text-white/70 transition hover:bg-white/10"
+            className="flex h-8 w-10 items-center justify-center text-white/70 transition hover:bg-white/10"
           >
             <Minus className="size-3.5" />
           </button>
           <button
             aria-label={win.maximized ? 'Восстановить' : 'Развернуть'}
             onClick={onToggleMax}
-            className="flex h-9 w-11 items-center justify-center text-white/70 transition hover:bg-white/10"
+            className="flex h-8 w-10 items-center justify-center text-white/70 transition hover:bg-white/10"
           >
             {win.maximized ? <Copy className="size-3 -scale-x-100" /> : <Square className="size-3" />}
           </button>
           <button
             aria-label="Закрыть"
             onClick={onClose}
-            className="flex h-9 w-11 items-center justify-center text-white/70 transition hover:bg-[#c42b1c] hover:text-white"
+            className="flex h-8 w-10 items-center justify-center text-white/70 transition hover:bg-[#c42b1c] hover:text-white"
           >
             <X className="size-4" />
           </button>

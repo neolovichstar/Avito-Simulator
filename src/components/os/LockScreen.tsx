@@ -275,7 +275,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
             return (
               <div
                 key={n.id}
-                className="flex items-center gap-3 rounded-[22px] bg-white/[0.08] px-4 py-3 ring-1 ring-white/[0.06] backdrop-blur-md"
+                className="flex items-center gap-3 rounded-2xl bg-white/[0.08] px-3 py-2 ring-1 ring-white/[0.06] backdrop-blur-md"
               >
                 <span
                   aria-hidden="true"
@@ -302,7 +302,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
 
           {/* Итоги дня (если сегодня были сделки) — в том же стеклянном стиле */}
           {day && dealsLabel && (
-            <div className="flex items-center gap-3 rounded-[22px] bg-white/[0.08] px-4 py-3 ring-1 ring-white/[0.06] backdrop-blur-md">
+            <div className="flex items-center gap-3 rounded-2xl bg-white/[0.08] px-3 py-2 ring-1 ring-white/[0.06] backdrop-blur-md">
               <span
                 aria-hidden="true"
                 className="flex size-9 shrink-0 items-center justify-center rounded-[12px] text-white shadow-sm"

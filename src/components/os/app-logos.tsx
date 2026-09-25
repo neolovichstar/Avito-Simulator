@@ -18,7 +18,7 @@ export function DealLogo() {
       fill="none"
       aria-hidden="true"
       focusable="false"
-      className="h-9 w-9"
+      className="h-7 w-7"
     >
       <defs>
         <linearGradient id="dealGrad" x1="10" y1="8" x2="38" y2="40" gradientUnits="userSpaceOnUse">
@@ -46,7 +46,7 @@ export function DealLogo() {
 // Лидеры: пьедестал-таблица с золотым лидером.
 export function LeaderboardLogo() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-7 w-7">
       <rect x="9" y="26" width="10" height="14" rx="2" fill="#94A3B8" />
       <rect x="19" y="18" width="10" height="22" rx="2" fill="#D4A017" />
       <rect x="29" y="30" width="10" height="10" rx="2" fill="#C48A5A" />
@@ -61,7 +61,7 @@ export function LeaderboardLogo() {
 // Банк: монета с рублём — свой образ, без отсылок к реальным банкам.
 export function BankLogo() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-7 w-7">
       <circle cx="24" cy="24" r="17" fill="#ffffff" opacity="0.95" />
       <circle cx="24" cy="24" r="13.2" stroke="#1B9A45" strokeWidth="2.2" opacity="0.55" />
       <path
@@ -79,7 +79,7 @@ export function BankLogo() {
 // Налоги: квитанция с зубчатым краем и знаком процента.
 export function TaxesLogo() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-7 w-7">
       <path
         d="M13 6 h22 v33 l-3.7 -2.6 -3.6 2.6 -3.7 -2.6 -3.6 2.6 -3.7 -2.6 L13 39 Z"
         fill="#ffffff"
@@ -101,7 +101,7 @@ export function TaxesLogo() {
 // Браузер: глобус с меридианами и орбитой-спутником.
 export function BrowserLogo() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-7 w-7">
       <circle cx="24" cy="24" r="15" stroke="#ffffff" strokeWidth="3" />
       <ellipse cx="24" cy="24" rx="7" ry="15" stroke="#ffffff" strokeWidth="2.2" opacity="0.75" />
       <path d="M9.5 19.5 h29 M9.5 28.5 h29" stroke="#ffffff" strokeWidth="2.2" opacity="0.75" />
@@ -120,7 +120,7 @@ export function BrowserLogo() {
 // Настройки: настоящая шестерёнка (8 зубьев + кольцо с отверстием).
 export function SettingsLogo() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-7 w-7">
       {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => (
         <rect
           key={a}
@@ -141,7 +141,7 @@ export function SettingsLogo() {
 // Сервис: гаечный ключ + молоток крестом (классический силуэт «build»).
 export function RepairLogo() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-7 w-7">
       <path
         transform="translate(3.6 3.6) scale(1.7)"
         fill="#ffffff"
@@ -154,7 +154,7 @@ export function RepairLogo() {
 // Аукцион: молоток судьи (гавел) с подставкой.
 export function AuctionLogo() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-7 w-7">
       <path
         transform="translate(3.6 3.6) scale(1.7)"
         fill="#ffffff"
@@ -167,7 +167,7 @@ export function AuctionLogo() {
 // Задания: кубок/трофей за квесты и достижения.
 export function CareerLogo() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-7 w-7">
       <path
         transform="translate(3.6 3.6) scale(1.7)"
         fill="#ffffff"
@@ -180,7 +180,7 @@ export function CareerLogo() {
 // Доставки: фургон курьера.
 export function DeliveryLogo() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-7 w-7">
       <path
         transform="translate(3.6 3.6) scale(1.7)"
         fill="#ffffff"
@@ -195,7 +195,7 @@ export function DeliveryLogo() {
 // Калькулятор: сетка кнопок.
 export function CalcLogo() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-7 w-7">
       <rect x="11" y="8" width="26" height="9" rx="2" fill="#ffffff" opacity="0.95" />
       {[0, 1, 2].map((r) =>
         [0, 1, 2].map((c) => (
@@ -210,7 +210,7 @@ export function CalcLogo() {
 // Часы: циферблат со стрелками.
 export function ClockLogo() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-7 w-7">
       <circle cx="24" cy="24" r="16.5" fill="#ffffff" opacity="0.95" />
       <circle cx="24" cy="24" r="16.5" stroke="#0f172a" strokeOpacity="0.18" strokeWidth="1.4" />
       <path d="M24 14.5 V24 l6.5 4.5" stroke="#0f172a" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -222,7 +222,7 @@ export function ClockLogo() {
 // Календарь: листок с красной шапкой и числом.
 export function CalendarLogo() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-7 w-7">
       <rect x="9" y="10" width="30" height="29" rx="4" fill="#ffffff" />
       <path d="M9 14 a4 4 0 0 1 4-4 h22 a4 4 0 0 1 4 4 v5 H9 Z" fill="#ef4444" />
       <text x="24" y="33.5" textAnchor="middle" fontSize="14" fontWeight="700" fill="#1f2937" fontFamily="system-ui, sans-serif">25</text>
@@ -233,7 +233,7 @@ export function CalendarLogo() {
 // Заметки: жёлтый лист с строками.
 export function NotesLogo() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-7 w-7">
       <rect x="10" y="8" width="28" height="32" rx="4" fill="#fef3c7" />
       <path d="M10 12 a4 4 0 0 1 4-4 h20 a4 4 0 0 1 4 4 v3 H10 Z" fill="#f59e0b" />
       <path d="M16 22 h16 M16 27.5 h16 M16 33 h10" stroke="#92400e" strokeWidth="2.2" strokeLinecap="round" opacity="0.75" />
@@ -244,7 +244,7 @@ export function NotesLogo() {
 // Погода: солнце за облаком.
 export function WeatherLogo() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-7 w-7">
       <circle cx="19" cy="18" r="7.5" fill="#fde047" />
       <path d="M15 34 a7 7 0 0 1 1.2-13.9 9 9 0 0 1 17.3 2.4 A6 6 0 0 1 33 34 Z" fill="#ffffff" />
     </svg>
@@ -254,7 +254,7 @@ export function WeatherLogo() {
 // Галерея: разноцветный «цветок» из лепестков.
 export function GalleryLogo() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-7 w-7">
       <circle cx="24" cy="16.5" r="6" fill="#ef4444" opacity="0.9" />
       <circle cx="31.5" cy="24" r="6" fill="#f59e0b" opacity="0.9" />
       <circle cx="24" cy="31.5" r="6" fill="#22c55e" opacity="0.9" />
@@ -267,7 +267,7 @@ export function GalleryLogo() {
 // Музыка: нота.
 export function MusicLogo() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-7 w-7">
       <path d="M19 34.5 V13.5 l16-3.5 v19" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
       <ellipse cx="14.5" cy="34.8" rx="5" ry="4" fill="#ffffff" />
       <ellipse cx="30.5" cy="29.3" rx="5" ry="4" fill="#ffffff" />
@@ -278,7 +278,7 @@ export function MusicLogo() {
 // Телефон: классическая трубка.
 export function PhoneLogo() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-7 w-7">
       <path
         transform="translate(3.6 3.6) scale(1.7)"
         fill="#ffffff"
@@ -291,7 +291,7 @@ export function PhoneLogo() {
 // Госуслуги: флаг-ромб бренда (стилизованный).
 export function GosLogo() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-7 w-7">
       <path d="M24 6 L42 24 L24 42 L6 24 Z" fill="#ffffff" />
       <path d="M24 13 L35 24 L24 35 L13 24 Z" fill="#0D4CD3" />
       <circle cx="24" cy="24" r="4" fill="#ffffff" />
@@ -302,7 +302,7 @@ export function GosLogo() {
 // Номера: три барабана с цифрами (прокрутка красивых номеров).
 export function NumbersLogo() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-9 w-9">
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-7 w-7">
       {[7, 24, 41].map((x, i) => (
         <g key={x}>
           <rect x={x - 7} y={12} width={14} height={24} rx={3.5} fill="#ffffff" opacity={i === 1 ? 0.95 : 0.75} />

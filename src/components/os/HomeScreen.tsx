@@ -30,8 +30,8 @@ function useClock(): Date | null {
   return ts ? new Date(ts) : null
 }
 
-const glass = 'rounded-[22px] bg-white/[0.10] backdrop-blur-md'
-const WIDGET_CLASS = 'flex min-h-12 items-center gap-2 rounded-[22px] bg-white/[0.10] px-3 py-2 text-left backdrop-blur-md outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white/70'
+const glass = 'rounded-2xl bg-white/[0.10] backdrop-blur-md'
+const WIDGET_CLASS = 'flex min-h-10 items-center gap-2 rounded-2xl bg-white/[0.10] px-3 py-1.5 text-left backdrop-blur-md outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white/70'
 
 // ─── Компактные виджеты (одна строка, h-12) ──────────────────────────────────
 function Widget({
@@ -51,11 +51,11 @@ function Widget({
 }) {
   if (w === 'clock') {
     return (
-      <div aria-label="Время и дата" className={`${glass} flex min-h-12 flex-col justify-center px-3.5 py-1.5`}>
-        <p className="text-xl font-semibold leading-none tabular-nums text-white" suppressHydrationWarning>
+      <div aria-label="Время и дата" className={`${glass} flex min-h-10 flex-col justify-center px-3 py-1`}>
+        <p className="text-lg font-semibold leading-none tabular-nums text-white" suppressHydrationWarning>
           {now ? now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '\u00A0'}
         </p>
-        <p className="mt-1 text-[10px] leading-none text-white/60" suppressHydrationWarning>
+        <p className="mt-1 text-[9px] leading-none text-white/60" suppressHydrationWarning>
           {now ? now.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' }) : '\u00A0'}
         </p>
       </div>
@@ -63,12 +63,12 @@ function Widget({
   }
   if (w === 'online') {
     return (
-      <div aria-label={`Онлайн: ${online}`} className={`${glass} flex min-h-12 items-center gap-2 px-3`}>
+      <div aria-label={`Онлайн: ${online}`} className={`${glass} flex min-h-10 items-center gap-2 px-3`}>
         <span className="relative flex h-2 w-2" aria-hidden="true">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
         </span>
-        <span className="text-base font-semibold tabular-nums text-white">{online}</span>
+        <span className="text-[15px] font-semibold tabular-nums text-white">{online}</span>
       </div>
     )
   }
@@ -76,8 +76,8 @@ function Widget({
     return (
       <button type="button" aria-label="Открыть кошелёк в приложении Банк" onClick={() => onOpenApp('bank')} className={WIDGET_CLASS}>
         <span className="flex flex-col justify-center">
-          <span className="block text-[9px] uppercase tracking-wider text-white/55">Кошелёк</span>
-          <span className="block text-[15px] font-semibold leading-tight tabular-nums text-white">{fmtMoney(balance)}</span>
+          <span className="block text-[8px] uppercase tracking-wider text-white/55">Кошелёк</span>
+          <span className="block text-[13px] font-semibold leading-tight tabular-nums text-white">{fmtMoney(balance)}</span>
         </span>
       </button>
     )
@@ -85,11 +85,11 @@ function Widget({
   if (w === 'quest') {
     return (
       <button type="button" aria-label="Открыть задания" onClick={() => onOpenApp('career')} className={WIDGET_CLASS}>
-        <Trophy className="size-4 shrink-0 text-amber-300" aria-hidden="true" />
+        <Trophy className="size-3.5 shrink-0 text-amber-300" aria-hidden="true" />
         {data.quest ? (
-          <span className="text-[13px] font-semibold tabular-nums text-white">{data.quest.progress}/{data.quest.target}</span>
+          <span className="text-[12px] font-semibold tabular-nums text-white">{data.quest.progress}/{data.quest.target}</span>
         ) : (
-          <span className="text-[11px] text-white/60">Заданий нет</span>
+          <span className="text-[10px] text-white/60">Заданий нет</span>
         )}
       </button>
     )
@@ -97,11 +97,11 @@ function Widget({
   // delivery
   return (
     <button type="button" aria-label="Открыть доставки" onClick={() => onOpenApp('delivery')} className={WIDGET_CLASS}>
-      <Package className="size-4 shrink-0 text-emerald-300" aria-hidden="true" />
+      <Package className="size-3.5 shrink-0 text-emerald-300" aria-hidden="true" />
       {data.delivery ? (
-        <span className="text-[11px] font-semibold text-amber-300">{data.delivery.status}</span>
+        <span className="text-[10px] font-semibold text-amber-300">{data.delivery.status}</span>
       ) : (
-        <span className="text-[11px] text-white/60">Посылок нет</span>
+        <span className="text-[10px] text-white/60">Посылок нет</span>
       )}
     </button>
   )
@@ -212,7 +212,7 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
         <div className="flex h-full w-[200%]" style={trackStyle}>
           {/* ─── Страница 1: компактные виджеты + основные приложения ─── */}
           <section className="flex h-full w-1/2 flex-col" aria-label="Страница 1 — приложения" aria-hidden={page !== 0}>
-            <div className="flex items-stretch gap-2 px-5">
+            <div className="flex items-stretch gap-1.5 px-4">
               {shownWidgets.filter((w) => w === 'clock').map((w) => (
                 <Widget key={w} w={w} now={now} online={online} balance={balance} data={day} onOpenApp={onOpenApp} />
               ))}
@@ -221,7 +221,7 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
               ))}
             </div>
 
-            <div className="mt-7 grid grid-cols-4 gap-x-5 gap-y-6 px-5">
+            <div className="mt-5 grid grid-cols-5 gap-x-2 gap-y-4 px-4">
               {PAGE1_APPS.map((app) => (
                 <AppIcon
                   key={app}
@@ -241,19 +241,19 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
           {/* ─── Страница 2: мини-стрип дня + единая сетка приложений ─── */}
           <section className="flex h-full w-1/2 flex-col" aria-label="Страница 2 — приложения" aria-hidden={page !== 1}>
             {/* мини-стрип дня: задание / посылка / место в топе */}
-            <div className="mx-5 grid grid-cols-3 gap-2">
+            <div className="mx-4 grid grid-cols-3 gap-1.5">
               <button
                 type="button"
                 aria-label="Задание дня"
                 onClick={() => onOpenApp('career')}
-                className={`${glass} flex min-h-12 flex-col justify-center px-3 py-1.5 text-left outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white/70`}
+                className={`${glass} flex min-h-10 flex-col justify-center px-2.5 py-1 text-left outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white/70`}
               >
-                <span className="flex items-center gap-1.5 text-[9px] uppercase tracking-wider text-white/55">
-                  <Trophy className="size-3 text-amber-300" aria-hidden="true" /> Задание
+                <span className="flex items-center gap-1 text-[8px] uppercase tracking-wider text-white/55">
+                  <Trophy className="size-2.5 text-amber-300" aria-hidden="true" /> Задание
                 </span>
                 {day.quest ? (
                   <>
-                    <span className="mt-0.5 text-[12px] font-semibold tabular-nums text-white">
+                    <span className="mt-0.5 text-[11px] font-semibold tabular-nums text-white">
                       {day.quest.progress}/{day.quest.target}
                     </span>
                     <span className="mt-1 h-1 w-full overflow-hidden rounded-full bg-white/15">
@@ -264,43 +264,43 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
                     </span>
                   </>
                 ) : (
-                  <span className="mt-0.5 text-[11px] text-white/60">Всё чисто</span>
+                  <span className="mt-0.5 text-[10px] text-white/60">Всё чисто</span>
                 )}
               </button>
               <button
                 type="button"
                 aria-label="Посылка"
                 onClick={() => onOpenApp('delivery')}
-                className={`${glass} flex min-h-12 flex-col justify-center px-3 py-1.5 text-left outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white/70`}
+                className={`${glass} flex min-h-10 flex-col justify-center px-2.5 py-1 text-left outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white/70`}
               >
-                <span className="flex items-center gap-1.5 text-[9px] uppercase tracking-wider text-white/55">
-                  <Package className="size-3 text-emerald-300" aria-hidden="true" /> Посылка
+                <span className="flex items-center gap-1 text-[8px] uppercase tracking-wider text-white/55">
+                  <Package className="size-2.5 text-emerald-300" aria-hidden="true" /> Посылка
                 </span>
                 {day.delivery ? (
-                  <span className="mt-0.5 text-[12px] font-semibold text-amber-300">В пути</span>
+                  <span className="mt-0.5 text-[11px] font-semibold text-amber-300">В пути</span>
                 ) : (
-                  <span className="mt-0.5 text-[11px] text-white/60">Посылок нет</span>
+                  <span className="mt-0.5 text-[10px] text-white/60">Посылок нет</span>
                 )}
               </button>
               <button
                 type="button"
                 aria-label="Топ площадки"
                 onClick={() => onOpenApp('leaderboard')}
-                className={`${glass} flex min-h-12 flex-col justify-center px-3 py-1.5 text-left outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white/70`}
+                className={`${glass} flex min-h-10 flex-col justify-center px-2.5 py-1 text-left outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white/70`}
               >
-                <span className="flex items-center gap-1.5 text-[9px] uppercase tracking-wider text-white/55">
-                  <Crown className="size-3 text-amber-300" aria-hidden="true" /> Топ
+                <span className="flex items-center gap-1 text-[8px] uppercase tracking-wider text-white/55">
+                  <Crown className="size-2.5 text-amber-300" aria-hidden="true" /> Топ
                 </span>
                 {day.myPlace ? (
-                  <span className="mt-0.5 text-[12px] font-semibold text-white">{day.myPlace} место</span>
+                  <span className="mt-0.5 text-[11px] font-semibold text-white">{day.myPlace} место</span>
                 ) : (
-                  <span className="mt-0.5 text-[11px] text-white/60">Не в топе</span>
+                  <span className="mt-0.5 text-[10px] text-white/60">Не в топе</span>
                 )}
               </button>
             </div>
 
-            {/* ЕДИНАЯ сетка 4 колонки — как на странице 1 */}
-            <div className="mt-7 grid grid-cols-4 gap-x-5 gap-y-6 px-5">
+            {/* ЕДИНАЯ сетка 5 колонок — как на странице 1 */}
+            <div className="mt-5 grid grid-cols-5 gap-x-2 gap-y-4 px-4">
               {PAGE2_APPS.map((app) => (
                 <AppIcon
                   key={app}
@@ -323,28 +323,28 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
       <MiniPlayer onOpenApp={onOpenApp} />
 
       {/* Page-dots: активная страница — пилюля */}
-      <div className="z-10 mb-3 flex items-center justify-center gap-1.5" aria-hidden="true">
-        <span className={`h-1.5 rounded-full bg-white transition-all duration-300 ${page === 0 ? 'w-5' : 'w-1.5 bg-white/40'}`} />
-        <span className={`h-1.5 rounded-full bg-white transition-all duration-300 ${page === 1 ? 'w-5' : 'w-1.5 bg-white/40'}`} />
+      <div className="z-10 mb-2 flex items-center justify-center gap-1" aria-hidden="true">
+        <span className={`h-1 rounded-full bg-white transition-all duration-300 ${page === 0 ? 'w-4' : 'w-1 bg-white/40'}`} />
+        <span className={`h-1 rounded-full bg-white transition-all duration-300 ${page === 1 ? 'w-4' : 'w-1 bg-white/40'}`} />
       </div>
 
       {/* ─── Поисковая пилюля над доком (в духе Google на Android) ─── */}
-      <div className="z-10 mx-5 mb-3">
+      <div className="z-10 mx-4 mb-2">
         <button
           type="button"
           aria-label="Поиск — открыть браузер"
           onClick={() => onOpenApp('browser')}
-          className="flex h-12 w-full items-center gap-3 rounded-full bg-white/[0.12] px-4 text-left backdrop-blur-xl outline-none ring-1 ring-white/10 transition-all duration-200 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-white/70"
+          className="flex h-10 w-full items-center gap-2.5 rounded-full bg-white/[0.12] px-3.5 text-left backdrop-blur-xl outline-none ring-1 ring-white/10 transition-all duration-200 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-white/70"
         >
-          <Search className="size-[18px] shrink-0 text-white/85" aria-hidden="true" />
-          <span className="flex-1 truncate text-[13px] font-medium text-white/75">Поиск</span>
-          <Mic className="size-[18px] shrink-0 text-white/55" aria-hidden="true" />
+          <Search className="size-4 shrink-0 text-white/85" aria-hidden="true" />
+          <span className="flex-1 truncate text-[12px] font-medium text-white/75">Поиск</span>
+          <Mic className="size-4 shrink-0 text-white/55" aria-hidden="true" />
         </button>
       </div>
 
       {/* ─── Док на стеклянной панели Android 16 ─── */}
-      <div className="z-10 mx-4 mb-2.5 rounded-[26px] bg-white/10 p-3 pb-3 backdrop-blur-xl ring-1 ring-white/10">
-        <div className="grid grid-cols-4 gap-4">
+      <div className="z-10 mx-3 mb-2 rounded-[22px] bg-white/10 p-2 pb-2 backdrop-blur-xl ring-1 ring-white/10">
+        <div className="grid grid-cols-4 gap-1">
           {DOCK_APPS.map((app) => (
             <AppIcon
               key={app}
@@ -353,6 +353,7 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
               image={APP_TILE[app].image || undefined}
               imageBg={APP_TILE[app].background}
               badge={app === 'avito' ? unreadChats : undefined}
+              small
               onClick={() => onOpenApp(app)}
             />
           ))}
