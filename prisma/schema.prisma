@@ -8,88 +8,93 @@ datasource db {
 }
 
 model User {
-  id          String   @id @default(cuid())
-  telegramId  String?  @unique
-  username    String   @unique
-  displayName String
-  photoUrl    String?
-  isBot       Boolean  @default(false)
-  personaId   String?
-  balance     Int      @default(35000)
-  debt        Int      @default(0)
-  deposit     Int      @default(0)
-  depositAt   DateTime?
-  xp          Int      @default(0)
-  level       Int      @default(1)
-  ratingSum   Int      @default(0)
-  ratingCount Int      @default(0)
-  taxDebt     Int      @default(0)
+  id           String    @id @default(cuid())
+  telegramId   String?   @unique
+  username     String    @unique
+  displayName  String
+  photoUrl     String?
+  isBot        Boolean   @default(false)
+  personaId    String?
+  balance      Int       @default(35000)
+  debt         Int       @default(0)
+  deposit      Int       @default(0)
+  depositAt    DateTime?
+  xp           Int       @default(0)
+  level        Int       @default(1)
+  ratingSum    Int       @default(0)
+  ratingCount  Int       @default(0)
+  taxDebt      Int       @default(0)
   taxPenaltyAt DateTime?
-  creditScore Int      @default(500)
-  city        String   @default("Москва")
-  bio         String?
-  achievements String  @default("[]")
-  stats       String   @default("{}")
-  questDay    String?
-  rerollDay   String?
-  bonusStreak Int      @default(0)
-  lastBonusAt DateTime?
-  lastSeenAt  DateTime @default(now())
-  createdAt   DateTime @default(now())
+  creditScore  Int       @default(500)
+  city         String    @default("Москва")
+  bio          String?
+  achievements String    @default("[]")
+  stats        String    @default("{}")
+  questDay     String?
+  rerollDay    String?
+  bonusStreak  Int       @default(0)
+  lastBonusAt  DateTime?
+  lastSeenAt   DateTime  @default(now())
+  createdAt    DateTime  @default(now())
 
-  listings     Listing[]
-  items        Item[]
-  reviewsGiven Review[]  @relation("reviewFrom")
-  reviewsGot   Review[]  @relation("reviewTo")
-  notifications Notification[]
-  taxBills     TaxBill[]
-  loans        Loan[]
-  transactions Transaction[]
-  quests       Quest[]
-  repairs      RepairOrder[]
-  deliveries   Delivery[]
-  auctionBids  AuctionBid[]
-  autoBids     AutoBid[]
-  savedSearches SavedSearch[]
-  complaints    Complaint[] @relation("complaintFrom")
-  favorites     Favorite[]
-  blocked       BlockedSeller[] @relation("blocker")
-  blockedMe     BlockedSeller[] @relation("blockedOne")
-  telegramLink  TelegramLink?
-  telegramCodes TelegramCode[]
-  phoneNumbers  PhoneNumber[]
-  callLogs      CallLog[]
-  partsStock    PartStock[]
-  workshopTools WorkshopTool[]
-  repairJobs    RepairJob[]
+  listings       Listing[]
+  items          Item[]
+  reviewsGiven   Review[]        @relation("reviewFrom")
+  reviewsGot     Review[]        @relation("reviewTo")
+  notifications  Notification[]
+  taxBills       TaxBill[]
+  loans          Loan[]
+  transactions   Transaction[]
+  quests         Quest[]
+  repairs        RepairOrder[]
+  deliveries     Delivery[]
+  auctionBids    AuctionBid[]
+  autoBids       AutoBid[]
+  savedSearches  SavedSearch[]
+  complaints     Complaint[]     @relation("complaintFrom")
+  favorites      Favorite[]
+  blocked        BlockedSeller[] @relation("blocker")
+  blockedMe      BlockedSeller[] @relation("blockedOne")
+  telegramLink   TelegramLink?
+  telegramCodes  TelegramCode[]
+  phoneNumbers   PhoneNumber[]
+  callLogs       CallLog[]
+  partsStock     PartStock[]
+  workshopTools  WorkshopTool[]
+  repairJobs     RepairJob[]
   installedParts InstalledPart[]
 }
 
 model Listing {
-  id          String    @id @default(cuid())
-  sellerId    String
-  seller      User      @relation(fields: [sellerId], references: [id])
-  itemId      String?
-  itemKey     String
-  title       String
-  description String
-  category    String
-  condition   String
-  price       Int
-  baseValue   Int
-  image       String
-  city        String
-  status      String    @default("active") // active | sold | removed
-  views       Int       @default(0)
-  complaintCount Int    @default(0)
-  boostedUntil DateTime?
-  createdAt   DateTime  @default(now())
-  soldAt      DateTime?
+  id             String    @id @default(cuid())
+  sellerId       String
+  seller         User      @relation(fields: [sellerId], references: [id])
+  itemId         String?
+  itemKey        String
+  title          String
+  description    String
+  category       String
+  condition      String
+  price          Int
+  baseValue      Int
+  image          String
+  city           String
+  status         String    @default("active") // active | sold | removed
+  views          Int       @default(0)
+  complaintCount Int       @default(0)
+  boostedUntil   DateTime?
+  createdAt      DateTime  @default(now())
+  soldAt         DateTime?
 
-  chats     Chat[]
-  reviews   Review[]
+  chats      Chat[]
+  reviews    Review[]
   complaints Complaint[]
-  favorites Favorite[]
+  favorites  Favorite[]
+
+  @@index([status, createdAt])
+  @@index([sellerId, status])
+  @@index([itemKey, status])
+  @@index([category, status])
 }
 
 model Item {
@@ -105,18 +110,17 @@ model Item {
   purchasePrice Int
   fromUserId    String?
   createdAt     DateTime @default(now())
-
 }
 
 model Chat {
-  id           String   @id @default(cuid())
-  listingId    String
-  listing      Listing  @relation(fields: [listingId], references: [id])
-  buyerId      String
-  sellerId     String
+  id            String   @id @default(cuid())
+  listingId     String
+  listing       Listing  @relation(fields: [listingId], references: [id])
+  buyerId       String
+  sellerId      String
   lastMessageAt DateTime @default(now())
-  meta         String   @default("{}")
-  createdAt    DateTime @default(now())
+  meta          String   @default("{}")
+  createdAt     DateTime @default(now())
 
   messages Message[]
 }
@@ -125,7 +129,7 @@ model Message {
   id         String    @id @default(cuid())
   chatId     String
   chat       Chat      @relation(fields: [chatId], references: [id])
-  senderType String    // user | bot | system
+  senderType String // user | bot | system
   senderId   String
   senderName String
   kind       String    @default("text") // text | invoice | system
@@ -135,32 +139,36 @@ model Message {
   paid       Boolean?
   createdAt  DateTime  @default(now())
   readAt     DateTime?
+
+  @@index([chatId, createdAt])
 }
 
 model Transaction {
-  id             String   @id @default(cuid())
-  userId         String
-  user           User     @relation(fields: [userId], references: [id])
-  type           String   // purchase | sale | loan | repay | tax | deposit | withdraw | boost | penalty | interest
-  amount         Int
-  counterpartyId String?
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id])
+  type             String // purchase | sale | loan | repay | tax | deposit | withdraw | boost | penalty | interest
+  amount           Int
+  counterpartyId   String?
   counterpartyName String?
-  listingId      String?
-  note           String?
-  createdAt      DateTime @default(now())
+  listingId        String?
+  note             String?
+  createdAt        DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 model Review {
-  id        String   @id @default(cuid())
-  listingId String
-  listing   Listing  @relation(fields: [listingId], references: [id])
+  id         String   @id @default(cuid())
+  listingId  String
+  listing    Listing  @relation(fields: [listingId], references: [id])
   fromUserId String
-  from      User     @relation("reviewFrom", fields: [fromUserId], references: [id])
-  toUserId  String
-  to        User     @relation("reviewTo", fields: [toUserId], references: [id])
-  rating    Int
-  text      String
-  createdAt DateTime @default(now())
+  from       User     @relation("reviewFrom", fields: [fromUserId], references: [id])
+  toUserId   String
+  to         User     @relation("reviewTo", fields: [toUserId], references: [id])
+  rating     Int
+  text       String
+  createdAt  DateTime @default(now())
 }
 
 model TaxBill {
@@ -176,15 +184,15 @@ model TaxBill {
 }
 
 model Loan {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
   principal Int
   owed      Int
   rate      Int
   dueAt     DateTime
-  status    String   @default("active") // active | repaid | overdue
-  takenAt   DateTime @default(now())
+  status    String    @default("active") // active | repaid | overdue
+  takenAt   DateTime  @default(now())
   repaidAt  DateTime?
 }
 
@@ -192,7 +200,7 @@ model Notification {
   id        String    @id @default(cuid())
   userId    String
   user      User      @relation(fields: [userId], references: [id])
-  kind      String    // deal | message | tax | market | system
+  kind      String // deal | message | tax | market | system
   title     String
   body      String
   readAt    DateTime?
@@ -209,7 +217,7 @@ model MarketIndex {
 model MarketEvent {
   id        String   @id @default(cuid())
   category  String
-  kind      String   // demand_up | demand_down | fashion | crisis | opu | tax_raid | supply
+  kind      String // demand_up | demand_down | fashion | crisis | opu | tax_raid | supply
   magnitude Float
   headline  String
   body      String
@@ -218,71 +226,71 @@ model MarketEvent {
 }
 
 model RepairOrder {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id])
-  itemId       String
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  itemId        String
   fromCondition String
-  toCondition  String
-  cost         Int
-  status       String   @default("in_progress") // in_progress | ready | done
-  startedAt    DateTime @default(now())
-  readyAt      DateTime
-  doneAt       DateTime?
+  toCondition   String
+  cost          Int
+  status        String    @default("in_progress") // in_progress | ready | done
+  startedAt     DateTime  @default(now())
+  readyAt       DateTime
+  doneAt        DateTime?
 }
 
 model Delivery {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  listingId   String
-  title       String
-  image       String
-  price       Int
-  itemKey     String
-  category    String
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  listingId       String
+  title           String
+  image           String
+  price           Int
+  itemKey         String
+  category        String
   listedCondition String
-  realCondition String
-  baseValue   Int
-  courier     String
+  realCondition   String
+  baseValue       Int
+  courier         String
   // kind: purchase (покупка игрока: курьер/самовывоз → ПВЗ → забрал) | sale (продажа игрока: курьер забрал → деньги после вручения)
-  kind        String   @default("purchase")
-  status      String   @default("in_transit") // collecting | in_transit | arrived | delivered | returned
-  createdAt   DateTime @default(now())
-  eta         DateTime
-  deliveredAt DateTime?
+  kind            String    @default("purchase")
+  status          String    @default("in_transit") // collecting | in_transit | arrived | delivered | returned
+  createdAt       DateTime  @default(now())
+  eta             DateTime
+  deliveredAt     DateTime?
 }
 
 model AuctionLot {
-  id          String   @id @default(cuid())
-  itemKey     String
-  title       String
-  image       String
-  category    String
-  condition   String
-  baseValue   Int
-  startPrice  Int
-  currentBid  Int?
-  currentBidderId String?
+  id                String       @id @default(cuid())
+  itemKey           String
+  title             String
+  image             String
+  category          String
+  condition         String
+  baseValue         Int
+  startPrice        Int
+  currentBid        Int?
+  currentBidderId   String?
   currentBidderName String?
-  bidCount    Int      @default(0)
-  status      String   @default("active") // active | finished | cancelled
-  createdAt   DateTime @default(now())
-  endsAt      DateTime
-  finishedAt  DateTime?
-  bids        AuctionBid[]
-  autoBids    AutoBid[]
+  bidCount          Int          @default(0)
+  status            String       @default("active") // active | finished | cancelled
+  createdAt         DateTime     @default(now())
+  endsAt            DateTime
+  finishedAt        DateTime?
+  bids              AuctionBid[]
+  autoBids          AutoBid[]
 }
 
 model AuctionBid {
-  id        String   @id @default(cuid())
+  id        String     @id @default(cuid())
   lotId     String
   lot       AuctionLot @relation(fields: [lotId], references: [id])
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User       @relation(fields: [userId], references: [id])
   userName  String
   amount    Int
-  createdAt DateTime @default(now())
+  createdAt DateTime   @default(now())
 }
 
 // Автоставка игрока на аукционе (прокси-ставки как на eBay):
@@ -319,13 +327,13 @@ model SavedSearch {
 }
 
 model Complaint {
-  id        String   @id @default(cuid())
-  listingId String
-  listing   Listing  @relation(fields: [listingId], references: [id])
+  id         String   @id @default(cuid())
+  listingId  String
+  listing    Listing  @relation(fields: [listingId], references: [id])
   fromUserId String
-  from      User     @relation("complaintFrom", fields: [fromUserId], references: [id])
-  reason    String
-  createdAt DateTime @default(now())
+  from       User     @relation("complaintFrom", fields: [fromUserId], references: [id])
+  reason     String
+  createdAt  DateTime @default(now())
 
   @@unique([listingId, fromUserId])
 }
@@ -373,12 +381,12 @@ model BlockedSeller {
 
 // Привязка игрового аккаунта к Telegram-боту @resalesimbot: уведомления и команды
 model TelegramLink {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id])
-  chatId    String   @unique
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id])
+  chatId     String   @unique
   tgUsername String?
-  createdAt DateTime @default(now())
+  createdAt  DateTime @default(now())
 }
 
 // Одноразовые коды привязки (жизнь 15 минут)

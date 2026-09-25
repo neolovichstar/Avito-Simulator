@@ -3,7 +3,7 @@
 // Лента «Resale» — светлый маркетплейс 1:1 как настоящий Авито:
 // шапка с городом и круглым аватаром, серая пилюля поиска, чипы категорий,
 // белые карточки (сердечко в белом кружке, цена bold 17, зелёная звезда продавца).
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   Search, SlidersHorizontal, Heart, Star, Zap, Bell, BellPlus, X, SearchX,
   History, Activity, Scale, Handshake, ArrowUpDown, ChevronDown,
@@ -222,14 +222,16 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
 
   useEffect(() => { load(1) }, [load])
 
-  const onFav = (id: string) => {
-    const next = toggleFav(id)
-    setFavs(next)
-    // синк на сервер (не блокирует UI): оповещения «цена снизилась» приходят только по синхронизированным
-    api.favToggle(id, next.includes(id)).catch(() => {})
-  }
+  const onFav = useCallback((id: string) => {
+    setFavs((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      // синк на сервер (не блокирует UI)
+      void import('@/lib/api').then(({ api }) => api.favToggle(id, next.includes(id)).catch(() => {}))
+      return next
+    })
+  }, [])
 
-  const toggleCompare = (l: FeedListing) => {
+  const toggleCompare = useCallback((l: FeedListing) => {
     setCompare((prev) => {
       if (prev.some((c) => c.id === l.id)) return prev.filter((c) => c.id !== l.id)
       if (prev.length >= 3) {
@@ -238,7 +240,9 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
       }
       return [...prev, l]
     })
-  }
+  }, [])
+
+  const comparingIds = useMemo(() => new Set(compare.map((c) => c.id)), [compare])
 
   const cancelSearch = () => {
     setQ('')
@@ -535,11 +539,11 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
                 <ListingCard
                   key={l.id}
                   listing={l}
-                  onOpen={() => onOpenListing(l.id)}
-                  onFav={() => onFav(l.id)}
+                  onOpen={onOpenListing}
+                  onFav={onFav}
                   fav={favs.includes(l.id)}
-                  comparing={compare.some((c) => c.id === l.id)}
-                  onCompareToggle={!favoritesMode ? () => toggleCompare(l) : undefined}
+                  comparing={comparingIds.has(l.id)}
+                  onCompareToggle={!favoritesMode ? toggleCompare : undefined}
                 />
               ))}
             </div>
@@ -712,19 +716,20 @@ function ViewedStrip({ items, onOpen, onClear }: {
 
 // Карточка ленты 1:1 как в настоящем Авито: белая, фото 4:3, сердечко в белом кружке,
 // цена bold 17 tabular-nums, название 14 (2 строки), «Москва • Сегодня 14:02», зелёная звезда.
-export function ListingCard({ listing: l, onOpen, onFav, fav, comparing, onCompareToggle }: {
+// memo: ре-рендер только той карточки, у которой реально сменились fav/comparing/listing
+const ListingCard = memo(function ListingCard({ listing: l, onOpen, onFav, fav, comparing, onCompareToggle }: {
   listing: FeedListing
-  onOpen: () => void
-  onFav?: () => void
+  onOpen: (id: string) => void
+  onFav?: (id: string) => void
   fav?: boolean
   comparing?: boolean
-  onCompareToggle?: () => void
+  onCompareToggle?: (l: FeedListing) => void
 }) {
   const cheap = cheaperPercent(l)
   return (
     <div className={`press rounded-2xl bg-white overflow-hidden ${comparing ? 'ring-2 ring-black ring-offset-2 ring-offset-[#F7F8FA]' : ''}`}>
       <div className="relative">
-        <button onClick={onOpen} aria-label={l.title} className="block w-full text-left">
+        <button onClick={() => onOpen(l.id)} aria-label={l.title} className="block w-full text-left">
           <div className="relative aspect-[4/3] bg-[#F0F1F5]">
             <img src={l.image} alt="" className="w-full h-full object-cover" loading="lazy" />
             {cheap >= 10 && (
@@ -741,7 +746,7 @@ export function ListingCard({ listing: l, onOpen, onFav, fav, comparing, onCompa
         </button>
         {onCompareToggle && (
           <button
-            onClick={onCompareToggle}
+            onClick={() => onCompareToggle?.(l)}
             aria-label={comparing ? `Убрать ${l.title} из сравнения` : `Добавить ${l.title} к сравнению`}
             aria-pressed={comparing}
             className="absolute top-1.5 left-1.5 w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center active:scale-90 transition-transform duration-200 ease-out"
@@ -751,7 +756,7 @@ export function ListingCard({ listing: l, onOpen, onFav, fav, comparing, onCompa
         )}
         {onFav && (
           <button
-            onClick={onFav}
+            onClick={() => onFav?.(l.id)}
             aria-label={fav ? 'Убрать из избранного' : 'В избранное'}
             aria-pressed={fav}
             className="absolute top-1.5 right-1.5 w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center active:scale-90 transition-transform duration-200 ease-out"
@@ -764,7 +769,7 @@ export function ListingCard({ listing: l, onOpen, onFav, fav, comparing, onCompa
           </button>
         )}
       </div>
-      <button onClick={onOpen} className="block w-full text-left p-2.5">
+      <button onClick={() => onOpen(l.id)} className="block w-full text-left p-2.5">
         <p className={`text-[17px] font-bold leading-none tabular-nums ${l.price === 0 ? 'text-[#067A47]' : 'text-black'}`}>
           {l.price === 0 ? 'Даром' : `${fmtNum(l.price)} ₽`}
         </p>
@@ -783,7 +788,7 @@ export function ListingCard({ listing: l, onOpen, onFav, fav, comparing, onCompa
       </button>
     </div>
   )
-}
+})
 
 // ПУЛЬС РЫНКА (28-a): белая карточка — новостная строка волн рынка сверху,
 // затем горизонтальный скролл топ-5 движений цен (за час + за день из индекса).

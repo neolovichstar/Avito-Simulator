@@ -334,7 +334,7 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
           type="button"
           aria-label="Поиск — открыть браузер"
           onClick={() => onOpenApp('browser')}
-          className="flex h-10 w-full items-center gap-2.5 rounded-full bg-white/[0.12] px-3.5 text-left backdrop-blur-xl outline-none ring-1 ring-white/10 transition-all duration-200 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-white/70"
+          className="flex h-10 w-full items-center gap-2.5 rounded-full bg-white/[0.12] px-3.5 text-left backdrop-blur-md outline-none ring-1 ring-white/10 transition-all duration-200 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-white/70"
         >
           <Search className="size-4 shrink-0 text-white/85" aria-hidden="true" />
           <span className="flex-1 truncate text-[12px] font-medium text-white/75">Поиск</span>
@@ -343,7 +343,7 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
       </div>
 
       {/* ─── Док на стеклянной панели Android 16 ─── */}
-      <div className="z-10 mx-3 mb-2 rounded-[22px] bg-white/10 p-2 pb-2 backdrop-blur-xl ring-1 ring-white/10">
+      <div className="z-10 mx-3 mb-2 rounded-[22px] bg-white/10 p-2 pb-2 backdrop-blur-md ring-1 ring-white/10">
         <div className="grid grid-cols-4 gap-1">
           {DOCK_APPS.map((app) => (
             <AppIcon
