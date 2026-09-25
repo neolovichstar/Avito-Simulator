@@ -30,6 +30,10 @@ export const db =
   globalForPrisma.prisma ??
   new PrismaClient({
     log: ['query'],
+    // На Vercel DATABASE_URL может отсутствовать — используем hosted Prisma Postgres.
+    // Локально это undefined → работает обычный datasource из schema.prisma (sqlite).
+    datasourceUrl:
+      process.env.DATABASE_URL ?? process.env.POSTGRESPRISMA_POSTGRES_URL ?? undefined,
   })
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
