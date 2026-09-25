@@ -1,15 +1,15 @@
 // Telegram-бот @resalesimbot — «Resale — симулятор ресейла»
 // Mini-service на порту :3004, долгий polling getUpdates + HTTP /health, /send.
 //
-// ПРОВЕРЕНО ЭМПИРИЧЕСКИ (2025-09-25, реальные вызовы Bot API):
-//  - custom_emoji (премиум-эмодзи) от этого бота ОТКЛОНЯЕТСЯ API: ENTITY_TEXT_INVALID.
-//    Боты могут слать custom emoji только с коллекционным юзернеймом Fragment.
-//    Поэтому в текстах и кнопках — яркие Unicode-эмодзи (работают у всех) + HTML bold/italic.
-//  - Поля InlineKeyboardButton "style" и "icon_custom_emoji_id" в Bot API НЕ существуют.
-//  - sendPhoto по file_id после первой загрузки — мгновенно (файл не гоняем повторно).
+// ПРОВЕРЕНО ЖИВЫМИ ВЫЗОВАМИ Bot API (2025-09-25, chat юзера):
+//  ✔ custom_emoji (<tg-emoji> и entities) — бот МОЕТ слать премиум-эмодзи
+//  ✔ InlineKeyboardButton style: success/primary/link + icon_custom_emoji_id — работает
+//  ВАЖНО (грабли): тесты через bash-строки ломают UTF-8 (\x-последовательности не
+//  интерпретируются в одиночных кавычках) → ложный ENTITY_TEXT_INVALID. Тестировать
+//  только через bun/node с настоящими UTF-8 строками!
 //
-// /start — приветственное фото + подпись + кнопки. /start КОД — привязка аккаунта.
-// Уведомления: основной сервер дергает POST /send { secret, chatId, text }.
+// /start — приветственное фото + подпись с премиум-эмодзи + цветные кнопки.
+// /start КОД — привязка аккаунта. Уведомления: основной сервер дергает POST /send.
 import { createServer, type IncomingMessage, type ServerResponse } from 'http'
 import { existsSync, readFileSync } from 'fs'
 import { dirname, join } from 'path'
@@ -40,74 +40,115 @@ const APP_URL = process.env.APP_URL ?? 'https://t.me/resalesimbot/resalesimulato
 const CHANNEL_URL = process.env.CHANNEL_URL ?? 'https://t.me/SnapTeamDev'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Кнопки: гарантированные цветные Unicode-эмодзи в тексте (рендерятся везде)
+// Премиум-эмодзи (custom_emoji_id). Все ID проверены через getCustomEmojiStickers,
+// фолбэк = точный базовый эмодзи (это важно для парсера).
+// Наборы: NewsEmoji, TgAndroidIcons, VariousAnimations9 — анимированные.
+// ─────────────────────────────────────────────────────────────────────────────
+const EMOJI = {
+  fire: '5424972470023104089', // 🔥
+  ruble: '5231449120635370684', // 💸
+  dollar: '5409048419211682843', // 💵
+  chartUp: '5244837092042750681', // 📈
+  arrowUp: '5449683594425410231', // 🔼
+  star: '5438496463044752972', // ⭐️
+  bell: '5458603043203327669', // 🔔
+  megaphone: '5424818078833715060', // 📣
+  tag: '5985433648810171091', // 🏷
+  wallet: '5769403330761593044', // 👛
+  shop: '5983399041197675256', // 🏪
+  info: '5323442290708985472', // © (копирайт — для соглашения)
+  like: '5337080053119336309', // 👍
+  top: '5415655814079723871', // 🔝
+  chat: '5443038326535759644', // 💬
+  letter: '5253742260054409879', // ✉️
+  briefcase: '5967389567781703494', // 💼
+  bookmark: '5222444124698853913', // 🔖
+  exclaim: '5274099962655816924', // ❗️
+  diagram: '5231200819986047254', // 📊
+  link: '5271604874419647061', // 🔗
+  check: '5206607081334906820', // ✔️
+  plane: '5875465628285931233', // ✈️
+} as const
+
+// HTML-тег премиум-эмодзи для parse_mode HTML (фолбэк — точный базовый эмодзи)
+function emo(id: string, fallback: string): string {
+  return `<tg-emoji emoji-id="${id}">${fallback}</tg-emoji>`
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Кнопки: цветные (style) + иконка премиум-эмодзи перед текстом
 // ─────────────────────────────────────────────────────────────────────────────
 interface Btn {
   text: string
   url?: string
   callback_data?: string
+  style?: 'primary' | 'success' | 'danger' | 'link'
+  icon_custom_emoji_id?: string
 }
 interface Markup {
   inline_keyboard: Btn[][]
 }
 
-const BTN_PLAY: Btn = { text: '🟢 Начать ресейлить', url: APP_URL }
-const BTN_SUB: Btn = { text: '📣 Подписаться на канал', url: CHANNEL_URL }
-const BTN_TERMS: Btn = { text: '🏷 Пользовательское соглашение', callback_data: 'terms' }
-const BTN_HELP: Btn = { text: 'ℹ️ Помощь и команды', callback_data: 'help' }
-const BTN_BACK: Btn = { text: '⬅️ Вернуться в меню', callback_data: 'back' }
-
 const WELCOME_MARKUP: Markup = {
   inline_keyboard: [
-    [BTN_PLAY],
-    [BTN_SUB],
-    [BTN_TERMS],
-    [BTN_HELP],
+    [{ text: 'Начать ресейлить', url: APP_URL, style: 'success', icon_custom_emoji_id: EMOJI.arrowUp }],
+    [{ text: 'Подписаться на канал', url: CHANNEL_URL, style: 'primary', icon_custom_emoji_id: EMOJI.bell }],
+    [{ text: 'Пользовательское соглашение', callback_data: 'terms', icon_custom_emoji_id: EMOJI.info }],
+    [{ text: 'Помощь и команды', callback_data: 'help', style: 'link', icon_custom_emoji_id: EMOJI.chat }],
   ],
 }
 
-const BACK_MARKUP: Markup = { inline_keyboard: [[BTN_BACK]] }
+const BACK_MARKUP: Markup = {
+  inline_keyboard: [
+    [{ text: 'Вернуться в меню', callback_data: 'back', style: 'primary', icon_custom_emoji_id: EMOJI.link }],
+  ],
+}
 
-const START_MARKUP: Markup = { inline_keyboard: [[BTN_PLAY], [BTN_HELP]] }
+const START_MARKUP: Markup = {
+  inline_keyboard: [
+    [{ text: 'Начать ресейлить', url: APP_URL, style: 'success', icon_custom_emoji_id: EMOJI.arrowUp }],
+    [{ text: 'Помощь и команды', callback_data: 'help', style: 'link', icon_custom_emoji_id: EMOJI.chat }],
+  ],
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Тексты (HTML: <b>/<i>/<code>; лимит подписи к фото — 1024 символа)
+// Тексты (лимит подписи к фото — 1024 символа)
 // ─────────────────────────────────────────────────────────────────────────────
 const WELCOME_CAPTION = [
-  `🔥 <b><i>Resale</i></b> — симулятор ресейла, где скупка и перепродажа превращаются в империю.`,
-  ``,
-  `🏪 <b>Что тебя ждёт:</b>`,
-  `💸 живая экономика — цены двигают ИИ-боты и реальные игроки`,
-  `🏷 скупай дёшево, торгуйся в чатах и продавай дороже`,
-  `📈 аукционы, банк, налоги и доставки — как в жизни`,
-  `⭐️ уровни, рейтинг и топ лидеров сервера`,
-  ``,
-  `💵 Стартовый капитал уже ждёт. Удачных сделок!`,
+  `${emo(EMOJI.fire, '🔥')} <b><i>Resale</i></b> — симулятор ресейла, где скупка и перепродажа превращаются в империю.`,
+  '',
+  `${emo(EMOJI.shop, '🏪')} <b>Что тебя ждёт:</b>`,
+  `${emo(EMOJI.ruble, '💸')} живая экономика — цены двигают ИИ-боты и реальные игроки`,
+  `${emo(EMOJI.tag, '🏷')} скупай дёшево, торгуйся в чатах и продавай дороже`,
+  `${emo(EMOJI.chartUp, '📈')} аукционы, банк, налоги и доставки — как в жизни`,
+  `${emo(EMOJI.star, '⭐️')} уровни, рейтинг и топ лидеров сервера`,
+  '',
+  `${emo(EMOJI.dollar, '💵')} Стартовый капитал уже ждёт. Удачных сделок!`,
 ].join('\n')
 
 const TERMS_TEXT = [
-  `🏷 <b>Пользовательское соглашение Resale</b>`,
-  ``,
+  `${emo(EMOJI.tag, '🏷')} <b>Пользовательское соглашение Resale</b>`,
+  '',
   `<b>1.</b> Resale — онлайн-игра, симулятор перепродажи. Все товары, продавцы, деньги и чаты — вымышленные.`,
   `<b>2.</b> Внутриигровая валюта не имеет реальной стоимости; реальные товары не продаются и не покупаются.`,
   `<b>3.</b> Запрещены оскорбления, спам, попытки обмана игроков и злоупотребление багами.`,
   `<b>4.</b> Мы можем корректировать экономику и баланс игры, уведомляя игроков в канале ${CHANNEL_URL}.`,
   `<b>5.</b> Для профиля игра использует только имя и username из Telegram.`,
   `<b>6.</b> Продолжая играть, вы соглашаетесь с этими правилами.`,
-  ``,
-  `👍 Приятного ресейла!`,
+  '',
+  `${emo(EMOJI.like, '👍')} Приятного ресейла!`,
 ].join('\n')
 
 const HELP_TEXT = [
-  `💬 <b>Команды бота Resale</b>`,
-  ``,
-  `🔗 /start КОД — привязать аккаунт из игры`,
-  `👛 /balance — кошелёк, долги и налоги`,
-  `📈 /lots — активные лоты аукциона`,
-  `ℹ️ /help — эта справка`,
-  ``,
-  `🏪 <b>Как играть:</b>`,
-  `<b>1.</b> Нажми «🟢 Начать ресейлить» — откроется смартфон с игрой.`,
+  `${emo(EMOJI.chat, '💬')} <b>Команды бота Resale</b>`,
+  '',
+  `${emo(EMOJI.link, '🔗')} /start КОД — привязать аккаунт из игры`,
+  `${emo(EMOJI.wallet, '👛')} /balance — кошелёк, долги и налоги`,
+  `${emo(EMOJI.chartUp, '📈')} /lots — активные лоты аукциона`,
+  `${emo(EMOJI.letter, '✉️')} /help — эта справка`,
+  '',
+  `${emo(EMOJI.shop, '🏪')} <b>Как играть:</b>`,
+  `<b>1.</b> Нажми «Начать ресейлить» — откроется смартфон с игрой.`,
   `<b>2.</b> Скупай товары на витрине: сравнивай цены, торгуйся в чатах, оформляй доставки.`,
   `<b>3.</b> Продавай дороже, следи за рынком и плати налоги — как в жизни.`,
   `<b>4.</b> Выполняй задания, качай уровень и поднимайся в топ лидеров!`,
@@ -165,21 +206,67 @@ async function tg(method: string, body: Record<string, unknown>): Promise<TgResu
   }
 }
 
-// Отправка текста: HTML, без превью. Возвращает результат с логом.
-async function sendSmart(chatId: number | string, html: string, markup?: Markup): Promise<TgResult | null> {
-  const res = await tg('sendMessage', {
-    chat_id: chatId,
-    text: html,
-    parse_mode: 'HTML',
-    disable_web_page_preview: true,
-    ...(markup ? { reply_markup: markup } : {}),
-  })
-  if (!res || !res.ok) console.warn(`[tg-bot] sendMessage → ${chatId} FAILED:`, res?.description ?? 'no response')
-  return res
+// Убрать премиум-фичи из HTML (фолбэк для случаев, если API отклонит custom emoji)
+function stripPremiumHtml(html: string): string {
+  return html.replace(/<tg-emoji emoji-id="\d+">([\s\S]*?)<\/tg-emoji>/g, '$1')
+}
+// Убрать style кнопок, но оставить иконки премиум-эмодзи
+function stripButtonStyles(markup: Markup | null): Markup | null {
+  if (!markup) return null
+  return {
+    inline_keyboard: markup.inline_keyboard.map((row) =>
+      row.map((b) => {
+        const { style, ...rest } = b
+        void style
+        return rest
+      }),
+    ),
+  }
+}
+function stripPremiumMarkup(markup: Markup | null): Markup | null {
+  if (!markup) return null
+  return {
+    inline_keyboard: markup.inline_keyboard.map((row) =>
+      row.map((b) => {
+        const { style, icon_custom_emoji_id, ...rest } = b
+        void style
+        void icon_custom_emoji_id
+        return rest
+      }),
+    ),
+  }
 }
 
-// Приветствие: фото-баннер + подпись + кнопки. Первый раз — upload файла,
-// дальше — мгновенный file_id (кэш в памяти).
+// Отправка текста с авто-фолбэком: полный премиум -> кнопки без стилей (иконки остаются)
+// -> всё без премиума -> чистый текст. На живом API первый вариант проходит.
+async function sendSmart(chatId: number | string, html: string, markup?: Markup): Promise<TgResult | null> {
+  const variants: Array<{ text: string; markup: Markup | null }> = [
+    ...(markup
+      ? [markup, stripButtonStyles(markup), stripPremiumMarkup(markup)].map((m) => ({ text: html, markup: m }))
+      : []),
+    { text: stripPremiumHtml(html), markup: null as Markup | null },
+  ]
+  for (let i = 0; i < variants.length; i++) {
+    const v = variants[i]
+    const res = await tg('sendMessage', {
+      chat_id: chatId,
+      text: v.text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+      ...(v.markup ? { reply_markup: v.markup } : {}),
+    })
+    if (res && res.ok) {
+      if (i > 0) console.warn(`[tg-bot] sendMessage premium-variant ${i} → fallback used`)
+      return res
+    }
+    if (res) console.warn(`[tg-bot] sendMessage variant ${i + 1}/${variants.length} failed:`, res.description)
+  }
+  console.warn(`[tg-bot] sendMessage → ${chatId}: ALL variants failed`)
+  return null
+}
+
+// Приветствие: фото-баннер + подпись с премиум-эмодзи + кнопки.
+// Первый раз — upload файла, дальше — мгновенный file_id (кэш в памяти).
 let welcomeBuf: Buffer | null | undefined
 let welcomeFileId: string | null = null
 function loadWelcome(): Buffer | null {
@@ -206,43 +293,54 @@ function loadWelcome(): Buffer | null {
 async function sendWelcome(chatId: number | string): Promise<TgResult | null> {
   const buf = loadWelcome()
   if (buf || welcomeFileId) {
-    try {
-      let data: TgResult | null
-      if (welcomeFileId) {
-        data = await tg('sendPhoto', {
-          chat_id: chatId,
-          photo: welcomeFileId,
-          caption: WELCOME_CAPTION,
-          parse_mode: 'HTML',
-          reply_markup: WELCOME_MARKUP,
-        })
-      } else {
-        const form = new FormData()
-        form.append('chat_id', String(chatId))
-        form.append('photo', new Blob([new Uint8Array(buf as Buffer)], { type: 'image/png' }), 'welcome.png')
-        form.append('caption', WELCOME_CAPTION)
-        form.append('parse_mode', 'HTML')
-        form.append('reply_markup', JSON.stringify(WELCOME_MARKUP))
-        const res = await fetch(`${API}/sendPhoto`, {
-          method: 'POST',
-          body: form,
-          signal: AbortSignal.timeout(30_000),
-        })
-        data = (await res.json().catch(() => null)) as TgResult | null
-      }
-      if (data && data.ok) {
-        // запоминаем file_id самой большой фотки для мгновенных следующих отправок
-        const photos = data.result?.photo
-        if (photos && photos.length > 0) {
-          const fid = photos[photos.length - 1]?.file_id
-          if (fid) welcomeFileId = fid
+    // 3 попытки: полный премиум → кнопки без стилей → всё без премиума
+    const attempts: Array<{ markup: Markup | null; caption: string }> = [
+      { markup: WELCOME_MARKUP, caption: WELCOME_CAPTION },
+      { markup: stripButtonStyles(WELCOME_MARKUP), caption: WELCOME_CAPTION },
+      { markup: stripPremiumMarkup(WELCOME_MARKUP), caption: WELCOME_CAPTION },
+      { markup: null, caption: stripPremiumHtml(WELCOME_CAPTION) },
+    ]
+    for (let i = 0; i < attempts.length; i++) {
+      const a = attempts[i]
+      try {
+        let data: TgResult | null
+        if (welcomeFileId) {
+          data = await tg('sendPhoto', {
+            chat_id: chatId,
+            photo: welcomeFileId,
+            caption: a.caption,
+            parse_mode: 'HTML',
+            ...(a.markup ? { reply_markup: a.markup } : {}),
+          })
+        } else {
+          const form = new FormData()
+          form.append('chat_id', String(chatId))
+          form.append('photo', new Blob([new Uint8Array(buf as Buffer)], { type: 'image/png' }), 'welcome.png')
+          form.append('caption', a.caption)
+          form.append('parse_mode', 'HTML')
+          if (a.markup) form.append('reply_markup', JSON.stringify(a.markup))
+          const res = await fetch(`${API}/sendPhoto`, {
+            method: 'POST',
+            body: form,
+            signal: AbortSignal.timeout(30_000),
+          })
+          data = (await res.json().catch(() => null)) as TgResult | null
         }
-        console.log(`[tg-bot] welcome → ${chatId}: OK${welcomeFileId ? ' (file_id cached)' : ''}`)
-        return data
+        if (data && data.ok) {
+          // запоминаем file_id самой большой фотки для мгновенных следующих отправок
+          const photos = data.result?.photo
+          if (photos && photos.length > 0) {
+            const fid = photos[photos.length - 1]?.file_id
+            if (fid) welcomeFileId = fid
+          }
+          if (i > 0) console.warn(`[tg-bot] sendPhoto premium-variant ${i} → fallback used`)
+          console.log(`[tg-bot] welcome → ${chatId}: OK${welcomeFileId ? ' (file_id cached)' : ''}`)
+          return data
+        }
+        console.warn('[tg-bot] sendPhoto attempt', i + 1, 'failed:', data?.description ?? 'no response')
+      } catch (e) {
+        console.error('[tg-bot] sendPhoto error', e)
       }
-      console.warn('[tg-bot] sendPhoto failed:', data?.description ?? 'no response')
-    } catch (e) {
-      console.error('[tg-bot] sendPhoto error', e)
     }
   }
   // фолбэк: текстовое приветствие теми же кнопками
@@ -289,20 +387,20 @@ async function handleCommand(msg: TgMessage): Promise<void> {
         await sendSmart(
           chatId,
           [
-            `✅ <b>Аккаунт привязан, ${data.displayName ?? name}!</b>`,
-            ``,
-            `👛 Кошелёк: <b>${fmtMoney(data.balance ?? 0)}</b>`,
-            ``,
-            `🔔 Теперь сюда будут приходить уведомления: сделки, перебитые ставки аукциона, доставки, налоги, кредиты, ремонт и достижения.`,
-            ``,
-            `🔼 Жми кнопку — и в игру:`,
+            `${emo(EMOJI.check, '✔️')} <b>Аккаунт привязан, ${data.displayName ?? name}!</b>`,
+            '',
+            `${emo(EMOJI.wallet, '👛')} Кошелёк: <b>${fmtMoney(data.balance ?? 0)}</b>`,
+            '',
+            `${emo(EMOJI.bell, '🔔')} Теперь сюда будут приходить уведомления: сделки, перебитые ставки аукциона, доставки, налоги, кредиты, ремонт и достижения.`,
+            '',
+            `${emo(EMOJI.arrowUp, '🔼')} Жми кнопку — и в игру:`,
           ].join('\n'),
           START_MARKUP,
         )
       } else {
         await sendSmart(
           chatId,
-          `❗️ Не получилось: ${data.error ?? 'код не принят'}.\nПолучите новый код в игре: Настройки → Telegram.`,
+          `${emo(EMOJI.exclaim, '❗️')} Не получилось: ${data.error ?? 'код не принят'}.\nПолучите новый код в игре: Настройки → Telegram.`,
           BACK_MARKUP,
         )
       }
@@ -328,23 +426,23 @@ async function handleCommand(msg: TgMessage): Promise<void> {
     if (!st || !st.linked) {
       await sendSmart(
         chatId,
-        `❗️ Аккаунт не привязан.\nОткройте игру → Настройки → «Получить код привязки» и отправьте <code>/start КОД</code>.`,
+        `${emo(EMOJI.exclaim, '❗️')} Аккаунт не привязан.\nОткройте игру → Настройки → «Получить код привязки» и отправьте <code>/start КОД</code>.`,
         START_MARKUP,
       )
       return
     }
     const lines = [
-      `👛 <b>${st.displayName}</b> · уровень ${st.level} · рейтинг ${st.rating || '—'}`,
-      ``,
-      `💵 Кошелёк: <b>${fmtMoney(st.balance ?? 0)}</b>`,
-      st.deposit ? `📊 На вкладе: ${fmtMoney(st.deposit)}` : null,
-      st.debt ? `💼 Долг банку: <b>${fmtMoney(st.debt)}</b>` : `✅ Долгов банку нет`,
+      `${emo(EMOJI.wallet, '👛')} <b>${st.displayName}</b> · уровень ${st.level} · рейтинг ${st.rating || '—'}`,
+      '',
+      `${emo(EMOJI.dollar, '💵')} Кошелёк: <b>${fmtMoney(st.balance ?? 0)}</b>`,
+      st.deposit ? `${emo(EMOJI.diagram, '📊')} На вкладе: ${fmtMoney(st.deposit)}` : null,
+      st.debt ? `${emo(EMOJI.briefcase, '💼')} Долг банку: <b>${fmtMoney(st.debt)}</b>` : `${emo(EMOJI.check, '✔️')} Долгов банку нет`,
       st.taxDebt
-        ? `❗️ Налоговая: <b>${fmtMoney(st.taxDebt)}</b> — оплатите, пока не заблокировали продажи`
-        : `✅ Налоговая: чисто`,
-      ``,
-      st.deliveries ? `✈️ Доставок в пути: ${st.deliveries}` : null,
-      st.leading ? `🔝 Вы лидер в ${st.leading} лот(ах) аукциона` : null,
+        ? `${emo(EMOJI.exclaim, '❗️')} Налоговая: <b>${fmtMoney(st.taxDebt)}</b> — оплатите, пока не заблокировали продажи`
+        : `${emo(EMOJI.check, '✔️')} Налоговая: чисто`,
+      '',
+      st.deliveries ? `${emo(EMOJI.plane, '✈️')} Доставок в пути: ${st.deliveries}` : null,
+      st.leading ? `${emo(EMOJI.top, '🔝')} Вы лидер в ${st.leading} лот(ах) аукциона` : null,
     ].filter((x): x is string => x !== null)
     await sendSmart(chatId, lines.join('\n'))
     return
@@ -353,16 +451,16 @@ async function handleCommand(msg: TgMessage): Promise<void> {
   if (cmd === '/lots') {
     const data = await apiGet<{ lots: Array<{ title: string; currentBid: number; bids: number; leader: string; endsInMin: number }> }>(`/api/telegram/auctions`)
     if (!data || data.lots.length === 0) {
-      await sendSmart(chatId, `📈 Активных лотов нет. Аукционный дом выставляет новые — следите за уведомлениями.`)
+      await sendSmart(chatId, `${emo(EMOJI.chartUp, '📈')} Активных лотов нет. Аукционный дом выставляет новые — следите за уведомлениями.`)
       return
     }
-    const lines = [`📈 <b>Аукцион · активные лоты</b>`, ``]
+    const lines = [`${emo(EMOJI.chartUp, '📈')} <b>Аукцион · активные лоты</b>`, '']
     for (const l of data.lots) {
-      lines.push(`🏷 <b>${l.title}</b>`)
+      lines.push(`${emo(EMOJI.tag, '🏷')} <b>${l.title}</b>`)
       lines.push(`${fmtMoney(l.currentBid)} · ${l.bids} ставок · лидер ${l.leader} · конец через ${l.endsInMin} мин`)
-      lines.push(``)
+      lines.push('')
     }
-    lines.push(`🔼 Ставки — в приложении Аукцион в игре.`)
+    lines.push(`${emo(EMOJI.arrowUp, '🔼')} Ставки — в приложении Аукцион в игре.`)
     await sendSmart(chatId, lines.join('\n'), START_MARKUP)
     return
   }
@@ -390,7 +488,7 @@ async function handleCallback(cb: TgCallbackQuery): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Long polling
+// Long polling (один экземпляр! dev-скрипт без --hot, чтобы не плодить зомби-поллеры)
 // ---------------------------------------------------------------------------
 let offset = 0
 let polling = false
@@ -451,7 +549,7 @@ async function setupBot(): Promise<void> {
     ],
   })
   await tg('setChatMenuButton', {
-    menu_button: { type: 'web_app', text: '🟢 Начать ресейлить', web_app: { url: APP_URL } },
+    menu_button: { type: 'web_app', text: 'Начать ресейлить', web_app: { url: APP_URL } },
   })
   console.log('[tg-bot] profile configured: name, commands, menu button (web_app)')
 }
