@@ -196,11 +196,13 @@ export default function Home() {
     tg?.expand?.()
     applyTelegramChrome('#050d09')
 
-    // Быстрый путь: уже есть живой токен прошлой сессии — просто проверяем его
-    // через /api/profile. Это спасает прогресс, когда Telegram SDK один раз
-    // не ответит: без этого клиент падал на общий фолбэк-аккаунт и «терял» сейв.
+    // ВАЖНО: быстрый путь по живому токену — ТОЛЬКО когда Telegram-данных нет
+    // (браузер/превью). Внутри Telegram авторизуемся ВСЕГДА по initData:
+    // иначе устаревший токен дев-аккаунта навсегда блокировал привязку
+    // Telegram-профиля (жалоба «профиль и данные с телеграма не работают»).
     const stored = getToken()
-    if (stored) {
+    const initData = tg?.initData ?? null
+    if (stored && !initData) {
       try {
         const p = await api.profile()
         setSession(p.user)
@@ -220,7 +222,6 @@ export default function Home() {
     for (let attempt = 0; attempt < 3; attempt++) {
       if (attempt > 0) await new Promise((r) => setTimeout(r, 700 * attempt))
       try {
-        const initData = tg?.initData ?? null
         const res = await api.auth(initData, getDeviceId())
         setToken(res.token)
         setSession(res.user)
@@ -447,7 +448,9 @@ export default function Home() {
             над светлыми приложениями (Resale/Банк) — тёмные иконки на светлой полосе */}
         <StatusBar variant={lightChrome ? 'light' : 'dark'} onBell={() => { setControlOpen(false); setNotifOpen(true) }} />
 
-        {/* контент — до самого низа: пилюля-жест накладывается поверх */}
+        {/* контент — до самого низа: пилюля-жест накладывается поверх.
+            Приложения живут в СЛОЯХ внутри RecentsOverlay (keep-alive как в
+            настоящем телефоне): recents показывает их живые миниатюры. */}
         <div className={`absolute inset-0 top-10 bottom-6 overflow-hidden bg-black ${theme === 'dark' ? 'theme-dark' : ''}`}>
           {!session ? (
             authError ? (
@@ -458,12 +461,16 @@ export default function Home() {
                 <p className="text-xs text-white/50">Загрузка системы...</p>
               </div>
             )
-          ) : currentApp ? (
-            <div key={currentApp} className="screen-enter h-full">
-              {renderApp()}
-            </div>
           ) : (
-            <HomeScreen onOpenApp={openApp} />
+            <>
+              {currentApp === null && <HomeScreen onOpenApp={openApp} />}
+              <RecentsOverlay
+                open={recentsOpen}
+                onClose={() => setRecentsOpen(false)}
+                onResume={() => setRecentsOpen(false)}
+                renderApp={renderApp}
+              />
+            </>
           )}
         </div>
 
@@ -474,7 +481,6 @@ export default function Home() {
         <NotificationCenter open={notifOpen} onClose={() => setNotifOpen(false)} onOpenApp={(a) => { setNotifOpen(false); openApp(a) }} />
         <ControlCenter open={controlOpen} onClose={() => setControlOpen(false)} onOpenApp={(a) => { setControlOpen(false); openApp(a) }} />
         <ToastStack />
-        <RecentsOverlay open={recentsOpen} onClose={() => setRecentsOpen(false)} onResume={() => setRecentsOpen(false)} />
 
         {/* яркость: затемняющий слой поверх всего */}
         <div
@@ -509,11 +515,18 @@ export default function Home() {
           onClick={() => { setNotifOpen(false); setControlOpen(true) }}
         />
 
-        {/* жестовая навигация: пилюля + свайпы от краёв (вместо кнопок) */}
+        {/* жестовая навигация: пилюля + свайпы от краёв (вместо кнопок).
+            Из recents: свайп вверх — домой, назад/тап по фону — закрыть ленту. */}
         <GestureNav
           canGoBack={!!currentApp}
-          onBack={closeApp}
-          onHome={closeApp}
+          onBack={() => {
+            if (recentsOpen) setRecentsOpen(false)
+            else closeApp()
+          }}
+          onHome={() => {
+            setRecentsOpen(false)
+            closeApp()
+          }}
           onRecents={() => setRecentsOpen((v) => !v)}
         />
       </PhoneFrame>

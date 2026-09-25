@@ -587,6 +587,13 @@
 /* Ступенчатое появление плиток QS / карточек шторки (delay задаётся инлайн) */
 .m3-rise-stagger { animation: m3-rise 0.3s cubic-bezier(0.2, 0, 0, 1) both; }
 
+/* Фон recents: чистый fade без сдвига (карточки анимируются трансформом слоёв) */
+@keyframes recents-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.recents-fade { animation: recents-fade 0.24s ease both; }
+
 /* Такт «дыхания» для хендла локскрина: едва заметная пульсация ширины */
 @keyframes handle-breathe {
   0%, 100% { transform: scaleX(1); opacity: 0.5; }
@@ -602,7 +609,7 @@
 .lock-clock-in { animation: lock-clock-in 0.5s cubic-bezier(0.2, 0, 0, 1) both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .m3-rise, .m3-rise-stagger, .handle-breathe, .lock-clock-in { animation: none !important; }
+  .m3-rise, .m3-rise-stagger, .handle-breathe, .lock-clock-in, .recents-fade { animation: none !important; }
 }
 
 /* ============================================================
