@@ -288,6 +288,18 @@ function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
 }
 
+/**
+ * Код региона: первый код в списке — «лицо» региона (у блатных — 777,
+ * у Москвы — 495) и выпадает в большинстве круток, остальные коды делят остаток.
+ * Раньше код выбирался равномерно — из-за этого блатной регион почти не давал 777.
+ */
+function pickCode(region: Region): string {
+  const codes = region.codes
+  if (codes.length === 1) return codes[0]
+  if (Math.random() < 0.6) return codes[0]
+  return pick(codes.slice(1))
+}
+
 function digit(): string {
   return String(Math.floor(Math.random() * 10))
 }
@@ -357,7 +369,7 @@ export function generateTail(prestige: number): string {
 
 /** Полные цифры номера: 7 + код (3) + хвост (7) = 11 цифр. */
 export function generateDigits(region: Region): string {
-  const code = pick(region.codes)
+  const code = pickCode(region)
   return '7' + code + generateTail(region.prestige)
 }
 

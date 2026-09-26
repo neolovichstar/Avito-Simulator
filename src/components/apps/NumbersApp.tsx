@@ -639,8 +639,23 @@ export default function NumbersApp() {
 
   const [tab, setTab] = useState<Tab>('roll')
 
-  const [region, setRegion] = useState('msk')
+  // Регион сохраняется между сессиями: выбрал «Блатные» — 777 стоит на плашке
+  // по умолчанию при каждом заходе, а крутка идёт по выбранному региону.
+  const [region, setRegion] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'msk'
+    try {
+      const saved = window.localStorage.getItem('numbers.region')
+      return saved && REGIONS.some((r) => r.id === saved) ? saved : 'msk'
+    } catch {
+      return 'msk'
+    }
+  })
   const regionMeta = REGIONS.find((r) => r.id === region) ?? REGIONS[0]
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('numbers.region', region)
+    } catch {}
+  }, [region])
   const [sheetOpen, setSheetOpen] = useState(false)
 
   const [spin, setSpin] = useState<SpinCmd | null>(null)

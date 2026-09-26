@@ -33,7 +33,7 @@ export default function RootLayout({
         {/* Логотипы приложений: скачиваем заранее — иконки на дом-экране рисуются мгновенно */}
         {['avito', 'bank', 'taxes', 'browser', 'settings', 'repair', 'auction', 'career', 'delivery', 'leaderboard'].map(
           (n) => (
-            <link key={n} rel="preload" as="image" href={`/img/apps/${n}.png`} fetchPriority="high" />
+            <link key={n} rel="preload" as="image" href={`/img/apps/${n}.png?v=2`} fetchPriority="high" />
           ),
         )}
       </head>
