@@ -78,7 +78,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     },
     counterpart: {
       id: counterpart.id, displayName: counterpart.displayName, isBot: counterpart.isBot,
-      online: isOnline(counterpart),
+      online: isOnline(counterpart), lastSeenAt: counterpart.lastSeenAt.toISOString(),
       rating: counterpart.ratingCount ? Math.round((counterpart.ratingSum / counterpart.ratingCount) * 10) / 10 : 0,
       ratingCount: counterpart.ratingCount,
     },

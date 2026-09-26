@@ -167,7 +167,7 @@ export interface ChatMessageDTO {
 export interface ChatDetailData {
   id: string
   listing: { id: string; title: string; price: number; image: string; status: string; condition: string }
-  counterpart: { id: string; displayName: string; isBot: boolean; online: boolean; rating: number; ratingCount: number }
+  counterpart: { id: string; displayName: string; isBot: boolean; online: boolean; lastSeenAt: string; rating: number; ratingCount: number }
   role: 'buyer' | 'seller'
   // посылка этой сделки (28-b): статус-строка «Курьер забирает товар…» с прогрессом
   delivery?: ChatDeliveryDTO | null

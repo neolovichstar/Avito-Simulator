@@ -32,6 +32,18 @@ function useTick(intervalMs = 1000): number {
   )
 }
 
+// «был(а) недавно» — как у живых людей: точное «в сети» знает только мессенджер
+function fmtLastSeen(iso: string): string {
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
+  if (mins < 1) return 'был(а) только что'
+  if (mins < 60) return `был(а) ${mins} мин назад`
+  const h = Math.floor(mins / 60)
+  if (h < 24) return `был(а) ${h} ч назад`
+  const d = Math.floor(h / 24)
+  if (d < 7) return `был(а) ${d} дн назад`
+  return 'был(а) давно'
+}
+
 // ─── Статус-строка посылки в чате сделки (28-b) ───
 // После оплаты: «Продавец собирает товар…» → «В пути» с прогрессом → «Прибыл — заберите».
 // Для продавца: «Курьер забирает ваш товар…» → деньги после доставки.
@@ -172,6 +184,8 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
   const bottomRef = useRef<HTMLDivElement>(null)
   const refreshSession = useOS((s) => s.refreshSession)
   const pushToast = useOS((s) => s.pushToast)
+  // живой статус «был(а) N мин назад» в шапке — тик раз в 30 с (хук до early-return'ов)
+  useTick(30_000)
 
   // ─── Edge-swipe назад: тянем от левого края вправо — чат «съезжает» и закрывается.
   // Работает и мышью на ПК, и пальцем на телефоне (Pointer Events).
@@ -393,6 +407,9 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
             <div className="text-[11px] text-[#8B8F99] flex items-center gap-1">
               <Star size={9} className="text-[#0AC760] fill-[#0AC760]" aria-hidden />
               {chat.counterpart.rating > 0 ? `${chat.counterpart.rating.toFixed(1)} (${chat.counterpart.ratingCount})` : 'Новый продавец'}
+              {!chat.counterpart.online && chat.counterpart.lastSeenAt && (
+                <span className="text-[#8B8F99]/80"> · {fmtLastSeen(chat.counterpart.lastSeenAt)}</span>
+              )}
             </div>
           </div>
         </div>

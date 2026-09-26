@@ -16,6 +16,8 @@ import {
   getBotMemoryEntry, noteDeal, noteSignal, setBotCooldown, hasActiveCooldown,
   memoryPromptLine, type BotMemoryEntry,
 } from '@/lib/bot-memory'
+import { queueBotReply, pendingReplySweep as pendingReplySweepInternal, type PendingReply } from '@/lib/reply-scheduler'
+import { isOnline } from '@/lib/dto'
 import type { Chat, Listing, User } from '@prisma/client'
 
 export interface ChatMeta {
@@ -175,32 +177,139 @@ async function onDealCompleted(opts: {
 }
 
 // Основной ответ бота на сообщение/счёт игрока.
-// Обёртка: пока бот «думает», событие typing повторяется —
-// индикатор поймают и открытый чат, и список чатов.
+// ЖИВЫЕ ПАУЗЫ: расчёт ответа (ИИ) происходит сразу, но САМО сообщение
+// доставляется через человеческую задержку (прочитал → печатает → иногда
+// «занят/ушёл») — см. queueBotReply. Пока ответ в печати, новые сообщения
+// игрока не порождают второй расчёт (бот отвечает на одно за раз).
 export async function botReply(chatId: string, playerMsg: { text?: string; invoice?: number }): Promise<void> {
-  let typingName: string | null = null
-  let finished = false
-  const loop = (async () => {
-    while (typingName === null && !finished) await new Promise((r) => setTimeout(r, 120))
-    while (typingName !== null && typingName !== '' && !finished) {
-      await emitTo(`chat:${chatId}`, 'typing', { chatId, name: typingName })
-      // короткий интервал: закрывает брешь, пока слушатели (список чатов) ещё подписываются
-      await new Promise((r) => setTimeout(r, 1_200))
-    }
-  })().catch(() => {})
   try {
-    await botReplyCore(chatId, playerMsg, (n) => { typingName = n })
-  } finally {
-    finished = true
-    await loop
+    await botReplyCore(chatId, playerMsg)
+  } catch (e) {
+    console.error('[chat-engine] botReply error:', e)
   }
 }
 
-async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?: number }, setTypingName: (n: string) => void): Promise<void> {
+/**
+ * Человеческая задержка ответа: чтение сообщения игрока + набор своего +
+ * характер (недоверчивый отвечает дольше), иногда бот «занят» или был
+ * офлайн — тогда отвечает сильно позже. Всё в пределах разумного для игры.
+ */
+function humanDelay(opts: {
+  playerTextLen: number
+  replyLen: number
+  rude: boolean
+  lowball: boolean
+  praise: boolean
+  trust: number
+  offline: boolean
+}): number {
+  const reading = Math.min(2400, 800 + opts.playerTextLen * 34) // прочитал
+  const typing = Math.min(3000, 500 + opts.replyLen * 24) // набрал
+  let d = 1500 + Math.random() * 2400 + reading * 0.45 + typing * 0.55
+  d += (1 - opts.trust) * 1300 // недоверчивый тянет
+  if (opts.rude) d += 1600 + Math.random() * 3200 // грубость — пауза «остыл»
+  if (opts.lowball) d += 900
+  if (opts.praise) d -= 700
+  // ~20% — «занят»: отвечает через десятки секунд, как живой человек
+  if (Math.random() < 0.2) d += 9000 + Math.random() * 21000
+  // бот был офлайн — «увидел сообщение не сразу»
+  if (opts.offline) d += 4000 + Math.random() * 13000
+  return Math.min(120_000, Math.max(2500, d))
+}
+
+/** Поставить посчитанный ответ в очередь доставки (см. reply-scheduler). */
+async function queueReply(args: {
+  chatId: string
+  metaJson: string // финальный meta ветки (уже записан/записывается в БД)
+  bot: Pick<User, 'id' | 'displayName' | 'lastSeenAt' | 'isBot'>
+  text: string
+  typoRate: number
+  playerTextLen: number
+  rude: boolean
+  lowball: boolean
+  praise: boolean
+  trust: number
+  extra?: { kind?: 'invoice'; amount?: number; invoiceId?: string; offer?: number }
+  sysText?: string
+  answerFrom?: string
+  noFollowUp?: boolean
+}): Promise<void> {
+  const offline = !isOnline(args.bot)
+  const delayMs = humanDelay({
+    playerTextLen: args.playerTextLen,
+    replyLen: args.text.length,
+    rude: args.rude,
+    lowball: args.lowball,
+    praise: args.praise,
+    trust: args.trust,
+    offline,
+  })
+  const pending: PendingReply = {
+    at: new Date(Date.now() + delayMs).toISOString(),
+    senderId: args.bot.id,
+    senderName: args.bot.displayName,
+    text: args.text,
+    typoRate: args.typoRate,
+    kind: args.extra?.kind,
+    amount: args.extra?.amount,
+    invoiceId: args.extra?.invoiceId,
+    offer: args.extra?.offer,
+    sysText: args.sysText,
+    answerFrom: args.answerFrom,
+    noFollowUp: args.noFollowUp,
+  }
+  await queueBotReply(args.chatId, args.metaJson, pending, deliverReplyPayload)
+}
+
+/** Доставка отложенного ответа (движок + планировщик). */
+export async function deliverReplyPayload(chatId: string, p: PendingReply): Promise<void> {
+  const sender = { id: p.senderId, displayName: p.senderName } as Pick<User, 'id' | 'displayName'>
+  // бот «в телефоне»: отвечая, он онлайн (живое присутствие)
+  await db.user.updateMany({ where: { id: p.senderId, isBot: true }, data: { lastSeenAt: new Date() } }).catch(() => {})
+  await saveAndEmit(chatId, sender, p.text, p.typoRate, {
+    kind: p.kind,
+    amount: p.amount,
+    invoiceId: p.invoiceId,
+    offer: p.offer,
+  })
+  if (p.sysText) await saveSystem(chatId, p.sysText)
+
+  // «дочитывание»: пока бот «печатал», игрок мог дописать ещё — отвечаем и на
+  // это, со своей живой паузой. Двойные/тройные сообщения не остаются без
+  // ответа (как у живого человека: ответил на первое, дочитал остальное).
+  if (p.answerFrom && !p.noFollowUp) {
+    const newer = await db.message.findFirst({
+      where: { chatId, senderType: 'user', createdAt: { gt: new Date(p.answerFrom) } },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (newer) {
+      await botReply(chatId, {
+        text: newer.kind === 'invoice' ? undefined : newer.text,
+        invoice: newer.kind === 'invoice' ? (newer.amount ?? undefined) : undefined,
+      })
+    }
+  }
+}
+
+/** Свип для движка: доставить ответы, чей таймер потерялся (рестарт инстанса). */
+export async function sweepPendingReplies(): Promise<void> {
+  await pendingReplySweepInternal(deliverReplyPayload)
+}
+
+async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?: number }): Promise<void> {
   const chat = await db.chat.findUnique({ where: { id: chatId } })
   if (!chat) return
+  // ответ на предыдущее сообщение ещё «в печати» — второй расчёт не запускаем
+  // (бот отвечает на одно сообщение за раз; недописанное «дочитается» после
+  // доставки — см. deliverReplyPayload)
+  if (chat.meta.includes('"pendingReply"')) return
   const listing = await db.listing.findUnique({ where: { id: chat.listingId } })
   if (!listing) return
+  // время последнего сообщения в чате — «на что именно отвечает бот»
+  const lastMsg = await db.message.findFirst({
+    where: { chatId }, orderBy: { createdAt: 'desc' }, select: { createdAt: true },
+  })
+  const answerFrom = lastMsg?.createdAt.toISOString()
   // бот — собеседник игрока
   const bot = await db.user.findUnique({ where: { id: chat.sellerId === chat.buyerId ? chat.sellerId : (await db.user.findUnique({ where: { id: chat.buyerId } }))?.isBot ? chat.buyerId : chat.sellerId } })
   if (!bot) return
@@ -214,9 +323,23 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
     ? `Собеседник выставил счёт на ${fmtMoney(playerMsg.invoice)} (предлагает цену ${fmtMoney(playerMsg.invoice)})`
     : playerMsg.text ?? ''
 
+  // ---------- СИГНАЛЫ ПЕРЕПИСКИ (нужны и паузе, и веткам характера) ----------
+  const signals = analyzePlayerMessage(playerMsg.text ?? '', playerMsg.invoice, listing.price, !isBuyer)
+  const base = {
+    chatId: chat.id,
+    bot,
+    playerTextLen: (playerMsg.text ?? '').length,
+    rude: signals.rude,
+    lowball: !!signals.lowballOffer,
+    praise: signals.praise,
+    trust: persona.trust,
+    typoRate: persona.typoRate,
+    answerFrom,
+  }
+
   // бот уже закрыл сделку — короткий ответ
   if (meta.closed) {
-    await saveAndEmit(chat.id, bot, 'Извиняюсь, товар уже не актуален, сделка закрыта', persona.typoRate)
+    await queueReply({ ...base, metaJson: chat.meta, text: 'Извиняюсь, товар уже не актуален, сделка закрыта', noFollowUp: true })
     return
   }
 
@@ -225,13 +348,13 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
 
   // кулдаун: бот «закрыл встречу» после грязного торга — серверная память, перезаход не сбрасывает
   if (hasActiveCooldown(memory) && !player.isBot) {
-    await db.chat.update({ where: { id: chat.id }, data: { meta: JSON.stringify({ ...meta, closed: true }) } })
-    await saveAndEmit(chat.id, bot, pick(WALK_LINES_COOLDOWN), persona.typoRate)
+    const metaJson = JSON.stringify({ ...meta, closed: true })
+    await db.chat.update({ where: { id: chat.id }, data: { meta: metaJson } })
+    await queueReply({ ...base, metaJson, text: pick(WALK_LINES_COOLDOWN), noFollowUp: true })
     return
   }
 
-  // ---------- СИГНАЛЫ ПЕРЕПИСКИ ----------
-  const signals = analyzePlayerMessage(playerMsg.text ?? '', playerMsg.invoice, listing.price, !isBuyer)
+  // ---------- СИГНАЛЫ: реакция характером ----------
   const freshMeta: ChatMeta = { ...meta }
 
   if (signals.rude && !player.isBot) {
@@ -239,8 +362,9 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
     if (e && (e.rudeCount ?? 0) >= 2) {
       // систематическая грубость — кулдаун
       await setBotCooldown(player.id, bot.id, (20 + Math.random() * 30) * 60_000, 'грубил в переписке')
-      await db.chat.update({ where: { id: chat.id }, data: { meta: JSON.stringify({ ...freshMeta, closed: true }) } })
-      await saveAndEmit(chat.id, bot, pick(WALK_LINES_COOLDOWN), persona.typoRate)
+      const metaJson = JSON.stringify({ ...freshMeta, closed: true })
+      await db.chat.update({ where: { id: chat.id }, data: { meta: metaJson } })
+      await queueReply({ ...base, metaJson, text: pick(WALK_LINES_COOLDOWN), noFollowUp: true })
       return
     }
   }
@@ -261,11 +385,12 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
     if (freshMeta.lowballStreak >= 2 && Math.random() < 0.75) {
       // второй лоубол подряд — бот закрывает встречу и уходит в кулдаун
       await setBotCooldown(player.id, bot.id, (30 + Math.random() * 45) * 60_000, 'выжил терпение лоуболами')
-      await db.chat.update({ where: { id: chat.id }, data: { meta: JSON.stringify({ ...freshMeta, closed: true }) } })
+      const metaJson = JSON.stringify({ ...freshMeta, closed: true })
+      await db.chat.update({ where: { id: chat.id }, data: { meta: metaJson } })
       const line = (memory?.flags.includes('lowballer') || (memory?.lowballs ?? 0) >= 3)
         ? `${pick(WALK_LINES_COOLDOWN)}`
         : pick(WALK_LINES_SELLER)
-      await saveAndEmit(chat.id, bot, line, persona.typoRate)
+      await queueReply({ ...base, metaJson, text: line, noFollowUp: true })
       return
     }
   }
@@ -274,17 +399,6 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
     await db.chat.update({ where: { id: chat.id }, data: { meta: JSON.stringify(freshMeta) } })
     meta = freshMeta
   }
-
-  // печатает... (дальше событие повторяется keepalive-циклом обёртки).
-  // Пауза живая: злой бот отвечает дольше, довольный — быстрее.
-  setTypingName(bot.displayName)
-  const delayMs = 500
-    + Math.random() * 1_300
-    + (signals.rude ? 900 : 0)
-    + (signals.lowballOffer ? 500 : 0)
-    + (signals.praise ? -200 : 0)
-    + (memory && hasActiveCooldown(memory) ? 600 : 0)
-  await new Promise((r) => setTimeout(r, Math.max(400, delayMs)))
 
   const history = await historyOf(chat.id, bot.id)
   const condLabel = CONDITION_LABEL[listing.condition] ?? listing.condition
@@ -300,12 +414,15 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
       if (!isBuyer) {
         // бот-продавец выставляет счёт ровно на обещанную цену
         const invoiceId = `inv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
-        await saveAndEmit(
-          chat.id, bot, `${pickAgree()} ${fmtMoney(meta.lastOffer)}. Ставлю счёт${memory?.flags.includes('scammer') ? ', оплата вперёд' : ''}`, persona.typoRate,
-          { kind: 'invoice', amount: meta.lastOffer, invoiceId },
-        )
-        await saveSystem(chat.id, `Счёт от продавца: ${fmtMoney(meta.lastOffer)}. Оплатите, чтобы получить товар.`)
-        await db.chat.update({ where: { id: chat.id }, data: { meta: JSON.stringify({ ...meta, invoicePending: true }) } })
+        const metaJson = JSON.stringify({ ...meta, invoicePending: true })
+        await db.chat.update({ where: { id: chat.id }, data: { meta: metaJson } })
+        await queueReply({
+          ...base,
+          metaJson,
+          text: `${pickAgree()} ${fmtMoney(meta.lastOffer)}. Ставлю счёт${memory?.flags.includes('scammer') ? ', оплата вперёд' : ''}`,
+          extra: { kind: 'invoice', amount: meta.lastOffer, invoiceId },
+          sysText: `Счёт от продавца: ${fmtMoney(meta.lastOffer)}. Оплатите, чтобы получить товар.`,
+        })
         return
       }
       // бот-покупатель платит игроку-продавцу сразу
@@ -314,7 +431,7 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
       })
       if (res.ok) {
         await onDealCompleted({ listing, buyerBotId: bot.id, player, price: meta.lastOffer })
-        await saveAndEmit(chat.id, bot, `${pickAgree()} оплатил, глянь`, persona.typoRate)
+        await queueReply({ ...base, metaJson: chat.meta, text: `${pickAgree()} оплатил, глянь` })
         return
       }
     }
@@ -330,13 +447,14 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
       // устал: терпение кончилось — закрываем встречу; грязный след в памяти → кулдаун
       const dirt = (memory?.flags.includes('lowballer') || memory?.flags.includes('scammer') || (meta.lowballStreak ?? 0) >= 2) && !player.isBot
       if (dirt) await setBotCooldown(player.id, bot.id, (25 + Math.random() * 50) * 60_000, 'выжил терпение в торге')
-      await db.chat.update({ where: { id: chat.id }, data: { meta: JSON.stringify({ ...meta, closed: true, patience }) } })
+      const metaJson = JSON.stringify({ ...meta, closed: true, patience })
+      await db.chat.update({ where: { id: chat.id }, data: { meta: metaJson } })
       const bye = isBuyer
         ? pick(['ну всё, больше не дам, удачи в поисках', 'всё, потолок, до связи', 'не могу больше, пас'])
         : dirt
           ? pick([...WALK_LINES_COOLDOWN, 'всё, я своё сказал. Пас'])
           : pick(['всё, больше не уступлю, думай', 'последняя цена была — дальше никак, до связи', 'всё, я своё сказал, пас'])
-      await saveAndEmit(chat.id, bot, bye, persona.typoRate)
+      await queueReply({ ...base, metaJson, text: bye, noFollowUp: true })
       return
     }
     if (!meta.finalDone) {
@@ -346,11 +464,9 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
       const text = isBuyer
         ? `${pick(['ну окей, всё что есть', 'ладно, ты победил'])}: ${fmtMoney(finalPrice)}, больше не дам`
         : `${pick(['ладно, уговорил', 'всё, последняя цена'])}: ${fmtMoney(finalPrice)}. Устраивает — ставь счёт`
-      await saveAndEmit(chat.id, bot, text, persona.typoRate, finalPrice ? { offer: finalPrice } : undefined)
-      await db.chat.update({
-        where: { id: chat.id },
-        data: { meta: JSON.stringify({ ...meta, finalDone: true, lastOffer: finalPrice, patience }) },
-      })
+      const metaJson = JSON.stringify({ ...meta, finalDone: true, lastOffer: finalPrice, patience })
+      await db.chat.update({ where: { id: chat.id }, data: { meta: metaJson } })
+      await queueReply({ ...base, metaJson, text, extra: finalPrice ? { offer: finalPrice } : undefined })
       return
     }
   }
@@ -393,10 +509,10 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
     marketNote,
   })
 
-  await db.chat.update({
-    where: { id: chat.id },
-    data: { meta: JSON.stringify({ ...meta, botLimit: reply.newLimit, rounds: meta.rounds + 1, lastOffer: reply.price ?? meta.lastOffer }) },
-  })
+  // итоговый meta после раунда ИИ (раньше ветка инвойса затирала rounds/botLimit — фикс)
+  const metaAfterAi: ChatMeta = { ...meta, botLimit: reply.newLimit, rounds: meta.rounds + 1, lastOffer: reply.price ?? meta.lastOffer }
+  const metaAiJson = JSON.stringify(metaAfterAi)
+  await db.chat.update({ where: { id: chat.id }, data: { meta: metaAiJson } })
 
   // действия
   if ((reply.action === 'accept' || reply.action === 'invoice') && reply.price) {
@@ -408,20 +524,23 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
       if (res.ok) {
         await onDealCompleted({ listing, buyerBotId: bot.id, player, price: reply.price })
         if (!player.isBot) await bumpStats(bot.id, {})
-        await saveAndEmit(chat.id, bot, `${reply.text}`, persona.typoRate)
+        await queueReply({ ...base, metaJson: metaAiJson, text: reply.text })
         return
       }
-      await saveAndEmit(chat.id, bot, 'что-то с оплатой не вышло, давай чуть позже', persona.typoRate)
+      await queueReply({ ...base, metaJson: metaAiJson, text: 'что-то с оплатой не вышло, давай чуть позже' })
       return
     }
     // бот-продавец выставляет счёт на согласованную цену
     const invoiceId = `inv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
-    await saveAndEmit(
-      chat.id, bot, reply.text, persona.typoRate,
-      { kind: 'invoice', amount: reply.price, invoiceId },
-    )
-    await saveSystem(chat.id, `Счёт от продавца: ${fmtMoney(reply.price)}. Оплатите, чтобы получить товар.`)
-    await db.chat.update({ where: { id: chat.id }, data: { meta: JSON.stringify({ ...meta, invoicePending: true }) } })
+    const metaJson = JSON.stringify({ ...metaAfterAi, invoicePending: true })
+    await db.chat.update({ where: { id: chat.id }, data: { meta: metaJson } })
+    await queueReply({
+      ...base,
+      metaJson,
+      text: reply.text,
+      extra: { kind: 'invoice', amount: reply.price, invoiceId },
+      sysText: `Счёт от продавца: ${fmtMoney(reply.price)}. Оплатите, чтобы получить товар.`,
+    })
     return
   }
 
@@ -431,12 +550,13 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
     if (!player.isBot && (meta.lowballStreak ?? 0) >= 2) {
       await setBotCooldown(player.id, bot.id, (25 + Math.random() * 45) * 60_000, 'закрыл встречу после лоуболов')
     }
-    await db.chat.update({ where: { id: chat.id }, data: { meta: JSON.stringify({ ...meta, closed: true }) } })
-    await saveAndEmit(chat.id, bot, reply.text, persona.typoRate)
+    const metaJson = JSON.stringify({ ...metaAfterAi, closed: true })
+    await db.chat.update({ where: { id: chat.id }, data: { meta: metaJson } })
+    await queueReply({ ...base, metaJson, text: reply.text, noFollowUp: true })
     return
   }
 
-  await saveAndEmit(chat.id, bot, reply.text, persona.typoRate, reply.price ? { offer: reply.price } : undefined)
+  await queueReply({ ...base, metaJson: metaAiJson, text: reply.text, extra: reply.price ? { offer: reply.price } : undefined })
 }
 
 // Публичный хелпер: бот пишет сообщение в чат (используется и движком рынка)
@@ -452,7 +572,7 @@ export async function botSay(
 
 async function saveAndEmit(
   chatId: string,
-  bot: User,
+  bot: Pick<User, 'id' | 'displayName'>,
   text: string,
   typoRate: number,
   extra?: { kind?: 'invoice'; amount?: number; invoiceId?: string; offer?: number },

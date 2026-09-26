@@ -6,7 +6,7 @@ import { PERSONAS } from '@/lib/personas-data'
 import { CATEGORY_IMAGE, CONDITIONS, CONDITION_MULT, CATEGORY_LABEL } from '@/lib/catalog-types'
 import { estValueFor, completeSale, deliverDue, notifyUser } from '@/lib/deals'
 import { ensureDailyQuests } from '@/lib/quest-engine'
-import { botOpener, winBackSweep } from '@/lib/chat-engine'
+import { botOpener, winBackSweep, sweepPendingReplies } from '@/lib/chat-engine'
 import { auctionStep } from '@/lib/economy'
 import { emitTo } from '@/lib/realtime-emit'
 import { onListingCreated, notifyPriceDrop } from '@/lib/market-hooks'
@@ -636,7 +636,10 @@ async function deliveryTick() {
 
 async function presenceTick() {
   const bots = await db.user.findMany({ where: { isBot: true }, take: 200 })
-  const n = randInt(4, 9)
+  // Живое присутствие: боты НЕ постоянно онлайн. Равновесие ≈ 45% от пула:
+  // при окне 15 мин и 1–2 бампа за тик (15 с) онлайн держится ~90 из 200.
+  // Боты, ответившие в чате, дополнительно бампятся в deliverReplyPayload.
+  const n = randInt(1, 2)
   for (let i = 0; i < n && bots.length; i++) {
     const b = rnd(bots)
     await db.user.update({ where: { id: b.id }, data: { lastSeenAt: new Date() } })
@@ -658,6 +661,7 @@ export async function tickAll() {
     await auctionTick(tick)
     await deliveryTick()
     await repairTick()
+    await sweepPendingReplies() // доставить ответы ботов, чей таймер потерялся
     if (tick % 4 === 0) await financeTick()
     if (tick % 4 === 0) await winBackSweep()
     await presenceTick()

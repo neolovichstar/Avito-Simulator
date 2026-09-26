@@ -5,6 +5,7 @@ import { redisLimit } from '@/lib/redis'
 import { bumpStats, bumpQuests } from '@/lib/deals'
 import { emitTo } from '@/lib/realtime-emit'
 import { stripEmoji } from '@/lib/format'
+import { after } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,10 +58,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   await bumpStats(user.id, { chat: 1 })
   await bumpQuests(user.id, 'chat')
 
-  // если собеседник — бот, получаем ответ ИИ
+  // если собеседник — бот, считаем ответ ПОСЛЕ отправки ответа игроку:
+  // сообщение улетает мгновенно, бот «читает и печатает» уже в фоне (after
+  // держит инстанс живым на Vercel), доставка — через reply-scheduler с
+  // человеческой паузой. botReply сам ставит ответ в очередь.
   if (counterpart.isBot) {
-    await botReply(chat.id, { text: text ?? undefined, invoice }).catch((e) => {
-      console.error('[chat] botReply error:', e)
+    after(async () => {
+      await botReply(chat.id, { text: text ?? undefined, invoice })
     })
   }
 

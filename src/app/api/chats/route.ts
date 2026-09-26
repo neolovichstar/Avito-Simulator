@@ -1,7 +1,7 @@
 import { db } from '@/lib/db'
 import { getSessionUser, unauthorized } from '@/lib/session'
 import { isOnline } from '@/lib/dto'
-import { botOpener, personaOf, parseChatMeta, coldOpenerLine } from '@/lib/chat-engine'
+import { personaOf, parseChatMeta } from '@/lib/chat-engine'
 import { CONDITION_MULT } from '@/lib/catalog-types'
 import { getCategoryMult } from '@/lib/engine'
 import { getMarketValue } from '@/lib/market-index'
@@ -101,6 +101,10 @@ export async function POST(req: Request) {
       Math.round(est * (cooldown ? 0.6 : 0.45)),
       Math.min(Math.round(listing.price * 0.97), Math.round(listing.price * (0.90 + Math.random() * 0.06 + levelFactor + greedShift + trustShift + memShift))),
     )
+    // Чат создаётся ПУСТЫМ: объявление принадлежит продавцу, поэтому ПЕРВЫМ
+    // пишет игрок (как на настоящем Авито). Бот отвечает уже на сообщение
+    // игрока — с живой паузой (см. botReply). Холодный opener при кулдауне
+    // памяти бот пришлёт сам в ответ на первое сообщение.
     chat = await db.chat.create({
       data: {
         listingId: listing.id, buyerId: user.id, sellerId: listing.sellerId,
@@ -111,24 +115,6 @@ export async function POST(req: Request) {
         }),
       },
     })
-    // холодный opener: бот помнит обиды и не здоровается по-доброму
-    const openerText = cooldown ? coldOpenerLine() : null
-    if (openerText) {
-      await db.message.create({
-        data: {
-          chatId: chat.id, senderType: 'bot', senderId: listing.seller.id,
-          senderName: listing.seller.displayName, kind: 'text', text: openerText,
-        },
-      })
-    } else {
-      const opener = botOpener(chat, listing, listing.seller)
-      await db.message.create({
-        data: {
-          chatId: chat.id, senderType: 'bot', senderId: listing.seller.id,
-          senderName: listing.seller.displayName, kind: 'text', text: opener.text,
-        },
-      })
-    }
   } else if (!chat) {
     chat = await db.chat.create({
       data: { listingId: listing.id, buyerId: user.id, sellerId: listing.sellerId, meta: JSON.stringify({}) },
@@ -167,7 +153,8 @@ export async function POST(req: Request) {
     },
     counterpart: {
       id: listing.seller.id, displayName: listing.seller.displayName, isBot: listing.seller.isBot,
-      online: isOnline(listing.seller), rating: listing.seller.ratingCount
+      online: isOnline(listing.seller), lastSeenAt: listing.seller.lastSeenAt.toISOString(),
+      rating: listing.seller.ratingCount
         ? Math.round((listing.seller.ratingSum / listing.seller.ratingCount) * 10) / 10 : 0,
       ratingCount: listing.seller.ratingCount,
     },
