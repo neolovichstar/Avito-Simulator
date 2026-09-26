@@ -2,7 +2,7 @@
 
 // Игроки: поиск, фильтр боты/реальные, правка баланса/налогов/рейтинга.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Bot, Search, Users, Wallet } from 'lucide-react'
 import { adminApi, type AdminUser, type UsersPage } from '@/lib/admin-client'
 import {
@@ -21,7 +21,7 @@ import {
   Th,
 } from './ui'
 
-export default function UsersSection({ onToast }: { onToast: (t: string, ok: boolean) => void }) {
+export default function UsersSection({ onToast, refreshKey = 0 }: { onToast: (t: string, ok: boolean) => void; refreshKey?: number }) {
   const [q, setQ] = useState('')
   const [bot, setBot] = useState<'all' | 'bots' | 'real'>('all')
   const [page, setPage] = useState(1)
@@ -45,6 +45,14 @@ export default function UsersSection({ onToast }: { onToast: (t: string, ok: boo
     load(1)
     setPage(1)
   }, [bot])
+
+  // live-обновление: перезагружаем текущую страницу без сброса фильтров/пагинации
+  const liveRef = useRef(false)
+  useEffect(() => {
+    if (liveRef.current) load(page)
+    liveRef.current = true
+     
+  }, [refreshKey])
 
   const openEdit = (u: AdminUser) => {
     setEditing(u)

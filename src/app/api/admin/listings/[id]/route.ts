@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { requireAdmin } from '@/lib/admin-auth'
+import { logAdmin } from '@/lib/admin-log'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,6 +23,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   await db.listing.update({ where: { id }, data: { status } })
+  await logAdmin(
+    'listing.status',
+    'listing',
+    id,
+    `«${listing.title}» — статус ${status === 'removed' ? 'снято с публикации' : 'вернуто на площадку'}`,
+  )
   return Response.json({ ok: true })
 }
 
@@ -46,5 +53,6 @@ export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }
     await tx.listing.delete({ where: { id } })
   })
 
+  await logAdmin('listing.delete', 'listing', id, `«${listing.title}» удалено навсегда (вместе с чатами и отзывами)`)
   return Response.json({ ok: true })
 }

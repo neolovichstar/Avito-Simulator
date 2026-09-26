@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { requireAdmin } from '@/lib/admin-auth'
+import { logAdmin } from '@/lib/admin-log'
 import { CATEGORY_LABEL } from '@/lib/catalog-types'
 import { emitTo } from '@/lib/realtime-emit'
 
@@ -51,6 +52,12 @@ export async function POST(req: Request) {
   }
 
   await emitTo('global', 'market:event', { headline, category, magnitude: m }).catch(() => {})
+  await logAdmin(
+    'market.event',
+    'market',
+    event.id,
+    `Событие «${headline}» — ${category === 'all' ? 'все категории' : CATEGORY_LABEL[category] ?? category}, ${magnitude > 0 ? '+' : ''}${magnitude}% на ${hours} ч`,
+  )
 
   return Response.json({ ok: true, event: { id: event.id } })
 }

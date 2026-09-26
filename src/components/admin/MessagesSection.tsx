@@ -7,7 +7,7 @@ import { Bot, MessageSquare, Search, Trash2 } from 'lucide-react'
 import { adminApi, type AdminMessage } from '@/lib/admin-client'
 import { Badge, Btn, Card, EmptyState, fmtDT, Input, Page } from './ui'
 
-export default function MessagesSection({ onToast }: { onToast: (t: string, ok: boolean) => void }) {
+export default function MessagesSection({ onToast, refreshKey = 0 }: { onToast: (t: string, ok: boolean) => void; refreshKey?: number }) {
   const [rows, setRows] = useState<AdminMessage[]>([])
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(true)
@@ -31,8 +31,9 @@ export default function MessagesSection({ onToast }: { onToast: (t: string, ok: 
     return () => {
       alive = false
     }
+
      
-  }, [])
+  }, [refreshKey])
 
   const del = async (m: AdminMessage) => {
     try {

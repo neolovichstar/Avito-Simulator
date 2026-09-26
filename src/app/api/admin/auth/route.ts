@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { ADMIN_COOKIE, getAdminKey, isAuthorized } from '@/lib/admin-auth'
+import { logAdmin } from '@/lib/admin-log'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,8 +19,10 @@ export async function POST(req: Request) {
   } catch {}
   const { key: real, usingDefault } = getAdminKey()
   if (!key || key !== real) {
+    await logAdmin('auth.fail', 'system', '', 'Неудачная попытка входа: неверный ключ')
     return NextResponse.json({ error: 'Неверный ключ' }, { status: 403 })
   }
+  await logAdmin('auth.login', 'system', '', usingDefault ? 'Вход в панель (ключ по умолчанию)' : 'Вход в панель')
   const res = NextResponse.json({ ok: true, usingDefault })
   res.cookies.set(ADMIN_COOKIE, encodeURIComponent(real), {
     httpOnly: true,

@@ -38,6 +38,15 @@ export function fmtRel(iso: string) {
   return new Date(iso).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' })
 }
 
+/** Русская плюрализация: plural(2, 'запись','записи','записей') → 'записи' */
+export function plural(n: number, one: string, few: string, many: string) {
+  const m10 = n % 10
+  const m100 = n % 100
+  if (m10 === 1 && m100 !== 11) return one
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few
+  return many
+}
+
 export function Page({
   title,
   sub,
@@ -299,7 +308,7 @@ export function Pagination({
   )
 }
 
-export function Th({ children, className = '' }: { children: ReactNode; className?: string }) {
+export function Th({ children, className = '' }: { children?: ReactNode; className?: string }) {
   return (
     <th
       className={`whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ${className}`}

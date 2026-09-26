@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { requireAdmin } from '@/lib/admin-auth'
+import { logAdmin } from '@/lib/admin-log'
 import { emitTo } from '@/lib/realtime-emit'
 
 export const dynamic = 'force-dynamic'
@@ -21,6 +22,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     data: { endsAt: new Date() },
   })
   await emitTo('global', 'auction:update', { lotId: id, adminFinished: true }).catch(() => {})
+  await logAdmin('auction.finish', 'auction', id, `Лот «${lot.title}» завершён досрочно (ставок: ${lot.bidCount})`)
 
   return Response.json({ ok: true })
 }

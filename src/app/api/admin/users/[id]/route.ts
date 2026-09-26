@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { requireAdmin } from '@/lib/admin-auth'
+import { logAdmin } from '@/lib/admin-log'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,6 +37,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       },
     })
   }
+
+  const changes: string[] = []
+  if (Number.isFinite(balanceDelta) && balanceDelta !== 0)
+    changes.push(`баланс ${balanceDelta > 0 ? '+' : ''}${Math.round(balanceDelta)} ₽`)
+  if (taxDebtReset) changes.push('налоговый долг списан')
+  if (Number.isFinite(creditScore)) changes.push(`кредитный скор → ${updated.creditScore}`)
+  await logAdmin('user.update', 'user', id, `${user.displayName} (@${user.username}): ${changes.join(', ')}`)
 
   return Response.json({ ok: true, user: { balance: updated.balance, taxDebt: updated.taxDebt, creditScore: updated.creditScore } })
 }

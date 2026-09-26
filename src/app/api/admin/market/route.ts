@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { requireAdmin } from '@/lib/admin-auth'
+import { logAdmin } from '@/lib/admin-log'
 import { CATEGORIES, CATEGORY_LABEL } from '@/lib/catalog-types'
 
 export const dynamic = 'force-dynamic'
@@ -63,6 +64,9 @@ export async function PUT(req: Request) {
       create: { category, multiplier: clamped },
     })
   }
+
+  const changed = entries.map(([c, v]) => `${CATEGORY_LABEL[c] ?? c} → ${Math.min(3, Math.max(0.2, v)).toFixed(2)}`)
+  await logAdmin('market.multipliers', 'market', '', `Множители цен: ${changed.join(', ')}`)
 
   return Response.json({ ok: true, updated: entries.length })
 }

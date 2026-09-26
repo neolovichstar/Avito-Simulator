@@ -16,7 +16,7 @@ function timeLeft(iso: string) {
   return m >= 1 ? `${m} мин ${String(s).padStart(2, '0')} с` : `${s} с`
 }
 
-export default function AuctionsSection({ onToast }: { onToast: (t: string, ok: boolean) => void }) {
+export default function AuctionsSection({ onToast, refreshKey = 0 }: { onToast: (t: string, ok: boolean) => void; refreshKey?: number }) {
   const [data, setData] = useState<{ active: AdminAuction[]; recent: AdminAuction[] } | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [, force] = useState(0)
@@ -32,7 +32,8 @@ export default function AuctionsSection({ onToast }: { onToast: (t: string, ok: 
     load()
     const t = setInterval(() => force((v) => v + 1), 1000) // живой таймер
     return () => clearInterval(t)
-  }, [])
+     
+  }, [refreshKey])
 
   const finish = async (lot: AdminAuction) => {
     setBusyId(lot.id)

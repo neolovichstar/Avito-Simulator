@@ -505,3 +505,17 @@ model InstalledPart {
 
   @@index([userId, itemId])
 }
+
+// ───────────────────────── Админ-панель ─────────────────────────
+
+// Журнал действий администратора: каждое изменение через /admin фиксируется.
+model AdminAction {
+  id        String   @id @default(cuid())
+  action    String // user.update | listing.status | listing.delete | market.multipliers | market.event | auction.finish | message.delete | broadcast | tax.forgive | loan.writeoff | complaint.dismiss | auth.login | auth.fail
+  entity    String   @default("") // user | listing | market | auction | message | broadcast | finance | complaint | system
+  entityId  String   @default("")
+  detail    String   @default("") // человекочитаемое описание для журнала
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}

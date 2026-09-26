@@ -2,7 +2,7 @@
 
 // Объявления: модерация — снять с публикации / вернуть / удалить навсегда.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Eye, RotateCcw, Search, Store, Trash2 } from 'lucide-react'
 import { CATEGORY_LABEL } from '@/lib/catalog-types'
 import { adminApi, type ListingsPage } from '@/lib/admin-client'
@@ -21,7 +21,7 @@ const STATUS_BADGE: Record<string, { tone: 'green' | 'amber' | 'red' | 'zinc'; l
   removed: { tone: 'red', label: 'Снято' },
 }
 
-export default function ListingsSection({ onToast }: { onToast: (t: string, ok: boolean) => void }) {
+export default function ListingsSection({ onToast, refreshKey = 0 }: { onToast: (t: string, ok: boolean) => void; refreshKey?: number }) {
   const [status, setStatus] = useState('active')
   const [q, setQ] = useState('')
   const [page, setPage] = useState(1)
@@ -30,7 +30,7 @@ export default function ListingsSection({ onToast }: { onToast: (t: string, ok: 
   const [deleting, setDeleting] = useState<{ id: string; title: string } | null>(null)
   const [busy, setBusy] = useState(false)
 
-  const load = (p = 1) => {
+  const load = (p = page) => {
     setLoading(true)
     adminApi
       .listings({ status, q: q.trim() || undefined, page: p })
@@ -43,6 +43,14 @@ export default function ListingsSection({ onToast }: { onToast: (t: string, ok: 
     load(1)
     setPage(1)
   }, [status])
+
+  // live-обновление: перезагружаем текущую страницу без сброса фильтров/пагинации
+  const liveRef = useRef(false)
+  useEffect(() => {
+    if (liveRef.current) load()
+    liveRef.current = true
+     
+  }, [refreshKey])
 
   const toggle = async (id: string, cur: string) => {
     const next = cur === 'active' ? 'removed' : 'active'

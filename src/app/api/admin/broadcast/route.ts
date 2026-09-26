@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { requireAdmin } from '@/lib/admin-auth'
+import { logAdmin } from '@/lib/admin-log'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,6 +25,8 @@ export async function POST(req: Request) {
   await db.notification.createMany({
     data: users.map((u) => ({ userId: u.id, kind, title, body: text })),
   })
+
+  await logAdmin('broadcast', 'broadcast', '', `Рассылка «${title}» — ${users.length} получателям`)
 
   return Response.json({ ok: true, sent: users.length })
 }

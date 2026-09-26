@@ -28,7 +28,7 @@ import {
 import { adminApi, type OverviewData } from '@/lib/admin-client'
 import { Card, EmptyState, fmtDT, fmtMoney, fmtRel, fmtShort, Page, StatCard, Td, Th } from './ui'
 
-export default function OverviewSection({ onToast }: { onToast: (t: string, ok: boolean) => void }) {
+export default function OverviewSection({ onToast, refreshKey = 0 }: { onToast: (t: string, ok: boolean) => void; refreshKey?: number }) {
   const [data, setData] = useState<OverviewData | null>(null)
   const [err, setErr] = useState(false)
 
@@ -38,8 +38,11 @@ export default function OverviewSection({ onToast }: { onToast: (t: string, ok: 
       .then(setData)
       .catch(() => setErr(true))
   }
-   
-  useEffect(load, [])
+
+  useEffect(() => {
+    load()
+     
+  }, [refreshKey])
 
   const gmvDelta =
     data && data.kpis.gmv24Prev > 0 ? (data.kpis.gmv24 - data.kpis.gmv24Prev) / data.kpis.gmv24Prev : null

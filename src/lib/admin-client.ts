@@ -134,6 +134,128 @@ export type AdminMessage = {
   sellerName: string
 }
 
+export type AuditRow = {
+  id: string
+  action: string
+  entity: string
+  entityId: string
+  detail: string
+  createdAt: string
+}
+
+export type AuditPage = {
+  rows: AuditRow[]
+  total: number
+  page: number
+  pages: number
+}
+
+export type ComplaintRow = {
+  id: string
+  reason: string
+  createdAt: string
+  fromName: string
+  fromIsBot: boolean
+  listing: {
+    id: string
+    title: string
+    price: number
+    image: string
+    status: string
+    category: string
+    city: string
+    sellerName: string
+    sellerIsBot: boolean
+  }
+}
+
+export type ComplaintsData = {
+  summary: { total: number; onActive: number; uniqueListings: number }
+  rows: ComplaintRow[]
+}
+
+export type FinanceUser = {
+  id: string
+  name: string
+  username: string
+  isBot: boolean
+  photoUrl: string | null
+  balance: number
+}
+
+export type TaxBillRow = {
+  id: string
+  amount: number
+  reason: string
+  dueAt: string
+  overdue: boolean
+  user: FinanceUser
+}
+
+export type LoanRow = {
+  id: string
+  principal: number
+  owed: number
+  rate: number
+  dueAt: string
+  overdue: boolean
+  user: FinanceUser
+}
+
+export type FinanceData = {
+  summary: {
+    unpaidTaxCount: number
+    unpaidTaxSum: number
+    overdueTaxCount: number
+    loansCount: number
+    loansOwedSum: number
+    overdueLoansCount: number
+  }
+  taxBills: TaxBillRow[]
+  loans: LoanRow[]
+}
+
+export type DeliveryRow = {
+  id: string
+  kind: string
+  status: string
+  title: string
+  image: string
+  price: number
+  courier: string
+  userName: string
+  userIsBot: boolean
+  eta: string
+  stuck: boolean
+  createdAt: string
+}
+
+export type RepairRow = {
+  id: string
+  itemId: string
+  fromCondition: string
+  toCondition: string
+  cost: number
+  userName: string
+  userIsBot: boolean
+  readyAt: string
+  stuck: boolean
+  startedAt: string
+}
+
+export type OpsData = {
+  summary: {
+    deliveriesInWork: number
+    deliveriesStuck: number
+    repairsInWork: number
+    repairsStuck: number
+  }
+  deliveries: DeliveryRow[]
+  repairs: RepairRow[]
+}
+
+export type BadgesData = { complaints: number; liveAuctions: number; opsStuck: number }
+
 export class AdminApiError extends Error {
   status: number
   constructor(status: number, message: string) {
@@ -211,6 +333,20 @@ export const adminApi = {
   deleteMessage: (id: string) => request<{ ok: true }>(`/messages/${id}`, { method: 'DELETE' }),
   broadcast: (data: { title: string; body: string; kind: string }) =>
     request<{ ok: true; sent: number }>('/broadcast', { method: 'POST', body: JSON.stringify(data) }),
+  badges: () => request<BadgesData>('/badges'),
+  audit: (params: { q?: string; entity?: string; page?: number }) => {
+    const sp = new URLSearchParams()
+    if (params.q) sp.set('q', params.q)
+    if (params.entity && params.entity !== 'all') sp.set('entity', params.entity)
+    sp.set('page', String(params.page ?? 1))
+    return request<AuditPage>(`/audit?${sp}`)
+  },
+  complaints: () => request<ComplaintsData>('/complaints'),
+  dismissComplaint: (id: string) => request<{ ok: true }>(`/complaints/${id}`, { method: 'DELETE' }),
+  finance: () => request<FinanceData>('/finance'),
+  financeAction: (data: { kind: 'tax' | 'loan'; id: string }) =>
+    request<{ ok: true }>('/finance', { method: 'POST', body: JSON.stringify(data) }),
+  ops: () => request<OpsData>('/ops'),
 }
 
 export const EXPORT_TYPES = [
