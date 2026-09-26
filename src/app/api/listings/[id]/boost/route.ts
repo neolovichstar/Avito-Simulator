@@ -27,7 +27,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     where: { id },
     data: { boostedUntil: new Date(Date.now() + 2 * 3_600_000), createdAt: new Date() },
   })
-  await notifyUser(user.id, 'system', 'Объявление продвинуто', `«${listing.title}» на 2 часа поднимется в ленте`)
+  await notifyUser(user.id, 'system', '🚀 Объявление продвинуто', `«${listing.title}» на 2 часа поднимется в ленте`)
   cache.invalidate('feed')
   const fresh = await db.user.findUnique({ where: { id: user.id } })
   return Response.json({ ok: true, balance: fresh?.balance ?? user.balance })

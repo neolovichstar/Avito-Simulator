@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   await bumpStats(user.id, { repairs: 1 })
   await bumpQuests(user.id, 'repair')
   await checkAchievements(user.id)
-  await notifyUser(user.id, 'system', 'Товар забран из ремонта', `«${item.title}» теперь в состоянии: улучшено`)
+  await notifyUser(user.id, 'system', '📦 Товар забран из ремонта', `«${item.title}» теперь в состоянии: улучшено`)
   return Response.json({
     ok: true,
     item: {

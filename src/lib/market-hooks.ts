@@ -44,7 +44,7 @@ export async function notifySavedSearches(listing: {
       await notifyUser(
         s.userId,
         'market',
-        'Новый товар по вашему поиску',
+        '🔎 Новый товар по вашему поиску',
         `«${listing.title}» за ${priceLabel} в категории «${catName}». Успейте посмотреть.`,
       )
     }
@@ -87,7 +87,7 @@ export async function notifyPriceDrop(
       await notifyUser(
         f.userId,
         'market',
-        'Цена снизилась',
+        '📉 Цена снизилась',
         `«${listing.title}» подешевел${dropPct >= 10 ? ' сильно' : ''}: ${oldPrice.toLocaleString('ru-RU')} → ${listing.price.toLocaleString('ru-RU')} ₽ (−${dropPct}%). Из избранного можно забрать.`,
       )
     }

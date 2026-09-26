@@ -112,7 +112,7 @@ export async function onPlayerPriceDrop(
         await notifyUser(
           listing.sellerId,
           'market',
-          'Война цен',
+          '⚔️ Война цен',
           `Конкурент «${rival.seller.displayName}» ответил на вашу цену: его «${rival.title}» теперь ${fmtMoney(newPrice)} — на ${rivalPct}% дешевле вас.`,
         )
       } else if (roll < 0.9) {
@@ -158,7 +158,7 @@ export async function onPlayerPriceDrop(
         await notifyUser(
           listing.sellerId,
           'market',
-          'Конкурент подтянулся',
+          '👀 Конкурент подтянулся',
           `«${rival.title}» конкурента теперь ${fmtMoney(undercut)}. Рынок отвечает на ваши цены.`,
         )
       }

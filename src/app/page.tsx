@@ -358,17 +358,22 @@ export default function Home() {
     return unsub1
   }, [])
 
+  const claimingBonus = useRef(false)
   const claimDailyBonus = useCallback(async () => {
+    if (claimingBonus.current) return // параллельный вызов (двойной анлок) — не дублируем
+    claimingBonus.current = true
     try {
       const st = await api.bonusState()
       if (st.claimedToday) return
       const res = await api.bonusClaim()
       pushToast(
-        'Бонус за вход',
+        '🎁 Бонус за вход',
         `+${res.reward.toLocaleString('ru-RU')} ₽ за ${res.streak} ${res.streak === 1 ? 'день' : res.streak < 5 ? 'дня' : 'дней'} подряд. Завтра будет больше`,
       )
       api.profile().then((p) => useOS.getState().refreshSession({ balance: p.user.balance })).catch(() => {})
-    } catch { /* бонус не критичен */ }
+    } catch { /* бонус не критичен */ } finally {
+      claimingBonus.current = false
+    }
   }, [pushToast])
 
   const unlock = () => {

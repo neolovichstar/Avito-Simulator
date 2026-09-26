@@ -63,7 +63,7 @@ export async function POST(req: Request) {
   void notifyUser(
     user.id,
     'system',
-    'Штраф оплачен',
+    '🧾 Штраф оплачен',
     `${fine.title} — ${amount} ₽. Квитанция сохранена в Госуслугах.`,
   ).catch(() => {})
 

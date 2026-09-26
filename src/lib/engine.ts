@@ -21,7 +21,7 @@ import { DEPOSIT_RATE_PER_HOUR } from '@/lib/economy'
 import { bumpStats, bumpQuests, checkAchievements } from '@/lib/deals'
 
 const g = globalThis as unknown as {
-  __avitoEngine?: { started: boolean; tick: number; lastSpecialDay?: string }
+  __avitoEngine?: { started: boolean; running?: boolean; tick: number; lastSpecialDay?: string }
   __avitoNotifyCd?: Map<string, number>
 }
 
@@ -162,11 +162,11 @@ async function dailySpecial() {
         await db.taxBill.create({
           data: { userId: p.id, amount: penalty, reason: 'Пеня по итогам налоговой проверки', dueAt: new Date(Date.now() + 2 * 86_400_000) },
         })
-        await notifyUser(p.id, 'tax', 'Налоговая проверка', `Обнаружена задолженность. Начислена пеня ${fmtMoney(penalty)}. Оплатите в приложении Налоги.`)
+        await notifyUser(p.id, 'tax', '🧾 Налоговая проверка', `Обнаружена задолженность. Начислена пеня ${fmtMoney(penalty)}. Оплатите в приложении Налоги.`)
       } else {
         await db.user.update({ where: { id: p.id }, data: { balance: { increment: 1000 } } })
         await db.transaction.create({ data: { userId: p.id, type: 'sale', amount: 1000, note: 'Премия за честность (налоговая проверка)' } })
-        await notifyUser(p.id, 'tax', 'Налоговая проверка', 'Проверка пройдена. Премия 1 000 ₽ за чистую декларацию.')
+        await notifyUser(p.id, 'tax', '🧾 Налоговая проверка', 'Проверка пройдена. Премия 1 000 ₽ за чистую декларацию. 💸')
       }
     }
     await db.marketEvent.create({
@@ -214,12 +214,27 @@ async function dailySpecial() {
   if (g.__avitoEngine) g.__avitoEngine.lastSpecialDay = today
 }
 
-// Гаражная распродажа: пачка discounted-объявлений в двух категориях + новость
+// Гаражная распродажа: пачка discounted-объявлений в двух категориях + новость.
+// Кулдаун 5 ч: без него распродажи шли пачками и захламляли ленту уведомлений.
+const GARAGE_COOLDOWN_MS = 5 * 3_600_000
+
+// Ротация текстов: даже повторные распродажи не выглядят копипастой.
+const GARAGE_NOTIF = [
+  { t: '🏷️ Гаражная распродажа', b: (n: number, a: string, c: string) => `${n} товаров за полцены в категориях «${a}» и «${c}». Рынок не будет ждать.` },
+  { t: '🧰 Распродажа из гаража', b: (n: number, a: string, c: string) => `Соседи выносят лишнее: ${n} лотов за полцены — «${a}» и «${c}». Успей, пока не разобрали.` },
+  { t: '📦 Блошиный рынок', b: (n: number, a: string, c: string) => `Привезли ${n} лотов за полцены: «${a}» и «${c}». Кто первый — того и цены.` },
+  { t: '🔥 Цены вдвое ниже', b: (n: number, a: string, c: string) => `Гаражная распродажа: ${n} товаров в категориях «${a}» и «${c}» почти даром.` },
+]
+
 export async function spawnGarageSale() {
   const active = await db.marketEvent.findFirst({
     where: { kind: 'garage', expiresAt: { gt: new Date() } },
   })
   if (active) return // одна распродажа за раз
+  const recent = await db.marketEvent.findFirst({
+    where: { kind: 'garage', createdAt: { gt: new Date(Date.now() - GARAGE_COOLDOWN_MS) } },
+  })
+  if (recent) return // кулдаун: не чаще раза в 5 ч, даже если событие уже истекло
   const cats = await db.marketIndex.findMany()
   if (!cats.length) return
   const cityNames = ['Черёмушках', 'Ярославском шоссе', 'Гавриловой-Яме', 'Лиговке', 'Бутове', 'Уралмаше']
@@ -261,12 +276,15 @@ export async function spawnGarageSale() {
     },
   })
   cache.invalidate('feed')
-  // пуш всем живым игрокам
+  // пуш всем живым игрокам; dedupeKey (бакет 4 ч) атомарно режет дубли даже при гонке тиков
+  const tpl = rnd(GARAGE_NOTIF)
+  const bucket = Math.floor(Date.now() / (4 * 3_600_000))
   const players = await db.user.findMany({ where: { isBot: false }, take: 100 })
   for (const p of players) {
     await notifyUser(
-      p.id, 'market', 'Гаражная распродажа',
-      `${spawned} товаров за полцены в категориях «${catLabel(catA.category)}» и «${catLabel(catB.category)}». Рынок не будет ждать.`,
+      p.id, 'market', tpl.t,
+      tpl.b(spawned, catLabel(catA.category), catLabel(catB.category)),
+      { dedupeKey: `garage:${bucket}` },
     )
   }
 }
@@ -523,7 +541,7 @@ async function auctionTick(tick: number) {
         const prev = await db.user.findUnique({ where: { id: prevBidderId } })
         if (prev && !prev.isBot && lot.currentBid) {
           await db.user.update({ where: { id: prev.id }, data: { balance: { increment: lot.currentBid } } })
-          await notifyUser(prev.id, 'market', 'Вас перебили на аукционе', `Лот «${lot.title}» уходит за ${fmtMoney(nextBid)}. Ставка возвращена на счёт.`)
+          await notifyUser(prev.id, 'market', '🔨 Вас перебили на аукционе', `Лот «${lot.title}» уходит за ${fmtMoney(nextBid)}. Ставка возвращена на счёт.`)
         }
       }
       await emitTo('global', 'auction:update', { lotId: lot.id, extended })
@@ -548,7 +566,7 @@ async function auctionTick(tick: number) {
       await db.transaction.create({
         data: { userId: winner.id, type: 'purchase', amount: -lot.currentBid, note: `Аукцион: ${lot.title}` },
       })
-      await notifyUser(winner.id, 'deal', 'Вы выиграли аукцион', `«${lot.title}» за ${fmtMoney(lot.currentBid)} уже в инвентаре`)
+      await notifyUser(winner.id, 'deal', '🏆 Вы выиграли аукцион', `«${lot.title}» за ${fmtMoney(lot.currentBid)} уже в инвентаре`)
       await bumpStats(winner.id, { auctionWins: 1 })
       await bumpQuests(winner.id, 'auction_win')
       await checkAchievements(winner.id)
@@ -602,7 +620,7 @@ async function financeTick() {
     await db.taxBill.create({
       data: { userId: u.id, amount: penalty, reason: 'Пеня 10% за просрочку налога', dueAt: new Date(Date.now() + 86_400_000) },
     })
-    await notifyUser(u.id, 'tax', 'Пеня налоговой', `Начислена пеня ${fmtMoney(penalty)}. Задолженность растёт каждый день.`)
+    await notifyUser(u.id, 'tax', '⚠️ Пеня налоговой', `Начислена пеня ${fmtMoney(penalty)}. Задолженность растёт каждый день.`)
   }
   // просроченные кредиты
   const overdue = await db.loan.findMany({ where: { status: 'active', dueAt: { lt: new Date() } } })
@@ -612,9 +630,9 @@ async function financeTick() {
     if (owner && !owner.isBot) {
       const newScore = Math.max(300, owner.creditScore - 80)
       await db.user.update({ where: { id: owner.id }, data: { creditScore: newScore } })
-      await notifyUser(l.userId, 'system', 'Кредит просрочен', `Банк ждёт погашения. Кредитный рейтинг упал до ${newScore} — лимит срезан, ставка выросла. Покупки ограничены при долге свыше 30 000 ₽.`)
+      await notifyUser(l.userId, 'system', '🏦 Кредит просрочен', `Банк ждёт погашения. Кредитный рейтинг упал до ${newScore} — лимит срезан, ставка выросла. Покупки ограничены при долге свыше 30 000 ₽.`)
     } else {
-      await notifyUser(l.userId, 'system', 'Кредит просрочен', 'Банк ждёт погашения. Покупки ограничены при долге свыше 30 000 ₽.')
+      await notifyUser(l.userId, 'system', '🏦 Кредит просрочен', 'Банк ждёт погашения. Покупки ограничены при долге свыше 30 000 ₽.')
     }
   }
 }
@@ -626,7 +644,7 @@ async function repairTick() {
   })
   for (const r of ready) {
     await db.repairOrder.update({ where: { id: r.id }, data: { status: 'ready' } })
-    await notifyUser(r.userId, 'system', 'Ремонт завершён', 'Ваш товар готов — заберите в сервисе.')
+    await notifyUser(r.userId, 'system', '🔧 Ремонт завершён', 'Ваш товар готов — заберите в сервисе.')
   }
 }
 
@@ -653,6 +671,11 @@ async function presenceTick() {
 
 export async function tickAll() {
   if (!g.__avitoEngine) return
+  // анти-оверлап: интервал 15 с не ждёт завершения прошлого тика, а на удалённой БД
+  // тик легко идёт дольше 15 с — без гарда два тика проходили по рынку одновременно
+  // и дважды спавнили события/уведомления (тройные «Гаражные распродажи»).
+  if (g.__avitoEngine.running) return
+  g.__avitoEngine.running = true
   g.__avitoEngine.tick++
   const tick = g.__avitoEngine.tick
   try {
@@ -669,6 +692,8 @@ export async function tickAll() {
     if (tick % 40 === 0) await leaderboardTick()
   } catch (e) {
     console.error('[engine] tick error:', e)
+  } finally {
+    g.__avitoEngine.running = false
   }
 }
 
@@ -689,7 +714,7 @@ async function leaderboardTick() {
   await notifyUser(
     me.id,
     'leader',
-    `Вы в топ-${rank} площадки`,
+    `👑 Вы в топ-${rank} площадки`,
     `С балансом ${fmtMoney(me.balance)} вы входите в тройку лидеров Resale. Держите марку — боты дышат в спину!`,
   )
 }

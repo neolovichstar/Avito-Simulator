@@ -63,7 +63,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       await notifyUser(
         r.fromUserId,
         'system',
-        'Жалоба удовлетворена',
+        '✅ Жалоба удовлетворена',
         `Объявление «${listing.title}» снято с публикации после проверки модератором.`,
       )
     }
@@ -71,7 +71,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     await notifyUser(
       user.id,
       'system',
-      'Жалоба принята',
+      '📨 Жалоба принята',
       `Спасибо, мы проверим объявление «${listing.title}». Решение придёт в уведомлениях.`,
     )
   }

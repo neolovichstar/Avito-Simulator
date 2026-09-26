@@ -41,7 +41,7 @@ export async function POST(req: Request) {
       // аккуратное погашение повышает кредитный рейтинг
       const newScore = Math.min(850, fresh.creditScore + 40)
       await db.user.update({ where: { id: fresh.id }, data: { creditScore: newScore } })
-      await notifyUser(user.id, 'system', 'Кредит закрыт', `Долг погашен полностью. Кредитный рейтинг повышен: ${newScore}. Лимит и ставка улучшились.`)
+      await notifyUser(user.id, 'system', '🏦 Кредит закрыт', `Долг погашен полностью. Кредитный рейтинг повышен: ${newScore}. Лимит и ставка улучшились.`)
     }
     return Response.json({ ok: true, balance: fresh?.balance ?? user.balance, debt: fresh?.debt ?? 0 })
   }
@@ -74,7 +74,7 @@ export async function POST(req: Request) {
   })
   await bumpStats(user.id, { loans: 1 })
   await bumpQuests(user.id, 'loan')
-  await notifyUser(user.id, 'system', 'Кредит выдан', `${fmtMoney(amount)} зачислено на счёт. К возврату ${fmtMoney(owed)} до ${dueAt.toLocaleDateString('ru-RU')}.`)
+  await notifyUser(user.id, 'system', '🏦 Кредит выдан', `${fmtMoney(amount)} зачислено на счёт. К возврату ${fmtMoney(owed)} до ${dueAt.toLocaleDateString('ru-RU')}.`)
   const fresh = await db.user.findUnique({ where: { id: user.id } })
   return Response.json({ ok: true, balance: fresh?.balance ?? user.balance })
 }

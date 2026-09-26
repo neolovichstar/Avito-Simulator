@@ -54,18 +54,29 @@ export async function POST(req: Request) {
   const streak = last === yesterdayKey() ? user.bonusStreak + 1 : 1
   const reward = bonusFor(streak)
 
-  await db.user.update({
-    where: { id: user.id },
+  // АТОМНЫЙ гард от гонки: параллельные POST (двойной клик/несколько вкладок)
+  // читали старый lastBonusAt и все проходили проверку → три «Бонуса за вход».
+  // updateMany с условием «бонус за сегодня ещё не забран» подтверждает ровно один.
+  const startOfToday = new Date(`${today}T00:00:00.000Z`)
+  const upd = await db.user.updateMany({
+    where: {
+      id: user.id,
+      OR: [{ lastBonusAt: null }, { lastBonusAt: { lt: startOfToday } }],
+    },
     data: { balance: { increment: reward }, bonusStreak: streak, lastBonusAt: new Date() },
   })
+  if (upd.count === 0) {
+    return Response.json({ error: 'Бонус за сегодня уже получен', streak: user.bonusStreak }, { status: 409 })
+  }
   await db.transaction.create({
     data: { userId: user.id, type: 'sale', amount: reward, note: `Бонус за вход (серия ${streak} дн.)` },
   })
   await notifyUser(
     user.id,
     'system',
-    'Бонус за вход',
-    `Серия ${streak} ${streak === 1 ? 'день' : streak < 5 ? 'дня' : 'дней'}. Начислено ${fmtMoney(reward)}. Заходите завтра — будет больше.`,
+    '🎁 Бонус за вход',
+    `Серия ${streak} ${streak === 1 ? 'день' : streak < 5 ? 'дня' : 'дней'}. Начислено ${fmtMoney(reward)}. Заходите завтра — будет больше. 💰`,
+    { dedupeKey: `bonus:${today}` },
   )
   return Response.json({ ok: true, reward, streak })
 }

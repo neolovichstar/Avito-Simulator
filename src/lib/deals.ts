@@ -24,10 +24,45 @@ export const ACTIVE_DELIVERY_STATUSES: DeliveryStatus[] = ['collecting', 'in_tra
 
 const COURIERS = ['Пони-Экспресс', 'Синяя Точка', 'Resale Доставка', 'Курьер Сразу']
 
-export async function notifyUser(userId: string, kind: string, title: string, body: string) {
-  const n = await db.notification.create({
-    data: { userId, kind, title, body },
-  })
+// P2002 — нарушение уникальности (наш dedupeKey): значит, уведомление уже создал
+// параллельный тик/запрос, повторять не нужно.
+function isUniqueViolation(e: unknown): boolean {
+  return (
+    typeof e === 'object' &&
+    e !== null &&
+    'code' in e &&
+    (e as { code?: string }).code === 'P2002'
+  )
+}
+
+export async function notifyUser(
+  userId: string,
+  kind: string,
+  title: string,
+  body: string,
+  opts?: { dedupeKey?: string },
+) {
+  let n
+  if (opts?.dedupeKey) {
+    // ЖЁСТКАЯ дедупликация: уникальный ключ в БД атомарно отсекает гонки
+    // даже между разными инстансами (оверлапящиеся тики, параллельные POST).
+    const key = `${opts.dedupeKey}:${userId}`
+    try {
+      n = await db.notification.create({ data: { userId, kind, title, body, dedupeKey: key } })
+    } catch (e) {
+      if (isUniqueViolation(e)) return null
+      throw e
+    }
+  } else {
+    // МЯГКАЯ дедупликация: идентичное (заголовок + текст) за последние 2 минуты — не дублируем.
+    // Ловит повторные срабатывания одного события, не трогая легитимные повторы другого дня.
+    const dupe = await db.notification.findFirst({
+      where: { userId, title, body, createdAt: { gt: new Date(Date.now() - 120_000) } },
+      select: { id: true },
+    })
+    if (dupe) return null
+    n = await db.notification.create({ data: { userId, kind, title, body } })
+  }
   await emitTo(`user:${userId}`, 'notify', {
     id: n.id, kind: n.kind, title: n.title, body: n.body, readAt: null, createdAt: n.createdAt.toISOString(),
   })
@@ -47,7 +82,7 @@ export async function addXp(userId: string, xp: number): Promise<number> {
   const level = levelFromXp(newXp)
   await db.user.update({ where: { id: userId }, data: { xp: newXp, level } })
   if (level > user.level) {
-    await notifyUser(userId, 'system', 'Новый уровень', `Вы достигли ${level} уровня. Лимит кредита повышен.`)
+    await notifyUser(userId, 'system', '🎖️ Новый уровень', `Вы достигли ${level} уровня. Лимит кредита повышен.`)
   }
   return newXp
 }
@@ -89,7 +124,7 @@ export async function checkAchievements(userId: string) {
     data: { userId, type: 'sale', amount: reward, note: `Достижения: ${unlocked.map((a) => a.title).join(', ')}` },
   })
   for (const a of unlocked) {
-    await notifyUser(userId, 'system', `Достижение: ${a.title}`, `${a.desc}. Награда ${fmtMoney(a.reward)}`)
+    await notifyUser(userId, 'system', `🏆 Достижение: ${a.title}`, `${a.desc}. Награда ${fmtMoney(a.reward)}`)
   }
   await bumpStats(userId, { })
 }
@@ -320,14 +355,14 @@ export async function completeSale(opts: {
       ? 'Самовывоз — заберите посылку через приложение Доставки'
       : 'Продавец собирает посылку. Отслеживайте в приложении Доставки'
     await notifyUser(
-      opts.buyer.id, 'deal', 'Оплата прошла',
+      opts.buyer.id, 'deal', '💳 Оплата прошла',
       `«${listing.title}» за ${fmtMoney(mode === 'courier' ? price + DELIVERY_FEE : price)}. ${how}`,
     )
     await emitTo(`user:${opts.buyer.id}`, 'deal', { title: listing.title, price, role: 'buyer' })
   }
   if (!seller.isBot) {
     await notifyUser(
-      seller.id, 'deal', 'Продажа оформлена',
+      seller.id, 'deal', '✅ Продажа оформлена',
       `«${listing.title}» продан за ${fmtMoney(price)}. Курьер заберёт товар, деньги придут после доставки`,
     )
     await emitTo(`user:${seller.id}`, 'deal', { title: listing.title, price, role: 'seller' })
@@ -360,9 +395,9 @@ export async function deliverDue(): Promise<number> {
       if (d.status === 'collecting' && now >= collectEnd) {
         await db.delivery.update({ where: { id: d.id }, data: { status: 'in_transit' } })
         if (d.kind === 'sale') {
-          await notifyUser(d.userId, 'deal', 'Курьер забрал ваш товар', `«${d.title}» в пути к покупателю. Деньги придут после вручения`)
+          await notifyUser(d.userId, 'deal', '🚚 Курьер забрал ваш товар', `«${d.title}» в пути к покупателю. Деньги придут после вручения`)
         } else {
-          await notifyUser(d.userId, 'deal', 'Посылка в пути', `«${d.title}» отправлен. Прибудет примерно ${fmtTimeLeft(d.eta.getTime() - now.getTime())}`)
+          await notifyUser(d.userId, 'deal', '📦 Посылка в пути', `«${d.title}» отправлен. Прибудет примерно ${fmtTimeLeft(d.eta.getTime() - now.getTime())}`)
         }
         touched++
       }
@@ -371,7 +406,7 @@ export async function deliverDue(): Promise<number> {
           await settleSaleDelivery(d.id)
         } else {
           await db.delivery.update({ where: { id: d.id }, data: { status: 'arrived' } })
-          await notifyUser(d.userId, 'deal', 'Доставка прибыла', `«${d.title}» ждёт в пункте выдачи — заберите в приложении Доставки. Хранение 24 ч`)
+          await notifyUser(d.userId, 'deal', '📬 Доставка прибыла', `«${d.title}» ждёт в пункте выдачи — заберите в приложении Доставки. Хранение 24 ч`)
         }
         touched++
         continue // дальше по этой посылке делать нечего в этом тике
@@ -425,7 +460,7 @@ async function settleSaleDelivery(deliveryId: string): Promise<void> {
     })
   }
   await notifyUser(
-    d.userId, 'deal', 'Продажа завершена',
+    d.userId, 'deal', '💰 Продажа завершена',
     `«${d.title}» вручён покупателю, ${fmtMoney(d.price)} зачислены на счёт`,
   )
   await emitTo(`user:${d.userId}`, 'deal', { title: d.title, price: d.price, role: 'seller' })
@@ -453,7 +488,7 @@ async function returnDelivery(deliveryId: string): Promise<void> {
     })
   }
   await notifyUser(
-    d.userId, 'deal', 'Посылка возвращена',
+    d.userId, 'deal', '↩️ Посылка возвращена',
     `«${d.title}» не забрали за 24 ч — курьер вернул отправление. Возврат ${fmtMoney(refund)} (комиссия ${Math.round(RETURN_COMMISSION * 100)}%)`,
   )
 }
@@ -503,7 +538,7 @@ export async function pickupDelivery(userId: string, deliveryId: string): Promis
   if (d.price === 0) await bumpQuests(userId, 'free')
   await checkAchievements(userId)
   await notifyUser(
-    userId, 'deal', 'Посылка получена',
+    userId, 'deal', '📬 Посылка получена',
     worse
       ? `«${d.title}» забран. Осторожно: состояние хуже, чем было в объявлении`
       : `«${d.title}» забран — вещь уже в инвентаре`,

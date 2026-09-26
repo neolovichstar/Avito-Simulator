@@ -206,6 +206,7 @@ model Notification {
   body      String
   readAt    DateTime?
   tgSentAt  DateTime? // когда уведомление ушло в Telegram (поллер бота)
+  dedupeKey String?   @unique // атомарная защита от дублей: гонки тиков/бонусов создают одну нотификацию
   createdAt DateTime  @default(now())
 }
 

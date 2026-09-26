@@ -42,7 +42,7 @@ export async function fireAutoBids(lotId: string): Promise<boolean> {
       await notifyUser(
         ab.userId,
         'market',
-        'Автоставка отключена',
+        '🤖 Автоставка отключена',
         `На лоте «${lot.title}» не хватило баланса, чтобы перебить ${fmtMoney(nextBid)}.`,
       )
       continue
@@ -64,7 +64,7 @@ export async function fireAutoBids(lotId: string): Promise<boolean> {
         await notifyUser(
           prev.id,
           'market',
-          'Вас перебили на аукционе',
+          '🔨 Вас перебили на аукционе',
           `Лот «${lot.title}» теперь ${fmtMoney(nextBid)}. Резерв возвращён на счёт.`,
         )
       }
@@ -87,7 +87,7 @@ export async function fireAutoBids(lotId: string): Promise<boolean> {
     await notifyUser(
       ab.userId,
       'market',
-      'Автоставка сработала',
+      '🤖 Автоставка сработала',
       `«${lot.title}» — ваша ставка ${fmtMoney(nextBid)} перебила соперника. Потолок ${fmtMoney(ab.maxAmount)} сохранён.`,
     )
     await emitTo('global', 'auction:update', { lotId, extended, autobid: true })

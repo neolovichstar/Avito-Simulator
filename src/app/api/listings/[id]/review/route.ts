@@ -62,7 +62,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   await notifyUser(
     listing.sellerId,
     'avito',
-    'Новый отзыв',
+    '⭐ Новый отзыв',
     `${user.displayName} оценил сделку на ${rating} из 5`,
   )
 
@@ -101,7 +101,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
           await notifyUser(
             user.id,
             'avito',
-            'Ответный отзыв',
+            '💬 Ответный отзыв',
             `${listing.seller.displayName}: «${replyText}»`,
           )
         })

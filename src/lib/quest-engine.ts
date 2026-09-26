@@ -58,7 +58,7 @@ export async function ensureDailyQuests(userId: string) {
   }
   await db.user.update({ where: { id: userId }, data: { questDay: today } })
   await notifyUser(
-    userId, 'system', 'Новые задания',
+    userId, 'system', '🎯 Новые задания',
     mega
       ? 'Три новых поручения и мега-задание с двойной наградой — смотрите в приложении Задания.'
       : 'Заходите в приложение Задания — три новых поручения на день.',

@@ -61,7 +61,7 @@ export async function POST(req: Request) {
   await notifyUser(
     user.id,
     'system',
-    'Чёрный список',
+    '🚫 Чёрный список',
     `Продавец «${seller.displayName}» заблокирован — его объявления скрыты из ленты.`,
   )
   return Response.json({ ok: true, blocked: true, name: seller.displayName })
