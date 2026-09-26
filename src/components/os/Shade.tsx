@@ -181,6 +181,16 @@ export default function Shade({
     },
   })
 
+  // Нижняя зона: свайп вверх (или флик) закрывает шторку — как в Android.
+  const closeDrag = useDrag({
+    onEnd: (_dx, dy, fling) => {
+      if (dy < -36 || fling.vy < -0.55) {
+        sound.swipe()
+        onClose()
+      }
+    },
+  })
+
   const tiles = (full: boolean) => {
     const list: React.ReactNode[] = [
       <Tile
@@ -453,14 +463,15 @@ export default function Shade({
           )}
         </div>
 
-        {/* нижний хендл — тап сворачивает шторку */}
+        {/* нижняя зона — свайп вверх или тап сворачивает шторку (полноширинная, как в Android) */}
         <button
           type="button"
           aria-label="Свернуть шторку"
           onClick={onClose}
-          className="mx-auto mb-2 mt-1 flex h-8 w-24 shrink-0 items-center justify-center rounded-full outline-none transition-colors duration-200 active:bg-white/15 focus-visible:ring-2 focus-visible:ring-white/70"
+          {...closeDrag}
+          className="flex h-12 w-full shrink-0 items-start justify-center bg-gradient-to-b from-transparent to-white/[0.04] outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/70 active:to-white/[0.10]"
         >
-          <span aria-hidden="true" className="block h-1 w-16 rounded-full bg-white/30" />
+          <span aria-hidden="true" className="mt-2 block h-1 w-16 rounded-full bg-white/30" />
         </button>
       </section>
     </div>
