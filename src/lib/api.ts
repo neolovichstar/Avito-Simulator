@@ -7,6 +7,7 @@ import type {
   RepairOrderDTO, RepairQuoteDTO, DeliveryDTO, AuctionData, AuctionLotDTO, CareerData, QuestDTO,
   SavedSearchDTO, SellerProfile, BonusState, PulseItemDTO, MarketPulseDTO, RivalsData, BlockedSellerDTO,
   LoanHistoryItem, WorkshopDataDTO, JobConfigDTO, JobResultDTO, StockDTO, TransitItemDTO,
+  PlateOfferDTO, CarPlateDTO,
 } from '@/lib/types'
 import type { CatalogItem, CategoryKey } from '@/lib/catalog-types'
 
@@ -202,6 +203,25 @@ export const api = {
 
   // профиль и прочее
   profile: () => req<ProfileData>('/api/profile'),
+  updateCity: (city: string) => patch<{ ok: boolean; city: string }>('/api/profile', { city }),
+  resetProfile: () => post<{ ok: boolean }>('/api/profile/reset'),
+
+  // автономера (ГОСТ-знаки)
+  phonesList: () => req<{ numbers: unknown[]; balance: number }>('/api/phones'),
+  plateSubjects: () =>
+    req<{ subjects: { name: string; district: string; prestige: number }[] }>('/api/plates/roll'),
+  plateRoll: (body: {
+    subject: string
+    mode: 'full' | 'letters' | 'digits'
+    keep?: { digits?: string; letters?: string; first?: string }
+  }) =>
+    post<{ offer: PlateOfferDTO }>('/api/plates/roll', body),
+  plates: () => req<{ plates: CarPlateDTO[] }>('/api/plates'),
+  plateBuy: (o: { first: string; digits: string; letters: string; regionCode: string; regionName: string }) =>
+    post<{ plate: CarPlateDTO; balance: number }>('/api/plates', o),
+  plateSetMain: (id: string) => patch<{ ok: boolean }>(`/api/plates/${id}`, { isMain: true }),
+  plateRelease: (id: string) => del<{ ok: boolean }>(`/api/plates/${id}`),
+
   notifications: () => req<{ items: NotificationDTO[] }>('/api/notifications'),
   readNotifications: () => post<{ ok: boolean }>('/api/notifications', { action: 'read' }),
   deleteNotification: (id: string) => post<{ ok: boolean }>('/api/notifications', { action: 'delete', id }),

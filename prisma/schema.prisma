@@ -58,6 +58,7 @@ model User {
   telegramLink   TelegramLink?
   telegramCodes  TelegramCode[]
   phoneNumbers   PhoneNumber[]
+  plates         CarPlate[]
   callLogs       CallLog[]
   partsStock     PartStock[]
   workshopTools  WorkshopTool[]
@@ -518,4 +519,27 @@ model AdminAction {
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+}
+
+// ───────────────────────── Автономера (ГОСТ-знаки) ─────────────────────────
+
+// Выбитый игроком автомобильный номер: крутилка букв/цифр с редкостями,
+// неоновой подсветкой и ценой выкупа. plate — уникальный ключ «А123ВС777».
+model CarPlate {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  plate       String   @unique
+  first       String
+  letters     String
+  digits      String
+  regionCode  String
+  regionName  String
+  rarity      String   @default("common") // common | rare | epic | legendary | mythic
+  beautyScore Int      @default(0)
+  price       Int
+  isMain      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
 }

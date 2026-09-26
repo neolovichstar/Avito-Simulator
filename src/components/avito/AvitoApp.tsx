@@ -4,7 +4,7 @@
 // нижняя таб-навигация (Главная / Поиск / Избранное / Сообщения / Профиль)
 // и чёрная круглая кнопка «+» для продажи.
 import { useCallback, useEffect, useState } from 'react'
-import { Home, Search, Heart, MessageCircle, User, Plus } from 'lucide-react'
+import { Car, Hash, Home, MessageCircle, User, Plus } from 'lucide-react'
 import { api } from '@/lib/api'
 import NotificationCenter from '@/components/os/NotificationCenter'
 import FeedScreen from './FeedScreen'
@@ -13,17 +13,18 @@ import SellScreen from './SellScreen'
 import ChatsScreen from './ChatsScreen'
 import ChatScreen from './ChatScreen'
 import ProfileScreen from './ProfileScreen'
+import NumbersScreen from './NumbersScreen'
 import SellerScreen from './SellerScreen'
 
-type Tab = 'feed' | 'search' | 'fav' | 'chats' | 'profile' | 'sell'
+type Tab = 'feed' | 'auto' | 'numbers' | 'search' | 'fav' | 'chats' | 'profile' | 'sell'
 
 // Внутренняя навигация: стек экранов (объявление → продавец → объявление …)
 type View = { type: 'listing' | 'seller' | 'chat'; id: string }
 
 const TABS: { key: Tab; label: string; icon: typeof Home }[] = [
   { key: 'feed', label: 'Главная', icon: Home },
-  { key: 'search', label: 'Поиск', icon: Search },
-  { key: 'fav', label: 'Избранное', icon: Heart },
+  { key: 'auto', label: 'Авто', icon: Car },
+  { key: 'numbers', label: 'Номера', icon: Hash },
   { key: 'chats', label: 'Сообщения', icon: MessageCircle },
   { key: 'profile', label: 'Профиль', icon: User },
 ]
@@ -118,6 +119,32 @@ export default function AvitoApp() {
             {tab === 'fav' && (
               <FeedScreen onOpenListing={openListing} favoritesMode />
             )}
+            {tab === 'auto' && (
+              <FeedScreen
+                onOpenListing={openListing}
+                favoritesMode={false}
+                initialCategory="auto"
+                lockCategory
+                onOpenNotifications={() => setNotifOpen(true)}
+                onCompareActiveChange={onCompareActiveChange}
+                headerHero={
+                  <button
+                    onClick={() => goTab('numbers')}
+                    className="flex w-full items-center gap-3 rounded-2xl bg-gradient-to-r from-[#0F1210] to-[#232A24] p-3.5 text-left text-white transition-all active:scale-[0.99]"
+                  >
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/10">
+                      <Hash size={19} aria-hidden />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[14px] font-bold leading-tight">Автономера</span>
+                      <span className="block text-[11.5px] text-white/60">Крутите буквы и цифры — блатной знак украсит машину</span>
+                    </span>
+                    <span className="shrink-0 rounded-full bg-white px-3.5 py-2 text-[12px] font-bold text-black">Крутить</span>
+                  </button>
+                }
+              />
+            )}
+            {tab === 'numbers' && <NumbersScreen />}
             {tab === 'sell' && <SellScreen onDone={() => goTab('profile')} />}
             {tab === 'chats' && <ChatsScreen onOpenChat={openChat} />}
             {tab === 'profile' && (
@@ -131,7 +158,7 @@ export default function AvitoApp() {
         )}
 
         {/* чёрная круглая «+ Продать» — как в настоящем Авито */}
-        {!top && tab !== 'sell' && tab !== 'chats' && !compareActive && (
+        {!top && tab !== 'sell' && tab !== 'chats' && tab !== 'numbers' && !compareActive && (
           <button
             onClick={openSell}
             aria-label="Продать вещь"

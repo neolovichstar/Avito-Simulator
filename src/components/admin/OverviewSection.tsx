@@ -241,6 +241,7 @@ export default function OverviewSection({ onToast, refreshKey = 0 }: { onToast: 
           </div>
           <div className="max-h-80 overflow-y-auto [scrollbar-width:thin]">
             {data && data.recentTx.length > 0 ? (
+              <div className="overflow-x-auto [scrollbar-width:thin] -mx-1 px-1">
               <table className="w-full">
                 <thead className="sticky top-0 bg-[#0D120F]">
                   <tr className="border-b border-white/[0.06]">
@@ -272,6 +273,7 @@ export default function OverviewSection({ onToast, refreshKey = 0 }: { onToast: 
                   ))}
                 </tbody>
               </table>
+              </div>
             ) : (
               <EmptyState icon={<ShoppingBag className="size-5" />} title="Пока пусто" sub="Транзакции появятся, когда игроки начнут торговаться" />
             )}

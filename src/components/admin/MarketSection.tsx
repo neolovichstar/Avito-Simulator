@@ -86,6 +86,7 @@ export default function MarketSection({ onToast }: { onToast: (t: string, ok: bo
             </Btn>
           </div>
           <div className="max-h-[520px] overflow-y-auto [scrollbar-width:thin]">
+            <div className="overflow-x-auto [scrollbar-width:thin] -mx-1 px-1">
             <table className="w-full">
               <thead className="sticky top-0 bg-[#0D120F]">
                 <tr className="border-b border-white/[0.06]">
@@ -116,6 +117,7 @@ export default function MarketSection({ onToast }: { onToast: (t: string, ok: bo
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         </Card>
 

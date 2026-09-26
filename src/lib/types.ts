@@ -541,3 +541,33 @@ export interface BonusState {
   nextReward: number
   nextStreak: number
 }
+
+// ───────────────────────── Автономера ─────────────────────────
+
+export type PlateRarityDTO = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic'
+
+export interface PlateOfferDTO {
+  first: string
+  digits: string
+  letters: string
+  regionCode: string
+  regionName: string
+  rarity: PlateRarityDTO
+  beautyScore: number
+  price: number
+}
+
+export interface CarPlateDTO {
+  id: string
+  plate: string
+  first: string
+  letters: string
+  digits: string
+  regionCode: string
+  regionName: string
+  rarity: PlateRarityDTO
+  beautyScore: number
+  price: number
+  isMain: boolean
+  createdAt: string
+}

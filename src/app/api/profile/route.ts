@@ -73,3 +73,18 @@ export async function GET(req: Request) {
     }),
   })
 }
+
+/**
+ * PATCH /api/profile { city } — выбор региона (онбординг при первом входе).
+ * Город проверяется по списку субъектов РФ; также разрешаем произвольное
+ * название до 48 символов (для старых профилей).
+ */
+export async function PATCH(req: Request) {
+  const user = await getSessionUser(req)
+  if (!user) return unauthorized()
+  const body = (await req.json().catch(() => ({}))) as { city?: string }
+  const city = (body.city ?? '').trim().slice(0, 48)
+  if (!city) return Response.json({ error: 'Пустой регион' }, { status: 400 })
+  const updated = await db.user.update({ where: { id: user.id }, data: { city } })
+  return Response.json({ ok: true, city: updated.city })
+}

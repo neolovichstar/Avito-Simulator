@@ -13,7 +13,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import {
   Bell, Bluetooth, Check, ChevronRight, Eye, EyeOff, Fingerprint, LayoutGrid, LockKeyhole, Moon, MoonStar,
-  Search, Signal, Smartphone, Sparkles, Sun, User, Vibrate, Volume2, Wifi, X, Zap,
+  RotateCcw, Search, Signal, Smartphone, Sparkles, Sun, TriangleAlert, User, Vibrate, Volume2, Wifi, X, Zap,
 } from 'lucide-react'
 import { useOS, ALL_WIDGETS, WIDGET_LABEL, type AppKey, type NetKind, type WidgetKey } from '@/lib/store'
 import { usePrefs } from '@/lib/prefs'
@@ -22,6 +22,8 @@ import { collectDeviceInfo, type DeviceInfo } from '@/lib/device-info'
 import { WALLPAPERS, wallpaperPreviewStyle } from '@/lib/wallpapers'
 import { APP_TILE } from '@/components/os/app-logos'
 import { sound } from '@/lib/sound'
+import { api } from '@/lib/api'
+import { REGION_FLAG_KEY } from '@/components/os/RegionOnboarding'
 import { fuzzyMatch } from '@/lib/smart-search'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -255,6 +257,27 @@ const APPS: { key: AppKey; role: string }[] = [
 export default function SettingsApp() {
   // реальные настройки ОС
   const session = useOS((s) => s.session)
+  // «Начать с нуля»: подтверждение и состояние запроса
+  const [resetAsk, setResetAsk] = useState(false)
+  const [resetBusy, setResetBusy] = useState(false)
+  const [resetErr, setResetErr] = useState('')
+
+  const doReset = async () => {
+    if (resetBusy) return
+    setResetBusy(true)
+    setResetErr('')
+    try {
+      await api.resetProfile()
+      try {
+        localStorage.removeItem(REGION_FLAG_KEY) // регион спросят заново
+      } catch {}
+      window.location.reload()
+    } catch {
+      setResetErr('Не удалось сбросить. Попробуйте ещё раз')
+      setResetBusy(false)
+    }
+  }
+
   const battery = useOS((s) => s.battery)
   const batteryReal = useOS((s) => s.batteryReal)
   const charging = useOS((s) => s.charging)
@@ -780,6 +803,29 @@ export default function SettingsApp() {
       ),
     },
     {
+      key: 'reset',
+      visible: true,
+      node: (
+        <Section title="Данные и сброс">
+          <button
+            type="button"
+            onClick={() => setResetAsk(true)}
+            className="relative flex min-h-[56px] w-full items-center gap-3.5 px-4 py-2.5 text-left transition duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:bg-red-500/[0.08]"
+          >
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-red-500/15">
+              <RotateCcw className="size-[18px] text-red-400" aria-hidden="true" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[14px] font-semibold text-red-400">Начать с нуля</span>
+              <span className="mt-0.5 block text-[12px] text-white/50">
+                Полный сброс прогресса: баланс, вещи, объявления, номера, рейтинг
+              </span>
+            </span>
+          </button>
+        </Section>
+      ),
+    },
+    {
       key: 'about',
       visible: aboutRows.length > 0,
       node: (
@@ -841,6 +887,42 @@ export default function SettingsApp() {
           Resale Phone 17 · Android 17 · ResaleOS 2.6.0 (140)
         </p>
       </div>
+
+      {/* Диалог подтверждения полного сброса */}
+      {resetAsk && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 px-6" role="dialog" aria-modal="true" aria-label="Подтверждение сброса">
+          <div className="w-full max-w-[320px] rounded-3xl bg-[#141A16] p-5 shadow-2xl ring-1 ring-white/10">
+            <span className="flex size-11 items-center justify-center rounded-2xl bg-red-500/15">
+              <TriangleAlert className="size-5 text-red-400" aria-hidden="true" />
+            </span>
+            <h2 className="mt-3 text-[17px] font-bold text-white">Начать с нуля?</h2>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-white/55">
+              Будут удалены: баланс и доходы, вещи и склад, объявления, чаты, телефонные и авто­номера,
+              доставки, ремонты, кредиты, налоги, рейтинг и уровень. Отыграть обратно нельзя.
+            </p>
+            {resetErr && <p className="mt-2 text-[12px] font-semibold text-red-400">{resetErr}</p>}
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setResetAsk(false)}
+                disabled={resetBusy}
+                className="h-11 flex-1 rounded-full bg-white/[0.08] text-[13.5px] font-semibold text-white transition-colors active:bg-white/[0.14] disabled:opacity-50"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={doReset}
+                disabled={resetBusy}
+                className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-red-500 text-[13.5px] font-bold text-white transition-colors hover:bg-red-400 disabled:opacity-60"
+              >
+                {resetBusy && <span className="size-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />}
+                {resetBusy ? 'Стираем…' : 'Сбросить всё'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

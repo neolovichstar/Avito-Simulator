@@ -15,6 +15,7 @@ import {
   Gavel,
   History,
   LayoutDashboard,
+  LayoutGrid,
   Landmark,
   LogOut,
   Megaphone,
@@ -92,6 +93,14 @@ const NAV_GROUPS: { label: string; items: { key: Section; label: string; sub: st
 
 const NAV_FLAT = NAV_GROUPS.flatMap((g) => g.items.map((i) => ({ ...i, group: g.label })))
 
+/** Пять главных разделов нижнего мобильного бара. */
+const MOBILE_TABS: { key: Section; label: string; icon: React.ReactNode; badge?: 'complaints' | 'liveAuctions' | 'opsStuck' }[] = [
+  { key: 'overview', label: 'Обзор', icon: <LayoutDashboard className="size-[18px]" /> },
+  { key: 'users', label: 'Игроки', icon: <Users className="size-[18px]" /> },
+  { key: 'auctions', label: 'Аукционы', icon: <Gavel className="size-[18px]" />, badge: 'liveAuctions' },
+  { key: 'complaints', label: 'Жалобы', icon: <ShieldAlert className="size-[18px]" />, badge: 'complaints' },
+]
+
 export default function AdminPage() {
   const [state, setState] = useState<'loading' | 'authed'>('loading')
   const [defaultKey, setDefaultKey] = useState(false)
@@ -101,6 +110,7 @@ export default function AdminPage() {
   const [live, setLive] = useState(true)
   const [tick, setTick] = useState(0)
   const [clock, setClock] = useState('')
+  const [sheetOpen, setSheetOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [paletteQ, setPaletteQ] = useState('')
   const [paletteIdx, setPaletteIdx] = useState(0)
@@ -335,29 +345,9 @@ export default function AdminPage() {
                   </button>
                 </div>
               </div>
-              {/* мобильная навигация */}
-              <div className="flex gap-1 overflow-x-auto px-2 pb-2 [scrollbar-width:none] lg:hidden">
-                {NAV_FLAT.map((n) => (
-                  <button
-                    key={n.key}
-                    onClick={() => setSection(n.key)}
-                    className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-all ${
-                      section === n.key ? 'bg-[#21A038] text-white' : 'bg-white/[0.05] text-zinc-400'
-                    }`}
-                  >
-                    {n.icon}
-                    {n.label}
-                    {badgeValue(n.badge) > 0 && (
-                      <span className={`rounded-full px-1.5 text-[10px] font-bold ${n.badge === 'complaints' ? 'bg-red-500/25 text-red-200' : 'bg-white/15 text-white'}`}>
-                        {badgeValue(n.badge)}
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
             </div>
 
-            <main className="mx-auto max-w-[1200px] p-4 sm:p-6">
+            <main className="mx-auto max-w-[1200px] p-3 pb-28 sm:p-6 sm:pb-6 lg:pb-6">
               {defaultKey && (
                 <div className="mb-4 flex items-start gap-2.5 rounded-xl bg-amber-500/10 px-4 py-3 text-[12.5px] text-amber-200 ring-1 ring-amber-500/25">
                   <Bot className="mt-0.5 size-4 shrink-0" />
@@ -381,6 +371,103 @@ export default function AdminPage() {
                 {section === 'audit' && <AuditSection onToast={onToast} refreshKey={tick} />}
               </div>
             </main>
+
+            {/* нижняя мобильная навигация (как в приложении) */}
+            <nav
+              className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.07] bg-[#0A0F0C]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
+              aria-label="Разделы"
+            >
+              <div className="mx-auto grid max-w-[560px] grid-cols-5">
+                {MOBILE_TABS.map((m) => {
+                  const active = section === m.key
+                  const bv = badgeValue(m.badge)
+                  return (
+                    <button
+                      key={m.key}
+                      onClick={() => setSection(m.key)}
+                      aria-current={active ? 'page' : undefined}
+                      className="relative flex h-[58px] flex-col items-center justify-center gap-1 transition-colors active:bg-white/[0.04]"
+                    >
+                      <span className={`relative ${active ? 'text-[#4ADE80]' : 'text-zinc-500'}`}>
+                        {m.icon}
+                        {bv > 0 && (
+                          <span className={`absolute -top-1 -right-2 min-w-[15px] rounded-full px-1 text-center text-[9.5px] font-bold leading-[15px] ${
+                            m.badge === 'complaints' ? 'bg-red-500 text-white' : 'bg-[#21A038] text-white'
+                          }`}>
+                            {bv > 99 ? '99+' : bv}
+                          </span>
+                        )}
+                      </span>
+                      <span className={`text-[10px] leading-none ${active ? 'font-bold text-[#4ADE80]' : 'font-medium text-zinc-500'}`}>
+                        {m.label}
+                      </span>
+                    </button>
+                  )
+                })}
+                <button
+                  onClick={() => setSheetOpen(true)}
+                  className="flex h-[58px] flex-col items-center justify-center gap-1 transition-colors active:bg-white/[0.04]"
+                >
+                  <span className="text-zinc-500"><LayoutGrid className="size-[18px]" /></span>
+                  <span className="text-[10px] font-medium leading-none text-zinc-500">Ещё</span>
+                </button>
+              </div>
+            </nav>
+
+            {/* лист «Ещё»: все разделы по группам */}
+            {sheetOpen && (
+              <div className="fixed inset-0 z-50 flex flex-col justify-end lg:hidden" onClick={() => setSheetOpen(false)}>
+                <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+                <div
+                  className="relative max-h-[78vh] overflow-y-auto rounded-t-3xl bg-[#0D120F] pb-[max(12px,env(safe-area-inset-bottom))] [scrollbar-width:thin]"
+                  onClick={(e) => e.stopPropagation()}
+                  role="dialog"
+                  aria-label="Все разделы"
+                >
+                  <div className="sticky top-0 flex items-center justify-between border-b border-white/[0.06] bg-[#0D120F] px-5 py-3.5">
+                    <p className="text-[15px] font-bold text-zinc-100">Все разделы</p>
+                    <button onClick={() => setSheetOpen(false)} className="rounded-lg bg-white/[0.06] px-3 py-1.5 text-[12px] font-semibold text-zinc-300">
+                      Закрыть
+                    </button>
+                  </div>
+                  <div className="px-3 py-2">
+                    {NAV_GROUPS.map((g) => (
+                      <div key={g.label} className="mb-2">
+                        <p className="px-2 pb-1 pt-3 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-600">{g.label}</p>
+                        {g.items.map((n) => {
+                          const bv = badgeValue(n.badge)
+                          return (
+                            <button
+                              key={n.key}
+                              onClick={() => {
+                                setSection(n.key)
+                                setSheetOpen(false)
+                              }}
+                              className={`flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition-colors active:bg-white/[0.05] ${
+                                section === n.key ? 'bg-[#21A038]/10 text-[#4ADE80]' : 'text-zinc-300'
+                              }`}
+                            >
+                              {n.icon}
+                              <span className="min-w-0 flex-1">
+                                <span className="block text-[13.5px] font-semibold">{n.label}</span>
+                                <span className="block truncate text-[11px] text-zinc-500">{n.sub}</span>
+                              </span>
+                              {bv > 0 && (
+                                <span className={`min-w-5 rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold ${
+                                  n.badge === 'complaints' ? 'bg-red-500/20 text-red-300' : 'bg-[#21A038]/20 text-[#4ADE80]'
+                                }`}>
+                                  {bv}
+                                </span>
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

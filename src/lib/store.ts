@@ -9,7 +9,7 @@ export type AppKey =
   | 'avito' | 'bank' | 'taxes' | 'browser' | 'settings'
   | 'repair' | 'auction' | 'career' | 'delivery' | 'leaderboard'
   | 'calc' | 'clock' | 'calendar' | 'notes' | 'weather'
-  | 'gallery' | 'music' | 'phone' | 'gosuslugi' | 'numbers'
+  | 'gallery' | 'music' | 'phone' | 'gosuslugi' | 'numbers' | 'plates'
 
 /** Реальный тип сети устройства (Network Information API + navigator.onLine). */
 export type NetKind = 'offline' | 'slow' | '3g' | '4g' | 'wifi'

@@ -71,17 +71,23 @@ function cheaperPercent(l: FeedListing): number {
   return Math.min(90, Math.round(((est - l.price) / l.price) * 100))
 }
 
-export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, onCancelSearch, onOpenNotifications, onCompareActiveChange }: {
+export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, onCancelSearch, onOpenNotifications, onCompareActiveChange, initialCategory, lockCategory, headerHero }: {
   onOpenListing: (id: string) => void
   favoritesMode: boolean
   searchMode?: boolean
   onCancelSearch?: () => void
   onOpenNotifications?: () => void
   onCompareActiveChange?: (v: boolean) => void
+  /** стартовая категория (например, «auto» для вкладки Авто) */
+  initialCategory?: CategoryKey | 'all'
+  /** спрятать чипы категорий и держать фиксированную (вкладка Авто) */
+  lockCategory?: boolean
+  /** баннер между поиском и лентой (акцент вкладки) */
+  headerHero?: React.ReactNode
 }) {
   const [q, setQ] = useState('')
   const [query, setQuery] = useState('')
-  const [category, setCategory] = useState<CategoryKey | 'all'>('all')
+  const [category, setCategory] = useState<CategoryKey | 'all'>(initialCategory ?? 'all')
   const [sort, setSort] = useState<'new' | 'cheap' | 'expensive'>('new')
   const [showSort, setShowSort] = useState(false)
   const [items, setItems] = useState<FeedListing[]>([])
@@ -391,7 +397,7 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
         </div>
 
         {/* категории — горизонтальный скролл чипов, активный чёрный */}
-        {!searchMode && (
+        {!searchMode && !lockCategory && (
           <div className="flex gap-2 mt-2.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-0.5" role="tablist" aria-label="Категории">
             <CatChip label="Все" active={category === 'all'} onClick={() => setCategory('all')} role="tab" ariaSelected={category === 'all'} />
             {CATEGORIES.map((c) => (
@@ -406,6 +412,9 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
             ))}
           </div>
         )}
+
+        {/* акцент-баннер вкладки (Авто/Номера) */}
+        {headerHero && !searchMode && <div className="mt-2.5">{headerHero}</div>}
 
         {/* фильтры — светлые пилюли с иконками */}
         <div className="flex gap-2 mt-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Фильтры и сортировка">

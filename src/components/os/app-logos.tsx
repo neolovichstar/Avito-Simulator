@@ -323,6 +323,24 @@ export function NumbersLogo() {
   )
 }
 
+export function PlatesLogo() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-7 w-7">
+      <rect x={4} y={13} width={40} height={22} rx={4} fill="#ffffff" opacity={0.96} />
+      <rect x={6.2} y={15.2} width={35.6} height={17.6} rx={2.4} stroke="#17181A" strokeOpacity={0.85} strokeWidth={1.6} />
+      <text x={13.5} y={30} textAnchor="middle" fontSize={12} fontWeight={800} fontFamily="Arial, sans-serif" fill="#17181A">
+        {'А'}
+      </text>
+      <text x={24} y={30} textAnchor="middle" fontSize={12} fontWeight={800} fontFamily="Arial, sans-serif" fill="#17181A">
+        {'777'}
+      </text>
+      <text x={34.5} y={30} textAnchor="middle" fontSize={11} fontWeight={800} fontFamily="Arial, sans-serif" fill="#17181A">
+        {'ВС'}
+      </text>
+    </svg>
+  )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Реестр плиток: градиент фона + логотип + подпись для каждого AppKey.
 // image — вырезанный логотип из фирменного пака (public/img/apps/*.png):
@@ -450,6 +468,12 @@ export const APP_TILE: Record<AppKey, { label: string; background: string; image
     image: '/img/apps/numbers.png?v=2',
     icon: <NumbersLogo />,
   },
+  plates: {
+    label: 'Автономера',
+    background: 'linear-gradient(145deg, #3F4753, #171B21)',
+    image: '/img/apps/plates.png?v=1',
+    icon: <PlatesLogo />,
+  },
 }
 
 /** Иконка-картинка приложения: логотип из пака, заполняет плитку целиком. */
@@ -490,6 +514,7 @@ export const HOME_GRID: AppKey[] = [
   'browser',
   'phone',
   'numbers',
+  'plates',
   'gosuslugi',
 ]
 

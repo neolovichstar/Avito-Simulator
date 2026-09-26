@@ -21,6 +21,7 @@ import CallOverlay from '@/components/os/CallOverlay'
 import RecentsOverlay from '@/components/os/RecentsOverlay'
 import DesktopShell from '@/components/desktop/DesktopShell'
 import OrientationGate from '@/components/os/OrientationGate'
+import RegionOnboarding, { regionPicked } from '@/components/os/RegionOnboarding'
 import AvitoApp from '@/components/avito/AvitoApp'
 import BankApp from '@/components/apps/BankApp'
 import TaxesApp from '@/components/apps/TaxesApp'
@@ -41,6 +42,7 @@ import MusicApp from '@/components/apps/MusicApp'
 import PhoneApp from '@/components/apps/PhoneApp'
 import GosuslugiApp from '@/components/apps/GosuslugiApp'
 import NumbersApp from '@/components/apps/NumbersApp'
+import PlateApp from '@/components/apps/PlateApp'
 
 const BATTERY_KEY = 'avito_sim_battery'
 const THEME_KEY = 'avito_sim_theme'
@@ -109,6 +111,7 @@ export default function Home() {
   const [shadeQs, setShadeQs] = useState(false)
   const [isDesktop, setIsDesktop] = useState(false)
   const [authError, setAuthError] = useState(false)
+  const [regionAsk, setRegionAsk] = useState(false)
   const booted = useOS((s) => s.booted)
   const locked = useOS((s) => s.locked)
   const session = useOS((s) => s.session)
@@ -309,6 +312,12 @@ export default function Home() {
     } catch { /* ignore */ }
   }, [setBattery])
 
+  // онбординг региона: показываем один раз после входа (когда ОС разблокирована)
+  useEffect(() => {
+    if (!session || locked) return
+    setRegionAsk(!regionPicked())
+  }, [session, locked])
+
   useEffect(() => {
     if (!booted) return
     // Настоящая батарея устройства — симуляция разряда не нужна.
@@ -415,6 +424,7 @@ export default function Home() {
       case 'phone': return <PhoneApp />
       case 'gosuslugi': return <GosuslugiApp />
       case 'numbers': return <NumbersApp />
+      case 'plates': return <PlateApp />
       default: return null
     }
   }, [currentApp])
@@ -446,6 +456,11 @@ export default function Home() {
           />
         )}
         <ToastStack variant="desktop" />
+        {regionAsk && session && !locked && (
+          <div className="fixed inset-0 z-[80] max-w-[480px] mx-auto">
+            <RegionOnboarding onDone={() => setRegionAsk(false)} />
+          </div>
+        )}
         {/* яркость: затемняющий слой поверх всего */}
         <div
           aria-hidden="true"
@@ -503,6 +518,9 @@ export default function Home() {
           onOpenApp={(a) => { setShadeOpen(false); openApp(a) }}
         />
         <ToastStack />
+        {regionAsk && session && !locked && (
+          <RegionOnboarding onDone={() => setRegionAsk(false)} />
+        )}
         <VolumePlate />
         <CallOverlay /> {/* системный звонок поверх приложений (26-d) */}
 
