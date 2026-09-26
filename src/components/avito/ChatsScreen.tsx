@@ -145,7 +145,7 @@ export default function ChatsScreen({ onOpenChat }: { onOpenChat: (id: string) =
       {error && <div className="bg-[#FDEBEB] text-[#D14343] text-sm rounded-xl p-3 m-3">{error}</div>}
       {items.length === 0 ? (
         <div className="text-center pt-10 px-8">
-          <div className="mx-auto max-w-[260px] rounded-[20px] bg-[#101012] px-6 py-5" aria-hidden>
+          <div className="mx-auto max-w-[240px]" aria-hidden>
             <img src="/img/empty/chat.webp" alt="" className="w-full" loading="lazy" decoding="async" />
           </div>
           <p className="text-[15px] text-black font-semibold mt-3">Сообщений пока нет</p>

@@ -191,9 +191,7 @@ function EmptyState({ icon: Icon, title, sub, image }: { icon?: typeof Wrench; t
   return (
     <div className={`flex flex-col items-center rounded-[20px] bg-white px-4 py-8 text-center shadow-[0_2px_14px_rgba(23,24,26,0.05)]`}>
       {image ? (
-        <div className="rounded-2xl bg-[#101012] px-5 py-4" aria-hidden>
-          <img src={image} alt="" loading="lazy" decoding="async" className="h-24" />
-        </div>
+        <img src={image} alt="" aria-hidden="true" loading="lazy" decoding="async" className="h-24" />
       ) : Icon ? (
         <div className="flex size-14 items-center justify-center rounded-full bg-[#F0F1F5]">
           <Icon className="size-6 text-[#9AA0A8]" aria-hidden />

@@ -805,15 +805,14 @@ export default function DeliveryApp() {
               </div>
             ) : sorted.length === 0 ? (
               <div className="flex flex-col items-center rounded-[20px] bg-white px-4 py-10 text-center shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-                <div className="rounded-2xl bg-[#101012] px-5 py-3" aria-hidden>
-                  <img
-                    src="/img/empty/delivery.webp"
-                    alt=""
-                    loading="lazy"
-                    decoding="async"
-                    className="h-24"
-                  />
-                </div>
+                <img
+                  src="/img/empty/delivery.webp"
+                  alt=""
+                  aria-hidden="true"
+                  loading="lazy"
+                  decoding="async"
+                  className="h-24"
+                />
                 <div className="mt-3 text-[15px] font-semibold text-[#1A1A1A]">Доставок пока нет</div>
                 <div className="mt-1 max-w-64 text-[13px] leading-relaxed text-[#9AA0A8]">
                   Каждая покупка едет посылкой: собираем → в пути → забирайте в пункте выдачи.
@@ -821,15 +820,14 @@ export default function DeliveryApp() {
               </div>
             ) : list.length === 0 ? (
               <div className="flex flex-col items-center rounded-[20px] bg-white px-4 py-10 text-center shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-                <div className="rounded-2xl bg-[#101012] px-5 py-3" aria-hidden>
-                  <img
-                    src="/img/empty/deal-success.webp"
-                    alt=""
-                    loading="lazy"
-                    decoding="async"
-                    className="h-24"
-                  />
-                </div>
+                <img
+                  src="/img/empty/deal-success.webp"
+                  alt=""
+                  aria-hidden="true"
+                  loading="lazy"
+                  decoding="async"
+                  className="h-24"
+                />
                 <div className="mt-3 text-[15px] font-semibold text-[#1A1A1A]">
                   {tab === 'active' ? 'Всё доставлено' : 'История пуста'}
                 </div>
