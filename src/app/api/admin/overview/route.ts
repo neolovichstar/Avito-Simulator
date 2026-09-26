@@ -7,6 +7,15 @@ export const dynamic = 'force-dynamic'
 
 const DAY = 24 * 3600_000
 
+/** Отказоустойчивый prisma-вызов: даже если модели нет в клиенте — вернём fallback. */
+function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return fn().catch(() => fallback)
+  } catch {
+    return Promise.resolve(fallback)
+  }
+}
+
 export async function GET(req: Request) {
   const denied = await requireAdmin(req)
   if (denied) return denied
@@ -69,7 +78,8 @@ export async function GET(req: Request) {
       db.chat.count({ where: { lastMessageAt: { gte: since24 } } }),
       db.user.aggregate({ _sum: { taxDebt: true } }),
       db.user.aggregate({ _sum: { balance: true } }),
-      db.adminAction.count({ where: { action: 'auth.fail', createdAt: { gte: since24 } } }),
+      // отказоустойчиво: если таблица аудита недоступна — просто 0 попыток взлома
+      safe(() => db.adminAction.count({ where: { action: 'auth.fail', createdAt: { gte: since24 } } }), 0),
     ])
 
     // бакеты по дням в JS — переносимо между SQLite и Postgres
