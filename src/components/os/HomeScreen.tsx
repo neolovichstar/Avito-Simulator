@@ -351,22 +351,22 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
         <span className={`h-1 rounded-full bg-white transition-all duration-300 ${page === 1 ? 'w-4' : 'w-1 bg-white/40'}`} />
       </div>
 
-      {/* ─── Поисковая пилюля над доком (в духе Google на Android) ─── */}
-      <div className="z-10 mx-4 mb-2">
+      {/* ─── Поисковая пилюля над доком (в духе Google на Android 17) ─── */}
+      <div className="z-10 mx-4 mb-1.5">
         <button
           type="button"
           aria-label="Поиск — открыть браузер"
           onClick={() => onOpenApp('browser')}
-          className="flex h-10 w-full items-center gap-2.5 rounded-full bg-white/[0.16] px-3.5 text-left backdrop-blur-sm outline-none ring-1 ring-white/10 transition-all duration-200 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-white/70"
+          className="flex h-11 w-full items-center gap-2.5 rounded-full bg-white/[0.15] px-4 text-left backdrop-blur-sm outline-none ring-1 ring-white/[0.09] transition-all duration-200 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-white/70"
         >
           <Search className="size-4 shrink-0 text-white/85" aria-hidden="true" />
-          <span className="flex-1 truncate text-[12px] font-medium text-white/75">Поиск</span>
+          <span className="flex-1 truncate text-[12.5px] font-medium text-white/80">Поиск</span>
           <Mic className="size-4 shrink-0 text-white/55" aria-hidden="true" />
         </button>
       </div>
 
-      {/* ─── Док на стеклянной панели Android 16 ─── */}
-      <div className="z-10 mx-3 mb-2 rounded-[22px] bg-white/[0.14] p-2 pb-2 backdrop-blur-sm ring-1 ring-white/10">
+      {/* ─── Док Android 17: иконки без панели и без подписей ─── */}
+      <div className="z-10 mx-2 mb-1">
         <div className="grid grid-cols-4 gap-1">
           {DOCK_APPS.map((app) => (
             <AppIcon
@@ -377,6 +377,7 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
               imageBg={APP_TILE[app].background}
               badge={app === 'avito' ? unreadChats : undefined}
               small
+              hideLabel
               onClick={() => onOpenApp(app)}
             />
           ))}

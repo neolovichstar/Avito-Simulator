@@ -36,28 +36,28 @@ export default function RecentsTab({ calls, onCall }: Props) {
 
   return (
     <div className="flex-1 overflow-y-auto px-4 pb-4">
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1 rounded-[24px] bg-white/[0.06] p-1.5">
         {calls.map((r) => (
           <button
             key={r.id}
             type="button"
             onClick={() => onCall(r.name, r.number)}
             aria-label={`Позвонить: ${r.name ?? r.number}`}
-            className="flex min-h-14 w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors active:bg-white/[0.04]"
+            className="flex min-h-14 w-full items-center gap-3 rounded-[18px] px-3 py-2.5 text-left transition-colors active:bg-white/[0.05]"
           >
             {r.kind === 'in' && (
-              <PhoneIncoming className="size-5 shrink-0 text-emerald-400" aria-hidden="true" />
+              <PhoneIncoming className="size-5 shrink-0 text-emerald-300" aria-hidden="true" />
             )}
             {r.kind === 'out' && (
               <PhoneOutgoing className="size-5 shrink-0 text-white/40" aria-hidden="true" />
             )}
             {r.kind === 'miss' && (
-              <PhoneMissed className="size-5 shrink-0 text-red-400" aria-hidden="true" />
+              <PhoneMissed className="size-5 shrink-0 text-[#E5484D]" aria-hidden="true" />
             )}
             <span className="min-w-0 flex-1">
               <span
                 className={
-                  'block truncate text-[15px] ' + (r.kind === 'miss' ? 'text-red-400' : 'text-white')
+                  'block truncate text-[15px] ' + (r.kind === 'miss' ? 'text-[#E5484D]' : 'text-white')
                 }
               >
                 {r.name ?? 'Неизвестный'}

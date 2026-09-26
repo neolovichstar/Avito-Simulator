@@ -380,13 +380,13 @@ export default function CallScreen() {
           {(phase === 'dialing' || phase === 'ringing') && (
             <>
               <motion.span
-                className="absolute size-20 rounded-full bg-emerald-500/20"
+                className="absolute size-20 rounded-full bg-[#21A038]/20"
                 animate={{ scale: [1, 1.7], opacity: [0.55, 0] }}
                 transition={{ repeat: Infinity, duration: 1.6, ease: 'easeOut' }}
                 aria-hidden="true"
               />
               <motion.span
-                className="absolute size-20 rounded-full bg-emerald-500/15"
+                className="absolute size-20 rounded-full bg-[#21A038]/15"
                 animate={{ scale: [1, 1.7], opacity: [0.4, 0] }}
                 transition={{ repeat: Infinity, duration: 1.6, ease: 'easeOut', delay: 0.55 }}
                 aria-hidden="true"
@@ -396,7 +396,7 @@ export default function CallScreen() {
           <motion.div
             className={
               'flex size-20 items-center justify-center rounded-full text-[24px] font-semibold ' +
-              (isAi ? 'bg-amber-400/15 text-amber-300' : 'bg-emerald-500/20 text-emerald-300')
+              (isAi ? 'bg-amber-400/15 text-amber-300' : 'bg-[#21A038]/[0.18] text-emerald-300')
             }
             animate={phase === 'dialing' || phase === 'ringing' ? { scale: [1, 1.08, 1] } : { scale: 1 }}
             transition={{ repeat: phase === 'dialing' || phase === 'ringing' ? Infinity : 0, duration: 1.4 }}
@@ -446,7 +446,7 @@ export default function CallScreen() {
                 className={
                   'max-w-[80%] rounded-2xl px-3.5 py-2 text-[13.5px] leading-snug ' +
                   (b.role === 'user'
-                    ? 'rounded-br-md bg-emerald-500/25 text-emerald-50'
+                    ? 'rounded-br-md bg-[#21A038]/[0.25] text-emerald-50'
                     : 'rounded-bl-md bg-white/[0.08] text-white/90')
                 }
               >
@@ -477,10 +477,10 @@ export default function CallScreen() {
         <>
           {/* индикатор записи */}
           {isAi && voice === 'recording' && (
-            <div className="mb-1 flex items-center justify-center gap-2 text-[12px] text-red-300">
+            <div className="mb-1 flex items-center justify-center gap-2 text-[12px] text-[#E5484D]">
               <span className="relative flex size-2">
-                <span className="absolute inline-flex size-2 animate-ping rounded-full bg-red-400 opacity-75" />
-                <span className="relative inline-flex size-2 rounded-full bg-red-400" />
+                <span className="absolute inline-flex size-2 animate-ping rounded-full bg-[#E5484D] opacity-75" />
+                <span className="relative inline-flex size-2 rounded-full bg-[#E5484D]" />
               </span>
               Идёт запись · отпустите, чтобы отправить
             </div>
@@ -498,7 +498,7 @@ export default function CallScreen() {
               aria-label={muted ? 'Включить микрофон' : 'Выключить микрофон'}
               className={
                 'flex size-12 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-30 ' +
-                (muted ? 'bg-white text-[#052E16]' : 'bg-white/[0.08] text-white/80')
+                (muted ? 'bg-white text-[#0A0F0C]' : 'bg-white/[0.08] text-white/80')
               }
             >
               {muted ? <MicOff className="size-5" aria-hidden="true" /> : <Mic className="size-5" aria-hidden="true" />}
@@ -528,7 +528,7 @@ export default function CallScreen() {
                   type="submit"
                   disabled={!typed.trim() || voice === 'thinking' || voice === 'speaking'}
                   aria-label="Отправить"
-                  className="flex size-11 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[#052E16] transition-transform active:scale-90 disabled:opacity-40"
+                  className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[#21A038] text-white transition-transform active:scale-90 disabled:opacity-40"
                 >
                   {voice === 'thinking' ? (
                     <Loader2 className="size-4 animate-spin" aria-hidden="true" />
@@ -565,13 +565,13 @@ export default function CallScreen() {
                 className={
                   'relative flex size-[76px] touch-none select-none items-center justify-center rounded-full transition-transform disabled:opacity-40 ' +
                   (voice === 'recording'
-                    ? 'scale-105 bg-red-500 text-white'
-                    : 'bg-emerald-500 text-[#052E16] active:scale-95')
+                    ? 'scale-105 bg-[#E5484D] text-white'
+                    : 'bg-[#21A038] text-white active:scale-95')
                 }
               >
                 {voice === 'recording' && (
                   <motion.span
-                    className="absolute inset-0 rounded-full bg-red-500/40"
+                    className="absolute inset-0 rounded-full bg-[#E5484D]/40"
                     animate={{ scale: [1, 1.25], opacity: [0.6, 0] }}
                     transition={{ repeat: Infinity, duration: 1.1, ease: 'easeOut' }}
                     aria-hidden="true"
@@ -594,7 +594,7 @@ export default function CallScreen() {
               aria-label={speaker ? 'Выключить громкую связь' : 'Включить громкую связь'}
               className={
                 'flex size-12 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-30 ' +
-                (speaker ? 'bg-white text-[#052E16]' : 'bg-white/[0.08] text-white/80')
+                (speaker ? 'bg-white text-[#0A0F0C]' : 'bg-white/[0.08] text-white/80')
               }
             >
               {speaker ? (
@@ -642,7 +642,7 @@ export default function CallScreen() {
               type="button"
               onClick={() => endCall('hangup')}
               aria-label="Завершить вызов"
-              className="flex size-16 items-center justify-center rounded-full bg-red-500 text-white transition-transform active:scale-95"
+              className="flex size-16 items-center justify-center rounded-full bg-[#E5484D] text-white transition-transform active:scale-95"
             >
               <PhoneOff className="size-7" aria-hidden="true" />
             </button>

@@ -2,6 +2,7 @@
 
 // Заметки ОС: список карточками, полноэкранный редактор с автосохранением
 // по вводу в localStorage ('avito_sim_notes'), плавающая кнопка новой заметки.
+// Визуал — Google Keep (M3): masonry-сетка 2 колонки, пастельные тональные карточки, FAB rounded-[20px].
 
 import { useState } from 'react'
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react'
@@ -58,6 +59,22 @@ function splitNote(text: string): { title: string; preview: string } {
   }
 }
 
+// Пастельные тональные фоны карточек (M3 secondary-container): выбор детерминированный
+// по id заметки — только визуал, данные и логика не меняются
+const TINTS = [
+  'bg-emerald-500/[0.13]',
+  'bg-amber-500/[0.13]',
+  'bg-rose-500/[0.13]',
+  'bg-violet-500/[0.13]',
+  'bg-stone-500/[0.10]',
+]
+
+function tintFor(id: string): string {
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
+  return TINTS[h % TINTS.length]
+}
+
 export default function NotesApp() {
   const [notes, setNotes] = useState<Note[]>(loadNotes)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -111,28 +128,31 @@ export default function NotesApp() {
               type="button"
               onClick={closeEditor}
               aria-label="Назад к заметкам"
-              className="flex size-11 items-center justify-center rounded-full text-white/80 transition-transform active:scale-90"
+              className="flex size-10 items-center justify-center rounded-full bg-white/[0.08] text-white transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-90"
             >
-              <ChevronLeft className="size-6" aria-hidden="true" />
+              <ChevronLeft className="size-5" aria-hidden="true" />
             </button>
             <span className="text-[12px] text-white/40">Автосохранение</span>
             <button
               type="button"
               onClick={() => remove(note.id)}
               aria-label="Удалить заметку"
-              className="flex size-11 items-center justify-center rounded-full text-red-400 transition-transform active:scale-90"
+              className="flex size-10 items-center justify-center rounded-full bg-white/[0.08] text-[#E5484D] transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-90"
             >
               <Trash2 className="size-5" aria-hidden="true" />
             </button>
           </header>
-          <textarea
-            value={note.text}
-            onChange={(e) => update(note.id, e.target.value)}
-            placeholder="Начните печатать…"
-            autoFocus
-            aria-label="Текст заметки"
-            className="w-full flex-1 resize-none bg-transparent px-5 pb-6 text-[15px] leading-relaxed text-white outline-none placeholder:text-white/30"
-          />
+          {/* Панель редактора rounded-[28px] с полем ввода rounded-[18px] */}
+          <div className="mx-3 mb-3 flex min-h-0 flex-1 flex-col rounded-[28px] bg-white/[0.04] p-1.5 ring-1 ring-white/[0.06]">
+            <textarea
+              value={note.text}
+              onChange={(e) => update(note.id, e.target.value)}
+              placeholder="Начните печатать…"
+              autoFocus
+              aria-label="Текст заметки"
+              className="h-full w-full flex-1 resize-none rounded-[18px] bg-white/[0.06] px-4 py-3.5 text-[15px] leading-relaxed text-white outline-none placeholder:text-white/30"
+            />
+          </div>
         </div>
       )
     }
@@ -145,8 +165,8 @@ export default function NotesApp() {
   return (
     <div className="relative flex h-full flex-col bg-[#050D09] text-white">
       <header className="flex h-14 shrink-0 items-center justify-between px-5">
-        <h1 className="text-[17px] font-semibold">Заметки</h1>
-        {sorted.length > 0 && <span className="text-[12px] text-white/50">{sorted.length} шт.</span>}
+        <h1 className="text-[26px] font-bold tracking-[-0.02em]">Заметки</h1>
+        {sorted.length > 0 && <span className="text-[12px] tabular-nums text-white/50">{sorted.length} шт.</span>}
       </header>
 
       <div className="flex-1 overflow-y-auto [scrollbar-width:thin] px-4 pb-24">
@@ -163,7 +183,7 @@ export default function NotesApp() {
             <p className="text-[13px]">Пока нет заметок</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-2 pt-1">
+          <div className="m3-rise columns-2 gap-2.5 pt-1">
             {sorted.map((n) => {
               const { title, preview } = splitNote(n.text)
               return (
@@ -174,13 +194,20 @@ export default function NotesApp() {
                     sound.tap()
                     setEditingId(n.id)
                   }}
-                  className="rounded-2xl border border-emerald-500/15 bg-[#0E1F16] p-4 text-left transition-transform active:scale-[0.99]"
+                  className={
+                    tintFor(n.id) +
+                    ' mb-2.5 block w-full break-inside-avoid rounded-[18px] p-3.5 text-left ring-1 ring-white/[0.06] transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98]'
+                  }
                 >
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span className="min-w-0 truncate text-[15px] font-medium text-white">{title}</span>
-                    <span className="shrink-0 text-[11px] tabular-nums text-white/40">{fmtDate(n.updatedAt)}</span>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="min-w-0 truncate text-[13.5px] font-bold text-white">{title}</span>
+                    <span className="shrink-0 text-[10.5px] tabular-nums text-white/40">{fmtDate(n.updatedAt)}</span>
                   </div>
-                  {preview && <p className="mt-1 truncate text-[12px] text-white/50">{preview}</p>}
+                  {preview && (
+                    <p className="mt-1 line-clamp-4 whitespace-pre-line text-[12px] leading-snug text-white/70">
+                      {preview}
+                    </p>
+                  )}
                 </button>
               )
             })}
@@ -192,7 +219,7 @@ export default function NotesApp() {
         type="button"
         onClick={create}
         aria-label="Новая заметка"
-        className="absolute bottom-6 right-4 flex size-14 items-center justify-center rounded-full bg-[#22C55E] text-[#052E16] shadow-xl transition-transform active:scale-90"
+        className="absolute bottom-6 right-4 flex size-14 items-center justify-center rounded-[20px] bg-[#21A038] text-white shadow-lg shadow-emerald-500/25 transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-95"
       >
         <Plus className="size-6" aria-hidden="true" />
       </button>

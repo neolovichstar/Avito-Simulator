@@ -967,7 +967,7 @@ function OmniSuggestions({
 }) {
   return (
     <div
-      className="absolute inset-x-0 top-full z-40 mt-2.5 overflow-hidden rounded-2xl bg-[var(--sur)] py-1 shadow-[0_14px_44px_-10px_rgba(0,0,0,0.4)] ring-1 ring-[var(--bd)]"
+      className="absolute inset-x-0 top-full z-40 mt-2.5 overflow-hidden rounded-[24px] bg-[var(--sur)] py-1 shadow-[0_14px_44px_-10px_rgba(0,0,0,0.4)] ring-1 ring-[var(--bd)]"
       role="listbox"
       aria-label="Подсказки адресной строки"
       onMouseDown={(e) => e.preventDefault()}
@@ -1364,7 +1364,7 @@ function BookmarksPanel({
         type="button"
         onClick={onAdd}
         aria-label="Добавить закладку"
-        className="absolute bottom-4 right-4 flex size-12 items-center justify-center rounded-full bg-[#21A038] text-white shadow-[0_8px_20px_-6px_rgba(33,160,56,0.55)] transition active:scale-90"
+        className="absolute bottom-4 right-4 flex size-14 items-center justify-center rounded-full bg-[#21A038] text-white shadow-[0_8px_20px_-6px_rgba(33,160,56,0.55)] transition active:scale-90"
       >
         <Plus className="size-6" aria-hidden />
       </button>
@@ -1507,7 +1507,7 @@ function DownloadsPanel({ onBack }: { onBack: () => void }) {
               <li key={f.name}>
                 <div className="flex min-h-[52px] items-center gap-3 px-4 py-2.5">
                   <span
-                    className="flex size-10 shrink-0 items-center justify-center rounded-xl"
+                    className="flex size-10 shrink-0 items-center justify-center rounded-full"
                     style={{ backgroundColor: `${f.color}1A`, color: f.color }}
                     aria-hidden
                   >
@@ -1547,7 +1547,7 @@ function TabCard({ tab, active, onPick, onClose }: { tab: Tab; active: boolean; 
   return (
     <div className="tab-card-in">
       <div
-        className={'overflow-hidden rounded-[16px] bg-[var(--sur)] transition ' + (active ? 'ring-2 ring-[#21A038]' : 'ring-1 ring-[var(--bd)]')}
+        className={'overflow-hidden rounded-[20px] bg-[var(--sur)] transition ' + (active ? 'ring-2 ring-[#21A038]' : 'ring-1 ring-[var(--bd)]')}
       >
         <div className="flex items-center gap-1.5 px-2.5 py-2 text-[var(--txt)]">
           {tab.incognito ? (
@@ -1641,7 +1641,7 @@ function TabSwitcher({
             type="button"
             onClick={onNew}
             aria-label="Новая вкладка"
-            className="flex min-h-[192px] items-center justify-center rounded-[16px] border border-dashed border-[var(--bd)] transition active:scale-[0.98]"
+            className="flex min-h-[192px] items-center justify-center rounded-[20px] border border-dashed border-[var(--bd)] transition active:scale-[0.98]"
           >
             <span className="flex flex-col items-center gap-2">
               <Plus className="size-6 text-[var(--link)]" aria-hidden />
@@ -1684,8 +1684,8 @@ function PrivateScreen({ onOpenPrivate, onBack }: { onOpenPrivate: () => void; o
 
       <div className="mt-7 space-y-3">
         {features.map((f) => (
-          <div key={f.t} className="flex items-start gap-3 rounded-2xl bg-[var(--sur)] p-3.5">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--pill)] text-[var(--txt2)]" aria-hidden>
+          <div key={f.t} className="flex items-start gap-3 rounded-[24px] bg-[var(--sur)] p-3.5">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--pill)] text-[var(--txt2)]" aria-hidden>
               <f.icon className="size-5" />
             </span>
             <span className="min-w-0">
@@ -2085,7 +2085,7 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp?: (app: AppKey) =>
                 aria-label="Очистить строку"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => setUrlInput('')}
-                className="flex size-8 shrink-0 items-center justify-center rounded-full transition active:bg-[var(--hov)]"
+                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--hov)] transition active:scale-90"
               >
                 <X className="size-3.5 text-[var(--txt2)]" aria-hidden />
               </button>
@@ -2096,7 +2096,7 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp?: (app: AppKey) =>
                 type="button"
                 aria-label={bookmarked ? 'Убрать из закладок' : 'Добавить в закладки'}
                 onClick={toggleBookmark}
-                className="flex size-8 shrink-0 items-center justify-center rounded-full transition active:bg-[var(--hov)]"
+                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--hov)] transition active:scale-90"
               >
                 <Star className={`size-4.5 ${bookmarked ? 'fill-[#E8A020] text-[#E8A020]' : 'text-[var(--txt2)]'}`} aria-hidden />
               </button>
@@ -2105,7 +2105,7 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp?: (app: AppKey) =>
               type="button"
               aria-label="Перезагрузить страницу"
               onClick={reload}
-              className="flex size-8 shrink-0 items-center justify-center rounded-full transition active:bg-[var(--hov)]"
+              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--hov)] transition active:scale-90"
             >
               <RotateCw className="size-4 text-[var(--txt2)]" aria-hidden />
             </button>
@@ -2136,7 +2136,7 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp?: (app: AppKey) =>
               setMenuOpen(false)
             }}
             aria-label={`Вкладки: ${tabs.length}`}
-            className="relative flex size-11 shrink-0 items-center justify-center rounded-full text-[var(--txt)] transition active:bg-[var(--hov)]"
+            className="relative flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--hov)] text-[var(--txt)] transition active:scale-95"
           >
             <Square className="size-6" strokeWidth={2} aria-hidden />
             <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold">{tabs.length > 9 ? '9+' : tabs.length}</span>
@@ -2241,7 +2241,7 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp?: (app: AppKey) =>
             onClick={back}
             disabled={!canBack}
             aria-label="Назад"
-            className="flex size-11 items-center justify-center rounded-full transition active:bg-[var(--hov)] disabled:opacity-30"
+            className="flex size-10 items-center justify-center rounded-full bg-[var(--hov)] transition active:scale-95 disabled:opacity-30"
           >
             <ChevronLeft className={'size-6 ' + (canBack ? 'text-[var(--txt)]' : 'text-[var(--txt2)] opacity-50')} aria-hidden />
           </button>
@@ -2250,7 +2250,7 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp?: (app: AppKey) =>
             onClick={forward}
             disabled={!canForward}
             aria-label="Вперёд"
-            className="flex size-11 items-center justify-center rounded-full transition active:bg-[var(--hov)] disabled:opacity-30"
+            className="flex size-10 items-center justify-center rounded-full bg-[var(--hov)] transition active:scale-95 disabled:opacity-30"
           >
             <ChevronRight className={'size-6 ' + (canForward ? 'text-[var(--txt)]' : 'text-[var(--txt2)] opacity-50')} aria-hidden />
           </button>
@@ -2258,7 +2258,7 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp?: (app: AppKey) =>
             type="button"
             onClick={home}
             aria-label="Домашняя страница"
-            className="flex size-11 items-center justify-center rounded-full transition active:bg-[var(--hov)]"
+            className="flex size-10 items-center justify-center rounded-full bg-[var(--hov)] transition active:scale-95"
           >
             <Globe className="size-6 text-[var(--txt)]" aria-hidden />
           </button>
@@ -2268,7 +2268,7 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp?: (app: AppKey) =>
               onClick={() => setMenuOpen((o) => !o)}
               aria-label="Меню браузера"
               aria-expanded={menuOpen}
-              className="flex size-11 items-center justify-center rounded-full transition active:bg-[var(--hov)]"
+              className="flex size-10 items-center justify-center rounded-full bg-[var(--hov)] transition active:scale-95"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="text-[var(--txt)]" aria-hidden>
                 <circle cx="12" cy="5" r="2" />
@@ -2281,7 +2281,7 @@ export default function BrowserApp({ onOpenApp }: { onOpenApp?: (app: AppKey) =>
             {menuOpen && (
               <>
                 <button type="button" className="fixed inset-0 z-30 cursor-default" aria-label="Закрыть меню" onClick={() => setMenuOpen(false)} />
-                <div className="chrome-menu-in absolute bottom-[54px] right-0 z-40 w-64 origin-bottom-right overflow-hidden rounded-2xl bg-[var(--sur)] py-1.5 text-[var(--txt)] shadow-[0_12px_40px_-8px_rgba(0,0,0,0.35)] ring-1 ring-[var(--bd)]">
+                <div className="chrome-menu-in absolute bottom-[54px] right-0 z-40 w-64 origin-bottom-right overflow-hidden rounded-[24px] bg-[var(--sur)] py-1.5 text-[var(--txt)] shadow-[0_12px_40px_-8px_rgba(0,0,0,0.35)] ring-1 ring-[var(--bd)]">
                   {[
                     { icon: Plus, label: 'Новая вкладка', fn: () => newTab(false) },
                     { icon: VenetianMask, label: 'Приватная вкладка', fn: () => newTab(true) },

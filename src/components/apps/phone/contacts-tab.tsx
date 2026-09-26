@@ -57,7 +57,7 @@ export default function ContactsTab({ contacts, loading, onCall }: Props) {
     <div className="flex min-h-0 flex-1 flex-col">
       {/* умный поиск: имя или цифры номера */}
       <div className="px-4 pb-2">
-        <div className="flex h-10 items-center gap-2 rounded-full bg-white/[0.07] px-3.5">
+        <div className="flex h-12 items-center gap-2 rounded-full bg-white/[0.08] px-4">
           <Search className="size-4 shrink-0 text-white/40" aria-hidden />
           <input
             value={query}
@@ -82,39 +82,41 @@ export default function ContactsTab({ contacts, loading, onCall }: Props) {
 
       <div className="flex-1 overflow-y-auto px-4 pb-4">
         {groups.map((g) => (
-          <div key={g.letter || 'all'}>
+          <div key={g.letter || 'all'} className="mb-2">
             {g.letter && (
-              <div className="sticky top-0 z-10 bg-[#050D09] px-1 py-1.5 text-[11px] font-medium text-white/40">
+              <div className="sticky top-0 z-10 bg-[#050D09]/95 px-1 py-1.5 text-[12px] font-semibold uppercase tracking-wide text-white/50 backdrop-blur">
                 {g.letter}
               </div>
             )}
-            {g.items.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => onCall(c.name, c.num, c.isBot ? c.id : null)}
-                aria-label={`Позвонить: ${c.name}`}
-                className="flex min-h-14 w-full items-center gap-3 rounded-2xl px-1 py-2 text-left transition-colors active:bg-white/[0.04]"
-              >
-                <UserAvatar name={c.name} bot={c.isBot} className="size-10 rounded-full ring-1 ring-white/10" />
-                <span className="min-w-0">
-                  <span className="flex items-center gap-1.5">
-                    <span className="truncate text-[15px] text-white">
-                      {q ? <Highlight text={c.name} query={q} /> : c.name}
-                    </span>
-                    {c.isBot && (
-                      <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[9.5px] font-medium text-amber-300">
-                        <Store className="size-2.5" aria-hidden="true" />
-                        Продавец
+            <div className="rounded-[24px] bg-white/[0.06] p-1.5">
+              {g.items.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => onCall(c.name, c.num, c.isBot ? c.id : null)}
+                  aria-label={`Позвонить: ${c.name}`}
+                  className="flex min-h-14 w-full items-center gap-3 rounded-[18px] px-2.5 py-2 text-left transition-colors active:bg-white/[0.05]"
+                >
+                  <UserAvatar name={c.name} bot={c.isBot} className="size-10 rounded-full ring-1 ring-white/10" />
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-1.5">
+                      <span className="truncate text-[15px] text-white">
+                        {q ? <Highlight text={c.name} query={q} /> : c.name}
                       </span>
-                    )}
+                      {c.isBot && (
+                        <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[9.5px] font-medium text-amber-300">
+                          <Store className="size-2.5" aria-hidden="true" />
+                          Продавец
+                        </span>
+                      )}
+                    </span>
+                    <span className="block truncate text-[11px] tabular-nums text-white/40">
+                      {q ? <Highlight text={c.num} query={q} /> : c.num}
+                    </span>
                   </span>
-                  <span className="block truncate text-[11px] tabular-nums text-white/40">
-                    {q ? <Highlight text={c.num} query={q} /> : c.num}
-                  </span>
-                </span>
-              </button>
-            ))}
+                </button>
+              ))}
+            </div>
           </div>
         ))}
         {q && list.length === 0 && (

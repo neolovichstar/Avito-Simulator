@@ -1,7 +1,7 @@
 'use client'
 
 // Resale Music — светлая тема в едином стиле Resale/Банка (#F5F6F8, белые карточки
-// rounded-[20px], чёрные CTA-пилюли, жёлтый Play #FFD53D, лайк #F5554A).
+// rounded-[24px], чёрные CTA-пилюли, жёлтый Play #FFD53D, лайк #F5554A).
 //
 // Источник музыки — глобальный плеер ОС (src/lib/player.ts): единственный
 // HTMLAudioElement живёт на уровне модуля, поэтому музыка продолжает играть
@@ -415,7 +415,7 @@ function HomeSkeleton() {
 
 function ListSkeleton({ rows = 6 }: { rows?: number }) {
   return (
-    <div className="mx-4 mt-4 animate-pulse rounded-[20px] bg-white p-1.5 shadow-sm">
+    <div className="mx-4 mt-4 animate-pulse rounded-[24px] bg-white p-1.5 shadow-sm">
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="flex items-center gap-3 p-1.5">
           <div className="h-6 w-6 rounded-full bg-[#EBEDF0]" />
@@ -455,7 +455,12 @@ interface TrackRowProps {
 function TrackRow({ track, onPlay, liked, onToggleLike, rank, medal, playsLabel, active, highlight, hideLike }: TrackRowProps) {
   const medalColor = medal && rank ? MEDALS[rank] : undefined
   return (
-    <div className="flex items-center gap-1.5 rounded-[14px] p-1.5 transition-colors active:bg-[#F5F6F8]">
+    <div
+      className={
+        'flex items-center gap-1.5 rounded-[18px] p-1.5 transition-colors ' +
+        (active ? 'bg-[#21A038]/[0.12]' : 'active:bg-[#F5F6F8]')
+      }
+    >
       {rank !== undefined && (
         <div className="flex w-6 shrink-0 items-center justify-center" aria-hidden>
           {medalColor ? (
@@ -473,9 +478,9 @@ function TrackRow({ track, onPlay, liked, onToggleLike, rank, medal, playsLabel,
         aria-label={`Слушать: ${track.title} — ${track.artist}`}
         className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left"
       >
-        <Cover track={track} small className="h-14 w-14 rounded-[12px]" />
+        <Cover track={track} small className="h-14 w-14 rounded-[14px]" />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[14px] font-semibold leading-tight text-[#17181A]">
+          <span className={'block truncate text-[14px] font-semibold leading-tight ' + (active ? 'text-emerald-800' : 'text-[#17181A]')}>
             {highlight ? <Highlight text={track.title} query={highlight} /> : track.title}
           </span>
           <span className="mt-0.5 block truncate text-[12px] text-[#8B8F99]">
@@ -485,7 +490,7 @@ function TrackRow({ track, onPlay, liked, onToggleLike, rank, medal, playsLabel,
       </button>
       <div className="flex w-10 shrink-0 items-center justify-end" aria-hidden>
         {active ? (
-          <AudioLines size={18} className="text-[#17181A]" />
+          <AudioLines size={18} className="text-emerald-700" />
         ) : playsLabel ? (
           <span className="text-[12px] tabular-nums text-[#8B8F99]">{playsLabel}</span>
         ) : null}
@@ -508,7 +513,7 @@ function CarouselCard({ track, liked, onToggleLike, onPlay }: { track: Track; li
         aria-label={`Слушать: ${track.title} — ${track.artist}`}
         className="block w-full text-left transition-transform active:scale-[0.97]"
       >
-        <Cover track={track} className="aspect-square w-[116px] rounded-[14px]" />
+        <Cover track={track} className="aspect-square w-[116px] rounded-[18px]" />
         <span className="mt-2 block truncate text-[13px] font-semibold leading-tight text-[#17181A]">{track.title}</span>
         <span className="mt-0.5 block truncate text-[11px] leading-tight text-[#8B8F99]">{track.artist}</span>
       </button>
@@ -619,7 +624,7 @@ function HomeScreen({ state, sections, likes, onPlay, onRetry }: ScreenProps) {
   return (
     <div className="pb-6">
       <header className="px-4 pt-4">
-        <h1 className="text-[24px] font-bold leading-tight text-[#17181A]">Привет!</h1>
+        <h1 className="text-[26px] font-bold leading-tight tracking-[-0.02em] text-[#17181A]">Привет!</h1>
         <p className="mt-0.5 text-[13px] text-[#8B8F99]">Полные треки — слушай без ограничений</p>
       </header>
 
@@ -657,7 +662,7 @@ function ChartScreen({ state, sections, likes, onPlay, onRetry }: ScreenProps) {
   return (
     <div className="pb-6">
       <header className="px-4 pt-4">
-        <h1 className="text-[24px] font-bold leading-tight text-[#17181A]">Чарт</h1>
+        <h1 className="text-[26px] font-bold leading-tight tracking-[-0.02em] text-[#17181A]">Чарт</h1>
         <p className="mt-0.5 text-[13px] text-[#8B8F99]">Топ-20 прослушиваний на этой неделе</p>
       </header>
 
@@ -674,7 +679,7 @@ function ChartScreen({ state, sections, likes, onPlay, onRetry }: ScreenProps) {
           <p className="mt-1 text-[13px] text-[#8B8F99]">Загляните чуть позже</p>
         </div>
       ) : (
-        <div className="mx-4 mt-4 rounded-[20px] bg-white p-1.5 shadow-sm">
+        <div className="mx-4 mt-4 rounded-[24px] bg-white p-1.5 shadow-sm">
           {tracks.map((t, i) => (
             <TrackRow
               key={t.id}
@@ -730,7 +735,7 @@ function SearchScreen({ query, onQuery, results, state, recent, pool, onSuggesti
   return (
     <div className="pb-6">
       <header className="px-4 pt-4">
-        <h1 className="text-[24px] font-bold leading-tight text-[#17181A]">Поиск</h1>
+        <h1 className="text-[26px] font-bold leading-tight tracking-[-0.02em] text-[#17181A]">Поиск</h1>
         <p className="mt-0.5 text-[13px] text-[#8B8F99]">Миллионы полных треков</p>
       </header>
 
@@ -763,7 +768,7 @@ function SearchScreen({ query, onQuery, results, state, recent, pool, onSuggesti
 
       {/* Автодополнения: список под строкой поиска, тап = подставить */}
       {showCompletions && (
-        <div className="mx-4 mt-2 rounded-[16px] bg-white shadow-sm" role="listbox" aria-label="Подсказки">
+        <div className="mx-4 mt-2 rounded-[24px] bg-white shadow-sm" role="listbox" aria-label="Подсказки">
           {completions.map((c) => (
             <button
               key={c.value}
@@ -771,7 +776,7 @@ function SearchScreen({ query, onQuery, results, state, recent, pool, onSuggesti
               role="option"
               aria-selected={false}
               onClick={() => onSuggestion(c.value)}
-              className="flex min-h-11 w-full items-center gap-2.5 rounded-[16px] px-4 py-2 text-left transition-colors active:bg-[#F5F6F8]"
+              className="flex min-h-11 w-full items-center gap-2.5 rounded-[18px] px-4 py-2 text-left transition-colors active:bg-[#F5F6F8]"
             >
               <Search size={15} className="shrink-0 text-[#B9BDC7]" aria-hidden />
               <span className="min-w-0 flex-1 truncate text-[13.5px] text-[#17181A]">
@@ -835,7 +840,7 @@ function SearchScreen({ query, onQuery, results, state, recent, pool, onSuggesti
       ) : displayed.length === 0 ? (
         <NothingFound />
       ) : (
-        <div className="mx-4 mt-4 rounded-[20px] bg-white p-1.5 shadow-sm">
+        <div className="mx-4 mt-4 rounded-[24px] bg-white p-1.5 shadow-sm">
           {displayed.map((t, i) => (
             <TrackRow
               key={t.id}
@@ -960,7 +965,7 @@ function LibraryScreen({ likedTracks, likes, onCacheBump, onPlay }: LibraryScree
   return (
     <div className="pb-6">
       <header className="px-4 pt-4">
-        <h1 className="text-[24px] font-bold leading-tight text-[#17181A]">Библиотека</h1>
+        <h1 className="text-[26px] font-bold leading-tight tracking-[-0.02em] text-[#17181A]">Библиотека</h1>
         <p className="mt-0.5 text-[13px] text-[#8B8F99]">Ваша музыка собрана здесь</p>
       </header>
 
@@ -1028,7 +1033,7 @@ function LibraryScreen({ likedTracks, likes, onCacheBump, onPlay }: LibraryScree
             </div>
           )
         ) : (
-          <div className="mx-4 mt-3 rounded-[20px] bg-white p-1.5 shadow-sm">
+          <div className="mx-4 mt-3 rounded-[24px] bg-white p-1.5 shadow-sm">
             {likedTracks.map((t, i) => (
               <TrackRow
                 key={t.id}
@@ -1053,7 +1058,7 @@ function LibraryScreen({ likedTracks, likes, onCacheBump, onPlay }: LibraryScree
             <h2 className="text-[20px] font-bold leading-tight text-[#17181A]">Часто слушаете</h2>
             <p className="mt-0.5 text-[13px] text-[#8B8F99]">Топ-6 по вашим плейам</p>
           </div>
-          <div className="mx-4 mt-3 rounded-[20px] bg-white p-1.5 shadow-sm">
+          <div className="mx-4 mt-3 rounded-[24px] bg-white p-1.5 shadow-sm">
             {topEntries.map(({ track, plays }, i) => (
               <TrackRow
                 key={track.id}
@@ -1083,7 +1088,7 @@ function LibraryScreen({ likedTracks, likes, onCacheBump, onPlay }: LibraryScree
               Очистить статистику
             </button>
           ) : (
-            <div className="flex flex-wrap items-center justify-center gap-2 rounded-[16px] bg-white p-3 shadow-sm">
+            <div className="flex flex-wrap items-center justify-center gap-2 rounded-[24px] bg-white p-3 shadow-sm">
               <p className="text-[12px] text-[#17181A]">Удалить статистику прослушиваний?</p>
               <button
                 type="button"
@@ -1185,7 +1190,7 @@ function MiniPlayer({ onOpen, likes }: { onOpen: () => void; likes: LikesApi }) 
 
   return (
     <div className="relative z-30 mx-3 mb-2">
-      <div className="relative overflow-hidden rounded-2xl bg-white shadow-[0_10px_34px_-10px_rgba(23,24,26,0.22)]">
+      <div className="relative overflow-hidden rounded-[24px] bg-white shadow-[0_10px_34px_-10px_rgba(23,24,26,0.22)]">
         {/* Жёлтая полоска прогресса по верхней кромке */}
         <div
           className="absolute left-0 top-0 h-[3px] rounded-full bg-[#FFD53D] transition-[width] duration-300 ease-linear"
@@ -1193,8 +1198,8 @@ function MiniPlayer({ onOpen, likes }: { onOpen: () => void; likes: LikesApi }) 
           aria-hidden
         />
         <div className="flex items-center gap-1 p-2.5">
-          <button type="button" onClick={onOpen} aria-label="Открыть полный плеер" className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left">
-            <Cover track={current} small className="h-11 w-11 rounded-[12px]" />
+          <button type="button" onClick={onOpen} aria-label="Открыть полный плеер" className="flex min-w-0 flex-1 items-center gap-3 rounded-[18px] text-left">
+            <Cover track={current} small className="h-11 w-11 rounded-[14px]" />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[13px] font-semibold leading-tight text-[#17181A]">{current.title}</span>
               <span className="mt-0.5 block truncate text-[11px] text-[#8B8F99]">{current.artist}</span>
@@ -1406,7 +1411,7 @@ function TabBar({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
       aria-label="Разделы Музыки"
       className="z-30 shrink-0 border-t border-[#EBEDF0] bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
     >
-      <div className="flex items-stretch">
+      <div className="flex h-16 items-stretch">
         {TABS.map((t) => {
           const active = tab === t.key
           return (
@@ -1416,15 +1421,22 @@ function TabBar({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
               role="tab"
               aria-selected={active}
               onClick={() => onChange(t.key)}
-              className="flex min-h-[54px] flex-1 flex-col items-center justify-center gap-0.5 py-1.5 transition-transform active:scale-95"
+              className="flex flex-1 flex-col items-center justify-center gap-0.5 py-1.5 transition-transform active:scale-95"
             >
-              <t.icon
-                size={22}
-                strokeWidth={active ? 2.2 : 1.8}
-                className={active ? 'text-[#17181A]' : 'text-[#8B8F99]'}
-                aria-hidden
-              />
-              <span className={'text-[10px] leading-none ' + (active ? 'font-semibold text-[#17181A]' : 'text-[#8B8F99]')}>
+              <span
+                className={
+                  'flex items-center rounded-full px-4 py-1 transition-colors ' +
+                  (active ? 'bg-[#21A038]/[0.14]' : 'bg-transparent')
+                }
+              >
+                <t.icon
+                  size={22}
+                  strokeWidth={active ? 2.2 : 1.8}
+                  className={active ? 'text-[#157F2A]' : 'text-[#8B8F99]'}
+                  aria-hidden
+                />
+              </span>
+              <span className={'text-[10px] leading-none ' + (active ? 'font-semibold text-[#157F2A]' : 'text-[#8B8F99]')}>
                 {t.label}
               </span>
             </button>

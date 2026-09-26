@@ -59,28 +59,18 @@ export default function KeypadTab({ mainNumber, onCall, onOpenNumbers }: Props) 
             Ваш: {mainNumber.number}
           </span>
         ) : (
-          <span className="truncate text-emerald-400/80">Выбей номер в приложении «Номера»</span>
+          <span className="truncate text-emerald-300/80">Выбей номер в приложении «Номера»</span>
         )}
         {mainNumber && <TierBadge tier={mainNumber.tier} />}
       </button>
 
-      <div className="relative flex min-h-16 items-center justify-center py-3">
+      <div className="flex min-h-16 items-center justify-center py-3">
         {raw ? (
           <span className="max-w-[75%] truncate text-[24px] font-light tabular-nums tracking-wide text-white">
             {display}
           </span>
         ) : (
           <span className="text-[17px] text-white/25">Введите номер</span>
-        )}
-        {raw && (
-          <button
-            type="button"
-            onClick={backspace}
-            aria-label="Удалить цифру"
-            className="absolute right-0 flex size-11 items-center justify-center rounded-full text-white/50 transition-transform active:scale-90"
-          >
-            <Delete className="size-5" aria-hidden="true" />
-          </button>
         )}
       </div>
 
@@ -91,15 +81,17 @@ export default function KeypadTab({ mainNumber, onCall, onOpenNumbers }: Props) 
             type="button"
             onClick={() => press(k.d)}
             aria-label={k.label}
-            className="flex h-16 flex-col items-center justify-center rounded-full bg-white/[0.06] transition-transform active:scale-95"
+            className="mx-auto flex size-16 flex-col items-center justify-center rounded-full bg-white/[0.08] transition-transform active:scale-95"
           >
             <span className="text-[22px] font-medium leading-none">{k.d}</span>
-            {k.sub && <span className="mt-0.5 text-[10px] tracking-[0.25em] text-white/40">{k.sub}</span>}
+            {k.sub && <span className="mt-0.5 text-[9px] tracking-[0.25em] text-white/45">{k.sub}</span>}
           </button>
         ))}
       </div>
 
-      <div className="flex justify-center pt-4">
+      {/* Кнопка звонка по центру; рядом — серый круг удаления (как в Google Phone) */}
+      <div className="grid grid-cols-3 items-center pt-4">
+        <span aria-hidden="true" />
         <button
           type="button"
           onClick={() => {
@@ -108,10 +100,22 @@ export default function KeypadTab({ mainNumber, onCall, onOpenNumbers }: Props) 
           }}
           disabled={!raw.trim()}
           aria-label="Позвонить"
-          className="flex size-16 items-center justify-center rounded-full bg-[#22C55E] text-[#052E16] transition-transform active:scale-95 disabled:opacity-40"
+          className="mx-auto flex size-16 items-center justify-center rounded-full bg-[#21A038] text-white shadow-lg shadow-emerald-500/25 transition-transform active:scale-95 disabled:opacity-40"
         >
           <Phone className="size-6" aria-hidden="true" />
         </button>
+        {raw ? (
+          <button
+            type="button"
+            onClick={backspace}
+            aria-label="Удалить цифру"
+            className="mx-auto flex size-16 items-center justify-center rounded-full bg-white/[0.08] text-white/70 transition-transform active:scale-95"
+          >
+            <Delete className="size-6" aria-hidden="true" />
+          </button>
+        ) : (
+          <span aria-hidden="true" />
+        )}
       </div>
     </div>
   )

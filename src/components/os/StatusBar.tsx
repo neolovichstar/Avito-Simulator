@@ -1,13 +1,13 @@
 'use client'
 
-// Статус-бар в духе Android 16: минимализм без подложек.
-// Слева — время. Справа — компактный кластер состояния: индикаторы режима,
-// сеть (реальный Network Information API), вертикальная капсула-батарея
-// (реальная Battery API) с молнией при зарядке и колокольчик уведомлений
-// с точкой непрочитанных.
-import { useSyncExternalStore } from 'react'
+// Статус-бар Android 17: слева — время + до трёх иконок непрочитанных
+// уведомлений (как в настоящем Android), справа — компактный кластер:
+// индикаторы режимов, сеть (реальный Network Information API), Wi-Fi/LTE и
+// ГОРИЗОНТАЛЬНАЯ капсула-батарея (реальная Battery API) с молнией при зарядке.
+import { useMemo, useSyncExternalStore } from 'react'
 import { Bell, Flashlight, Moon, Wifi, WifiOff } from 'lucide-react'
 import { useOS } from '@/lib/store'
+import { KIND_APP } from './notif-meta'
 
 // ─── Сетка сигнала: 4 столбика, как в Android ───────────────────────────────
 function SignalBars({ kind }: { kind: 'offline' | 'slow' | '3g' | '4g' | 'wifi' }) {
@@ -27,34 +27,29 @@ function SignalBars({ kind }: { kind: 'offline' | 'slow' | '3g' | '4g' | 'wifi' 
   )
 }
 
-// ─── Батарея: ВЕРТИКАЛЬНАЯ капсула с зарядом внутри, молния при зарядке ─────
-// Android-стиль: узкий скруглённый корпус, заливка снизу вверх, вывод-контакт
-// сверху. Цвет заливки следует за темой статус-бара (currentColor).
+// ─── Батарея: ГОРИЗОНТАЛЬНАЯ капсула, заливка слева направо, молния ─────────
 function BatteryIcon({ level, charging }: { level: number; charging: boolean }) {
-  const fill = Math.max(5, Math.min(100, level))
+  const fill = Math.max(4, Math.min(100, level))
   const color = level <= 15 ? '#FF5A4E' : level <= 30 ? '#FFB25A' : 'currentColor'
   return (
-    <span className="relative flex flex-col items-center" role="img" aria-label={`Батарея ${Math.round(level)}%`}>
-      {/* контакт батареи */}
-      <span aria-hidden="true" className="mb-[1.5px] block h-[2px] w-[4px] rounded-t-[1.5px] bg-current opacity-50" />
+    <span className="relative flex items-center" role="img" aria-label={`Батарея ${Math.round(level)}%`}>
+      {/* корпус */}
       <span
         aria-hidden="true"
-        className="relative flex h-[14px] w-[8px] items-end overflow-hidden rounded-[2.5px] border border-current/45 p-[1.5px]"
+        className="relative flex h-[11.5px] w-[21px] items-center overflow-hidden rounded-[3.5px] border border-current/45 p-[1.5px]"
       >
         <span
-          className="block w-full rounded-[1.5px] transition-[height] duration-500"
-          style={{ height: `${fill}%`, backgroundColor: charging ? '#3ED598' : color }}
+          className="block h-full rounded-[1.5px] transition-[width] duration-500"
+          style={{ width: `${fill}%`, backgroundColor: charging ? '#3ED598' : color }}
         />
+        {charging && (
+          <svg aria-hidden="true" viewBox="0 0 24 24" className="absolute left-1/2 top-1/2 size-[9px] -translate-x-1/2 -translate-y-1/2 fill-[#052e16]">
+            <path d="M13 2 L4.5 13.5 H11 L10 22 L19.5 9.5 H13 Z" />
+          </svg>
+        )}
       </span>
-      {charging && (
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          className="absolute bottom-[1px] left-1/2 size-[9px] -translate-x-1/2 fill-[#052e16]"
-        >
-          <path d="M13 2 L4.5 13.5 H11 L10 22 L19.5 9.5 H13 Z" />
-        </svg>
-      )}
+      {/* контакт */}
+      <span aria-hidden="true" className="ml-[1.5px] block h-[4px] w-[1.5px] rounded-r-[1px] bg-current opacity-50" />
     </span>
   )
 }
@@ -81,10 +76,13 @@ export default function StatusBar({ variant, onBell }: { variant?: 'light' | 'da
   const netKind = useOS((s) => s.netKind)
   const flashlight = useOS((s) => s.flashlight)
   const dnd = useOS((s) => s.dnd)
-  const unreadNotifs = useOS((s) => s.notifications.filter((n) => !n.readAt).length)
+  const notifications = useOS((s) => s.notifications)
   const now = useClock()
 
   const isDark = variant !== 'light'
+  // до трёх маленьких иконок приложений с непрочитанными — как в Android
+  const unread = useMemo(() => notifications.filter((n) => !n.readAt), [notifications])
+  const notifIcons = unread.slice(0, 3).map((n) => KIND_APP[n.kind] ?? KIND_APP.system)
 
   return (
     <header
@@ -92,10 +90,28 @@ export default function StatusBar({ variant, onBell }: { variant?: 'light' | 'da
         isDark ? 'text-white' : 'bg-[#F7F8FA] text-black'
       }`}
     >
-      {/* время — единственный элемент слева, как в Android 16 */}
-      <time className="text-[13px] font-semibold tabular-nums" suppressHydrationWarning>
-        {now ? now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''}
-      </time>
+      {/* время + иконки уведомлений слева, как в Android */}
+      <div className="flex min-w-0 items-center gap-2">
+        <time className="text-[13px] font-semibold tabular-nums" suppressHydrationWarning>
+          {now ? now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''}
+        </time>
+        <span className="flex items-center gap-1">
+          {notifIcons.map((m, i) => {
+            const Icon = m.icon
+            return (
+              <span
+                key={`${m.app}-${i}`}
+                className="flex items-center"
+                title={m.app}
+                aria-label={`Уведомление: ${m.app}`}
+                role="img"
+              >
+                <Icon className="size-[13px] opacity-75" aria-hidden="true" />
+              </span>
+            )
+          })}
+        </span>
+      </div>
 
       <div className="flex items-center gap-[7px]">
         {/* индикаторы активных режимов — только когда включены */}
@@ -130,19 +146,19 @@ export default function StatusBar({ variant, onBell }: { variant?: 'light' | 'da
           )}
         </span>
 
-        {/* вертикальная капсула-батарея */}
+        {/* горизонтальная капсула-батарея */}
         <BatteryIcon level={battery} charging={charging} />
 
-        {/* колокольчик с точкой непрочитанных */}
+        {/* колокольчик с точкой непрочитанных (явный вход в шторку) */}
         {onBell && (
           <button
             type="button"
             onClick={onBell}
-            aria-label={`Уведомления: ${unreadNotifs} непрочитанных`}
+            aria-label={`Уведомления: ${unread.length} непрочитанных`}
             className="relative -mr-1.5 flex h-8 w-8 items-center justify-center rounded-full transition-transform active:scale-90"
           >
             <Bell className="h-[17px] w-[17px]" aria-hidden="true" />
-            {unreadNotifs > 0 && (
+            {unread.length > 0 && (
               <span
                 aria-hidden="true"
                 className="absolute right-[5px] top-[6px] size-[7px] rounded-full bg-[#FF4053]"

@@ -56,8 +56,8 @@ export default function PhoneApp() {
 
   return (
     <div className="flex h-full flex-col bg-[#050D09] text-white">
-      <header className="flex h-14 shrink-0 items-center gap-3 px-5">
-        <h1 className="text-[17px] font-semibold">Телефон</h1>
+      <header className="flex h-16 shrink-0 items-center gap-3 px-5">
+        <h1 className="text-[26px] font-bold tracking-[-0.02em]">Телефон</h1>
         {phone.reserves.length > 0 && (
           <button
             type="button"
@@ -83,7 +83,10 @@ export default function PhoneApp() {
         <ContactsTab contacts={phone.contacts} loading={phone.loading} onCall={startCall} />
       )}
 
-      <nav className="mt-auto flex shrink-0 border-t border-white/10" aria-label="Разделы телефона">
+      <nav
+        className="mt-auto flex h-16 shrink-0 items-stretch bg-[#0A0F0C]/95 backdrop-blur-xl ring-1 ring-white/[0.06]"
+        aria-label="Разделы телефона"
+      >
         {TABS.map((t) => {
           const Icon = t.icon
           const active = tab === t.key
@@ -97,13 +100,19 @@ export default function PhoneApp() {
               }}
               aria-label={t.label}
               aria-current={active}
-              className={
-                'flex flex-1 flex-col items-center gap-1 py-3 text-[11px] transition-transform active:scale-95 ' +
-                (active ? 'text-emerald-400' : 'text-white/50')
-              }
+              className="flex flex-1 flex-col items-center justify-center gap-1 transition-transform active:scale-95"
             >
-              <Icon className="size-5" aria-hidden="true" />
-              {t.label}
+              <span
+                className={
+                  'flex items-center rounded-full px-4 py-1.5 transition-colors ' +
+                  (active ? 'bg-white/[0.12]' : 'bg-transparent')
+                }
+              >
+                <Icon className={'size-5 ' + (active ? 'text-emerald-300' : 'text-white/50')} aria-hidden="true" />
+              </span>
+              <span className={'text-[10.5px] leading-none ' + (active ? 'font-semibold text-emerald-300' : 'text-white/50')}>
+                {t.label}
+              </span>
             </button>
           )
         })}

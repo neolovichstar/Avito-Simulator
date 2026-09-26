@@ -2,6 +2,7 @@
 
 // Калькулятор ОС: цепочка операций без eval (аккумулятор first/op/second),
 // крупный дисплей с историей прошлой операции, тихий звук нажатий.
+// Визуал — Google Calculator (M3 Expressive): круглые клавиши, зелёная колонка операций.
 
 import { useState } from 'react'
 import { sound } from '@/lib/sound'
@@ -29,8 +30,19 @@ function toNum(display: string): number {
   return Number.isFinite(n) ? n : 0
 }
 
-const NUM_KEY = 'rounded-full h-16 text-[22px] font-medium bg-white/[0.06] text-white transition-transform active:scale-95'
-const OP_KEY = 'rounded-full h-16 text-[22px] font-medium bg-white/[0.06] text-emerald-400 transition-transform active:scale-95'
+// Автомасштаб длинных чисел на дисплее (только визуал)
+function displaySize(s: string): string {
+  if (s.length <= 9) return 'text-[52px]'
+  if (s.length <= 12) return 'text-[44px]'
+  return 'text-[36px]'
+}
+
+const EASE = 'transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-90'
+const NUM_KEY = 'aspect-square rounded-full bg-white/[0.08] text-[20px] font-semibold text-white ' + EASE
+const NUM_WIDE = 'rounded-full bg-white/[0.08] text-[20px] font-semibold text-white ' + EASE
+const FUNC_KEY = 'aspect-square rounded-full bg-white/[0.05] text-[20px] font-semibold text-white/70 ' + EASE
+const OP_KEY = 'aspect-square rounded-full bg-[#21A038]/[0.16] text-[22px] font-semibold text-emerald-300 ' + EASE
+const EQ_KEY = 'aspect-square rounded-full bg-[#21A038] text-[22px] font-semibold text-white ' + EASE
 
 export default function CalcApp() {
   const [display, setDisplay] = useState('0')
@@ -118,26 +130,26 @@ export default function CalcApp() {
 
   return (
     <div className="flex h-full flex-col bg-[#050D09] text-white">
-      <header className="flex h-14 shrink-0 items-center gap-3 px-5">
-        <h1 className="text-[17px] font-semibold">Калькулятор</h1>
-      </header>
-
-      {/* Дисплей: история сверху мелко, текущее значение крупно справа */}
-      <div className="flex min-h-24 flex-1 flex-col items-end justify-end px-6 pb-3">
-        <div className="h-5 max-w-full truncate text-[13px] tabular-nums text-white/40">{history}</div>
-        <div className="mt-1 max-w-full truncate text-right text-[44px] font-light leading-none tabular-nums">
+      {/* Дисплей: выражение сверху мелко, текущее значение крупно справа (без шапки — как Google Calculator) */}
+      <div className="flex min-h-28 flex-1 flex-col items-end justify-end px-6 pt-10 pb-3">
+        <div className="h-5 max-w-full truncate text-[14px] tabular-nums text-white/50">{history}</div>
+        <div
+          className={
+            'mt-1 max-w-full truncate text-right font-medium leading-none tabular-nums ' + displaySize(display)
+          }
+        >
           {display}
         </div>
       </div>
 
-      <div className="grid shrink-0 grid-cols-4 gap-3 px-4 pb-5">
-        <button type="button" onClick={clearAll} aria-label="Сбросить" className={OP_KEY + ' text-red-400'}>
+      <div className="m3-rise grid shrink-0 grid-cols-4 gap-2.5 px-4 pb-6">
+        <button type="button" onClick={clearAll} aria-label="Сбросить" className={FUNC_KEY}>
           AC
         </button>
-        <button type="button" onClick={negate} aria-label="Сменить знак" className={OP_KEY}>
+        <button type="button" onClick={negate} aria-label="Сменить знак" className={FUNC_KEY}>
           ±
         </button>
-        <button type="button" onClick={percent} aria-label="Процент" className={OP_KEY}>
+        <button type="button" onClick={percent} aria-label="Процент" className={FUNC_KEY}>
           %
         </button>
         <button type="button" onClick={() => operator('÷')} aria-label="Разделить" className={OP_KEY}>
@@ -159,13 +171,13 @@ export default function CalcApp() {
         <button type="button" onClick={() => digit('3')} className={NUM_KEY}>3</button>
         <button type="button" onClick={() => operator('+')} aria-label="Прибавить" className={OP_KEY}>+</button>
 
-        <button type="button" onClick={() => digit('0')} aria-label="Ноль" className={NUM_KEY + ' col-span-2'}>0</button>
+        <button type="button" onClick={() => digit('0')} aria-label="Ноль" className={NUM_WIDE + ' col-span-2'}>0</button>
         <button type="button" onClick={dot} aria-label="Запятая" className={NUM_KEY}>.</button>
         <button
           type="button"
           onClick={equals}
           aria-label="Равно"
-          className="rounded-full h-16 text-[22px] font-bold bg-[#22C55E] text-[#052E16] transition-transform active:scale-95"
+          className={EQ_KEY}
         >
           =
         </button>

@@ -1,8 +1,8 @@
 'use client'
 
-// Экран блокировки «Resale OS» в духе Android 16:
-// огромные тонкие часы (76px, weight 300), дата под ними, компактные превью
-// уведомлений на стеклянных карточках и два круглых shortcut'а внизу
+// Экран блокировки «Resale OS» в стиле Android 17 (Material 3 Expressive):
+// дата-пилюля сверху, огромные плотные часы (88px, weight 550), превью
+// уведомлений на M3-карточках и два круглых shortcut'а внизу
 // (фонарик — реальный toggle, камера — открывает галерею).
 // Никаких паролей — это игра, телефон открывается свайпом вверх или касанием.
 
@@ -15,7 +15,7 @@ import { api } from '@/lib/api'
 import { fmtMoney, timeAgo } from '@/lib/format'
 import { setTorch } from '@/lib/torch'
 import { useDrag } from '@/lib/use-swipe'
-import { KIND_APP } from './NotificationCenter'
+import { KIND_APP } from './notif-meta'
 
 // Живые тики каждые 1000 мс без setState в эффекте (useSyncExternalStore).
 function useClock(): Date | null {
@@ -255,29 +255,29 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
       />
 
       <div className="relative z-10 flex h-full flex-col px-5 pb-4 pt-14">
-        {/* ─── Огромные часы Android 16: тонкие, плотный трекинг ─── */}
+        {/* ─── Часы Android 17: дата-пилюля сверху, плотные 88px ─── */}
         <div className="shrink-0 text-center" suppressHydrationWarning>
-          <p
-            className="lock-clock-in text-white"
-            style={{
-              fontSize: '76px',
-              fontWeight: 300,
-              lineHeight: 1,
-              letterSpacing: '-0.045em',
-              fontVariantNumeric: 'tabular-nums',
-              textShadow: '0 4px 44px rgba(0,0,0,0.55)',
-            }}
-          >
-            {now ? now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '\u00A0'}
-          </p>
-          <p className="mt-2 text-[15px] font-medium tracking-wide text-white/80">
+          <span className="lock-clock-in inline-flex items-center gap-1.5 rounded-full bg-white/[0.10] px-3.5 py-1 text-[12.5px] font-semibold text-white/85 ring-1 ring-white/[0.06] backdrop-blur-sm">
             {now
               ? now.toLocaleDateString('ru-RU', {
-                  weekday: 'long',
+                  weekday: 'short',
                   day: 'numeric',
                   month: 'long',
                 })
               : '\u00A0'}
+          </span>
+          <p
+            className="lock-clock-in mt-3 text-white"
+            style={{
+              fontSize: '88px',
+              fontWeight: 550,
+              lineHeight: 0.98,
+              letterSpacing: '-0.045em',
+              fontVariantNumeric: 'tabular-nums',
+              textShadow: '0 6px 48px rgba(0,0,0,0.6)',
+            }}
+          >
+            {now ? now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '\u00A0'}
           </p>
         </div>
 
@@ -289,8 +289,8 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
           </p>
         )}
 
-        {/* ─── Превью уведомлений: стеклянные карточки white/8, radius 22 ─── */}
-        <div data-lock-scroll className="mt-6 min-h-0 flex-1 space-y-2.5 overflow-y-auto [scrollbar-width:none]">
+        {/* ─── Превью уведомлений: M3-карточки radius 26 ─── */}
+        <div data-lock-scroll className="mt-5 min-h-0 flex-1 space-y-2.5 overflow-y-auto [scrollbar-width:none]">
           {unreadCount > 0 && (
             <p className="px-1 text-[11px] font-semibold uppercase tracking-wider text-white/40">
               {unreadCount} {notifWord(unreadCount)}
@@ -302,7 +302,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
             return (
               <div
                 key={n.id}
-                className="flex items-center gap-3 rounded-2xl bg-white/[0.08] px-3 py-2 ring-1 ring-white/[0.06] backdrop-blur-md"
+                className="flex items-center gap-3 rounded-[24px] bg-white/[0.08] px-3 py-2.5 ring-1 ring-white/[0.06] backdrop-blur-md"
               >
                 <span
                   aria-hidden="true"
@@ -315,7 +315,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
                   <p className="truncate text-[13px] font-bold leading-tight text-white">{n.title}</p>
                   <p className="mt-0.5 truncate text-[12px] leading-tight text-white/65">{n.body}</p>
                 </div>
-                <span className="shrink-0 text-[11px] text-white/40">{timeAgo(n.createdAt)}</span>
+                <span className="shrink-0 text-[11px] tabular-nums text-white/40">{timeAgo(n.createdAt)}</span>
               </div>
             )
           })}
@@ -327,9 +327,9 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
             </p>
           )}
 
-          {/* Итоги дня (если сегодня были сделки) — в том же стеклянном стиле */}
+          {/* Итоги дня (если сегодня были сделки) — в том же M3-стиле */}
           {day && dealsLabel && (
-            <div className="flex items-center gap-3 rounded-2xl bg-white/[0.08] px-3 py-2 ring-1 ring-white/[0.06] backdrop-blur-md">
+            <div className="flex items-center gap-3 rounded-[24px] bg-white/[0.08] px-3 py-2.5 ring-1 ring-white/[0.06] backdrop-blur-md">
               <span
                 aria-hidden="true"
                 className="flex size-9 shrink-0 items-center justify-center rounded-[12px] text-white shadow-sm"
@@ -356,7 +356,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
 
         {/* ─── Низ: подсказка, круглые shortcut'ы и Android-handle ─── */}
         <div className="shrink-0 pt-4">
-          <p className="text-center text-[12px] font-medium text-white/70">Проведите вверх, чтобы открыть</p>
+          <p className="text-center text-[12px] font-medium text-white/60">Проведите вверх, чтобы открыть</p>
           <div className="mt-4 flex items-center justify-between px-2">
             <button
               type="button"
@@ -369,7 +369,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
               className={`flex size-14 items-center justify-center rounded-full backdrop-blur-xl outline-none transition-all duration-200 active:scale-90 focus-visible:ring-2 focus-visible:ring-white/70 ${
                 flashlight
                   ? 'bg-white text-black shadow-[0_0_28px_rgba(255,251,214,0.45)]'
-                  : 'bg-white/[0.12] text-white'
+                  : 'bg-white/[0.10] text-white ring-1 ring-white/[0.08]'
               }`}
             >
               <Flashlight className="size-6" aria-hidden="true" />
@@ -382,7 +382,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
                 e.stopPropagation()
                 openCamera()
               }}
-              className="flex size-14 items-center justify-center rounded-full bg-white/[0.12] text-white backdrop-blur-xl outline-none transition-all duration-200 active:scale-90 focus-visible:ring-2 focus-visible:ring-white/70"
+              className="flex size-14 items-center justify-center rounded-full bg-white/[0.10] text-white ring-1 ring-white/[0.08] backdrop-blur-xl outline-none transition-all duration-200 active:scale-90 focus-visible:ring-2 focus-visible:ring-white/70"
             >
               <Camera className="size-6" aria-hidden="true" />
             </button>

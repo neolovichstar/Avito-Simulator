@@ -230,7 +230,7 @@ export default function RecentsOverlay({
       return {
         transform: `translate3d(${x}px, ${y}px, 0) scale(${CARD_SCALE})`,
         opacity,
-        borderRadius: 26,
+        borderRadius: 28,
         overflow: 'hidden',
         boxShadow: '0 34px 80px -24px rgba(0,0,0,0.85)',
         pointerEvents: 'none',
@@ -386,7 +386,7 @@ export default function RecentsOverlay({
       {open && (
         <div
           className="absolute inset-0 recents-fade"
-          style={{ background: 'rgba(4, 6, 9, 0.88)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' }}
+          style={{ background: 'rgba(3, 6, 5, 0.86)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' }}
           {...backdropPointers}
           role="presentation"
         />
@@ -429,14 +429,14 @@ export default function RecentsOverlay({
           )
         })}
 
-      {/* «Очистить все» — как в Pixel */}
+      {/* «Очистить все» — как в Pixel: слева внизу */}
       {open && n > 0 && !clearing && (
-        <div className="absolute inset-x-0 bottom-8 z-30 flex justify-center">
+        <div className="absolute bottom-8 left-5 z-30">
           <button
             type="button"
             onClick={clearAll}
             aria-label="Очистить все недавние приложения"
-            className="flex h-10 items-center gap-2 rounded-full bg-white/10 px-5 text-[13px] font-bold text-white/90 outline-none ring-1 ring-white/15 transition-all duration-200 active:scale-[0.96] active:bg-white/20 focus-visible:ring-2 focus-visible:ring-white"
+            className="flex h-10 items-center gap-2 rounded-full bg-white/[0.12] px-5 text-[13px] font-bold text-white/90 outline-none ring-1 ring-white/[0.12] backdrop-blur-sm transition-all duration-200 active:scale-[0.96] active:bg-white/20 focus-visible:ring-2 focus-visible:ring-white"
           >
             <Eraser className="size-4" aria-hidden="true" />
             Очистить все
@@ -447,7 +447,7 @@ export default function RecentsOverlay({
       {/* пусто */}
       {open && n === 0 && (
         <div className="pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 recents-fade">
-          <div className="flex size-16 items-center justify-center rounded-[22px] bg-white/[0.07]">
+          <div className="flex size-16 items-center justify-center rounded-[24px] bg-white/[0.07]">
             <Eraser className="size-7 text-white/40" aria-hidden="true" />
           </div>
           <p className="text-sm font-semibold text-white/80">Нет недавних приложений</p>

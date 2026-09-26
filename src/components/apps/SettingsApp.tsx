@@ -1,17 +1,18 @@
 'use client'
 
-// Приложение «Настройки» — Material 3 Expressive (Android 16), светлая тема.
-// Фон #F5F6F8, белые карточки rounded-[24px], текст #17181A, вторичный #8B8F99,
-// разделители #EBEDF0, акцент зелёный #21A038.
+// Приложение «Настройки» — Android 17 / Material 3 Expressive, тёмная системная тема.
+// Фон #0A0F0C, секции-карточки rounded-[24px] bg-white/[0.06] + ring-1 ring-white/[0.06],
+// заголовки-капсы 11px text-white/45 НАД карточками, строка = чип-иконка 40px (тональная
+// заливка emerald/amber/rose/zinc — без синего/индиго) + title 14.5px + sub 12px white/50.
 // Главный герой — правильный M3Switch: track 52×32, thumb 24px с иконкой-галочкой
 // (M3 Expressive), переход 200ms cubic-bezier(0.2,0,0,1). ВСЕ тогглы настроек — через него.
 // Реальные настройки ОС: dnd, тема, яркость, обои, виджеты, вибро-отклик, зарядка, сеть.
 // Устройство (с сохранением в prefs-сторе): Wi-Fi, мобильные данные, Bluetooth,
-// автоповорот, уведомления приложений. Громкость — локальный state.
+// автоповорот, уведомления приложений. Громкость медиа — глобальный стор volume.ts.
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import {
-  Bell, Bluetooth, Check, ChevronRight, Eye, EyeOff, Fingerprint, LayoutGrid, LockKeyhole, Moon, MoonStar, Palette,
+  Bell, Bluetooth, Check, ChevronRight, Eye, EyeOff, Fingerprint, LayoutGrid, LockKeyhole, Moon, MoonStar,
   Search, Signal, Smartphone, Sparkles, Sun, User, Vibrate, Volume2, Wifi, X, Zap,
 } from 'lucide-react'
 import { useOS, ALL_WIDGETS, WIDGET_LABEL, type AppKey, type NetKind, type WidgetKey } from '@/lib/store'
@@ -41,13 +42,13 @@ function M3Switch({ checked, onChange, label }: {
         e.stopPropagation()
         onChange(!checked)
       }}
-      className="group relative h-8 w-[52px] shrink-0 cursor-pointer rounded-full outline-none transition-colors duration-200 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:ring-2 focus-visible:ring-[#21A038]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-      style={{ backgroundColor: checked ? '#21A038' : '#DADCE0' }}
+      className="group relative h-8 w-[52px] shrink-0 cursor-pointer rounded-full outline-none transition-colors duration-200 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:ring-2 focus-visible:ring-[#21A038]/60"
+      style={{ backgroundColor: checked ? '#21A038' : 'rgba(255,255,255,0.16)' }}
     >
       <span
         aria-hidden="true"
         className="absolute top-1 flex size-6 items-center justify-center rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.3),0_3px_8px_rgba(0,0,0,0.15)] transition-[left,background-color] duration-200 ease-[cubic-bezier(0.2,0,0,1)] group-active:scale-90"
-        style={{ left: checked ? 24 : 4, backgroundColor: checked ? '#FFFFFF' : '#F7F8FA' }}
+        style={{ left: checked ? 24 : 4, backgroundColor: checked ? '#FFFFFF' : '#C9CDD4' }}
       >
         <Check
           className="size-3.5 transition-opacity duration-150"
@@ -84,7 +85,7 @@ function M3Slider({ value, onChange, ariaLabel, leftIcon, badge }: {
 
   return (
     <div className="flex items-center gap-3">
-      {leftIcon && <span className="shrink-0 text-[#8B8F99]" aria-hidden="true">{leftIcon}</span>}
+      {leftIcon && <span className="shrink-0 text-white/50" aria-hidden="true">{leftIcon}</span>}
       <div
         ref={trackRef}
         role="slider"
@@ -128,7 +129,7 @@ function M3Slider({ value, onChange, ariaLabel, leftIcon, badge }: {
             onChange(Math.min(1, value + 0.05))
           }
         }}
-        className="relative h-12 flex-1 touch-none select-none rounded-full bg-[#E4E6EB] outline-none focus-visible:ring-2 focus-visible:ring-[#21A038]/50"
+        className="relative h-12 flex-1 touch-none select-none rounded-full bg-white/[0.12] outline-none focus-visible:ring-2 focus-visible:ring-[#21A038]/50"
       >
         {/* активная заливка — до центра ручки (на 0% скрыта) */}
         <div
@@ -137,8 +138,8 @@ function M3Slider({ value, onChange, ariaLabel, leftIcon, badge }: {
         />
         {/* ручка 28px — всегда внутри капсулы (отступ 4px от краёв) */}
         <div
-          className={`absolute top-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.35),0_2px_6px_rgba(0,0,0,0.18)] ring-1 ring-black/5 transition-transform duration-150 ${drag ? 'scale-125' : ''}`}
-          style={{ left: `calc(4px + (100% - 36px) * ${value})`, width: 28, height: 28 }}
+          className={`absolute top-1/2 -translate-y-1/2 rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.35),0_2px_6px_rgba(0,0,0,0.18)] ring-1 ring-black/5 transition-transform duration-150 ${drag ? 'scale-125' : ''}`}
+          style={{ left: `calc(4px + (100% - 36px) * ${value})`, width: 28, height: 28, backgroundColor: '#FFFFFF' }}
         />
       </div>
       {badge}
@@ -152,17 +153,26 @@ function M3Slider({ value, onChange, ariaLabel, leftIcon, badge }: {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section>
-      <h2 className="mb-2 px-1 text-[13px] font-semibold uppercase tracking-[0.08em] text-[#8B8F99]">{title}</h2>
-      <div className="overflow-hidden rounded-[24px] bg-white shadow-[0_1px_2px_rgba(23,24,26,0.04),0_10px_30px_-18px_rgba(23,24,26,0.10)]">
+      <h2 className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-white/45">{title}</h2>
+      <div className="overflow-hidden rounded-[24px] bg-white/[0.06] ring-1 ring-white/[0.06]">
         {children}
       </div>
     </section>
   )
 }
 
+// Тональные чипы иконок (M3 Expressive): заливка 15% + светлый тон иконки. Без синего/индиго.
+// tone — строка (массивы строк проходят через .filter, литеральные типы там расширяются).
+const TONE: Record<string, string> = {
+  emerald: 'bg-emerald-500/15 text-emerald-300',
+  amber: 'bg-amber-500/15 text-amber-300',
+  rose: 'bg-rose-500/15 text-rose-300',
+  zinc: 'bg-zinc-500/15 text-zinc-300',
+}
+
 interface RowItem {
   key: string
-  color: string
+  tone: string
   icon: ReactNode
   label: string
   desc?: string
@@ -179,19 +189,18 @@ function RowLine({ r }: { r: RowItem }) {
         <span className="shrink-0" aria-hidden="true">{r.icon}</span>
       ) : (
         <span
-          className="flex size-10 shrink-0 items-center justify-center rounded-full"
-          style={{ backgroundColor: `${r.color}1F`, color: r.color }}
+          className={`flex size-10 shrink-0 items-center justify-center rounded-full ${TONE[r.tone]}`}
           aria-hidden="true"
         >
           {r.icon}
         </span>
       )}
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[15px] font-medium text-[#17181A]">{r.label}</span>
-        {r.desc && <span className="mt-0.5 block truncate text-xs text-[#8B8F99]">{r.desc}</span>}
+        <span className="block truncate text-[14.5px] font-semibold text-white">{r.label}</span>
+        {r.desc && <span className="mt-0.5 block truncate text-[12px] text-white/50">{r.desc}</span>}
       </span>
       {r.right}
-      {r.chevron && <ChevronRight className="size-4 shrink-0 text-[#C9CDD4]" aria-hidden="true" />}
+      {r.chevron && <ChevronRight className="size-4 shrink-0 text-white/25" aria-hidden="true" />}
     </>
   )
   if (r.right) {
@@ -200,7 +209,7 @@ function RowLine({ r }: { r: RowItem }) {
     return (
       <div
         onClick={r.onClick}
-        className="flex min-h-[52px] w-full cursor-pointer items-center gap-3.5 px-4 py-2.5 transition-colors duration-150 active:bg-[#F0F1F5]"
+        className="relative flex min-h-[52px] w-full cursor-pointer items-center gap-3.5 px-4 py-2.5 transition-colors duration-200 ease-[cubic-bezier(0.2,0,0,1)] before:absolute before:left-14 before:right-0 before:top-0 before:border-t before:border-white/[0.05] first:before:hidden active:bg-white/[0.04]"
       >
         {inner}
       </div>
@@ -211,13 +220,13 @@ function RowLine({ r }: { r: RowItem }) {
       <button
         type="button"
         onClick={r.onClick}
-        className="flex min-h-[52px] w-full items-center gap-3.5 px-4 py-2.5 text-left transition-colors duration-150 active:bg-[#F0F1F5]"
+        className="relative flex min-h-[52px] w-full items-center gap-3.5 px-4 py-2.5 text-left transition duration-200 ease-[cubic-bezier(0.2,0,0,1)] before:absolute before:left-14 before:right-0 before:top-0 before:border-t before:border-white/[0.05] first:before:hidden active:scale-[0.97] active:bg-white/[0.04]"
       >
         {inner}
       </button>
     )
   }
-  return <div className="flex min-h-[52px] items-center gap-3.5 px-4 py-2.5">{inner}</div>
+  return <div className="relative flex min-h-[52px] items-center gap-3.5 px-4 py-2.5 before:absolute before:left-14 before:right-0 before:top-0 before:border-t before:border-white/[0.05] first:before:hidden">{inner}</div>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -326,7 +335,7 @@ export default function SettingsApp() {
   const netRows: RowItem[] = [
     {
       key: 'wifi',
-      color: '#0A8A76',
+      tone: 'emerald',
       icon: <Wifi className="size-5" />,
       label: 'Wi-Fi',
       desc: wifiOn ? (netOnline ? NET_LABEL[netKind] : 'Сеть без доступа к интернету') : 'Выключено',
@@ -335,7 +344,7 @@ export default function SettingsApp() {
     },
     {
       key: 'mobile',
-      color: '#21A038',
+      tone: 'emerald',
       icon: <Signal className="size-5" />,
       label: 'Мобильные данные',
       desc: mobileData ? 'Фоновая передача данных включена' : 'Только Wi-Fi',
@@ -347,7 +356,7 @@ export default function SettingsApp() {
   const btRows: RowItem[] = [
     {
       key: 'bt',
-      color: '#D64570',
+      tone: 'emerald',
       icon: <Bluetooth className="size-5" />,
       label: 'Bluetooth',
       desc: btOn ? 'Доступен для устройств рядом' : 'Выключено',
@@ -358,7 +367,7 @@ export default function SettingsApp() {
 
   const appRows: RowItem[] = APPS.map(({ key, role }) => ({
     key: `app-${key}`,
-    color: '#21A038',
+    tone: 'emerald',
     noTile: true,
     icon: (
       <img loading="lazy" decoding="async" src={APP_TILE[key].image}
@@ -376,7 +385,7 @@ export default function SettingsApp() {
   const notifRows: RowItem[] = [
     {
       key: 'dnd',
-      color: '#44474F',
+      tone: 'amber',
       icon: <MoonStar className="size-5" />,
       label: 'Не беспокоить',
       desc: dnd ? 'Тосты скрыты — всё копится в шторке' : 'Уведомления всплывают поверх экрана',
@@ -385,7 +394,7 @@ export default function SettingsApp() {
     },
     {
       key: 'notif',
-      color: '#E8A020',
+      tone: 'amber',
       icon: <Bell className="size-5" />,
       label: 'Уведомления приложений',
       desc: notifOn ? 'Всплывающие карточки на экране' : 'Только в шторке уведомлений',
@@ -397,7 +406,7 @@ export default function SettingsApp() {
   const soundRows: RowItem[] = [
     {
       key: 'vibro',
-      color: '#21A038',
+      tone: 'emerald',
       icon: <Vibrate className="size-5" />,
       label: 'Вибро-отклик',
       desc: vibro ? 'Вибрация на действия и события включена' : 'Полная тишина: без вибрации',
@@ -409,7 +418,7 @@ export default function SettingsApp() {
   const screenRows: RowItem[] = [
     {
       key: 'dark',
-      color: '#44474F',
+      tone: 'zinc',
       icon: <Moon className="size-5" />,
       label: 'Тёмная тема',
       desc: theme === 'dark' ? 'Включена: тёмный интерфейс ОС' : 'Выключена: светлый интерфейс',
@@ -424,7 +433,7 @@ export default function SettingsApp() {
     },
     {
       key: 'rotate',
-      color: '#D64570',
+      tone: 'zinc',
       icon: <Smartphone className="size-5" />,
       label: 'Автоповорот',
       desc: autoRotate ? 'Экран следует за рукой' : 'Только портретная ориентация',
@@ -436,7 +445,7 @@ export default function SettingsApp() {
   const batteryRows: RowItem[] = [
     {
       key: 'charge',
-      color: '#21A038',
+      tone: 'emerald',
       icon: <Zap className="size-5" />,
       label: 'Зарядка подключена',
       desc: batteryReal ? 'Управляется системой устройства' : charging ? 'Кабель в розетке — батарея растёт' : 'Кабель отключён',
@@ -458,7 +467,7 @@ export default function SettingsApp() {
   const privacyRows: RowItem[] = [
     {
       key: 'allowCalls',
-      color: '#21A038',
+      tone: 'rose',
       icon: <LockKeyhole className="size-5" />,
       label: 'Принимать звонки',
       desc: allowCalls ? 'Входящие вызовы проходят' : 'Все входящие отклоняются автоматически',
@@ -467,7 +476,7 @@ export default function SettingsApp() {
     },
     {
       key: 'hideNumber',
-      color: '#44474F',
+      tone: 'rose',
       icon: <EyeOff className="size-5" />,
       label: 'Скрывать номер',
       desc: hideNumber ? 'Собеседник видит «Скрытый номер»' : 'Номер виден собеседникам и продавцам',
@@ -476,7 +485,7 @@ export default function SettingsApp() {
     },
     {
       key: 'hideOnline',
-      color: '#0A8A76',
+      tone: 'rose',
       icon: <Eye className="size-5" />,
       label: 'Статус онлайн',
       desc: hideOnline ? 'Скрыт — вы «невидимка»' : 'Виден всем в чатах и объявлениях',
@@ -485,7 +494,7 @@ export default function SettingsApp() {
     },
     {
       key: 'hideBalance',
-      color: '#E8A020',
+      tone: 'rose',
       icon: <EyeOff className="size-5" />,
       label: 'Скрывать баланс',
       desc: hideBalance ? 'Баланс виден только вам' : 'Баланс виден в профиле',
@@ -497,7 +506,7 @@ export default function SettingsApp() {
   const aboutRows: RowItem[] = [
     {
       key: 'model',
-      color: '#44474F',
+      tone: 'zinc',
       icon: <Smartphone className="size-5" />,
       label: 'Модель',
       desc: device
@@ -506,14 +515,14 @@ export default function SettingsApp() {
     },
     {
       key: 'version',
-      color: '#0A8A76',
+      tone: 'zinc',
       icon: <Sparkles className="size-5" />,
       label: 'Версия ОС',
       desc: device?.osVersion ? `Android 17 · реальная ОС: ${device.osName} ${device.osVersion}` : 'Android 17 · Material 3 Expressive',
     },
     {
       key: 'screen',
-      color: '#21A038',
+      tone: 'zinc',
       icon: <LayoutGrid className="size-5" />,
       label: 'Экран',
       desc: device?.screenPhysical
@@ -522,7 +531,7 @@ export default function SettingsApp() {
     },
     {
       key: 'cpu',
-      color: '#E8A020',
+      tone: 'zinc',
       icon: <Zap className="size-5" />,
       label: 'Процессор',
       desc: device?.cores
@@ -531,7 +540,7 @@ export default function SettingsApp() {
     },
     {
       key: 'storage',
-      color: '#D64570',
+      tone: 'zinc',
       icon: <Fingerprint className="size-5" />,
       label: 'Хранилище',
       desc:
@@ -541,40 +550,40 @@ export default function SettingsApp() {
     },
     {
       key: 'net',
-      color: '#0A8A76',
+      tone: 'zinc',
       icon: <Signal className="size-5" />,
       label: 'Сеть',
       desc: NET_LABEL[netKind],
     },
     {
       key: 'locale',
-      color: '#44474F',
+      tone: 'zinc',
       icon: <User className="size-5" />,
       label: 'Язык и регион',
       desc: device ? `${device.language} · ${device.timezone}` : '—',
     },
     {
       key: 'build',
-      color: '#E8A020',
+      tone: 'zinc',
       icon: <LayoutGrid className="size-5" />,
       label: 'Сборка',
       desc: `ResaleOS 2.6.0 (build 140) · ${device?.browser ?? 'WebView'}`,
     },
     {
       key: 'deviceid',
-      color: '#21A038',
+      tone: 'zinc',
       icon: <Fingerprint className="size-5" />,
       label: 'Идентификатор устройства',
       desc: 'Последние 8 знаков avito_sim_device_id',
       right: (
-        <span className="shrink-0 rounded-lg bg-[#F0F1F5] px-2 py-1 font-mono text-[12px] font-semibold tracking-wider text-[#17181A]">
+        <span className="shrink-0 rounded-lg bg-white/[0.08] px-2 py-1 font-mono text-[12px] font-semibold tracking-wider text-white/85">
           {deviceId}
         </span>
       ),
     },
     {
       key: 'owner',
-      color: '#D64570',
+      tone: 'zinc',
       icon: <User className="size-5" />,
       label: name,
       desc: session ? `@${session.username} · уровень ${session.level}` : 'Сессия не найдена',
@@ -590,18 +599,10 @@ export default function SettingsApp() {
   const sections: { key: string; visible: boolean; node: ReactNode }[] = [
     {
       key: 'net',
-      visible: netRows.length > 0,
+      visible: netRows.length > 0 || btRows.length > 0,
       node: (
         <Section title="Сеть и интернет">
           {netRows.map((r) => <RowLine key={r.key} r={r} />)}
-        </Section>
-      ),
-    },
-    {
-      key: 'bt',
-      visible: btRows.length > 0,
-      node: (
-        <Section title="Подключённые устройства">
           {btRows.map((r) => <RowLine key={r.key} r={r} />)}
         </Section>
       ),
@@ -630,10 +631,10 @@ export default function SettingsApp() {
       node: (
         <Section title="Звук и вибрация">
           {volumeHit && (
-            <div className="border-b border-[#EBEDF0] px-4 py-4">
+            <div className="px-4 py-4">
               <div className="mb-2.5 flex items-baseline justify-between">
-                <span className="text-[15px] font-medium text-[#17181A]">Громкость медиа</span>
-                <span className="text-[13px] font-semibold tabular-nums text-[#8B8F99]">{Math.round(volume * 100)}%</span>
+                <span className="text-[14.5px] font-semibold text-white">Громкость медиа</span>
+                <span className="text-[12px] font-semibold tabular-nums text-white/45">{Math.round(volume * 100)}%</span>
               </div>
               <M3Slider
                 value={volume}
@@ -641,7 +642,7 @@ export default function SettingsApp() {
                 ariaLabel="Громкость медиа"
                 leftIcon={<Volume2 className="size-5" />}
               />
-              <p className="mt-2 text-[11px] text-[#8B8F99]">Управляет музыкой ОС · синхронизировано с плашкой громкости</p>
+              <p className="mt-2 text-[11px] text-white/40">Управляет музыкой ОС · синхронизировано с плашкой громкости</p>
             </div>
           )}
           {soundRows.map((r) => <RowLine key={r.key} r={r} />)}
@@ -654,10 +655,10 @@ export default function SettingsApp() {
       node: (
         <Section title="Экран">
           {brightnessHit && (
-            <div className="border-b border-[#EBEDF0] px-4 py-4">
+            <div className="px-4 py-4">
               <div className="mb-2.5 flex items-baseline justify-between">
-                <span className="text-[15px] font-medium text-[#17181A]">Яркость</span>
-                <span className="text-[13px] font-semibold tabular-nums text-[#8B8F99]">{Math.round(brightness * 100)}%</span>
+                <span className="text-[14.5px] font-semibold text-white">Яркость</span>
+                <span className="text-[12px] font-semibold tabular-nums text-white/45">{Math.round(brightness * 100)}%</span>
               </div>
               <M3Slider
                 value={(brightness - 0.4) / 0.6}
@@ -675,10 +676,10 @@ export default function SettingsApp() {
       key: 'wall',
       visible: wallpaperHit,
       node: (
-        <Section title="Обои и стиль">
+        <Section title="Персонализация">
           <div className="px-4 py-4">
-            <div className="text-[15px] font-medium text-[#17181A]">Обои</div>
-            <div className="mt-0.5 text-xs text-[#8B8F99]">Фон домашнего экрана и локскрина</div>
+            <div className="text-[14.5px] font-semibold text-white">Обои</div>
+            <div className="mt-0.5 text-[12px] text-white/45">Фон домашнего экрана и локскрина</div>
             <div className="mt-3 grid grid-cols-4 gap-2.5">
               {WALLPAPERS.map((w) => {
                 const active = wallpaper === w.id
@@ -690,7 +691,7 @@ export default function SettingsApp() {
                     aria-pressed={active}
                     onClick={() => setWallpaper(w.id)}
                     className={`h-16 overflow-hidden rounded-xl border transition duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.97] ${
-                      active ? 'border-[#21A038] ring-2 ring-[#21A038]/50' : 'border-[#EBEDF0]'
+                      active ? 'border-[#21A038] ring-2 ring-[#21A038]/50' : 'border-white/10'
                     }`}
                     style={wallpaperPreviewStyle(w.id)}
                   />
@@ -698,8 +699,8 @@ export default function SettingsApp() {
               })}
             </div>
 
-            <div className="mt-5 text-[15px] font-medium text-[#17181A]">Виджеты домашнего экрана</div>
-            <div className="mt-0.5 text-xs text-[#8B8F99]">Минимум один — экран не бывает пустым</div>
+            <div className="mt-5 text-[14.5px] font-semibold text-white">Виджеты домашнего экрана</div>
+            <div className="mt-0.5 text-[12px] text-white/45">Минимум один — экран не бывает пустым</div>
             <div className="mt-3 flex flex-wrap gap-2">
               {ALL_WIDGETS.map((w: WidgetKey) => {
                 const on = widgets.includes(w)
@@ -715,8 +716,8 @@ export default function SettingsApp() {
                       }
                       setWidgets(on ? widgets.filter((x) => x !== w) : [...widgets, w])
                     }}
-                    className={`h-9 rounded-full px-3.5 text-[13px] font-medium transition duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-95 ${
-                      on ? 'bg-[#21A038] text-white' : 'bg-[#F0F1F5] text-[#17181A]'
+                    className={`h-11 rounded-full px-4 text-[13px] font-medium transition duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-95 ${
+                      on ? 'bg-[#21A038] text-white' : 'bg-white/[0.08] text-white/80'
                     }`}
                   >
                     {WIDGET_LABEL[w]}
@@ -734,14 +735,14 @@ export default function SettingsApp() {
       node: (
         <Section title="Батарея">
           {batteryHit && (
-            <div className="border-b border-[#EBEDF0] px-4 py-4">
+            <div className="px-4 py-4">
               <div className="flex items-center gap-4">
                 <div className="tabular-nums leading-none">
-                  <span className="text-[34px] font-bold text-[#17181A]">{battery}</span>
-                  <span className="text-[18px] font-semibold text-[#8B8F99]">%</span>
+                  <span className="text-[34px] font-bold text-white">{battery}</span>
+                  <span className="text-[18px] font-semibold text-white/45">%</span>
                 </div>
                 <div className="relative flex-1 pr-2">
-                  <div className="relative h-11 rounded-[14px] border-2 border-[#C9CDD4] p-[3px]">
+                  <div className="relative h-11 rounded-[14px] border-2 border-white/25 p-[3px]">
                     <div
                       className="h-full rounded-[9px] transition-[width,background-color] duration-500"
                       style={{ width: `${Math.max(4, battery)}%`, backgroundColor: batteryColor }}
@@ -753,13 +754,13 @@ export default function SettingsApp() {
                       />
                     )}
                   </div>
-                  <div className="absolute right-0 top-1/2 h-5 w-[5px] -translate-y-1/2 rounded-r-[3px] bg-[#C9CDD4]" />
+                  <div className="absolute right-0 top-1/2 h-5 w-[5px] -translate-y-1/2 rounded-r-[3px] bg-white/[0.25]" />
                 </div>
               </div>
-              <div className="mt-3 flex items-center gap-1.5 text-[13px] font-medium" style={{ color: charging ? '#21A038' : '#8B8F99' }}>
+              <div className="mt-3 flex items-center gap-1.5 text-[13px] font-medium" style={{ color: charging ? '#3ED598' : 'rgba(255,255,255,0.5)' }}>
                 <Zap className={`size-4 ${charging ? 'fill-[#21A038]/20' : ''}`} aria-hidden="true" />
                 {charging ? 'Заряжается' : 'Разряжается'}
-                <span className="font-normal text-[#8B8F99]">
+                <span className="font-normal text-white/40">
                   · {batteryReal ? 'реальная батарея устройства' : 'симуляция питания'}
                 </span>
               </div>
@@ -792,25 +793,25 @@ export default function SettingsApp() {
   const visibleSections = sections.filter((s) => s.visible)
 
   return (
-    <div className="flex h-full flex-col bg-[#F5F6F8] text-[#17181A]">
-      {/* шапка: крупный заголовок + поисковая пилюля */}
+    <div className="flex h-full flex-col bg-[#0A0F0C] text-white">
+      {/* шапка: large title M3 + поисковая пилюля */}
       <div className="shrink-0 px-4 pb-3 pt-5">
-        <h1 className="px-1 text-[28px] font-bold leading-tight tracking-[-0.01em]">Настройки</h1>
-        <div className="mt-4 flex h-12 items-center gap-2.5 rounded-full bg-[#F0F1F5] px-4">
-          <Search className="size-4.5 shrink-0 text-[#8B8F99]" aria-hidden="true" />
+        <h1 className="px-1 text-[26px] font-bold leading-tight tracking-[-0.02em]">Настройки</h1>
+        <div className="mt-4 flex h-12 items-center gap-2.5 rounded-full bg-white/[0.08] px-4">
+          <Search className="size-4.5 shrink-0 text-white/40" aria-hidden="true" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Поиск настроек"
             aria-label="Поиск настроек"
-            className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-[#8B8F99]"
+            className="min-w-0 flex-1 bg-transparent text-[15px] text-white outline-none placeholder:text-white/35"
           />
           {query !== '' && (
             <button
               type="button"
               aria-label="Очистить поиск"
               onClick={() => setQuery('')}
-              className="flex size-8 shrink-0 items-center justify-center rounded-full text-[#8B8F99] transition active:bg-[#E4E6EB]"
+              className="flex size-10 shrink-0 items-center justify-center rounded-full text-white/45 transition active:bg-white/[0.08]"
             >
               <X className="size-4" aria-hidden="true" />
             </button>
@@ -822,17 +823,21 @@ export default function SettingsApp() {
       <div className="flex-1 touch-pan-y space-y-5 overflow-y-auto px-4 pb-10 pt-1">
         {q !== '' && visibleSections.length === 0 ? (
           <div className="flex flex-col items-center px-6 pt-16 text-center">
-            <Search className="size-10 text-[#C9CDD4]" aria-hidden="true" />
-            <div className="mt-3 text-[15px] font-semibold text-[#17181A]">Ничего не найдено</div>
-            <p className="mt-1 max-w-[240px] text-[13px] text-[#8B8F99]">
+            <Search className="size-10 text-white/25" aria-hidden="true" />
+            <div className="mt-3 text-[15px] font-semibold text-white">Ничего не найдено</div>
+            <p className="mt-1 max-w-[240px] text-[13px] text-white/45">
               Попробуйте другой запрос — например «яркость», «обои» или «Wi-Fi»
             </p>
           </div>
         ) : (
-          visibleSections.map((s) => <div key={s.key}>{s.node}</div>)
+          visibleSections.map((s, i) => (
+            <div key={s.key} className="m3-rise" style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}>
+              {s.node}
+            </div>
+          ))
         )}
 
-        <p className="px-1 pb-2 pt-1 text-center text-[11px] text-[#8B8F99]">
+        <p className="px-1 pb-2 pt-1 text-center text-[11px] text-white/30">
           Resale Phone 17 · Android 17 · ResaleOS 2.6.0 (140)
         </p>
       </div>

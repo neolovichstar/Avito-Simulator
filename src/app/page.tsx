@@ -14,8 +14,7 @@ import StatusBar from '@/components/os/StatusBar'
 import LockScreen from '@/components/os/LockScreen'
 import HomeScreen from '@/components/os/HomeScreen'
 import GestureNav from '@/components/os/GestureNav'
-import NotificationCenter from '@/components/os/NotificationCenter'
-import ControlCenter from '@/components/os/ControlCenter'
+import Shade from '@/components/os/Shade'
 import ToastStack from '@/components/os/ToastStack'
 import VolumePlate from '@/components/os/VolumePlate'
 import CallOverlay from '@/components/os/CallOverlay'
@@ -106,8 +105,8 @@ function OfflineScreen({ onRetry, compact = false }: { onRetry: () => void; comp
 
 export default function Home() {
   const [recentsOpen, setRecentsOpen] = useState(false)
-  const [notifOpen, setNotifOpen] = useState(false)
-  const [controlOpen, setControlOpen] = useState(false)
+  const [shadeOpen, setShadeOpen] = useState(false)
+  const [shadeQs, setShadeQs] = useState(false)
   const [isDesktop, setIsDesktop] = useState(false)
   const [authError, setAuthError] = useState(false)
   const booted = useOS((s) => s.booted)
@@ -371,14 +370,14 @@ export default function Home() {
   }
 
   // ---------- ЖЕСТЫ ШТОРКИ (как в настоящем Android): -----------------------
-  // свайп вниз от ЛЕВОЙ половины верхнего края — центр уведомлений,
-  // от ПРАВОЙ половины — центр управления (яркость/фонарик и т.д.).
+  // свайп вниз от ЛЕВОЙ половины верхнего края — уведомления,
+  // от ПРАВОЙ половины — сразу полные быстрые настройки.
   const notifSwipe = useSwipe({
     threshold: 30,
     onSwipe: (dir) => {
       if (dir === 'down') {
-        setControlOpen(false)
-        setNotifOpen(true)
+        setShadeQs(false)
+        setShadeOpen(true)
       }
     },
   })
@@ -386,8 +385,8 @@ export default function Home() {
     threshold: 30,
     onSwipe: (dir) => {
       if (dir === 'down') {
-        setNotifOpen(false)
-        setControlOpen(true)
+        setShadeQs(true)
+        setShadeOpen(true)
       }
     },
   })
@@ -465,7 +464,7 @@ export default function Home() {
       <PhoneFrame>
         {/* статус-бар: тёмные иконки на тёмных экранах,
             над светлыми приложениями (Resale/Банк) — тёмные иконки на светлой полосе */}
-        <StatusBar variant={lightChrome ? 'light' : 'dark'} onBell={() => { setControlOpen(false); setNotifOpen(true) }} />
+        <StatusBar variant={lightChrome ? 'light' : 'dark'} onBell={() => { setShadeQs(false); setShadeOpen(true) }} />
 
         {/* контент — до самого низа: пилюля-жест накладывается поверх.
             Приложения живут в СЛОЯХ внутри RecentsOverlay (keep-alive как в
@@ -496,9 +495,13 @@ export default function Home() {
         {/* лок-скрин поверх всего */}
         {locked && <LockScreen onUnlock={unlock} />}
 
-        {/* уведомления и тосты */}
-        <NotificationCenter open={notifOpen} onClose={() => setNotifOpen(false)} onOpenApp={(a) => { setNotifOpen(false); openApp(a) }} />
-        <ControlCenter open={controlOpen} onClose={() => setControlOpen(false)} onOpenApp={(a) => { setControlOpen(false); openApp(a) }} />
+        {/* системная шторка Android 17: QS-плитки + медиа + уведомления */}
+        <Shade
+          open={shadeOpen}
+          qs={shadeQs}
+          onClose={() => setShadeOpen(false)}
+          onOpenApp={(a) => { setShadeOpen(false); openApp(a) }}
+        />
         <ToastStack />
         <VolumePlate />
         <CallOverlay /> {/* системный звонок поверх приложений (26-d) */}
@@ -526,14 +529,14 @@ export default function Home() {
           aria-label="Открыть уведомления"
           className="absolute left-0 top-0 z-[59] h-8 w-1/2 touch-none outline-none focus-visible:ring-2 focus-visible:ring-white/50"
           onPointerDown={notifSwipe.onPointerDown}
-          onClick={() => { setControlOpen(false); setNotifOpen(true) }}
+          onClick={() => { setShadeQs(false); setShadeOpen(true) }}
         />
         <div
           role="button"
-          aria-label="Открыть центр управления"
+          aria-label="Открыть быстрые настройки"
           className="absolute right-0 top-0 z-[59] h-8 w-1/2 touch-none outline-none focus-visible:ring-2 focus-visible:ring-white/50"
           onPointerDown={controlSwipe.onPointerDown}
-          onClick={() => { setNotifOpen(false); setControlOpen(true) }}
+          onClick={() => { setShadeQs(true); setShadeOpen(true) }}
         />
 
         {/* жестовая навигация: пилюля + свайпы от краёв (вместо кнопок).
@@ -541,14 +544,19 @@ export default function Home() {
         <GestureNav
           canGoBack={!!currentApp}
           onBack={() => {
-            if (recentsOpen) setRecentsOpen(false)
+            if (shadeOpen) setShadeOpen(false)
+            else if (recentsOpen) setRecentsOpen(false)
             else closeApp()
           }}
           onHome={() => {
+            setShadeOpen(false)
             setRecentsOpen(false)
             closeApp()
           }}
-          onRecents={() => setRecentsOpen((v) => !v)}
+          onRecents={() => {
+            setShadeOpen(false)
+            setRecentsOpen((v) => !v)
+          }}
         />
       </PhoneFrame>
     </main>

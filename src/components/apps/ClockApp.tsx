@@ -3,6 +3,7 @@
 // Часы ОС: мировое время, секундомер и таймер.
 // Живые тики — через useSyncExternalStore (без setState в эффектах);
 // интервалы/тайм-ауты запускаются только из обработчиков нажатий.
+// Визуал — M3 Expressive: пилюли в нижней навигации, круглые кнопки управления, тональные карточки.
 
 import { useSyncExternalStore, useState } from 'react'
 import {
@@ -75,7 +76,7 @@ function WorldTab() {
   const now = tick ? new Date(tick) : null
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto [scrollbar-width:thin] px-4 pb-4">
+    <div className="flex flex-1 flex-col overflow-y-auto [scrollbar-width:thin] px-4 pb-6">
       <div className="flex flex-col items-center pt-6 pb-8">
         <div className="text-[13px] capitalize text-white/60" suppressHydrationWarning>
           {now ? now.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' }) : ''}
@@ -88,12 +89,12 @@ function WorldTab() {
         <div className="mt-2 text-[12px] text-white/40">Местное время</div>
       </div>
 
-      <div className="text-[12px] text-white/60">Другие города</div>
+      <div className="text-[13px] font-semibold uppercase tracking-wide text-white/50">Другие города</div>
       <div className="mt-2 flex flex-col gap-2">
         {CITIES.map((c) => (
           <div
             key={c.tz}
-            className="flex items-center justify-between rounded-2xl border border-emerald-500/15 bg-[#0E1F16] p-4"
+            className="flex items-center justify-between rounded-[24px] bg-white/[0.06] p-4 ring-1 ring-white/[0.06]"
           >
             <div className="flex min-w-0 items-center gap-3">
               <FlagDot kind={c.flag} />
@@ -160,33 +161,29 @@ function StopwatchTab() {
   const canReset = !running && (acc > 0 || laps.length > 0)
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto [scrollbar-width:thin] px-4 pb-4">
+    <div className="flex flex-1 flex-col overflow-y-auto [scrollbar-width:thin] px-4 pb-6">
       <div className="flex flex-col items-center pt-10 pb-8">
         <div className="text-[56px] font-light leading-none tabular-nums">{fmtSw(elapsed)}</div>
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex items-center justify-center gap-4">
         {running ? (
           <button
             type="button"
             onClick={stop}
             aria-label="Остановить секундомер"
-            className="h-12 flex-1 rounded-2xl border border-red-500/30 bg-red-500/15 text-[15px] font-semibold text-red-400 transition-transform active:scale-[0.98]"
+            className="flex size-16 items-center justify-center rounded-full bg-white/[0.08] text-white transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-90"
           >
-            <span className="inline-flex items-center gap-2">
-              <Pause className="size-4" aria-hidden="true" /> Стоп
-            </span>
+            <Pause className="size-6" aria-hidden="true" />
           </button>
         ) : (
           <button
             type="button"
             onClick={start}
             aria-label="Запустить секундомер"
-            className="h-12 flex-1 rounded-2xl bg-[#22C55E] text-[15px] font-bold text-[#052E16] transition-transform active:scale-[0.98]"
+            className="flex size-16 items-center justify-center rounded-full bg-[#21A038] text-white shadow-lg shadow-emerald-500/25 transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-90"
           >
-            <span className="inline-flex items-center gap-2">
-              <Play className="size-4" aria-hidden="true" /> Старт
-            </span>
+            <Play className="size-6" aria-hidden="true" />
           </button>
         )}
         {running ? (
@@ -194,11 +191,9 @@ function StopwatchTab() {
             type="button"
             onClick={lap}
             aria-label="Зафиксировать круг"
-            className="h-12 flex-1 rounded-2xl border border-white/10 bg-white/[0.06] text-[15px] font-semibold text-white transition-transform active:scale-[0.98]"
+            className="flex size-16 items-center justify-center rounded-full bg-white/[0.08] text-white transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-90"
           >
-            <span className="inline-flex items-center gap-2">
-              <Flag className="size-4" aria-hidden="true" /> Круг
-            </span>
+            <Flag className="size-6" aria-hidden="true" />
           </button>
         ) : (
           <button
@@ -206,11 +201,9 @@ function StopwatchTab() {
             onClick={reset}
             disabled={!canReset}
             aria-label="Сбросить секундомер"
-            className="h-12 flex-1 rounded-2xl border border-white/10 bg-white/[0.06] text-[15px] font-semibold text-white transition-transform active:scale-[0.98] disabled:opacity-40"
+            className="flex size-16 items-center justify-center rounded-full bg-white/[0.08] text-white transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-90 disabled:opacity-40"
           >
-            <span className="inline-flex items-center gap-2">
-              <RotateCcw className="size-4" aria-hidden="true" /> Сброс
-            </span>
+            <RotateCcw className="size-6" aria-hidden="true" />
           </button>
         )}
       </div>
@@ -226,7 +219,7 @@ function StopwatchTab() {
             return (
               <div
                 key={`${total}-${i}`}
-                className="flex items-center justify-between rounded-xl border border-emerald-500/15 bg-[#0E1F16] px-4 py-2.5"
+                className="flex items-center justify-between rounded-[20px] bg-white/[0.06] px-4 py-2.5 ring-1 ring-white/[0.06]"
               >
                 <span className="text-[13px] text-white/60">Круг {laps.length - i}</span>
                 <span className="flex items-baseline gap-3">
@@ -236,7 +229,7 @@ function StopwatchTab() {
                       {(Math.abs(delta) / 1000).toFixed(2)} с
                     </span>
                   )}
-                  <span className="text-[14px] font-medium tabular-nums text-emerald-400">{fmtSw(split)}</span>
+                  <span className="text-[14px] font-medium tabular-nums text-emerald-300">{fmtSw(split)}</span>
                   <span className="text-[12px] tabular-nums text-white/40">{fmtSw(total)}</span>
                 </span>
               </div>
@@ -295,16 +288,16 @@ function TimerTab() {
   const showSs = totalSec % 60
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto [scrollbar-width:thin] px-4 pb-4">
+    <div className="flex flex-1 flex-col overflow-y-auto [scrollbar-width:thin] px-4 pb-6">
       {done ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3">
-          <Hourglass className="size-10 text-emerald-400" aria-hidden="true" />
-          <div className="text-[24px] font-semibold text-emerald-400">Время вышло</div>
+          <Hourglass className="size-10 text-emerald-300" aria-hidden="true" />
+          <div className="text-[24px] font-semibold text-emerald-300">Время вышло</div>
           <button
             type="button"
             onClick={cancel}
             aria-label="Сбросить таймер"
-            className="mt-4 h-12 w-full rounded-2xl border border-white/10 bg-white/[0.06] text-[15px] font-semibold text-white transition-transform active:scale-[0.98]"
+            className="mt-4 h-14 w-full rounded-full bg-white/[0.08] text-[15px] font-semibold text-white transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-95"
           >
             Готово
           </button>
@@ -339,9 +332,9 @@ function TimerTab() {
                     aria-label={`Таймер на ${m} минут`}
                     aria-pressed={minutes === m}
                     className={
-                      'h-9 rounded-full px-4 text-[13px] transition-transform active:scale-95 ' +
+                      'h-9 rounded-full px-4 text-[13px] transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-95 ' +
                       (minutes === m
-                        ? 'bg-emerald-500 font-semibold text-[#052E16]'
+                        ? 'bg-[#21A038] font-semibold text-white'
                         : 'bg-white/[0.06] text-white/70')
                     }
                   >
@@ -353,9 +346,9 @@ function TimerTab() {
                 type="button"
                 onClick={start}
                 aria-label="Запустить таймер"
-                className="mt-6 h-12 w-full rounded-2xl bg-[#22C55E] text-[15px] font-bold text-[#052E16] transition-transform active:scale-[0.98]"
+                className="mx-auto mt-6 flex size-16 items-center justify-center rounded-full bg-[#21A038] text-white shadow-lg shadow-emerald-500/25 transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-90"
               >
-                Старт
+                <Play className="size-7" aria-hidden="true" />
               </button>
             </>
           ) : (
@@ -363,9 +356,9 @@ function TimerTab() {
               type="button"
               onClick={cancel}
               aria-label="Остановить таймер"
-              className="h-12 w-full rounded-2xl border border-red-500/30 bg-red-500/15 text-[15px] font-semibold text-red-400 transition-transform active:scale-[0.98]"
+              className="mx-auto flex size-16 items-center justify-center rounded-full bg-white/[0.08] text-white transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-90"
             >
-              Стоп
+              <Pause className="size-6" aria-hidden="true" />
             </button>
           )}
         </>
@@ -390,7 +383,7 @@ export default function ClockApp() {
   return (
     <div className="flex h-full flex-col bg-[linear-gradient(180deg,#07130D,#050D09)] text-white">
       <header className="flex h-14 shrink-0 items-center gap-3 px-5">
-        <h1 className="text-[17px] font-semibold">Часы</h1>
+        <h1 className="text-[26px] font-bold tracking-[-0.02em]">Часы</h1>
       </header>
 
       {/* Вкладки остаются смонтированными (hidden): секундомер и таймер не сбрасываются при переключении */}
@@ -404,7 +397,10 @@ export default function ClockApp() {
         <TimerTab />
       </div>
 
-      <nav className="mt-auto flex shrink-0 border-t border-white/10" aria-label="Разделы часов">
+      <nav
+        className="mt-auto flex h-16 shrink-0 items-stretch bg-[#0A0F0C]/95 backdrop-blur-xl ring-1 ring-white/[0.06]"
+        aria-label="Разделы часов"
+      >
         {TABS.map((t) => {
           const Icon = t.icon
           const active = tab === t.key
@@ -419,11 +415,13 @@ export default function ClockApp() {
               aria-label={t.label}
               aria-current={active}
               className={
-                'flex flex-1 flex-col items-center gap-1 py-3 text-[11px] transition-transform active:scale-95 ' +
-                (active ? 'text-emerald-400' : 'text-white/50')
+                'flex flex-1 flex-col items-center justify-center gap-1 pt-1 text-[10px] transition-transform active:scale-95 ' +
+                (active ? 'font-semibold text-white' : 'text-white/50')
               }
             >
-              <Icon className="size-5" aria-hidden="true" />
+              <span className={'flex items-center rounded-full px-4 py-1.5 ' + (active ? 'bg-white/[0.12]' : '')}>
+                <Icon className="size-5" aria-hidden="true" />
+              </span>
               {t.label}
             </button>
           )

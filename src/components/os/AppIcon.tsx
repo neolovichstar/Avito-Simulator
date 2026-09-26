@@ -41,6 +41,7 @@ export default function AppIcon({
   imageBg,
   badge,
   small = false,
+  hideLabel = false,
   loading = 'eager',
   onClick,
 }: {
@@ -57,6 +58,8 @@ export default function AppIcon({
   badge?: number
   /** Компактный режим (док): плитка 52px, подпись 9px. */
   small?: boolean
+  /** Скрыть подпись (док Android — иконки без подписей). */
+  hideLabel?: boolean
   /** Стратегия загрузки лого: экран 2 лончера — lazy (не тормозит старт). */
   loading?: 'eager' | 'lazy'
   onClick: () => void
@@ -95,17 +98,19 @@ export default function AppIcon({
         )}
         {badge !== undefined && badge > 0 && (
           <span
-            className={`absolute -right-1 -top-1 flex ${small ? 'h-4 min-w-4 text-[9px]' : 'h-[18px] min-w-[18px] text-[10px]'} items-center justify-center rounded-full bg-red-500 px-1 font-semibold leading-none text-white shadow-md`}
+            className={`absolute -right-1 -top-1 flex ${small ? 'h-4 min-w-4 text-[9px]' : 'h-[18px] min-w-[18px] text-[10px]'} items-center justify-center rounded-full bg-[#E5484D] px-1 font-semibold leading-none text-white shadow-md`}
           >
             {badge > 99 ? '99+' : badge}
           </span>
         )}
       </span>
-      <span
-        className={`${small ? 'w-[52px] text-[9px]' : 'w-[62px] text-[10px]'} truncate text-center text-white/90 [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]`}
-      >
-        {label}
-      </span>
+      {!hideLabel && (
+        <span
+          className={`${small ? 'w-[52px] text-[9px]' : 'w-[62px] text-[10px]'} truncate text-center text-white/90 [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]`}
+        >
+          {label}
+        </span>
+      )}
     </button>
   )
 }

@@ -1,8 +1,8 @@
 'use client'
 
-// Погода ОС: полностью офлайн — детерминированный псевдорандом (mulberry32
-// от хэша строки «город+дата») вместо сети. Одинаковый город и день всегда
-// дают одинаковую погоду.
+// Погода ОС (Pixel Weather × M3 Expressive): полностью офлайн —
+// детерминированный псевдорандом (mulberry32 от хэша строки «город+дата»)
+// вместо сети. Одинаковый город и день всегда дают одинаковую погоду.
 
 import { useMemo, useState } from 'react'
 import {
@@ -140,8 +140,8 @@ function buildHours(cityName: string, day: DayWeather, date: Date): HourWeather[
 }
 
 function CondIcon({ cond, night, className }: { cond: Condition; night?: boolean; className: string }) {
-  if (night && cond === 'Солнечно') return <Moon className={className + ' text-slate-200'} aria-hidden="true" />
-  if (night && cond === 'Облачно') return <CloudMoon className={className + ' text-slate-200'} aria-hidden="true" />
+  if (night && cond === 'Солнечно') return <Moon className={className + ' text-white/80'} aria-hidden="true" />
+  if (night && cond === 'Облачно') return <CloudMoon className={className + ' text-white/80'} aria-hidden="true" />
   if (cond === 'Солнечно') return <Sun className={className + ' text-amber-300'} aria-hidden="true" />
   if (cond === 'Облачно') return <CloudSun className={className + ' text-amber-300'} aria-hidden="true" />
   if (cond === 'Пасмурно') return <Cloud className={className + ' text-white/80'} aria-hidden="true" />
@@ -173,10 +173,15 @@ export default function WeatherApp() {
   const nowHour = today.getHours()
   const nightNow = isNightHour(nowHour)
 
+  // Диапазон шкалы для прогресс-баров температуры на 7 дней (презентационное)
+  const gMin = Math.min(...model.days.map(({ w }) => w.tMin))
+  const gMax = Math.max(...model.days.map(({ w }) => w.tMax))
+  const span = Math.max(1, gMax - gMin)
+
   return (
     <div className="flex h-full flex-col bg-[linear-gradient(180deg,#07130D,#050D09)] text-white">
-      <header className="flex h-14 shrink-0 items-center gap-3 px-5">
-        <h1 className="text-[17px] font-semibold">Погода</h1>
+      <header className="shrink-0 px-5 pb-2 pt-4">
+        <h1 className="text-[26px] font-bold tracking-[-0.02em]">Погода</h1>
       </header>
 
       <div className="flex-1 overflow-y-auto [scrollbar-width:thin] px-4 pb-6">
@@ -193,8 +198,10 @@ export default function WeatherApp() {
               aria-label={`Погода в городе ${c.name}`}
               aria-pressed={i === cityIdx}
               className={
-                'h-9 rounded-full px-4 text-[13px] transition-transform active:scale-95 ' +
-                (i === cityIdx ? 'bg-emerald-500 font-semibold text-[#052E16]' : 'bg-white/[0.06] text-white/70')
+                'h-10 rounded-full px-4 text-[13px] transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-95 ' +
+                (i === cityIdx
+                  ? 'bg-[#21A038] font-semibold text-white'
+                  : 'bg-white/[0.08] font-medium text-white/70')
               }
             >
               {c.name}
@@ -202,12 +209,17 @@ export default function WeatherApp() {
           ))}
         </div>
 
-        {/* Сейчас */}
-        <div className="mt-4 flex items-center justify-between rounded-2xl border border-emerald-500/15 bg-[#0E1F16] p-5">
+        {/* Сейчас: hero с фотоиллюстрацией справа */}
+        <div className="m3-rise mt-4 flex items-center justify-between gap-4 rounded-[28px] bg-[linear-gradient(145deg,#1C4A2A_0%,#0D2B1A_50%,#0A0F0C_100%)] p-5 ring-1 ring-white/[0.06]">
           <div className="min-w-0">
-            <div className="text-[12px] text-white/40">{city.name}</div>
-            <div className="mt-1 text-[56px] font-light leading-none tabular-nums">{fmtDeg(model.now.temp)}</div>
-            <div className="mt-2 text-[14px] text-white/70">{condLabel(model.now.cond, nightNow)}</div>
+            <div className="text-[13px] font-medium text-white/65">{city.name}</div>
+            <div className="mt-1 text-[64px] font-light leading-none tracking-[-0.02em] tabular-nums">
+              {fmtDeg(model.now.temp)}
+            </div>
+            <div className="mt-2 text-[15px] font-medium text-white/90">{condLabel(model.now.cond, nightNow)}</div>
+            <div className="mt-1 text-[13px] text-white/55 tabular-nums">
+              Днём {fmtDeg(model.now.tMax)} · Ночью {fmtDeg(model.now.tMin)}
+            </div>
           </div>
           <img
             src={condImg(model.now.cond, nightNow)}
@@ -215,46 +227,70 @@ export default function WeatherApp() {
             aria-hidden="true"
             loading="lazy"
             decoding="async"
-            className="h-24 w-24 shrink-0 rounded-2xl object-cover ring-1 ring-white/10"
+            className="h-28 w-28 shrink-0 rounded-[20px] object-cover ring-1 ring-white/10"
           />
         </div>
 
-        {/* По часам */}
-        <div className="mt-3 rounded-2xl border border-emerald-500/15 bg-[#0E1F16] p-4">
-          <div className="text-[12px] text-white/60">По часам</div>
-          <div className="mt-3 flex gap-4 overflow-x-auto [scrollbar-width:thin]">
-            {model.hours.map((h) => (
-              <div
-                key={h.hour}
-                className={
-                  'flex min-w-10 flex-col items-center gap-1.5 ' +
-                  (h.hour === nowHour ? 'text-emerald-400' : h.hour < nowHour ? 'text-white/40' : '')
-                }
-              >
-                <span className="text-[11px] tabular-nums">{String(h.hour).padStart(2, '0')}</span>
-                <CondIcon cond={h.cond} night={isNightHour(h.hour)} className="size-4" />
-                <span className="text-[11px] tabular-nums">{fmtDeg(h.temp)}</span>
-              </div>
-            ))}
+        {/* Почасовой прогноз */}
+        <div
+          className="m3-rise-stagger mt-3 rounded-[24px] bg-white/[0.06] p-4 ring-1 ring-white/[0.06]"
+          style={{ animationDelay: '40ms' }}
+        >
+          <div className="text-[13px] font-semibold uppercase tracking-wide text-white/50">Почасовой прогноз</div>
+          <div className="-mx-1 mt-3 flex gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
+            {model.hours.map((h) => {
+              const isActive = h.hour === nowHour
+              const isPast = h.hour < nowHour
+              return (
+                <div
+                  key={h.hour}
+                  className={
+                    'flex min-w-[52px] flex-col items-center gap-1.5 rounded-2xl px-1.5 py-2 transition-colors duration-200 ' +
+                    (isActive
+                      ? 'bg-white/[0.09] text-white ring-1 ring-white/[0.08]'
+                      : isPast
+                        ? 'text-white/40'
+                        : 'text-white/85')
+                  }
+                >
+                  <span className="text-[11px] tabular-nums opacity-70">{String(h.hour).padStart(2, '0')}</span>
+                  <span className={isPast ? 'opacity-50' : undefined}>
+                    <CondIcon cond={h.cond} night={isNightHour(h.hour)} className="size-4" />
+                  </span>
+                  <span className="text-[12px] font-medium tabular-nums">{fmtDeg(h.temp)}</span>
+                </div>
+              )
+            })}
           </div>
         </div>
 
         {/* На 7 дней */}
-        <div className="mt-3 rounded-2xl border border-emerald-500/15 bg-[#0E1F16] p-4">
-          <div className="text-[12px] text-white/60">На 7 дней</div>
-          <div className="mt-1">
+        <div
+          className="m3-rise-stagger mt-3 rounded-[24px] bg-white/[0.06] p-4 ring-1 ring-white/[0.06]"
+          style={{ animationDelay: '80ms' }}
+        >
+          <div className="text-[13px] font-semibold uppercase tracking-wide text-white/50">На 7 дней</div>
+          <div className="mt-2">
             {model.days.map(({ date, w }, i) => (
-              <div
-                key={dayKey(date)}
-                className="flex items-center justify-between border-b border-white/5 py-2.5 last:border-0"
-              >
-                <span className={'text-[14px] ' + (i === 0 ? 'font-medium text-white' : 'text-white/70')}>
+              <div key={dayKey(date)} className="flex items-center gap-3 py-2">
+                <span className={'w-14 shrink-0 text-[13px] ' + (i === 0 ? 'font-semibold text-white' : 'text-white/60')}>
                   {i === 0 ? 'Сегодня' : date.toLocaleDateString('ru-RU', { weekday: 'short' })}
                 </span>
-                <CondIcon cond={w.cond} className="size-5" />
-                <span className="flex items-baseline gap-2 tabular-nums">
-                  <span className="text-[13px] text-white/40">{fmtDeg(w.tMin)}</span>
-                  <span className="text-[13px] font-medium">{fmtDeg(w.tMax)}</span>
+                <span className="flex w-6 shrink-0 justify-center">
+                  <CondIcon cond={w.cond} className="size-5" />
+                </span>
+                <span className="w-9 shrink-0 text-right text-[13px] text-white/40 tabular-nums">{fmtDeg(w.tMin)}</span>
+                <span className="relative h-1.5 min-w-0 flex-1 rounded-full bg-white/10">
+                  <span
+                    className="absolute inset-y-0 rounded-full bg-[linear-gradient(90deg,#3ED598,#21A038)]"
+                    style={{
+                      left: `${((w.tMin - gMin) / span) * 100}%`,
+                      width: `${Math.max(((w.tMax - w.tMin) / span) * 100, 6)}%`,
+                    }}
+                  />
+                </span>
+                <span className="w-9 shrink-0 text-right text-[13px] font-medium text-white/85 tabular-nums">
+                  {fmtDeg(w.tMax)}
                 </span>
               </div>
             ))}
@@ -262,30 +298,54 @@ export default function WeatherApp() {
         </div>
 
         {/* Детали */}
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          <div className="rounded-2xl border border-emerald-500/15 bg-[#0E1F16] p-4">
-            <div className="flex items-center gap-2 text-[12px] text-white/50">
-              <Wind className="size-4" aria-hidden="true" /> Ветер
+        <div className="grid grid-cols-2 gap-3">
+          <div
+            className="m3-rise-stagger rounded-[24px] bg-white/[0.06] p-4 ring-1 ring-white/[0.06]"
+            style={{ animationDelay: '120ms' }}
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="flex size-9 items-center justify-center rounded-full bg-white/[0.08]">
+                <Wind className="size-4 text-emerald-300" aria-hidden="true" />
+              </span>
+              <span className="text-[12px] text-white/50">Ветер</span>
             </div>
-            <div className="mt-2 text-[18px] font-semibold tabular-nums">{model.now.wind.toFixed(1)} м/с</div>
+            <div className="mt-3 text-[20px] font-semibold tabular-nums">{model.now.wind.toFixed(1)} м/с</div>
           </div>
-          <div className="rounded-2xl border border-emerald-500/15 bg-[#0E1F16] p-4">
-            <div className="flex items-center gap-2 text-[12px] text-white/50">
-              <Droplets className="size-4" aria-hidden="true" /> Влажность
+          <div
+            className="m3-rise-stagger rounded-[24px] bg-white/[0.06] p-4 ring-1 ring-white/[0.06]"
+            style={{ animationDelay: '160ms' }}
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="flex size-9 items-center justify-center rounded-full bg-white/[0.08]">
+                <Droplets className="size-4 text-emerald-300" aria-hidden="true" />
+              </span>
+              <span className="text-[12px] text-white/50">Влажность</span>
             </div>
-            <div className="mt-2 text-[18px] font-semibold tabular-nums">{model.now.hum}%</div>
+            <div className="mt-3 text-[20px] font-semibold tabular-nums">{model.now.hum}%</div>
           </div>
-          <div className="rounded-2xl border border-emerald-500/15 bg-[#0E1F16] p-4">
-            <div className="flex items-center gap-2 text-[12px] text-white/50">
-              <Gauge className="size-4" aria-hidden="true" /> Давление
+          <div
+            className="m3-rise-stagger rounded-[24px] bg-white/[0.06] p-4 ring-1 ring-white/[0.06]"
+            style={{ animationDelay: '200ms' }}
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="flex size-9 items-center justify-center rounded-full bg-white/[0.08]">
+                <Gauge className="size-4 text-emerald-300" aria-hidden="true" />
+              </span>
+              <span className="text-[12px] text-white/50">Давление</span>
             </div>
-            <div className="mt-2 text-[18px] font-semibold tabular-nums">{model.now.press} мм рт.</div>
+            <div className="mt-3 text-[20px] font-semibold tabular-nums">{model.now.press} мм рт.</div>
           </div>
-          <div className="rounded-2xl border border-emerald-500/15 bg-[#0E1F16] p-4">
-            <div className="flex items-center gap-2 text-[12px] text-white/50">
-              <Thermometer className="size-4" aria-hidden="true" /> Ощущается
+          <div
+            className="m3-rise-stagger rounded-[24px] bg-white/[0.06] p-4 ring-1 ring-white/[0.06]"
+            style={{ animationDelay: '240ms' }}
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="flex size-9 items-center justify-center rounded-full bg-white/[0.08]">
+                <Thermometer className="size-4 text-emerald-300" aria-hidden="true" />
+              </span>
+              <span className="text-[12px] text-white/50">Ощущается</span>
             </div>
-            <div className="mt-2 text-[18px] font-semibold tabular-nums">{fmtDeg(model.now.feels)}</div>
+            <div className="mt-3 text-[20px] font-semibold tabular-nums">{fmtDeg(model.now.feels)}</div>
           </div>
         </div>
       </div>

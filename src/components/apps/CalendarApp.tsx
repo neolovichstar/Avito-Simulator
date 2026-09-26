@@ -1,7 +1,8 @@
 'use client'
 
-// Календарь ОС: сетка месяца с Пн, события выбранного дня в localStorage
-// ('avito_sim_events' → { 'YYYY-MM-DD': [строки] }), точки под днями с событиями.
+// Календарь ОС (M3 Expressive): сетка месяца с Пн, события выбранного дня в
+// localStorage ('avito_sim_events' → { 'YYYY-MM-DD': [строки] }), точки под
+// днями с событиями, чипы событий с тональными фонами (emerald/amber/rose).
 
 import { useState } from 'react'
 import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react'
@@ -10,6 +11,13 @@ import { sound } from '@/lib/sound'
 const LS_KEY = 'avito_sim_events'
 
 type EventsMap = Record<string, string[]>
+
+// Тональные фоны чипов событий (M3 containers), цикл emerald → amber → rose
+const CHIP_TONES = [
+  'bg-emerald-500/15 text-emerald-300',
+  'bg-amber-500/15 text-amber-300',
+  'bg-rose-500/15 text-rose-300',
+] as const
 
 function loadEvents(): EventsMap {
   if (typeof window === 'undefined') return {}
@@ -66,14 +74,15 @@ export default function CalendarApp() {
 
   const todayKey = isoKey(now.getFullYear(), now.getMonth(), now.getDate())
 
-  // Сетка: пустые ячейки до 1-го числа (неделя с Пн) + дни месяца
+  // Сетка: хвост предыдущего месяца + дни текущего + голова следующего (Пн-старт)
   const lead = (new Date(viewY, viewM, 1).getDay() + 6) % 7
   const daysInMonth = new Date(viewY, viewM + 1, 0).getDate()
-  const cells: (number | null)[] = [
-    ...Array.from({ length: lead }, () => null),
-    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-  ]
-  while (cells.length % 7 !== 0) cells.push(null)
+  const daysInPrev = new Date(viewY, viewM, 0).getDate()
+  const cells: { d: number; adj: boolean }[] = []
+  for (let i = lead; i > 0; i--) cells.push({ d: daysInPrev - i + 1, adj: true })
+  for (let d = 1; d <= daysInMonth; d++) cells.push({ d, adj: false })
+  let trail = 1
+  while (cells.length % 7 !== 0) cells.push({ d: trail++, adj: true })
 
   const [selY, selM, selD] = sel.split('-').map(Number)
   const selDate = new Date(selY, selM - 1, selD)
@@ -105,15 +114,15 @@ export default function CalendarApp() {
   return (
     <div className="flex h-full flex-col bg-[linear-gradient(180deg,#07130D,#050D09)] text-white">
       <header className="flex h-14 shrink-0 items-center justify-between px-5">
-        <h1 className="text-[17px] font-semibold">
-          {monthTitle(viewY, viewM)} {viewY}
+        <h1 className="text-[22px] font-bold tracking-[-0.01em]">
+          {monthTitle(viewY, viewM)} <span className="tabular-nums">{viewY}</span>
         </h1>
-        <div className="flex gap-1">
+        <div className="flex gap-2">
           <button
             type="button"
             onClick={prevMonth}
             aria-label="Предыдущий месяц"
-            className="flex size-11 items-center justify-center rounded-full text-white/70 transition-transform active:scale-90"
+            className="flex size-10 items-center justify-center rounded-full bg-white/[0.08] text-white/80 transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-95"
           >
             <ChevronLeft className="size-5" aria-hidden="true" />
           </button>
@@ -121,7 +130,7 @@ export default function CalendarApp() {
             type="button"
             onClick={nextMonth}
             aria-label="Следующий месяц"
-            className="flex size-11 items-center justify-center rounded-full text-white/70 transition-transform active:scale-90"
+            className="flex size-10 items-center justify-center rounded-full bg-white/[0.08] text-white/80 transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-95"
           >
             <ChevronRight className="size-5" aria-hidden="true" />
           </button>
@@ -130,14 +139,25 @@ export default function CalendarApp() {
 
       <div className="flex-1 overflow-y-auto [scrollbar-width:thin] px-3 pb-4">
         {/* Сетка месяца */}
-        <div className="grid grid-cols-7">
+        <div className="m3-rise grid grid-cols-7">
           {WEEKDAYS.map((w) => (
-            <div key={w} className="flex h-8 items-center justify-center text-[11px] text-white/40">
+            <div key={w} className="flex h-9 items-center justify-center text-[11px] font-medium text-white/40">
               {w}
             </div>
           ))}
-          {cells.map((d, i) => {
-            if (d === null) return <span key={`empty-${i}`} aria-hidden="true" />
+          {cells.map((c, i) => {
+            if (c.adj) {
+              return (
+                <span
+                  key={`adj-${i}`}
+                  aria-hidden="true"
+                  className="mx-auto flex size-11 items-center justify-center rounded-full text-[15px] tabular-nums text-white/25"
+                >
+                  {c.d}
+                </span>
+              )
+            }
+            const d = c.d
             const key = isoKey(viewY, viewM, d)
             const isToday = key === todayKey
             const isSelected = key === sel
@@ -152,23 +172,23 @@ export default function CalendarApp() {
                 }}
                 aria-label={`${d} ${monthTitle(viewY, viewM).toLowerCase()}${hasEvents ? ', есть события' : ''}`}
                 aria-pressed={isSelected}
-                className="relative mx-auto flex size-11 items-center justify-center rounded-full transition-transform active:scale-90"
+                className="relative mx-auto flex size-11 items-center justify-center rounded-full transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-90"
               >
-                {isToday && <span className="absolute inset-0 rounded-full bg-emerald-500" aria-hidden="true" />}
+                {isToday && <span className="absolute inset-0 rounded-full bg-[#21A038]" aria-hidden="true" />}
                 <span
                   className={
                     'relative z-10 flex size-11 items-center justify-center rounded-full text-[15px] tabular-nums ' +
                     (isToday
-                      ? 'font-bold text-[#052E16]'
+                      ? 'font-bold text-white'
                       : isSelected
-                        ? 'text-white ring-1 ring-emerald-400'
-                        : 'text-white/80')
+                        ? 'text-emerald-300 ring-2 ring-[#21A038]'
+                        : 'text-white/85')
                   }
                 >
                   {d}
                 </span>
                 {hasEvents && !isToday && (
-                  <span className="absolute bottom-0.5 left-1/2 size-1 -translate-x-1/2 rounded-full bg-emerald-400" aria-hidden="true" />
+                  <span className="absolute bottom-0.5 left-1/2 z-10 size-1 -translate-x-1/2 rounded-full bg-emerald-400" aria-hidden="true" />
                 )}
               </button>
             )
@@ -176,33 +196,39 @@ export default function CalendarApp() {
         </div>
 
         {/* События выбранного дня */}
-        <div className="mt-4 px-2">
-          <div className="text-[12px] capitalize text-white/60">{selLabel}</div>
-          <div className="mt-2 flex flex-col gap-2">
-            {dayEvents.length === 0 ? (
-              <div className="rounded-2xl border border-emerald-500/15 bg-[#0E1F16] p-4 text-center text-[13px] text-white/40">
-                Нет событий на этот день
-              </div>
-            ) : (
-              dayEvents.map((ev, i) => (
-                <div
-                  key={`${ev}-${i}`}
-                  className="flex items-center gap-2 rounded-2xl border border-emerald-500/15 bg-[#0E1F16] p-4"
-                >
-                  <span className="size-1.5 shrink-0 rounded-full bg-emerald-400" aria-hidden="true" />
-                  <span className="min-w-0 flex-1 break-words text-[14px]">{ev}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeEvent(i)}
-                    aria-label="Удалить событие"
-                    className="-mr-2 flex size-11 shrink-0 items-center justify-center rounded-full text-white/40 transition-transform active:scale-90"
+        <div className="m3-rise-stagger mt-5 px-2" style={{ animationDelay: '40ms' }}>
+          <div className="text-[13px] font-semibold uppercase tracking-wide text-white/50">{selLabel}</div>
+
+          {dayEvents.length === 0 ? (
+            <div className="mt-2.5 rounded-[20px] bg-white/[0.04] p-5 text-center text-[13px] text-white/45">
+              Нет событий на этот день
+            </div>
+          ) : (
+            <div className="mt-2.5 rounded-[20px] bg-white/[0.06] p-3 ring-1 ring-white/[0.06]">
+              <div className="flex flex-wrap gap-2">
+                {dayEvents.map((ev, i) => (
+                  <div
+                    key={`${ev}-${i}`}
+                    className={
+                      'flex max-w-full items-center gap-2 rounded-full py-1.5 pl-4 pr-1.5 ' +
+                      CHIP_TONES[i % CHIP_TONES.length]
+                    }
                   >
-                    <X className="size-4" aria-hidden="true" />
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
+                    <span className="size-1.5 shrink-0 rounded-full bg-current" aria-hidden="true" />
+                    <span className="min-w-0 truncate text-[13.5px] font-medium">{ev}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeEvent(i)}
+                      aria-label="Удалить событие"
+                      className="-mr-1 flex size-9 shrink-0 items-center justify-center rounded-full transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-90"
+                    >
+                      <X className="size-4" aria-hidden="true" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <form
             onSubmit={(e) => {
@@ -217,12 +243,12 @@ export default function CalendarApp() {
               placeholder="Новое событие"
               aria-label="Новое событие"
               maxLength={120}
-              className="h-12 min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[0.06] px-4 text-[15px] text-white outline-none placeholder:text-white/40 focus:border-emerald-500/50"
+              className="h-12 min-w-0 flex-1 rounded-full bg-white/[0.08] px-5 text-[15px] text-white outline-none ring-[#21A038]/60 transition placeholder:text-white/40 focus:ring-2"
             />
             <button
               type="submit"
               aria-label="Добавить событие"
-              className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-[#22C55E] text-[#052E16] transition-transform active:scale-[0.98]"
+              className="flex size-12 shrink-0 items-center justify-center rounded-[18px] bg-[#21A038] text-white shadow-lg shadow-emerald-500/25 transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-95"
             >
               <Plus className="size-5" aria-hidden="true" />
             </button>

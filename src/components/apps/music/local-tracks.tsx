@@ -246,27 +246,33 @@ export function LocalTracksSection({
       </div>
 
       {availableTracks.length > 0 && (
-        <div className="mx-4 mt-3 rounded-[20px] bg-white p-1.5 shadow-sm">
+        <div className="mx-4 mt-3 rounded-[24px] bg-white p-1.5 shadow-sm">
           {availableTracks.map((t, i) => (
-            <div key={t.id} className="flex items-center gap-1.5 rounded-[14px] p-1.5 transition-colors active:bg-[#F5F6F8]">
+            <div
+              key={t.id}
+              className={
+                'flex items-center gap-1.5 rounded-[18px] p-1.5 transition-colors ' +
+                (t.id === currentId ? 'bg-[#21A038]/[0.12]' : 'active:bg-[#F5F6F8]')
+              }
+            >
               <button
                 type="button"
                 onClick={() => onPlay(availableTracks, i)}
                 aria-label={`Слушать: ${t.title} — локальный файл`}
                 className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left"
               >
-                <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-gradient-to-br from-[#F0F1F5] to-[#E4E6EB]" aria-hidden>
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[14px] bg-gradient-to-br from-[#F0F1F5] to-[#E4E6EB]" aria-hidden>
                   <Music4 className="h-5 w-5 text-[#B9BDC7]" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[14px] font-semibold leading-tight text-[#17181A]">{t.title}</span>
+                  <span className={'block truncate text-[14px] font-semibold leading-tight ' + (t.id === currentId ? 'text-emerald-800' : 'text-[#17181A]')}>{t.title}</span>
                   <span className="mt-0.5 block truncate text-[12px] text-[#8B8F99]">
                     Моё устройство · {mmss(t.duration)}
                   </span>
                 </span>
               </button>
               <span className="flex w-10 shrink-0 items-center justify-end" aria-hidden>
-                {t.id === currentId && <AudioLines size={18} className="text-[#17181A]" />}
+                {t.id === currentId && <AudioLines size={18} className="text-emerald-700" />}
               </span>
             </div>
           ))}
@@ -274,10 +280,10 @@ export function LocalTracksSection({
       )}
 
       {staleTracks.length > 0 && (
-        <div className="mx-4 mt-3 rounded-[20px] bg-white/60 p-1.5 shadow-sm">
+        <div className="mx-4 mt-3 rounded-[24px] bg-white/60 p-1.5 shadow-sm">
           {staleTracks.map((m) => (
-            <div key={m.id} className="flex items-center gap-3 rounded-[14px] p-2.5 opacity-55" aria-disabled="true">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#F0F1F5]" aria-hidden>
+            <div key={m.id} className="flex items-center gap-3 rounded-[18px] p-2.5 opacity-55" aria-disabled="true">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[#F0F1F5]" aria-hidden>
                 <Music4 className="h-4 w-4 text-[#B9BDC7]" />
               </span>
               <span className="min-w-0 flex-1">
@@ -295,7 +301,7 @@ export function LocalTracksSection({
       )}
 
       {meta.length === 0 && (
-        <div className="mx-4 mt-3 rounded-[20px] bg-white p-4 text-center shadow-sm">
+        <div className="mx-4 mt-3 rounded-[24px] bg-white p-4 text-center shadow-sm">
           <p className="text-[13px] leading-snug text-[#8B8F99]">
             Нажмите «Добавить файлы» — выбранные треки появятся здесь и в общем плеере
           </p>
