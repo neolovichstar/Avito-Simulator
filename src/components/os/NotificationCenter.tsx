@@ -6,7 +6,7 @@
 // карточку, свайп в сторону удаляет (и на сервере тоже).
 import { useRef, useState, useSyncExternalStore } from 'react'
 import {
-  Bell, CheckCheck, ChevronDown, Crown, Gavel, Info, MessageSquare, Receipt,
+  CheckCheck, ChevronDown, Crown, Gavel, Info, MessageSquare, Receipt,
   ShoppingBag, Trash2, TrendingUp, Truck, Trophy, type LucideIcon,
 } from 'lucide-react'
 import { useOS, type AppKey } from '@/lib/store'
@@ -300,11 +300,16 @@ export default function NotificationCenter({
         <NowPlayingShade onOpenApp={onOpenApp} />
 
         {notifications.length === 0 ? (
-          <div className="flex flex-col items-center px-5 py-10">
-            <div className="flex size-14 items-center justify-center rounded-[18px] bg-white/[0.06]">
-              <Bell className="size-6 text-white/30" aria-hidden="true" />
-            </div>
-            <p className="mt-3 text-sm text-white/50">Пока пусто</p>
+          <div className="flex flex-col items-center px-5 py-8">
+            <img
+              src="/img/empty/notify.webp"
+              alt=""
+              aria-hidden="true"
+              loading="lazy"
+              decoding="async"
+              className="h-24"
+            />
+            <p className="mt-2 text-sm text-white/50">Пока пусто</p>
             <p className="mt-1 text-[11px] text-white/30">Здесь появятся сообщения и события</p>
           </div>
         ) : (

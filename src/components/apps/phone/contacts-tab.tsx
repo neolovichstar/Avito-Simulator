@@ -8,7 +8,7 @@
 import { useMemo, useState } from 'react'
 import { Search, Store, X } from 'lucide-react'
 import { fuzzyMatch, Highlight } from '@/lib/smart-search'
-import { initials } from './shared'
+import { UserAvatar } from '@/components/shared/UserAvatar'
 import type { ContactDTO } from './shared'
 
 // Локальные знакомые (не продавцы) — остаются как есть.
@@ -96,16 +96,7 @@ export default function ContactsTab({ contacts, loading, onCall }: Props) {
                 aria-label={`Позвонить: ${c.name}`}
                 className="flex min-h-14 w-full items-center gap-3 rounded-2xl px-1 py-2 text-left transition-colors active:bg-white/[0.04]"
               >
-                <span
-                  className={
-                    'flex size-10 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold ' +
-                    (c.isBot
-                      ? 'bg-amber-400/15 text-amber-300'
-                      : 'bg-emerald-500/20 text-emerald-300')
-                  }
-                >
-                  {initials(c.name)}
-                </span>
+                <UserAvatar name={c.name} bot={c.isBot} className="size-10 rounded-full ring-1 ring-white/10" />
                 <span className="min-w-0">
                   <span className="flex items-center gap-1.5">
                     <span className="truncate text-[15px] text-white">

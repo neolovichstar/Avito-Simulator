@@ -19,7 +19,8 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Phone, PhoneCall, PhoneOff } from 'lucide-react'
 import { useCall } from '@/lib/call'
 import CallScreen from '@/components/apps/phone/call-screen'
-import { initials, pad2, useTick } from '@/components/apps/phone/shared'
+import { pad2, useTick } from '@/components/apps/phone/shared'
+import { UserAvatar } from '@/components/shared/UserAvatar'
 
 function CallChip() {
   const peer = useCall((s) => s.peer)
@@ -40,9 +41,9 @@ function CallChip() {
       aria-label={`Вернуться к звонку: ${peer.name || peer.number}. Длительность ${pad2(Math.floor(secs / 60))}:${pad2(secs % 60)}`}
       className="absolute left-1/2 top-14 z-[66] flex -translate-x-1/2 select-none items-center gap-2 rounded-full bg-neutral-900/90 py-1.5 pl-1.5 pr-3.5 shadow-[0_10px_30px_-8px_rgba(0,0,0,0.7)] ring-1 ring-white/[0.14] backdrop-blur-xl transition-transform active:scale-95"
     >
-      <span className="relative flex size-7 items-center justify-center rounded-full bg-emerald-500/25 text-[10px] font-bold text-emerald-200">
+      <span className="relative flex size-7 items-center justify-center rounded-full">
         <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/20" aria-hidden="true" />
-        {initials(peer.name || peer.number)}
+        <UserAvatar name={peer.name || peer.number} className="size-7 rounded-full" />
       </span>
       <span className="max-w-28 truncate text-[12px] font-medium text-white/90">{peer.name || peer.number}</span>
       <span className="flex items-center gap-1 text-[11px] tabular-nums text-emerald-300">
@@ -77,11 +78,11 @@ function IncomingCallScreen() {
             aria-hidden="true"
           />
           <motion.div
-            className="flex size-24 items-center justify-center rounded-full bg-emerald-500/20 text-[30px] font-semibold text-emerald-300"
+            className="flex size-24 items-center justify-center rounded-full"
             animate={{ scale: [1, 1.08, 1] }}
             transition={{ repeat: Infinity, duration: 1.4 }}
           >
-            {initials(peer.name || peer.number || '?')}
+            <UserAvatar name={peer.name || peer.number || '?'} className="size-24 rounded-full" />
           </motion.div>
         </div>
         <div className="mt-2 max-w-[85%] truncate text-[26px] font-semibold">{peer.name || 'Игрок'}</div>

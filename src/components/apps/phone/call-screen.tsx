@@ -29,7 +29,8 @@ import {
 import { useCall } from '@/lib/call'
 import { usePrefs } from '@/lib/prefs'
 import { getToken } from '@/lib/api'
-import { initials, pad2, useTick } from './shared'
+import { pad2, useTick } from './shared'
+import { UserAvatar } from '@/components/shared/UserAvatar'
 
 type Voice = 'idle' | 'recording' | 'thinking' | 'speaking'
 
@@ -400,7 +401,7 @@ export default function CallScreen() {
             animate={phase === 'dialing' || phase === 'ringing' ? { scale: [1, 1.08, 1] } : { scale: 1 }}
             transition={{ repeat: phase === 'dialing' || phase === 'ringing' ? Infinity : 0, duration: 1.4 }}
           >
-            {peer.name ? initials(peer.name) : <Phone className="size-8" aria-hidden="true" />}
+            {peer.name ? <UserAvatar name={peer.name} bot={isAi} className="size-20 rounded-full" /> : <Phone className="size-8" aria-hidden="true" />}
           </motion.div>
         </div>
 

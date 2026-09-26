@@ -456,6 +456,58 @@
     linear-gradient(180deg, #1c0f18 0%, #2b1220 55%, #0d0509 100%);
 }
 
+/* Премиум-фотообои (image + градиент-подложка) */
+.wp-terrazzo {
+  background-image: url(/img/wall/terrazzo.webp), linear-gradient(180deg, #1a1b1e, #0c0d10);
+  background-size: cover;
+  background-position: center;
+}
+.wp-fabric {
+  background-image: url(/img/wall/fabric.webp), linear-gradient(170deg, #161a20, #0a0c10);
+  background-size: cover;
+  background-position: center;
+}
+.wp-depth {
+  background-image: url(/img/wall/depth.webp), linear-gradient(180deg, #101216, #0b0a09);
+  background-size: cover;
+  background-position: center;
+}
+.wp-onyx {
+  background-image: url(/img/wall/marble-dark.webp), linear-gradient(160deg, #191714, #2b241b);
+  background-size: cover;
+  background-position: center;
+}
+.wp-paper {
+  background-image: url(/img/wall/paper.webp), linear-gradient(180deg, #efe9e2, #d9c8b4);
+  background-size: cover;
+  background-position: center;
+}
+.wp-emerald {
+  background-image: url(/img/wall/emerald.webp), linear-gradient(180deg, #06231a, #0b3d2c);
+  background-size: cover;
+  background-position: center;
+}
+.wp-metropolis {
+  background-image: url(/img/wall/metropolis.webp), linear-gradient(180deg, #0a0e14, #1a2230);
+  background-size: cover;
+  background-position: center;
+}
+.wp-gold {
+  background-image: url(/img/wall/gold.webp), linear-gradient(180deg, #0d0a07, #2a1f12);
+  background-size: cover;
+  background-position: center;
+}
+.wp-jade {
+  background-image: url(/img/wall/jade.webp), linear-gradient(180deg, #0f241f, #123028);
+  background-size: cover;
+  background-position: center;
+}
+.wp-leather {
+  background-image: url(/img/wall/leather.webp), linear-gradient(170deg, #17110d, #241a12);
+  background-size: cover;
+  background-position: center;
+}
+
 /* ============================================================
    ПОЛИРОВКА v2.1: микро-анимации и тактильные детали
    ============================================================ */

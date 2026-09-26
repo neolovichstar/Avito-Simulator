@@ -5,7 +5,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, Star, BadgeCheck, MapPin, Eye, ArrowRight } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
-import { initials, fmtNum, timeAgo } from '@/lib/format'
+import { fmtNum, timeAgo } from '@/lib/format'
+import { UserAvatar } from '@/components/shared/UserAvatar'
 import type { SellerProfile, FeedListing } from '@/lib/types'
 import { ConditionBadge } from './AvitoApp'
 
@@ -106,13 +107,7 @@ export default function SellerScreen({ sellerId, onBack, onOpenListing }: {
         {/* шапка профиля */}
         <div className="rounded-2xl bg-white p-4">
           <div className="flex items-center gap-3">
-            <div
-              className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold text-white shrink-0"
-              style={{ background: seller.hue }}
-              aria-hidden
-            >
-              {initials(seller.displayName)}
-            </div>
+            <UserAvatar name={seller.displayName} className="w-16 h-16 rounded-full" />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
                 <h1 className="text-[17px] font-bold text-black truncate">{seller.displayName}</h1>

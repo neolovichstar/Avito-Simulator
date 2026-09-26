@@ -12,7 +12,8 @@ import {
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
-import { fmtMoney, initials, hueColor, timeAgo } from '@/lib/format'
+import { fmtMoney, timeAgo } from '@/lib/format'
+import { UserAvatar } from '@/components/shared/UserAvatar'
 import { getSocket } from '@/lib/use-realtime'
 import { CATEGORY_LABEL, CONDITION_LABEL } from '@/lib/catalog-types'
 import type { AuctionData, AuctionLotDTO } from '@/lib/types'
@@ -114,13 +115,11 @@ function BidAvatar({ name, top }: { name: string; top?: boolean }) {
   return (
     <span
       className={
-        'flex size-7 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white ' +
+        'inline-flex shrink-0 overflow-hidden rounded-full ' +
         (top ? 'ring-2 ring-[#E8A020] ring-offset-1' : '')
       }
-      style={{ background: hueColor(name.length * 47 % 360) }}
-      aria-hidden
     >
-      {initials(name)}
+      <UserAvatar name={name} className="size-7" />
     </span>
   )
 }

@@ -4,10 +4,11 @@
 // поиск сверху, круглые аватары 48, имя bold 15, сниппет 14, время 11,
 // зелёный бейдж непрочитанных. Живой: «печатает…» из realtime и черновики из localStorage.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Loader2, MessageSquare, Search, X } from 'lucide-react'
+import { Loader2, Search, X } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { getSocket } from '@/lib/use-realtime'
-import { timeAgo, initials, hueColor } from '@/lib/format'
+import { timeAgo } from '@/lib/format'
+import { UserAvatar } from '@/components/shared/UserAvatar'
 import type { ChatListItem } from '@/lib/types'
 
 export default function ChatsScreen({ onOpenChat }: { onOpenChat: (id: string) => void }) {
@@ -143,9 +144,9 @@ export default function ChatsScreen({ onOpenChat }: { onOpenChat: (id: string) =
 
       {error && <div className="bg-[#FDEBEB] text-[#D14343] text-sm rounded-xl p-3 m-3">{error}</div>}
       {items.length === 0 ? (
-        <div className="text-center pt-16 px-8">
-          <div className="mx-auto w-16 h-16 rounded-3xl bg-[#F0F1F5] flex items-center justify-center" aria-hidden>
-            <MessageSquare size={28} className="text-[#8B8F99]" />
+        <div className="text-center pt-10 px-8">
+          <div className="mx-auto max-w-[260px] rounded-[20px] bg-[#101012] px-6 py-5" aria-hidden>
+            <img src="/img/empty/chat.webp" alt="" className="w-full" loading="lazy" decoding="async" />
           </div>
           <p className="text-[15px] text-black font-semibold mt-3">Сообщений пока нет</p>
           <p className="text-[13px] text-[#8B8F99] mt-1 leading-relaxed">
@@ -167,13 +168,7 @@ export default function ChatsScreen({ onOpenChat }: { onOpenChat: (id: string) =
               >
                 {/* круглый аватар 48 + зелёная точка онлайн */}
                 <span className="relative shrink-0">
-                  <span
-                    className="w-12 h-12 rounded-full flex items-center justify-center text-[14px] font-bold text-white"
-                    style={{ background: hueColor(c.counterpart.id.length * 47 % 360) }}
-                    aria-hidden
-                  >
-                    {initials(c.counterpart.displayName)}
-                  </span>
+                  <UserAvatar name={c.counterpart.displayName} className="w-12 h-12 rounded-full" />
                   {c.counterpart.online && (
                     <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-[#0AC760] ring-2 ring-white" aria-label="Онлайн" />
                   )}

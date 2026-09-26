@@ -11,6 +11,7 @@ import {
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
 import { fmtNum, fmtMoney, timeAgo, initials, hueColor } from '@/lib/format'
+import { UserAvatar } from '@/components/shared/UserAvatar'
 import type { ProfileData, FeedListing, InventoryItemDTO, RivalsData, TransitItemDTO } from '@/lib/types'
 import { getFavs } from './FeedScreen'
 import { ConditionBadge } from './AvitoApp'
@@ -146,12 +147,7 @@ export default function ProfileScreen({ onOpenListing, onGoSell, onGoFavorites }
           {data.user.photoUrl ? (
             <img loading="lazy" decoding="async" src={data.user.photoUrl} alt={data.user.displayName} className="w-[72px] h-[72px] rounded-full object-cover ring-1 ring-[#EBEDF0]"/>
           ) : (
-            <div
-              className="w-[72px] h-[72px] rounded-full flex items-center justify-center text-white text-2xl font-bold shrink-0 bg-[#5C616B]"
-              aria-hidden
-            >
-              {initials(data.user.displayName)}
-            </div>
+            <UserAvatar name={data.user.displayName} className="w-[72px] h-[72px] rounded-full ring-1 ring-[#EBEDF0]" />
           )}
           <div className="flex-1 min-w-0">
             <p className="text-[20px] font-bold text-black leading-tight truncate">{data.user.displayName}</p>

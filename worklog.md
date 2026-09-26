@@ -1854,3 +1854,29 @@ Stage Summary:
 - Перф: индексы под все горячие запросы, кэш счётчика онлайна, memo-лента, дешёвые блюры — скролл/тапы ленты не перерисовывают лишнее
 - Артефакты: DesktopShell/WindowFrame/AppIcon/HomeScreen/MiniPlayer/app-logos/LockScreen/VolumePlate(фикс lint)/FeedScreen(memo), schema.prisma+schema.postgres.prisma (генерация+индексы), scripts/smoke-prod.ts (смоук прода)
 - Известное: engine.ts (15с тик) не оптимизировался — если прод начнёт лагать от движка, следующий шаг — батчить его последовательные await'ы
+
+---
+Task ID: 32
+Agent: Z.ai Code (main)
+Task: Интеграция пользовательских ассетов (10 листов): 40 аватаров, 10 обоев, 8 погодных иллюстраций, 8 empty-state. Без звука (решение пользователя).
+
+Work Log:
+- Листы не попали в /upload — скачаны с CDN по ссылкам из сообщения (upload/sheets/, в .gitignore)
+- scripts/slice_assets.py: автонарезка по проекционным профилям с детекцией фона (белый/чёрный/прозрачный RGBA); PIL+numpy
+- Нарезано: avatars a01–a40 (320px webp), wall +10 (terrazzo/fabric/depth/marble-dark/paper/emerald/metropolis/gold/jade/leather), weather 8 (sun/clouds/fog/rain/snow/storm/night/rainbow), empty 8 (chat/notify/notes/gallery/deal-success/deal-fail/repair/delivery — RGBA с прозрачностью)
+- src/lib/avatars.ts: avatarFor(name) — djb2-хэш → a01..a40 (стабильно между сессиями); BOT_AVATAR=a30 (робот)
+- src/components/shared/UserAvatar.tsx: img-аватар с фолбэком на инициалы при ошибке загрузки; проп bot → робот
+- Заменил буквенные кружки на фото (12 файлов): ChatsScreen(48), ChatScreen(36), ListingScreen(44), SellerScreen(64), ProfileScreen(72), FeedScreen(свой 36), LeaderboardApp, AuctionApp BidAvatar, contacts-tab (боты→робот), call-screen (ИИ→робот), CallOverlay (чип+входящий), CareerApp. Мелкие (<24px: rivalry w-5, compare w-[18px]) и гос-стиль (Taxes/gosuslugi) сознательно оставлены на инициалах
+- Обои: wallpapers.ts +10 записей, globals.css +10 классов wp-* (image+градиент-подложка), пикер настроек и Галерея получили новые миниатюры автоматически
+- Погода: CONDITIONS + «Гроза», COND_IMG-маппинг, hero-карточка «Сейчас» → фотоиллюстрация 96px rounded-2xl; в часах/7 днях остались lucide
+- Empty-states (иллюстрация на тёмном #101012 блоке в светлых темах): чаты→chat.webp, шторка уведомлений+десктоп→notify.webp, заметки→notes.webp, ремонт→repair.webp (EmptyState.image), доставки: ошибка→deal-fail, «пока нет»→delivery.webp, «всё доставлено»→deal-success.webp
+- Чистка импортов (MessageSquare/Bell/StickyNote/PackageOpen), EmptyState.icon опционален
+- QA: tsc 0 ошибок (кроме легаси examples/mini-services/skills), eslint чисто
+- agent-browser: анлок → десктоп → Resale (свой аватар-фото, продавец-фото в карточке) → чаты (котик empty-state) → погода (снег hero) → настройки (новые обои в пикере, «Изумруд» применился к десктопу) → dev.log без ошибок
+- Выяснено при QA: клики «по карточкам» попадали в виджет «Пульс рынка» (queryOf → поиск) — легитимное поведение, не баг
+
+Stage Summary:
+- 66 новых ассетов в public/img (≈1.5МБ webp), код — 24 файла
+- Аватары детерминированы по имени: один и тот же продавец всегда с одним лицом на всех экранах
+- Звуки не добавлялись (пользователь: «игра будет без звука»)
+- Ночь/rainbow webp пока в резерве (не встроены)

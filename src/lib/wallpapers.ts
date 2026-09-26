@@ -62,6 +62,17 @@ export const WALLPAPERS: WallpaperDef[] = [
       'radial-gradient(circle at 14% 90%, rgba(168,162,158,0.16), transparent 52%),' +
       'linear-gradient(178deg, #201e1b 0%, #141210 55%, #0a0908 100%)',
   },
+  // ── Премиум-фотообои (2026-09, срезаны из листов) ──
+  { id: 'terrazzo', name: 'Терраццо', image: '/img/wall/terrazzo.webp', css: 'linear-gradient(180deg, #1a1b1e 0%, #0c0d10 100%)' },
+  { id: 'fabric', name: 'Ткань', image: '/img/wall/fabric.webp', css: 'linear-gradient(170deg, #161a20 0%, #0a0c10 100%)' },
+  { id: 'depth', name: 'Глубина', image: '/img/wall/depth.webp', css: 'linear-gradient(180deg, #101216 0%, #0b0a09 100%)' },
+  { id: 'onyx', name: 'Оникс', image: '/img/wall/marble-dark.webp', css: 'linear-gradient(160deg, #191714 0%, #2b241b 100%)' },
+  { id: 'paper', name: 'Бумага', image: '/img/wall/paper.webp', css: 'linear-gradient(180deg, #efe9e2 0%, #d9c8b4 100%)' },
+  { id: 'emerald', name: 'Изумруд', image: '/img/wall/emerald.webp', css: 'linear-gradient(180deg, #06231a 0%, #0b3d2c 100%)' },
+  { id: 'metropolis', name: 'Мегаполис', image: '/img/wall/metropolis.webp', css: 'linear-gradient(180deg, #0a0e14 0%, #1a2230 100%)' },
+  { id: 'gold', name: 'Золото', image: '/img/wall/gold.webp', css: 'linear-gradient(180deg, #0d0a07 0%, #2a1f12 100%)' },
+  { id: 'jade', name: 'Нефрит', image: '/img/wall/jade.webp', css: 'linear-gradient(180deg, #0f241f 0%, #123028 100%)' },
+  { id: 'leather', name: 'Кожа', image: '/img/wall/leather.webp', css: 'linear-gradient(170deg, #17110d 0%, #241a12 100%)' },
 ]
 
 export function wallpaperById(id: string): WallpaperDef {

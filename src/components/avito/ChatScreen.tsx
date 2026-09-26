@@ -14,7 +14,8 @@ import { useCall, startOsLiveCall } from '@/lib/call'
 import { ensureConnected } from '@/lib/live-call'
 import { botDigits, formatNumber } from '@/lib/phone'
 import { getSocket } from '@/lib/use-realtime'
-import { fmtMoney, fmtTime, initials, hueColor } from '@/lib/format'
+import { fmtMoney, fmtTime } from '@/lib/format'
+import { UserAvatar } from '@/components/shared/UserAvatar'
 import { CONDITION_LABEL } from '@/lib/catalog-types'
 import { useDrag } from '@/lib/use-swipe'
 import type { ChatDetailData, ChatDeliveryDTO, ChatMessageDTO } from '@/lib/types'
@@ -379,13 +380,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
           <button onClick={onBack} aria-label="Назад" className="w-10 h-10 flex items-center justify-center rounded-full text-black active:bg-[#F0F1F5]">
             <ChevronLeft size={22} aria-hidden />
           </button>
-          <span
-            className="w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-bold text-white shrink-0"
-            style={{ background: hueColor(chat.counterpart.id.length * 47 % 360) }}
-            aria-hidden
-          >
-            {initials(chat.counterpart.displayName)}
-          </span>
+          <UserAvatar name={chat.counterpart.displayName} className="w-9 h-9 rounded-full" />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="text-[15px] font-bold text-black truncate">{chat.counterpart.displayName}</span>

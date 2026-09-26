@@ -25,8 +25,18 @@ const CITIES = [
   { name: 'Казань', base: 2 },
 ]
 
-const CONDITIONS = ['Солнечно', 'Облачно', 'Пасмурно', 'Дождь', 'Снег'] as const
+const CONDITIONS = ['Солнечно', 'Облачно', 'Пасмурно', 'Дождь', 'Снег', 'Гроза'] as const
 type Condition = (typeof CONDITIONS)[number]
+
+// Фото-иллюстрации для карточки «Сейчас» (нарезаны из листа, 512px)
+const COND_IMG: Record<Condition, string> = {
+  'Солнечно': '/img/weather/sun.webp',
+  'Облачно': '/img/weather/clouds.webp',
+  'Пасмурно': '/img/weather/fog.webp',
+  'Дождь': '/img/weather/rain.webp',
+  'Снег': '/img/weather/snow.webp',
+  'Гроза': '/img/weather/storm.webp',
+}
 
 interface DayWeather {
   cond: Condition
@@ -80,6 +90,7 @@ function buildWeather(cityName: string, base: number, date: Date): DayWeather {
   let temp = Math.round(base + rnd() * 7 - 2)
   if (cond === 'Снег' && temp > -1) temp = -1 - Math.round(rnd() * 5)
   if (cond === 'Дождь' && temp > 26) temp = 24
+  if (cond === 'Гроза' && temp > 32) temp = 27
   const wind = Math.round((0.5 + rnd() * 8) * 10) / 10
   const hum = Math.round(45 + rnd() * 45)
   const press = Math.round(738 + rnd() * 24)
@@ -166,7 +177,14 @@ export default function WeatherApp() {
             <div className="mt-1 text-[56px] font-light leading-none tabular-nums">{fmtDeg(model.now.temp)}</div>
             <div className="mt-2 text-[14px] text-white/70">{model.now.cond}</div>
           </div>
-          <CondIcon cond={model.now.cond} className="size-20 shrink-0" />
+          <img
+            src={COND_IMG[model.now.cond]}
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            decoding="async"
+            className="h-24 w-24 shrink-0 rounded-2xl object-cover ring-1 ring-white/10"
+          />
         </div>
 
         {/* По часам */}

@@ -40,6 +40,17 @@ const FILES = [
   '/img/wall/wave.png',
   '/img/wall/peak.png',
   '/img/wall/city.png',
+  '/img/wall/marble.png',
+  '/img/wall/terrazzo.webp',
+  '/img/wall/fabric.webp',
+  '/img/wall/depth.webp',
+  '/img/wall/marble-dark.webp',
+  '/img/wall/paper.webp',
+  '/img/wall/emerald.webp',
+  '/img/wall/metropolis.webp',
+  '/img/wall/gold.webp',
+  '/img/wall/jade.webp',
+  '/img/wall/leather.webp',
 ]
 
 function prettify(src: string): string {

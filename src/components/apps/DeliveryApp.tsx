@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import {
   AlertTriangle, Banknote, Check, CheckCircle2, ChevronLeft, ChevronRight, Copy, Home, Package,
-  PackageCheck, PackageOpen, Plus, Search, Star, Truck, X,
+  PackageCheck, Plus, Search, Star, Truck, X,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { fmtMoney, fmtDateTime, timeAgo } from '@/lib/format'
@@ -784,7 +784,15 @@ export default function DeliveryApp() {
                 <div className="h-24 animate-pulse rounded-[20px] bg-white" />
               </div>
             ) : error && !data ? (
-              <div className="flex flex-col items-center gap-3 rounded-[20px] bg-[#FDEEEE] p-6 text-center">
+              <div className="flex flex-col items-center gap-1 rounded-[20px] bg-[#FDEEEE] p-6 text-center">
+                <img
+                  src="/img/empty/deal-fail.webp"
+                  alt=""
+                  aria-hidden="true"
+                  loading="lazy"
+                  decoding="async"
+                  className="h-24"
+                />
                 <p className="text-sm font-medium text-[#B3382E]">{error}</p>
                 <button
                   type="button"
@@ -796,9 +804,15 @@ export default function DeliveryApp() {
                 </button>
               </div>
             ) : sorted.length === 0 ? (
-              <div className="flex flex-col items-center rounded-[20px] bg-white px-4 py-12 text-center shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-                <div className="flex size-14 items-center justify-center rounded-full" style={{ backgroundColor: `${EMERALD}1A` }}>
-                  <PackageOpen className="size-7" style={{ color: EMERALD }} aria-hidden />
+              <div className="flex flex-col items-center rounded-[20px] bg-white px-4 py-10 text-center shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+                <div className="rounded-2xl bg-[#101012] px-5 py-3" aria-hidden>
+                  <img
+                    src="/img/empty/delivery.webp"
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    className="h-24"
+                  />
                 </div>
                 <div className="mt-3 text-[15px] font-semibold text-[#1A1A1A]">Доставок пока нет</div>
                 <div className="mt-1 max-w-64 text-[13px] leading-relaxed text-[#9AA0A8]">
@@ -807,8 +821,14 @@ export default function DeliveryApp() {
               </div>
             ) : list.length === 0 ? (
               <div className="flex flex-col items-center rounded-[20px] bg-white px-4 py-10 text-center shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-                <div className="flex size-14 items-center justify-center rounded-full bg-[#F0F1F5]">
-                  <PackageOpen className="size-6 text-[#9AA0A8]" aria-hidden />
+                <div className="rounded-2xl bg-[#101012] px-5 py-3" aria-hidden>
+                  <img
+                    src="/img/empty/deal-success.webp"
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    className="h-24"
+                  />
                 </div>
                 <div className="mt-3 text-[15px] font-semibold text-[#1A1A1A]">
                   {tab === 'active' ? 'Всё доставлено' : 'История пуста'}

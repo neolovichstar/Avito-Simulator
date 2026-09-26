@@ -12,6 +12,7 @@ import { api, ApiError } from '@/lib/api'
 import { CATEGORIES, CATEGORY_LABEL, CONDITION_LABEL, CONDITION_MULT } from '@/lib/catalog-types'
 import type { CategoryKey } from '@/lib/catalog-types'
 import { fmtNum, fmtTime, initials, hueColor, timeAgo } from '@/lib/format'
+import { UserAvatar } from '@/components/shared/UserAvatar'
 import { useOS } from '@/lib/store'
 import { getViewed, clearViewed, type ViewedItem } from '@/lib/viewed'
 import { getSocket } from '@/lib/use-realtime'
@@ -307,13 +308,10 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
                   )}
                 </button>
               )}
-              <div
-                className="size-9 rounded-full overflow-hidden bg-[#E6E8ED] ring-1 ring-[#EBEDF0] flex items-center justify-center text-[12px] font-bold text-[#5C616B]"
-                aria-hidden
-              >
+              <div className="size-9 rounded-full overflow-hidden ring-1 ring-[#EBEDF0]" aria-hidden>
                 {user?.photoUrl
                   ? <img loading="lazy" decoding="async" src={user.photoUrl} alt="" className="h-full w-full object-cover"/>
-                  : initials(user?.displayName ?? 'Я')}
+                  : <UserAvatar name={user?.displayName ?? 'Я'} className="h-full w-full" />}
               </div>
             </div>
           </div>

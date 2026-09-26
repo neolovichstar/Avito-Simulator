@@ -11,7 +11,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Award, Coins, Crown, Flame, Loader2, RefreshCw, ShoppingBag, TrendingUp, Trophy } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
-import { fmtMoney, initials, hueColor } from '@/lib/format'
+import { fmtMoney } from '@/lib/format'
+import { UserAvatar } from '@/components/shared/UserAvatar'
 
 // Токены светлой системы
 const GOLD = '#D9A514'
@@ -64,15 +65,7 @@ function Avatar({ row, size = 'md' }: { row: Board; size?: 'md' | 'lg' }) {
       <img loading="lazy" decoding="async" src={row.photoUrl} alt="" className={`${cls} shrink-0 rounded-full object-cover ${ring}`}/>
     )
   }
-  return (
-    <span
-      className={`${cls} flex shrink-0 items-center justify-center rounded-full font-semibold text-white ${ring}`}
-      style={{ backgroundColor: hueColor(row.userId.length * 47 % 360) }}
-      aria-hidden
-    >
-      {initials(row.name)}
-    </span>
-  )
+  return <UserAvatar name={row.name} className={`${cls} rounded-full ${ring}`} />
 }
 
 export default function LeaderboardApp() {

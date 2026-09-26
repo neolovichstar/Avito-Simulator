@@ -13,7 +13,8 @@ import {
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
 import { sound } from '@/lib/sound'
-import { fmtNum, fmtMoney, timeAgo, initials, hueColor } from '@/lib/format'
+import { fmtNum, fmtMoney, timeAgo } from '@/lib/format'
+import { UserAvatar } from '@/components/shared/UserAvatar'
 import { CATEGORY_LABEL } from '@/lib/catalog-types'
 import { DELIVERY_FEE } from '@/lib/economy'
 import type { ListingDetailData, PricePointDTO } from '@/lib/types'
@@ -351,13 +352,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
               aria-label={`Все объявления продавца ${data.seller.displayName}`}
             >
               <div className="flex items-center gap-3">
-                <div
-                  className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
-                  style={{ background: hueColor(data.seller.id.length * 47 % 360) }}
-                  aria-hidden
-                >
-                  {initials(data.seller.displayName)}
-                </div>
+                <UserAvatar name={data.seller.displayName} className="w-11 h-11 rounded-full" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     <span className="text-[14px] font-bold text-black truncate">{data.seller.displayName}</span>

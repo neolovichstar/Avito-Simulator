@@ -296,7 +296,17 @@ export default function DesktopShell({ locked, onUnlock, renderApp, theme }: Pro
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
               {notifications.length === 0 ? (
-                <p className="py-10 text-center text-xs text-white/40">Пока пусто — всё спокойно</p>
+                <div className="flex flex-col items-center py-5">
+                  <img
+                    src="/img/empty/notify.webp"
+                    alt=""
+                    aria-hidden="true"
+                    loading="lazy"
+                    decoding="async"
+                    className="h-20"
+                  />
+                  <p className="py-1 text-center text-xs text-white/40">Пока пусто — всё спокойно</p>
+                </div>
               ) : (
                 notifications.slice(0, 30).map((n: NotificationDTO) => (
                   <div

@@ -64,3 +64,4 @@ mini-services/realtime/node_modules
 tool-results/
 tg-bot.log
 dev.log
+/upload/

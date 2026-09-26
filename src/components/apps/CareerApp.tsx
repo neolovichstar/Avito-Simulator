@@ -17,7 +17,8 @@ import {
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
 import { sound } from '@/lib/sound'
-import { fmtMoney, fmtNum, hueColor, initials } from '@/lib/format'
+import { fmtMoney, fmtNum } from '@/lib/format'
+import { UserAvatar } from '@/components/shared/UserAvatar'
 import { xpForLevel } from '@/lib/economy'
 import type { AchievementDTO, CareerData, QuestDTO, BonusState } from '@/lib/types'
 
@@ -356,13 +357,7 @@ export default function CareerApp() {
                     alt=""
                     className="size-12 shrink-0 rounded-full object-cover ring-1 ring-black/5"/>
                 ) : (
-                  <div
-                    className="flex size-12 shrink-0 items-center justify-center rounded-full text-[13px] font-bold text-white"
-                    style={{ backgroundColor: hueColor(((session?.id.length ?? 3) * 47) % 360) }}
-                    aria-hidden
-                  >
-                    {initials(session?.displayName ?? 'Игрок')}
-                  </div>
+                  <UserAvatar name={session?.displayName ?? 'Игрок'} className="size-12 rounded-full" />
                 )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">

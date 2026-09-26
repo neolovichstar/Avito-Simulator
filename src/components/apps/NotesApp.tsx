@@ -4,7 +4,7 @@
 // по вводу в localStorage ('avito_sim_notes'), плавающая кнопка новой заметки.
 
 import { useState } from 'react'
-import { ChevronLeft, Plus, StickyNote, Trash2 } from 'lucide-react'
+import { ChevronLeft, Plus, Trash2 } from 'lucide-react'
 import { sound } from '@/lib/sound'
 
 const LS_KEY = 'avito_sim_notes'
@@ -151,8 +151,15 @@ export default function NotesApp() {
 
       <div className="flex-1 overflow-y-auto [scrollbar-width:thin] px-4 pb-24">
         {sorted.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 text-white/40">
-            <StickyNote className="size-10" aria-hidden="true" />
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-white/40">
+            <img
+              src="/img/empty/notes.webp"
+              alt=""
+              aria-hidden="true"
+              loading="lazy"
+              decoding="async"
+              className="h-28"
+            />
             <p className="text-[13px]">Пока нет заметок</p>
           </div>
         ) : (
