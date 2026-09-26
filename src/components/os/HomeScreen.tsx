@@ -2,10 +2,14 @@
 
 // Домашний экран «Resale OS»: две страницы, как на настоящем смартфоне.
 // Страница 1 — компактные виджеты + основные приложения, страница 2 —
-// мини-стрип дня + ЕДИНАЯ сетка 4 колонки (как требует настоящая ОС).
+// мини-стрип дня + единая сетка приложений.
 // Перелистывание — свайпом: палец на телефоне, зажатая мышь на ПК (Pointer Events).
+//
+// Перф: свайп НЕ через setState — transform пишется напрямую в DOM (ref),
+// ре-рендер происходит один раз при смене страницы. Часы живут в отдельном
+// компоненте, поэтому тик раз в секунду не перерисовывает весь лончер.
 
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { memo, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Crown, Mic, Package, Search, Trophy } from 'lucide-react'
 import { useOS, type AppKey, type WidgetKey } from '@/lib/store'
 import { fmtMoney } from '@/lib/format'
@@ -30,37 +34,39 @@ function useClock(): Date | null {
   return ts ? new Date(ts) : null
 }
 
-const glass = 'rounded-2xl bg-white/[0.10] backdrop-blur-md'
-const WIDGET_CLASS = 'flex min-h-10 items-center gap-2 rounded-2xl bg-white/[0.10] px-3 py-1.5 text-left backdrop-blur-md outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white/70'
+const glass = 'rounded-2xl bg-white/[0.14] backdrop-blur-sm'
+const WIDGET_CLASS = 'flex min-h-10 items-center gap-2 rounded-2xl bg-white/[0.14] px-3 py-1.5 text-left backdrop-blur-sm outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white/70'
+
+// ─── Часы-виджет: тик внутри себя, корень лончера не трогаем ────────────────
+const ClockWidget = memo(function ClockWidget() {
+  const now = useClock()
+  return (
+    <div aria-label="Время и дата" className={`${glass} flex min-h-10 flex-col justify-center px-3 py-1`}>
+      <p className="text-lg font-semibold leading-none tabular-nums text-white" suppressHydrationWarning>
+        {now ? now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '\u00A0'}
+      </p>
+      <p className="mt-1 text-[9px] leading-none text-white/60" suppressHydrationWarning>
+        {now ? now.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' }) : '\u00A0'}
+      </p>
+    </div>
+  )
+})
 
 // ─── Компактные виджеты (одна строка, h-12) ──────────────────────────────────
 function Widget({
   w,
-  now,
   online,
   balance,
   data,
   onOpenApp,
 }: {
   w: WidgetKey
-  now: Date | null
   online: number
   balance: number
   data: { quest: { progress: number; target: number } | null; delivery: { status: string } | null }
   onOpenApp: (app: AppKey) => void
 }) {
-  if (w === 'clock') {
-    return (
-      <div aria-label="Время и дата" className={`${glass} flex min-h-10 flex-col justify-center px-3 py-1`}>
-        <p className="text-lg font-semibold leading-none tabular-nums text-white" suppressHydrationWarning>
-          {now ? now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '\u00A0'}
-        </p>
-        <p className="mt-1 text-[9px] leading-none text-white/60" suppressHydrationWarning>
-          {now ? now.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' }) : '\u00A0'}
-        </p>
-      </div>
-    )
-  }
+  if (w === 'clock') return <ClockWidget />
   if (w === 'online') {
     return (
       <div aria-label={`Онлайн: ${online}`} className={`${glass} flex min-h-10 items-center gap-2 px-3`}>
@@ -138,7 +144,9 @@ function useDayData() {
   return { quest, delivery, myPlace }
 }
 
-export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
+const SETTLE_EASE = 'transform 0.32s cubic-bezier(0.22, 1, 0.36, 1)'
+
+function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
   const balance = useOS((s) => s.session?.balance ?? 0)
   const unreadChats = useOS((s) => s.unreadChats)
   const online = useOS((s) => s.online)
@@ -147,36 +155,51 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
   // «Кошелёк» убран из ОС: дублировал приложение «Банк» (решение юзера).
   // Фильтр нужен, чтобы у старых игроков виджет не приезжал из localStorage.
   const shownWidgets = widgets.filter((w) => w !== 'wallet')
-  const now = useClock()
   const day = useDayData()
 
   // ─── Страницы + свайп (ПК и телефон) ───────────────────────────────────────
+  // transform трека пишется НАПРЯМУЮ в DOM во время жеста: React-ре-рендеров
+  // на каждый pointermove больше нет — свайп идёт на частоте дисплея.
   const [page, setPage] = useState(0)
-  const [dragX, setDragX] = useState(0)
-  const [dragging, setDragging] = useState(false)
+  const trackRef = useRef<HTMLDivElement>(null)
   const horizRef = useRef(false)
   const movedRef = useRef(false)
+  const halfWidthRef = useRef(1)
 
   const pages = useDrag({
     onStart: () => {
-      setDragging(true)
       horizRef.current = false
       movedRef.current = false
+      const el = trackRef.current
+      halfWidthRef.current = (el?.offsetWidth ?? 2) / 2
+      if (el) el.style.transition = 'none'
     },
     onMove: (dx, dy) => {
       if (Math.abs(dx) > 10 || Math.abs(dy) > 10) movedRef.current = true
       // горизонтальная интенция: включаем только если тянем вбок заметнее, чем вверх
       if (!horizRef.current && Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.4) horizRef.current = true
       if (!horizRef.current) return
+      const el = trackRef.current
+      if (!el) return
       // сопротивление за краями страниц
       const rubber = (page === 0 && dx > 0) || (page === 1 && dx < 0) ? 0.28 : 1
-      setDragX(dx * rubber)
+      const shift = dx * rubber
+      // база −page*50% + сдвиг пальцем (в %, чтобы не зависеть от px при ресайзе)
+      el.style.transform = `translateX(calc(${-page * 50}% + ${(shift / halfWidthRef.current) * 100}%))`
     },
-    onEnd: (dx) => {
-      setDragging(false)
-      if (horizRef.current && dx <= -56 && page === 0) setPage(1)
-      else if (horizRef.current && dx >= 56 && page === 1) setPage(0)
-      setDragX(0)
+    onEnd: (dx, _dy, fling) => {
+      const el = trackRef.current
+      const width = halfWidthRef.current
+      const distPct = width > 0 ? dx / width : 0
+      // флик по скорости тоже листает: быстрый короткий жест = смена страницы
+      const goNext = page === 0 && horizRef.current && (dx <= -56 || distPct <= -0.35 || (dx < -20 && fling.vx < -0.55))
+      const goPrev = page === 1 && horizRef.current && (dx >= 56 || distPct >= 0.35 || (dx > 20 && fling.vx > 0.55))
+      const next = goNext ? 1 : goPrev ? 0 : page
+      if (el) {
+        el.style.transition = SETTLE_EASE
+        el.style.transform = `translateX(${-next * 50}%)`
+      }
+      if (next !== page) setPage(next)
     },
   })
 
@@ -187,11 +210,6 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
       e.stopPropagation()
       movedRef.current = false
     }
-  }
-
-  const trackStyle: React.CSSProperties = {
-    transform: `translateX(calc(${-page * 50}% + ${dragX}px))`,
-    transition: dragging ? 'none' : 'transform 0.32s cubic-bezier(0.22, 1, 0.36, 1)',
   }
 
   return (
@@ -209,15 +227,19 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
       {/* ─── Страницы (свайп влево/вправо) ─── */}
       {/* touch-none: на телефоне браузер иначе перехватывает свайп под скролл и шлёт pointercancel */}
       <div className="relative z-10 flex-1 touch-none overflow-hidden" onPointerDown={pages.onPointerDown} onClickCapture={guardClick}>
-        <div className="flex h-full w-[200%]" style={trackStyle}>
+        <div
+          ref={trackRef}
+          className="flex h-full w-[200%]"
+          style={{ transform: `translateX(${-page * 50}%)`, transition: SETTLE_EASE, willChange: 'transform' }}
+        >
           {/* ─── Страница 1: компактные виджеты + основные приложения ─── */}
           <section className="flex h-full w-1/2 flex-col" aria-label="Страница 1 — приложения" aria-hidden={page !== 0}>
             <div className="flex items-stretch gap-1.5 px-4">
               {shownWidgets.filter((w) => w === 'clock').map((w) => (
-                <Widget key={w} w={w} now={now} online={online} balance={balance} data={day} onOpenApp={onOpenApp} />
+                <Widget key={w} w={w} online={online} balance={balance} data={day} onOpenApp={onOpenApp} />
               ))}
               {shownWidgets.filter((w) => w !== 'clock').slice(0, 3).map((w) => (
-                <Widget key={w} w={w} now={now} online={online} balance={balance} data={day} onOpenApp={onOpenApp} />
+                <Widget key={w} w={w} online={online} balance={balance} data={day} onOpenApp={onOpenApp} />
               ))}
             </div>
 
@@ -309,6 +331,7 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
                   image={APP_TILE[app].image || undefined}
                   imageBg={APP_TILE[app].background}
                   badge={app === 'avito' ? unreadChats : undefined}
+                  loading="lazy"
                   onClick={() => onOpenApp(app)}
                 />
               ))}
@@ -334,7 +357,7 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
           type="button"
           aria-label="Поиск — открыть браузер"
           onClick={() => onOpenApp('browser')}
-          className="flex h-10 w-full items-center gap-2.5 rounded-full bg-white/[0.12] px-3.5 text-left backdrop-blur-md outline-none ring-1 ring-white/10 transition-all duration-200 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-white/70"
+          className="flex h-10 w-full items-center gap-2.5 rounded-full bg-white/[0.16] px-3.5 text-left backdrop-blur-sm outline-none ring-1 ring-white/10 transition-all duration-200 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-white/70"
         >
           <Search className="size-4 shrink-0 text-white/85" aria-hidden="true" />
           <span className="flex-1 truncate text-[12px] font-medium text-white/75">Поиск</span>
@@ -343,7 +366,7 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
       </div>
 
       {/* ─── Док на стеклянной панели Android 16 ─── */}
-      <div className="z-10 mx-3 mb-2 rounded-[22px] bg-white/10 p-2 pb-2 backdrop-blur-md ring-1 ring-white/10">
+      <div className="z-10 mx-3 mb-2 rounded-[22px] bg-white/[0.14] p-2 pb-2 backdrop-blur-sm ring-1 ring-white/10">
         <div className="grid grid-cols-4 gap-1">
           {DOCK_APPS.map((app) => (
             <AppIcon
@@ -362,3 +385,7 @@ export default function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => 
     </div>
   )
 }
+
+// memo: page.tsx ре-рендерится на каждый тик батареи/онлайна — лончер не должен
+// перевоссоздавать ~50 иконок из-за этого.
+export default memo(HomeScreen)

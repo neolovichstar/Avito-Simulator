@@ -392,7 +392,9 @@ export default function Home() {
     },
   })
 
-  const renderApp = (app?: AppKey) => {
+  // Стабильные колбэки: page.tsx ре-рендерится на тиках батареи/онлайна —
+  // без useCallback ре-рендер страницы перевоссоздаёт дерево recents-слоёв.
+  const renderApp = useCallback((app?: AppKey) => {
     switch (app ?? currentApp) {
       case 'avito': return <AvitoApp />
       case 'bank': return <BankApp />
@@ -416,7 +418,10 @@ export default function Home() {
       case 'numbers': return <NumbersApp />
       default: return null
     }
-  }
+  }, [currentApp])
+
+  const closeRecents = useCallback(() => setRecentsOpen(false), [])
+  const resumeRecents = useCallback(() => setRecentsOpen(false), [])
 
   // ---------- ПК-РЕЖИМ (Windows 11) ----------
   if (isDesktop) {
@@ -480,8 +485,8 @@ export default function Home() {
               {currentApp === null && <HomeScreen onOpenApp={openApp} />}
               <RecentsOverlay
                 open={recentsOpen}
-                onClose={() => setRecentsOpen(false)}
-                onResume={() => setRecentsOpen(false)}
+                onClose={closeRecents}
+                onResume={resumeRecents}
                 renderApp={renderApp}
               />
             </>

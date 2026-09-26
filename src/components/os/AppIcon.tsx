@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 
 /** Логотип из фирменного пака: картинка сама — плитка (фон уже «вшит» в PNG). */
-function TileImage({ src, bg }: { src: string; bg?: string }) {
+function TileImage({ src, bg, loading }: { src: string; bg?: string; loading: 'eager' | 'lazy' }) {
   return (
     <>
       {/* подложка в тон логотипа — пока PNG грузится, плитка не мигает белым */}
@@ -13,9 +13,9 @@ function TileImage({ src, bg }: { src: string; bg?: string }) {
         alt=""
         aria-hidden="true"
         draggable={false}
-        loading="eager"
-        decoding="sync"
-        fetchPriority="high"
+        loading={loading}
+        decoding="async"
+        fetchPriority={loading === 'eager' ? 'high' : 'auto'}
         className="absolute inset-0 h-full w-full select-none object-cover"
       />
     </>
@@ -41,6 +41,7 @@ export default function AppIcon({
   imageBg,
   badge,
   small = false,
+  loading = 'eager',
   onClick,
 }: {
   icon: ReactNode
@@ -56,6 +57,8 @@ export default function AppIcon({
   badge?: number
   /** Компактный режим (док): плитка 52px, подпись 9px. */
   small?: boolean
+  /** Стратегия загрузки лого: экран 2 лончера — lazy (не тормозит старт). */
+  loading?: 'eager' | 'lazy'
   onClick: () => void
 }) {
   const base = color ?? '#4B5563'
@@ -79,7 +82,7 @@ export default function AppIcon({
         style={image ? undefined : { backgroundImage: tileBackground }}
       >
         {image ? (
-          <TileImage src={image} bg={imageBg ?? background} />
+          <TileImage src={image} bg={imageBg ?? background} loading={loading} />
         ) : (
           <>
             {/* Блик сверху — стеклянный отблеск, как у настоящих иконок ОС */}

@@ -98,7 +98,7 @@ export default function GestureNav({
       {/* невидимая нижняя зона жеста (пилюля внутри — просто отрисовка) */}
       <div
         aria-hidden="true"
-        className="absolute inset-x-0 bottom-0 z-[60] h-7 touch-none select-none"
+        className="absolute inset-x-0 bottom-0 z-[60] h-9 touch-none select-none"
         style={{ bottom: 'env(safe-area-inset-bottom)' }}
         {...bottom}
       />

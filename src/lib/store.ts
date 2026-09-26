@@ -126,7 +126,9 @@ export const useOS = create<OSState>((set, get) => ({
     sound.tap()
     set((s) => ({
       currentApp: app,
-      openApps: s.openApps[0] === app ? s.openApps : [app, ...s.openApps.filter((a) => a !== app)].slice(0, 6),
+      // keep-alive слои дороги (каждое живое приложение поллит и рендерится) —
+      // держим не больше 4 недавних, как память настоящего телефона
+      openApps: s.openApps[0] === app ? s.openApps : [app, ...s.openApps.filter((a) => a !== app)].slice(0, 4),
     }))
   },
   closeApp: () => set({ currentApp: null }),

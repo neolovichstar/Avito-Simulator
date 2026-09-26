@@ -101,9 +101,11 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   const timerRef = useRef(0)
   const [day, setDay] = useState<{ deals: number; net: number } | null>(null)
 
-  // свайп вверх с «следованиями за пальцем/мышью»: работает и на телефоне, и на ПК
-  const [dragY, setDragY] = useState(0)
-  const [dragging, setDragging] = useState(false)
+  // свайп вверх с «следованиями за пальцем/мышью»: работает и на телефоне, и на ПК.
+  // Перф: transform/opacity пишутся напрямую в DOM (ref) — ре-рендера на каждый
+  // pointermove нет. Внутри списка уведомлений жест не стартует — там живёт
+  // нативный скролл (data-lock-scroll + touch-action: pan-y на корне).
+  const rootRef = useRef<HTMLDivElement>(null)
   const movedRef = useRef(false)
 
   // итоги дня — только для авторизованной сессии, один раз при монтировании
@@ -145,6 +147,18 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     }
   }, [setFlashlight, pushToast])
 
+  // уход экрана вверх при разблокировке (императивно — transform уже в DOM)
+  useEffect(() => {
+    if (!leaving) return
+    const el = rootRef.current
+    if (el) {
+      el.style.transition = 'transform 400ms ease-out, opacity 400ms ease'
+      el.style.transform = 'translateY(-100%)'
+      el.style.opacity = '0.3'
+      el.style.willChange = 'auto'
+    }
+  }, [leaving])
+
   // Камера shortcut: разблокируем и открываем галерею (ближайшее к камере в игре)
   const openCamera = useCallback(() => {
     unlock()
@@ -152,22 +166,39 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   }, [unlock])
 
   const { onPointerDown } = useDrag({
+    ignoreWithin: '[data-lock-scroll]',
     onStart: () => {
       if (leavingRef.current) return
-      setDragging(true)
       movedRef.current = false
+      const el = rootRef.current
+      if (el) {
+        el.style.transition = 'none'
+        el.style.willChange = 'transform, opacity'
+      }
     },
     onMove: (dx, dy) => {
       if (Math.abs(dx) > 8 || Math.abs(dy) > 8) movedRef.current = true
       if (leavingRef.current) return
+      const el = rootRef.current
+      if (!el) return
       // вверх — следует за пальцем, вниз — заметно ослаблен (упругость)
-      setDragY(dy < 0 ? dy * 0.95 : dy * 0.16)
+      const y = dy < 0 ? dy * 0.95 : dy * 0.16
+      el.style.transform = `translateY(${y}px)`
+      el.style.opacity = String(Math.max(0.55, 1 + y / 460))
     },
-    onEnd: (_dx, dy) => {
-      setDragging(false)
-      if (leavingRef.current) return
-      if (dy < -70) unlock()
-      else setDragY(0) // пружинка назад
+    onEnd: (_dx, dy, fling) => {
+      const el = rootRef.current
+      // флик вверх тоже разблокирует: короткий, но быстрый жест
+      if (!leavingRef.current && (dy < -70 || (dy < -30 && fling.vy < -0.4))) {
+        unlock()
+        return
+      }
+      if (el) {
+        el.style.transition = 'transform 400ms cubic-bezier(0.22, 1, 0.36, 1), opacity 300ms ease'
+        el.style.transform = 'translateY(0px)'
+        el.style.opacity = '1'
+        el.style.willChange = 'auto'
+      }
     },
   })
 
@@ -204,17 +235,13 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
 
   return (
     <div
-      className={`absolute inset-0 z-50 cursor-pointer touch-none overflow-hidden select-none ease-out ${
-        dragging ? '' : 'transition-transform duration-[400ms]'
-      }`}
+      ref={rootRef}
+      className="absolute inset-0 z-50 cursor-pointer overflow-hidden select-none"
       role="dialog"
       aria-label="Экран блокировки — проведите вверх или коснитесь, чтобы открыть"
       onClick={onClick}
       onPointerDown={onPointerDown}
-      style={{
-        transform: leaving ? 'translateY(-100%)' : `translateY(${dragY}px)`,
-        opacity: leaving ? 0.3 : dragging ? Math.max(0.55, 1 + dragY / 460) : 1,
-      }}
+      style={{ touchAction: 'pan-y' }}
     >
       {/* ─── Тёмная сцена с мягкими бликами, как на системном экране блокировки ─── */}
       <div aria-hidden="true" className="absolute inset-0 bg-[#050d09]" />
@@ -263,7 +290,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
         )}
 
         {/* ─── Превью уведомлений: стеклянные карточки white/8, radius 22 ─── */}
-        <div className="mt-6 min-h-0 flex-1 space-y-2.5 overflow-y-auto [scrollbar-width:none]">
+        <div data-lock-scroll className="mt-6 min-h-0 flex-1 space-y-2.5 overflow-y-auto [scrollbar-width:none]">
           {unreadCount > 0 && (
             <p className="px-1 text-[11px] font-semibold uppercase tracking-wider text-white/40">
               {unreadCount} {notifWord(unreadCount)}

@@ -12,6 +12,7 @@
 
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -38,17 +39,18 @@ function AppLayer({
   active,
   open,
   style,
+  children,
   onCardPointerDown,
   onCardActivate,
-  renderApp,
 }: {
   app: AppKey
   active: boolean
   open: boolean
   style: CSSProperties
+  /** Кэшированное поддерево приложения: ре-рендер RecentsOverlay его не трогает. */
+  children: ReactNode
   onCardPointerDown?: (e: RPointerEvent<HTMLDivElement>) => void
   onCardActivate?: () => void
-  renderApp: (app: AppKey) => ReactNode
 }) {
   const innerRef = useRef<HTMLDivElement>(null)
   const prevOpen = useRef(open)
@@ -67,9 +69,7 @@ function AppLayer({
 
   return (
     <div style={style} className="absolute inset-0 bg-black" aria-hidden={!(active || open)}>
-      <div ref={innerRef} className="h-full w-full">
-        {renderApp(app)}
-      </div>
+      <div ref={innerRef} className="h-full w-full">{children}</div>
       {/* прозрачный перехватчик касаний поверх карточки в recents:
           тап — вернуться, драг — закрыть/прокрутить ленту.
           pointer-events:auto на ребёнке работает даже при none на родителе. */}
@@ -94,6 +94,12 @@ function AppLayer({
 }
 
 // ─── Recents ─────────────────────────────────────────────────────────────────
+// Кэш поддеревьев приложений (module-level, RecentsOverlay — синглтон):
+// БЕЗ него каждый перерисовочный тик ленты (setStrip на каждый pointermove)
+// ре-рендерил бы ВСЕ открытые приложения — главный источник лагов recents.
+// Инвалидация — по удалению из недавних.
+const nodeCache = new Map<AppKey, ReactNode>()
+
 export default function RecentsOverlay({
   open,
   onClose,
@@ -107,6 +113,22 @@ export default function RecentsOverlay({
 }) {
   const openApps = useOS((s) => s.openApps)
   const currentApp = useOS((s) => s.currentApp)
+
+  const nodes = useMemo(() => {
+    for (const k of [...nodeCache.keys()]) {
+      if (!openApps.includes(k)) nodeCache.delete(k)
+    }
+    const m = new Map<AppKey, ReactNode>()
+    for (const k of openApps) {
+      let node = nodeCache.get(k)
+      if (!node) {
+        node = renderApp(k)
+        nodeCache.set(k, node)
+      }
+      m.set(k, node)
+    }
+    return m
+  }, [openApps, renderApp])
 
   const boxRef = useRef<HTMLDivElement>(null)
   const [box, setBox] = useState({ w: 390, h: 780 })
@@ -228,11 +250,14 @@ export default function RecentsOverlay({
       borderRadius: 0,
       overflow: 'hidden',
       boxShadow: 'none',
+      // скрытые слои: не создаём компоузитор-слои и изолируем paint —
+      // фоновые приложения перестают давить на GPU
       pointerEvents: isActive ? 'auto' : 'none',
       zIndex: isActive ? 10 : 1,
+      contain: isActive ? undefined : 'layout paint style',
+      willChange: isActive ? 'transform, opacity' : 'auto',
       transition: `transform 420ms ${EASE}, opacity 240ms ease, visibility 0s linear ${isActive ? '0s' : '260ms'}`,
-      willChange: 'transform, opacity',
-    }
+    } as CSSProperties
   }
 
   // ── жесты карточки: тап / вертикаль (закрыть) / горизонталь (лента) ────────
@@ -361,7 +386,7 @@ export default function RecentsOverlay({
       {open && (
         <div
           className="absolute inset-0 recents-fade"
-          style={{ background: 'rgba(4, 6, 9, 0.86)', backdropFilter: 'blur(22px)', WebkitBackdropFilter: 'blur(22px)' }}
+          style={{ background: 'rgba(4, 6, 9, 0.88)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' }}
           {...backdropPointers}
           role="presentation"
         />
@@ -377,8 +402,9 @@ export default function RecentsOverlay({
           style={styleFor(key)}
           onCardPointerDown={open ? cardPointers(key).onPointerDown : undefined}
           onCardActivate={() => resume(key)}
-          renderApp={renderApp}
-        />
+        >
+          {nodes.get(key)}
+        </AppLayer>
       ))}
 
       {/* подписи под карточками: иконка + имя (как в Pixel) */}
@@ -420,7 +446,7 @@ export default function RecentsOverlay({
 
       {/* пусто */}
       {open && n === 0 && (
-        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 recents-fade">
+        <div className="pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 recents-fade">
           <div className="flex size-16 items-center justify-center rounded-[22px] bg-white/[0.07]">
             <Eraser className="size-7 text-white/40" aria-hidden="true" />
           </div>
