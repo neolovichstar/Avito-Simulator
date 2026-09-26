@@ -72,6 +72,7 @@ function M3Slider({ value, onChange, ariaLabel, leftIcon, badge }: {
 }) {
   const trackRef = useRef<HTMLDivElement>(null)
   const dragging = useRef(false)
+  const [drag, setDrag] = useState(false)
 
   const apply = (clientX: number) => {
     const el = trackRef.current
@@ -94,17 +95,28 @@ function M3Slider({ value, onChange, ariaLabel, leftIcon, badge }: {
         tabIndex={0}
         onPointerDown={(e) => {
           dragging.current = true
-          e.currentTarget.setPointerCapture?.(e.pointerId)
+          setDrag(true)
           apply(e.clientX)
+          try {
+            e.currentTarget.setPointerCapture?.(e.pointerId)
+          } catch {
+            // синтетический/неактивный указатель — не критично
+          }
         }}
         onPointerMove={(e) => {
           if (dragging.current) apply(e.clientX)
         }}
         onPointerUp={() => {
           dragging.current = false
+          setDrag(false)
         }}
         onPointerCancel={() => {
           dragging.current = false
+          setDrag(false)
+        }}
+        onLostPointerCapture={() => {
+          dragging.current = false
+          setDrag(false)
         }}
         onKeyDown={(e) => {
           if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
@@ -118,10 +130,15 @@ function M3Slider({ value, onChange, ariaLabel, leftIcon, badge }: {
         }}
         className="relative h-12 flex-1 touch-none select-none rounded-full bg-[#E4E6EB] outline-none focus-visible:ring-2 focus-visible:ring-[#21A038]/50"
       >
-        <div className="absolute inset-y-0 left-0 rounded-full bg-[#21A038]" style={{ width: `${value * 100}%` }} />
+        {/* активная заливка — до центра ручки (на 0% скрыта) */}
         <div
-          className="absolute top-1/2 size-7 -translate-y-1/2 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.35),0_2px_6px_rgba(0,0,0,0.18)] ring-1 ring-black/5"
-          style={{ left: `calc(${value * 100}% - 14px)` }}
+          className="absolute inset-y-0 left-0 rounded-full bg-[#21A038] transition-opacity duration-150"
+          style={{ width: `calc(18px + (100% - 36px) * ${value})`, opacity: value < 0.01 ? 0 : 1 }}
+        />
+        {/* ручка 28px — всегда внутри капсулы (отступ 4px от краёв) */}
+        <div
+          className={`absolute top-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.35),0_2px_6px_rgba(0,0,0,0.18)] ring-1 ring-black/5 transition-transform duration-150 ${drag ? 'scale-125' : ''}`}
+          style={{ left: `calc(4px + (100% - 36px) * ${value})`, width: 28, height: 28 }}
         />
       </div>
       {badge}

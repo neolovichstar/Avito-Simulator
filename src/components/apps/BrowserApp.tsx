@@ -1799,7 +1799,7 @@ function ChromeSwitch({ checked, onChange, label }: { checked: boolean; onChange
     >
       <span
         aria-hidden="true"
-        className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] ${checked ? 'translate-x-[22px]' : 'translate-x-0.5'}`}
+        className={`absolute left-0 top-0.5 size-5 rounded-full bg-white shadow transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] ${checked ? 'translate-x-[22px]' : 'translate-x-0.5'}`}
       />
     </button>
   )

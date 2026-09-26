@@ -214,11 +214,12 @@ function Toggle({ checked, onCheckedChange, label }: {
       aria-checked={checked}
       aria-label={label}
       onClick={() => onCheckedChange(!checked)}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${checked ? 'bg-[#21A03A]' : 'bg-[#D9DCE1]'}`}
+      className={`relative h-6 w-11 shrink-0 rounded-full outline-none transition-colors duration-200 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:ring-2 focus-visible:ring-[#21A038]/50 ${checked ? 'bg-[#21A03A]' : 'bg-[#D9DCE1]'}`}
     >
+      {/* left-0 обязателен: без него ползунок пляшет от статичной центрированной позиции */}
       <span
         aria-hidden="true"
-        className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-[22px]' : 'translate-x-0.5'}`}
+        className={`absolute left-0 top-0.5 size-5 rounded-full bg-white shadow transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-90 ${checked ? 'translate-x-[22px]' : 'translate-x-0.5'}`}
       />
     </button>
   )
