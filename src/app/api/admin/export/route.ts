@@ -30,7 +30,7 @@ function csvResponse(name: string, body: string) {
 }
 
 export async function GET(req: Request) {
-  const denied = requireAdmin(req)
+  const denied = await requireAdmin(req)
   if (denied) return denied
 
   const type = new URL(req.url).searchParams.get('type') ?? 'users'

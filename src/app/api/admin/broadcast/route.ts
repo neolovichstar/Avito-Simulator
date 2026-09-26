@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 // Рассылка всем реальным игрокам: уведомления появятся в шторке ОС,
 // а телеграм-поллер бота доставит их и в Telegram (по tgSentAt).
 export async function POST(req: Request) {
-  const denied = requireAdmin(req)
+  const denied = await requireAdmin(req)
   if (denied) return denied
 
   const body = await req.json().catch(() => ({}))

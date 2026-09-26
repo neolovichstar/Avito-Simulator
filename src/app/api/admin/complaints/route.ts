@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 
 // Очередь жалоб игроков: свежие сверху, с контекстом объявления и заявителя.
 export async function GET(req: Request) {
-  const denied = requireAdmin(req)
+  const denied = await requireAdmin(req)
   if (denied) return denied
 
   const rows = await db.complaint.findMany({

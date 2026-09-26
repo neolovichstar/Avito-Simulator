@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 
 // Фискальный мониторинг: неоплаченные налоги и живые кредиты игроков.
 export async function GET(req: Request) {
-  const denied = requireAdmin(req)
+  const denied = await requireAdmin(req)
   if (denied) return denied
 
   const now = new Date()
@@ -66,7 +66,7 @@ export async function GET(req: Request) {
 
 // Действия: списать налог (forgive) или списать кредит (writeoff).
 export async function POST(req: Request) {
-  const denied = requireAdmin(req)
+  const denied = await requireAdmin(req)
   if (denied) return denied
 
   const body = await req.json().catch(() => ({}))

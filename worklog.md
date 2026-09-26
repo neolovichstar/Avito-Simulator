@@ -2155,3 +2155,25 @@ Stage Summary:
 - /admin теперь полноценный проф-софт: 11 разделов в 4 группах, сквозной аудит всех действий (включая неудачные входы), модерация жалоб, фискальный мониторинг (налоги/кредиты со списанием), операционный мониторинг (доставки/ремонты с зависшими), live-режим, командная палитра
 - Безопасность без изменений: ADMIN_KEY + httpOnly-cookie 7 дней; каждый вход и отказ фиксируются в журнале
 - Игровая логика не тронута: схема расширилась только моделью аудита, движок/цены/боты как были
+
+---
+Task ID: 41
+Agent: main (Z.ai Code)
+Task: «Давай дальше и админку прям защити от третьих лиц» — харденинг /admin
+
+Work Log:
+- ПОДПИСАННЫЕ СЕССИИ: src/lib/admin-session.ts (Web Crypto HMAC-SHA256, работает в edge и Node). Cookie resale_admin теперь хранит токен `<exp>.<nonce>.<hmac>` вместо СЫРОГО ADMIN_KEY (была главная дыра: кража cookie раскрывала сам ключ). Смена ADMIN_KEY мгновенно инвалидирует все сессии; подделка/истечение → 401
+- EDGE-MIDDLEWARE src/middleware.ts: /admin и /api/admin/* без валидной сессии → 307 на /admin/login (страница) или 401 JSON (API); /admin/login открыт, при активной сессии редиректит в панель; CSRF-гард — мутации с Sec-Fetch-Site: cross-site → 403; security-заголовки на все /admin*-ответы: X-Frame-Options DENY, X-Robots-Tag noindex/nofollow/noarchive, Referrer-Policy no-referrer, X-Content-Type-Options nosniff, Cache-Control no-store
+- FAIL-CLOSED: production без ADMIN_KEY → вход 503 + все API закрыты (isLockedDown), в dev работает ключ по умолчанию с предупреждением. Служебный x-admin-key заголовок ограничен dev'ом и фактически перекрыт middleware — доступ ТОЛЬКО по сессии
+- АНТИ-БРУТФОРС src/lib/admin-rate-limit.ts: 5 неудачных попыток / 15 минут → блокировка (429 с lockSec). Глобальный слой Upstash Redis REST (общий на все инстансы Vercel), авто-фолбэк на память процесса; клиентский IP из x-forwarded-for/x-real-ip; unquote() для env в кавычках; успех сбрасывает счётчик
+- РОУТ /api/admin/auth переписан: rate-limit до проверки ключа, IP в аудите (auth.login/auth.fail «· IP x.x.x.x»), подписанная cookie (httpOnly, SameSite=Lax, secure в prod, 7 дней), тайминг-безопасное сравнение. requireAdmin стал async — await во всех 23 call-site
+- ПУБЛИЧНЫЙ ГЕЙТ /admin/login (отдельная страница): карточка «Защищённый контур», ввод ключа, «Неверный ключ», экран блокировки с тикающим таймером мм:сс при 429; admin-client: AdminApiError несёт body (error/lockSec), при 401 глобальный редирект на /admin/login
+- СТРАХОВОЧНЫЙ СЛОЙ: /admin/layout.tsx с metadata robots noindex; page.tsx очищен от встроенного логина (state 'anon' удалён, 401 → редирект)
+- НОВЫЕ KPI НА ОБЗОРЕ: «Денежная масса» (Σ балансов) и «Попытки взлома · 24ч» (счёт auth.fail из аудита), сетка 2×5 (lg:grid-cols-5); типы OverviewData расширены
+- СИЛЬНЫЙ КЛЮЧ: ADMIN_KEY в .env заменён на случайный 40-hex (openssl rand), прежний «resale-admin-2025» скомпрометирован дефолтом. Пользователю сообщить новый ключ; для продакшена задать этот же/свой ADMIN_KEY в Vercel env
+- QA (curl): /admin без сессии → 307 /admin/login; /api/admin/overview → 401; 5 неверных ключей → 403×5, далее 429 c lockSec; верный ключ → 200 + Set-Cookie с токеном (сырой ключ больше не виден); сессия → /admin 200 и API 200; RAW-KEY cookie → 307; подделанный токен → 401; cross-site POST → 403; заголовки на месте. QA (agent-browser): гейт рендерится, неверный ключ → «Неверный ключ», верный → дашборд (52 игрока, 22 онлайн, GMV 242K, денежная масса 18.5M, попытки взлома 7), журнал действий показывает «Вход в панель · IP ::1» и отказы; игра / отвечает 200; tsc 0 в src/, lint 0, dev.log чист
+
+Stage Summary:
+- /admin теперь за полным защитным контуром: edge-гард + подписанные HMAC-сессии + анти-брутфорс (Upstash) + CSRF + fail-closed prod + noindex/заголовки + аудит всех входов/отказов с IP
+- Новый ключ доступа в .env: 19203884801c0b208a8de692be582ce079e93b26 (для продакшена продублировать в переменных окружения Vercel)
+- Игровая часть не тронута: / работает как раньше, схема БД без изменений

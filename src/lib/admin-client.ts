@@ -12,6 +12,8 @@ export type AdminKpis = {
   liveAuctions: number
   taxDebtSum: number
   chats24: number
+  moneySupply: number
+  intrusions24: number
 }
 
 export type SeriesPoint = { day: string; gmv: number; deals: number }
@@ -258,9 +260,11 @@ export type BadgesData = { complaints: number; liveAuctions: number; opsStuck: n
 
 export class AdminApiError extends Error {
   status: number
-  constructor(status: number, message: string) {
+  body?: { error?: string; lockSec?: number }
+  constructor(status: number, message: string, body?: { error?: string; lockSec?: number }) {
     super(message)
     this.status = status
+    this.body = body
   }
 }
 
@@ -270,14 +274,22 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
     cache: 'no-store',
   })
-  if (res.status === 401) throw new AdminApiError(401, 'Требуется вход')
+  if (res.status === 401) {
+    // Сессия истекла/отозвана — уводим на публичный гейт входа
+    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/admin/login')) {
+      window.location.assign('/admin/login')
+    }
+    throw new AdminApiError(401, 'Требуется вход')
+  }
   if (!res.ok) {
     let msg = `Ошибка ${res.status}`
+    let body: { error?: string; lockSec?: number } | undefined
     try {
       const j = await res.json()
       if (j?.error) msg = j.error
+      body = j
     } catch {}
-    throw new AdminApiError(res.status, msg)
+    throw new AdminApiError(res.status, msg, body)
   }
   return res.json() as Promise<T>
 }

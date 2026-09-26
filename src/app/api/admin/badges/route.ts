@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 
 // Лёгкий эндпоинт для бейджей в сайдбаре (поллится каждые ~20 сек).
 export async function GET(req: Request) {
-  const denied = requireAdmin(req)
+  const denied = await requireAdmin(req)
   if (denied) return denied
 
   const now = new Date()

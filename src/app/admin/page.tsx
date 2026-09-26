@@ -1,7 +1,8 @@
 'use client'
 
 // Resale Admin — профессиональная панель управления игрой.
-// Вход по ключу (ADMIN_KEY): POST /api/admin/auth ставит httpOnly-cookie на 7 дней.
+// Защищённый контур: страница открывается только с валидной подписанной сессией
+// (edge-middleware), без сессии — редирект на публичный гейт /admin/login.
 // Оболочка: сайдбар с группами, бейджи (жалобы/аукционы/операции), live-режим,
 // командная палитра Ctrl+K, топбар с часами и индикатором LIVE.
 
@@ -92,13 +93,9 @@ const NAV_GROUPS: { label: string; items: { key: Section; label: string; sub: st
 const NAV_FLAT = NAV_GROUPS.flatMap((g) => g.items.map((i) => ({ ...i, group: g.label })))
 
 export default function AdminPage() {
-  const [state, setState] = useState<'loading' | 'anon' | 'authed'>('loading')
+  const [state, setState] = useState<'loading' | 'authed'>('loading')
   const [defaultKey, setDefaultKey] = useState(false)
   const [section, setSection] = useState<Section>('overview')
-
-  const [key, setKey] = useState('')
-  const [loginErr, setLoginErr] = useState('')
-  const [loginBusy, setLoginBusy] = useState(false)
 
   const [badges, setBadges] = useState<BadgesData | null>(null)
   const [live, setLive] = useState(true)
@@ -116,13 +113,22 @@ export default function AdminPage() {
   }, [])
 
   useEffect(() => {
+    // Middleware уже отфильтровал неавторизованных; проверка — для UX/подстраховки.
+    // При 401 admin-client сам редиректит на /admin/login.
+    let alive = true
     adminApi.auth
       .check()
       .then((r) => {
+        if (!alive) return
         setState('authed')
         setDefaultKey(r.usingDefault)
       })
-      .catch(() => setState('anon'))
+      .catch(() => {
+        if (alive && typeof window !== 'undefined') window.location.assign('/admin/login')
+      })
+    return () => {
+      alive = false
+    }
   }, [])
 
   // live-режим: тик каждые 12 сек перезагружает активную секцию
@@ -171,26 +177,9 @@ export default function AdminPage() {
     return NAV_FLAT.filter((n) => `${n.label} ${n.sub} ${n.group}`.toLowerCase().includes(q))
   }, [paletteQ])
 
-  const login = async () => {
-    if (!key.trim()) return
-    setLoginBusy(true)
-    setLoginErr('')
-    try {
-      const r = await adminApi.auth.login(key.trim())
-      setState('authed')
-      setDefaultKey(r.usingDefault)
-      setKey('')
-    } catch (e) {
-      setLoginErr(e instanceof AdminApiError && e.status === 403 ? 'Неверный ключ' : 'Сервис недоступен, попробуйте позже')
-    } finally {
-      setLoginBusy(false)
-    }
-  }
-
   const logout = async () => {
     await adminApi.auth.logout().catch(() => {})
-    setState('anon')
-    setSection('overview')
+    window.location.assign('/admin/login')
   }
 
   const badgeValue = (b?: 'complaints' | 'liveAuctions' | 'opsStuck') => {
@@ -209,42 +198,6 @@ export default function AdminPage() {
           <div className="flex flex-col items-center gap-3">
             <ShieldCheck className="size-8 animate-pulse text-[#21A038]" />
             <p className="text-[13px] text-zinc-500">Проверяем доступ…</p>
-          </div>
-        </div>
-      )}
-
-      {state === 'anon' && (
-        <div className="flex min-h-screen items-center justify-center p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-[#0D120F] p-6 ring-1 ring-white/[0.08] animate-[admIn_.3s_cubic-bezier(0.2,0,0,1)]">
-            <div className="mb-5 flex flex-col items-center text-center">
-              <img src="/icon.png" alt="Resale Admin" className="size-14 rounded-2xl shadow-lg" />
-              <h1 className="mt-3 text-[18px] font-bold text-zinc-50">Resale Admin</h1>
-              <p className="mt-1 text-[12.5px] text-zinc-500">Введите административный ключ для входа</p>
-            </div>
-            <input
-              type="password"
-              value={key}
-              onChange={(e) => setKey(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && login()}
-              placeholder="Ключ доступа"
-              autoFocus
-              className={`h-11 w-full rounded-xl bg-black/30 px-4 text-[14px] text-zinc-100 ring-1 outline-none transition-all placeholder:text-zinc-600 focus:ring-2 ${
-                loginErr ? 'ring-red-500/40 focus:ring-red-500/60' : 'ring-white/10 focus:ring-[#21A038]/60'
-              }`}
-            />
-            {loginErr && <p className="mt-2 text-[12px] font-semibold text-red-400">{loginErr}</p>}
-            <button
-              onClick={login}
-              disabled={loginBusy || !key.trim()}
-              className="mt-4 h-11 w-full rounded-xl bg-[#21A038] text-[14px] font-bold text-white shadow-[0_10px_24px_-10px_rgba(33,160,56,.7)] transition-all hover:bg-[#1F9134] active:scale-[0.98] disabled:opacity-50"
-            >
-              {loginBusy ? 'Входим…' : 'Войти'}
-            </button>
-            <p className="mt-4 text-center text-[11px] leading-relaxed text-zinc-600">
-              Ключ задаётся переменной окружения ADMIN_KEY.
-              <br />
-              Сессия хранится 7 дней в защищённой cookie.
-            </p>
           </div>
         </div>
       )}

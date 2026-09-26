@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 // escrow, предмет, уведомления) делает игровой движок на ближайшем тике —
 // так не дублируется логика и ничего не ломается.
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const denied = requireAdmin(req)
+  const denied = await requireAdmin(req)
   if (denied) return denied
 
   const { id } = await ctx.params

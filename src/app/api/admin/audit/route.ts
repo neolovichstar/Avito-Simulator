@@ -7,7 +7,7 @@ const PAGE_SIZE = 50
 
 // Журнал действий администратора — кто что делал в панели и когда.
 export async function GET(req: Request) {
-  const denied = requireAdmin(req)
+  const denied = await requireAdmin(req)
   if (denied) return denied
 
   const url = new URL(req.url)

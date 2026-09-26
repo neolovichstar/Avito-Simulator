@@ -6,7 +6,7 @@ import { CATEGORIES, CATEGORY_LABEL } from '@/lib/catalog-types'
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: Request) {
-  const denied = requireAdmin(req)
+  const denied = await requireAdmin(req)
   if (denied) return denied
 
   const [indexes, events] = await Promise.all([
@@ -43,7 +43,7 @@ export async function GET(req: Request) {
 }
 
 export async function PUT(req: Request) {
-  const denied = requireAdmin(req)
+  const denied = await requireAdmin(req)
   if (denied) return denied
 
   const body = await req.json().catch(() => ({}))

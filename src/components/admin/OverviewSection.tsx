@@ -19,8 +19,10 @@ import {
   Activity,
   BadgePercent,
   Box,
+  Coins,
   Gavel,
   MessagesSquare,
+  ShieldAlert,
   ShoppingBag,
   TrendingUp,
   Users,
@@ -65,7 +67,7 @@ export default function OverviewSection({ onToast, refreshKey = 0 }: { onToast: 
           Не удалось загрузить данные. Попробуйте ещё раз.
         </Card>
       )}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <StatCard
           label="Игроков"
           value={data ? fmtShort(data.kpis.users - data.kpis.bots) : '—'}
@@ -115,6 +117,18 @@ export default function OverviewSection({ onToast, refreshKey = 0 }: { onToast: 
           label="Долги по налогам"
           value={data ? fmtShort(data.kpis.taxDebtSum) : '—'}
           icon={<BadgePercent className="size-4" />}
+          loading={!data}
+        />
+        <StatCard
+          label="Денежная масса"
+          value={data ? fmtShort(data.kpis.moneySupply) : '—'}
+          icon={<Coins className="size-4" />}
+          loading={!data}
+        />
+        <StatCard
+          label="Попытки взлома · 24ч"
+          value={data ? String(data.kpis.intrusions24) : '—'}
+          icon={<ShieldAlert className="size-4" />}
           loading={!data}
         />
       </div>

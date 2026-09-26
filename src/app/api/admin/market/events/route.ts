@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 const KINDS = ['demand_up', 'demand_down', 'fashion', 'crisis', 'opu', 'tax_raid', 'supply']
 
 export async function POST(req: Request) {
-  const denied = requireAdmin(req)
+  const denied = await requireAdmin(req)
   if (denied) return denied
 
   const body = await req.json().catch(() => ({}))

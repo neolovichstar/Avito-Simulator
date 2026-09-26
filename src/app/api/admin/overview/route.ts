@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 const DAY = 24 * 3600_000
 
 export async function GET(req: Request) {
-  const denied = requireAdmin(req)
+  const denied = await requireAdmin(req)
   if (denied) return denied
 
   const data = await cache.getOrSet('admin:overview', 10_000, async () => {
@@ -30,6 +30,8 @@ export async function GET(req: Request) {
       hotListings,
       recentChats,
       taxAgg,
+      moneyAgg,
+      intrusions,
     ] = await Promise.all([
       db.user.count(),
       db.user.count({ where: { isBot: true } }),
@@ -66,6 +68,8 @@ export async function GET(req: Request) {
       }),
       db.chat.count({ where: { lastMessageAt: { gte: since24 } } }),
       db.user.aggregate({ _sum: { taxDebt: true } }),
+      db.user.aggregate({ _sum: { balance: true } }),
+      db.adminAction.count({ where: { action: 'auth.fail', createdAt: { gte: since24 } } }),
     ])
 
     // бакеты по дням в JS — переносимо между SQLite и Postgres
@@ -113,6 +117,8 @@ export async function GET(req: Request) {
         liveAuctions,
         taxDebtSum: taxAgg._sum.taxDebt ?? 0,
         chats24: recentChats,
+        moneySupply: moneyAgg._sum.balance ?? 0,
+        intrusions24: intrusions,
       },
       gmvSeries,
       signupSeries: days.map((d) => ({ day: d.slice(5).replace('-', '.'), count: signupMap.get(d) ?? 0 })),

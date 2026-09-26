@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 const PER = 25
 
 export async function GET(req: Request) {
-  const denied = requireAdmin(req)
+  const denied = await requireAdmin(req)
   if (denied) return denied
 
   const url = new URL(req.url)

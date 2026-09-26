@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 // Отклонить жалобу (удалить её). Объявление не трогаем —
 // снять с публикации можно отдельно из карточки жалобы или раздела «Объявления».
 export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const denied = requireAdmin(req)
+  const denied = await requireAdmin(req)
   if (denied) return denied
 
   const { id } = await ctx.params

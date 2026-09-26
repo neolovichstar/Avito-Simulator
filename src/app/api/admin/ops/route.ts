@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 // Операционный мониторинг: доставки и ремонты в работе,
 // зависшие (просроченные) подсвечиваются.
 export async function GET(req: Request) {
-  const denied = requireAdmin(req)
+  const denied = await requireAdmin(req)
   if (denied) return denied
 
   const now = new Date()
