@@ -36,6 +36,17 @@ const FILES = [
   '/img/p/eames-kreslo.jpg',
   // хобби
   '/img/p/fender-strat-mex.jpg',
+  // погода
+  '/img/weather/sun.webp',
+  '/img/weather/clouds.webp',
+  '/img/weather/fog.webp',
+  '/img/weather/rain.webp',
+  '/img/weather/snow.webp',
+  '/img/weather/storm.webp',
+  '/img/weather/night.webp',
+  '/img/weather/rainbow.webp',
+  // портреты (детерминированные аватары жителей)
+  ...Array.from({ length: 40 }, (_, i) => `/img/avatars/a${String(i + 1).padStart(2, '0')}.webp`),
   // обои
   '/img/wall/wave.png',
   '/img/wall/peak.png',
@@ -53,9 +64,25 @@ const FILES = [
   '/img/wall/leather.webp',
 ]
 
+// Красивые имена для служебных папок (товары/обои названы транслитом, погода и
+// портреты — на русском)
+const NAMES: Record<string, string> = {
+  sun: 'Солнце',
+  clouds: 'Облака',
+  fog: 'Туман',
+  rain: 'Дождь',
+  snow: 'Снег',
+  storm: 'Гроза',
+  night: 'Ночь',
+  rainbow: 'Радуга',
+}
+
 function prettify(src: string): string {
   const file = src.split('/').pop() ?? src
   const base = file.replace(/\.[a-z0-9]+$/i, '')
+  if (NAMES[base]) return NAMES[base]!
+  const m = /^a(\d{2})$/.exec(base)
+  if (m) return `Портрет ${Number(m[1])}`
   const words = base.replace(/-/g, ' ')
   return words.charAt(0).toUpperCase() + words.slice(1)
 }

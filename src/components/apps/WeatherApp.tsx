@@ -7,11 +7,15 @@
 import { useMemo, useState } from 'react'
 import {
   Cloud,
+  CloudLightning,
+  CloudMoon,
   CloudRain,
   CloudSnow,
   CloudSun,
   Droplets,
   Gauge,
+  Moon,
+  Rainbow,
   Sun,
   Thermometer,
   Wind,
@@ -25,7 +29,9 @@ const CITIES = [
   { name: 'Казань', base: 2 },
 ]
 
-const CONDITIONS = ['Солнечно', 'Облачно', 'Пасмурно', 'Дождь', 'Снег', 'Гроза'] as const
+const BASE_CONDITIONS = ['Солнечно', 'Облачно', 'Пасмурно', 'Дождь', 'Снег', 'Гроза'] as const
+// «После дождя» — редкий бонусный исход (≈3%), идёт отдельным взвешенным пулом
+const CONDITIONS = [...BASE_CONDITIONS, 'После дождя'] as const
 type Condition = (typeof CONDITIONS)[number]
 
 // Фото-иллюстрации для карточки «Сейчас» (нарезаны из листа, 512px)
@@ -36,6 +42,22 @@ const COND_IMG: Record<Condition, string> = {
   'Дождь': '/img/weather/rain.webp',
   'Снег': '/img/weather/snow.webp',
   'Гроза': '/img/weather/storm.webp',
+  'После дождя': '/img/weather/rainbow.webp',
+}
+const NIGHT_IMG = '/img/weather/night.webp'
+
+// Ночные часы для посуточной кривой (луна в почасовой ленте, звёздное небо в hero)
+function isNightHour(h: number): boolean {
+  return h >= 22 || h < 5
+}
+
+// Ночью «Солнечно» читается как «Ясно», а ясное/облачное небо показываем звёздным
+function condLabel(cond: Condition, night: boolean): string {
+  return night && cond === 'Солнечно' ? 'Ясно' : cond
+}
+function condImg(cond: Condition, night: boolean): string {
+  if (night && (cond === 'Солнечно' || cond === 'Облачно')) return NIGHT_IMG
+  return COND_IMG[cond]
 }
 
 interface DayWeather {
@@ -81,7 +103,10 @@ function dayKey(d: Date): string {
 }
 
 function pickCond(r: number): Condition {
-  return CONDITIONS[Math.floor(r * CONDITIONS.length)] ?? 'Облачно'
+  if (r < 0.03) return 'После дождя'
+  const pool = BASE_CONDITIONS as readonly string[]
+  const idx = Math.floor(((r - 0.03) / 0.97) * pool.length)
+  return (pool[idx] as Condition) ?? 'Облачно'
 }
 
 function buildWeather(cityName: string, base: number, date: Date): DayWeather {
@@ -91,6 +116,8 @@ function buildWeather(cityName: string, base: number, date: Date): DayWeather {
   if (cond === 'Снег' && temp > -1) temp = -1 - Math.round(rnd() * 5)
   if (cond === 'Дождь' && temp > 26) temp = 24
   if (cond === 'Гроза' && temp > 32) temp = 27
+  if (cond === 'После дождя' && temp > 28) temp = 22
+  if (cond === 'После дождя' && temp < 2) temp = 4
   const wind = Math.round((0.5 + rnd() * 8) * 10) / 10
   const hum = Math.round(45 + rnd() * 45)
   const press = Math.round(738 + rnd() * 24)
@@ -112,11 +139,15 @@ function buildHours(cityName: string, day: DayWeather, date: Date): HourWeather[
   return out
 }
 
-function CondIcon({ cond, className }: { cond: Condition; className: string }) {
+function CondIcon({ cond, night, className }: { cond: Condition; night?: boolean; className: string }) {
+  if (night && cond === 'Солнечно') return <Moon className={className + ' text-slate-200'} aria-hidden="true" />
+  if (night && cond === 'Облачно') return <CloudMoon className={className + ' text-slate-200'} aria-hidden="true" />
   if (cond === 'Солнечно') return <Sun className={className + ' text-amber-300'} aria-hidden="true" />
   if (cond === 'Облачно') return <CloudSun className={className + ' text-amber-300'} aria-hidden="true" />
   if (cond === 'Пасмурно') return <Cloud className={className + ' text-white/80'} aria-hidden="true" />
   if (cond === 'Дождь') return <CloudRain className={className + ' text-white/80'} aria-hidden="true" />
+  if (cond === 'Гроза') return <CloudLightning className={className + ' text-amber-200'} aria-hidden="true" />
+  if (cond === 'После дождя') return <Rainbow className={className + ' text-emerald-300'} aria-hidden="true" />
   return <CloudSnow className={className + ' text-white/80'} aria-hidden="true" />
 }
 
@@ -140,6 +171,7 @@ export default function WeatherApp() {
   }, [city, today])
 
   const nowHour = today.getHours()
+  const nightNow = isNightHour(nowHour)
 
   return (
     <div className="flex h-full flex-col bg-[linear-gradient(180deg,#07130D,#050D09)] text-white">
@@ -175,10 +207,10 @@ export default function WeatherApp() {
           <div className="min-w-0">
             <div className="text-[12px] text-white/40">{city.name}</div>
             <div className="mt-1 text-[56px] font-light leading-none tabular-nums">{fmtDeg(model.now.temp)}</div>
-            <div className="mt-2 text-[14px] text-white/70">{model.now.cond}</div>
+            <div className="mt-2 text-[14px] text-white/70">{condLabel(model.now.cond, nightNow)}</div>
           </div>
           <img
-            src={COND_IMG[model.now.cond]}
+            src={condImg(model.now.cond, nightNow)}
             alt=""
             aria-hidden="true"
             loading="lazy"
@@ -200,7 +232,7 @@ export default function WeatherApp() {
                 }
               >
                 <span className="text-[11px] tabular-nums">{String(h.hour).padStart(2, '0')}</span>
-                <CondIcon cond={h.cond} className="size-4" />
+                <CondIcon cond={h.cond} night={isNightHour(h.hour)} className="size-4" />
                 <span className="text-[11px] tabular-nums">{fmtDeg(h.temp)}</span>
               </div>
             ))}
