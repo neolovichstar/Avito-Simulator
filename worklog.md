@@ -2408,3 +2408,21 @@ Work Log:
 Stage Summary:
 - Заблокирован на неверном пароле БД Supabase; юзеру отправлена прямая ссылка сброса пароля: https://supabase.com/dashboard/project/kmpofhpjjcavrscjtkvr/settings/database → Reset database password
 - Всё остальное (host, ref, схема, env-план) готово — как только придёт пароль, заливка схемы занимает минуты
+---
+Task ID: 53-db
+Agent: main (Z.ai Code)
+Task: Supabase подключён — схема + сид залиты, подготовлены env для Vercel (продолжение)
+
+Work Log:
+- Пароль юзера (NZs0...) заработал на txn 6543 сразу, на session 5432 через ~минуту (пропагация пула)
+- db push через 6543+pgbouncer завис (>180с, prepared statements), через session 5432 прошёл за 29с → все 35 таблиц созданы
+- Сгенерирован postgres-клиент, прогнаны сиды против Supabase: scripts/seed.ts (24 бота, 13 индексов, 48+2 объявлений, 2 лота аукциона, 2 события) + scripts/seed-extra.ts (313 PricePoint по 38 товарам)
+- Проверка pg-драйвером: users 24, listings 50, auction 2, pricePoints 313, marketIndex 13, marketEvents 2
+- Локальный sqlite-клиент сгенерирован обратно (dev /api/cities и /api/stats → 200, dev.log чист)
+- .env дополнен SUPABASE_DB_URL (5432) и SUPABASE_DB_URL_POOLED (6543+pgbouncer); .env* в .gitignore — пароль в репо не уйдёт
+- Данные старого прода (Prisma Postgres, заблокирован planLimitReached) нечитаемы → прод стартует с чистой базой + сиды
+
+Stage Summary:
+- Supabase полностью готов к прод: схема 35 таблиц + стартовые игровые данные
+- ОСТАЛОСЬ (делает юзер): в Vercel Settings → Environment Variables обновить DATABASE_URL и POSTGRESPRISMA_POSTGRES_URL на SUPABASE_DB_URL_POOLED → после подтверждения я пушу триггер-коммит → авто-деплой → прод-проверка /api/cities /api/market /api/stats
+- Если Vercel попросит DIRECT_URL — использовать session-URL (5432)
