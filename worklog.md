@@ -2375,3 +2375,21 @@ Stage Summary:
 - Починен автопролистывание страниц при драге (рефловая гонка flipDir — баг тянулся с Task 51)
 - Все анимации на transform/opacity + вибро-отклик на ключевые жесты; оболочка соответствует макету юзера по всем 4 экранам
 - Файлы: os/HomeScreen.tsx (переписан), os/app-logos.tsx (порядок сетки), app/globals.css (анимации папок)
+
+---
+Task ID: 52-prod
+Agent: main (Z.ai Code)
+Task: Прод-проверка деплоя Task 52 → найдена блокировка прод-БД
+
+Work Log:
+- Деплой 1aa0b78 подтверждён на Vercel (маркер home_layout_v2 найден в чанке c8676e9103718fc7.js)
+- Прод-проверка в браузере: экран «Нет связи с сервером»; curl: /api/cities → 500, /api/market → 500, /api/stats → 500 (leaderboard/career 401 — норм без токена). Локально те же эндпоинты 200
+- Расследование: сначала гипотеза «схема postgres не запушена после 843a5f9» (SupportMessage/lastSeenAt/Stars) — prisma db push падал с P1001; прямой TCP до db.prisma.io:5432 работает, оба IP отвечают
+- Через JS-драйвер pg получена ИСТИНА: «Failed to identify your database: Your account has restrictions: planLimitReached. Please contact Prisma support» — Prisma Postgres заблокировал базу лимитом тарифа (аккаунт-левел). Все 500 на проде = БД не отвечает, не код и не схема
+- vercel CLI в песочнице нет; ключей Prisma Management API в .env нет → снять ограничение из песочницы невозможно
+- В worklog/итоге юзеру: варианты — (а) дашборд console.prisma.io: апгрейд плана или чистка/удаление лишних БД (лимит хранилища/числа БД), (б) переезд на Neon/Supabase free: заменить POSTGRESPRISMA_POSTGRES_URL в Vercel Env и рестартить деплой, (в) после разблокировки — прогнать prisma db push (команда в worklog Task 44-48) если схема отстанет
+- Побочно: bun add pg (JS-драйвер для диагностики БД, полезен на будущее)
+
+Stage Summary:
+- Код Task 52 на проде; прод неработоспособен из-за внешней блокировки Prisma Postgres (planLimitReached) — требует действия юзера в дашборде Prisma или смены провайдера БД
+- Локально всё функционирует (sqlite): папки, оболочка, все приложения
