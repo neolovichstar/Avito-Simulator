@@ -1,23 +1,24 @@
 'use client'
 
-// Лента «Resale» — светлый маркетплейс 1:1 как настоящий Авито:
-// шапка с городом и круглым аватаром, серая пилюля поиска, чипы категорий,
-// белые карточки (сердечко в белом кружке, цена bold 17, зелёная звезда продавца).
+// Лента «Resale» — светлое минималистичное приложение по фирменному макету:
+// капс-надзаголовок и город 26px, белая пилюля поиска, чипы-пилюли категорий,
+// сетка 2 колонки с квадратными фото, сердечко в белом кружке/70.
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   Search, SlidersHorizontal, Heart, Star, Zap, Bell, BellPlus, X, SearchX,
-  History, Activity, Scale, Handshake, ArrowUpDown, ChevronDown,
+  History, Activity, Scale, Handshake, ArrowUpDown, ChevronDown, MapPin,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { CATEGORIES, CATEGORY_LABEL, CONDITION_LABEL, CONDITION_MULT } from '@/lib/catalog-types'
 import type { CategoryKey } from '@/lib/catalog-types'
-import { fmtNum, fmtTime, initials, hueColor, timeAgo } from '@/lib/format'
+import { fmtNum, initials, hueColor, timeAgo } from '@/lib/format'
 import { UserAvatar } from '@/components/shared/UserAvatar'
 import { useOS } from '@/lib/store'
 import { getViewed, clearViewed, type ViewedItem } from '@/lib/viewed'
 import { getSocket } from '@/lib/use-realtime'
 import { topMatches, fuzzyMatch, Highlight } from '@/lib/smart-search'
 import type { FeedListing, SavedSearchDTO, PulseItemDTO } from '@/lib/types'
+import { Card, Chip, EmptyState, Overline, Skeleton, cn } from './ui'
 
 const FAV_KEY = 'avito_sim_favs'
 const RECENT_Q_KEY = 'resale_avito_recent_q_v1'
@@ -54,15 +55,6 @@ const SORT_LABEL: Record<'new' | 'cheap' | 'expensive', string> = {
   expensive: 'сначала дороже',
 }
 
-// «Сегодня, 14:02» / «Вчера» / «12 марта» — как в настоящем Авито
-function whenLabel(dateStr: string): string {
-  const d = new Date(dateStr)
-  const now = new Date()
-  if (d.toDateString() === now.toDateString()) return `Сегодня, ${fmtTime(d)}`
-  if (d.toDateString() === new Date(now.getTime() - 86_400_000).toDateString()) return 'Вчера'
-  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
-}
-
 // «Дешевле рынка N%»: оценка рынка по состоянию товара (как marginHint на бэке)
 function cheaperPercent(l: FeedListing): number {
   if (l.price <= 0) return 0
@@ -71,19 +63,20 @@ function cheaperPercent(l: FeedListing): number {
   return Math.min(90, Math.round(((est - l.price) / l.price) * 100))
 }
 
-export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, onCancelSearch, onOpenNotifications, onCompareActiveChange, initialCategory, lockCategory, headerHero }: {
+export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, onCancelSearch, onOpenNotifications, initialCategory, lockCategory, headerHero, headerExtra }: {
   onOpenListing: (id: string) => void
   favoritesMode: boolean
   searchMode?: boolean
   onCancelSearch?: () => void
   onOpenNotifications?: () => void
-  onCompareActiveChange?: (v: boolean) => void
   /** стартовая категория (например, «auto» для вкладки Авто) */
   initialCategory?: CategoryKey | 'all'
   /** спрятать чипы категорий и держать фиксированную (вкладка Авто) */
   lockCategory?: boolean
   /** баннер между поиском и лентой (акцент вкладки) */
   headerHero?: React.ReactNode
+  /** сервисная строка под категориями (Авто/Номера на главной) */
+  headerExtra?: React.ReactNode
 }) {
   const [q, setQ] = useState('')
   const [query, setQuery] = useState('')
@@ -118,12 +111,6 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
   useEffect(() => {
     if (searchMode) inputRef.current?.focus()
   }, [searchMode])
-
-  // панель сравнения видна — прячем «+» в AvitoApp
-  useEffect(() => {
-    onCompareActiveChange?.(compare.length > 0 && !showCompare)
-    return () => onCompareActiveChange?.(false)
-  }, [compare.length, showCompare, onCompareActiveChange])
 
   useEffect(() => {
     setFavs(getFavs())
@@ -260,7 +247,7 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
   const user = session
   const userCity = session?.city || 'Москва'
   const filtered = !favoritesMode && (Boolean(query) || category !== 'all' || city !== 'all')
-  const sectionTitle = favoritesMode ? 'Избранное' : filtered ? `Найдено ${fmtNum(total)}` : 'Объявления рядом'
+  const sectionTitle = favoritesMode ? 'Избранное' : filtered ? 'Результаты поиска' : 'Объявления рядом'
 
   // Умные подсказки под строкой поиска: категории + сохранённые поиски +
   // недавние запросы + пульс рынка, отобранные fuzzy по вводу.
@@ -286,35 +273,38 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
   const visibleItems = favoritesMode && qTrim ? items.filter((l) => fuzzyMatch(qTrim, [l.title, l.city, CATEGORY_LABEL[l.category] ?? ''])) : items
 
   return (
-    <div className="relative h-full flex flex-col bg-[#F7F8FA]">
-      {/* ШАПКА (sticky): город + аватар, пилюля поиска, чипы категорий, фильтры */}
-      <div className="shrink-0 bg-[#F7F8FA] px-4 pt-2 pb-2.5">
-        {/* город + уведомления + аватар */}
+    <div className="relative h-full flex flex-col bg-[#F6F7F9]">
+      {/* ШАПКА: надзаголовок + город 26px, пилюля поиска, чипы, фильтры */}
+      <div className="shrink-0 bg-[#F6F7F9] px-4 pt-2 pb-2.5">
+        {/* надзаголовок + город + уведомления + аватар */}
         {!searchMode && (
-          <div className="flex items-center mb-2.5">
-            <button
-              onClick={() => setShowSort((s) => !s)}
-              aria-expanded={showSort}
-              aria-label={`Город ${userCity}. Открыть фильтры`}
-              className="flex items-center gap-0.5 text-[18px] font-bold text-black leading-none active:opacity-70"
-            >
-              {userCity}
-              <ChevronDown size={17} className="ml-0.5" aria-hidden />
-            </button>
+          <div className="mb-3 flex items-center">
+            <div className="min-w-0">
+              <Overline>Resale</Overline>
+              <button
+                onClick={() => setShowSort((s) => !s)}
+                aria-expanded={showSort}
+                aria-label={`Город ${userCity}. Открыть фильтры`}
+                className="flex items-center text-[26px] font-bold tracking-tight leading-tight text-[#141414] transition-opacity active:opacity-70"
+              >
+                <span className="truncate">{userCity}</span>
+                <ChevronDown size={20} className="ml-1 shrink-0 text-black/40" aria-hidden />
+              </button>
+            </div>
             <div className="ml-auto flex items-center gap-1">
               {onOpenNotifications && (
                 <button
                   onClick={onOpenNotifications}
                   aria-label="Уведомления"
-                  className="relative w-10 h-10 flex items-center justify-center rounded-full text-black active:bg-black/[0.06]"
+                  className="relative flex size-11 items-center justify-center rounded-full text-[#141414] transition-colors active:bg-black/[0.06]"
                 >
                   <Bell size={21} aria-hidden />
                   {notifUnread && (
-                    <span className="absolute top-2 right-2.5 size-2 rounded-full bg-[#0AC760] ring-2 ring-[#F7F8FA]" aria-hidden />
+                    <span className="absolute right-2.5 top-2 size-2 rounded-full bg-[#16A34A] ring-2 ring-[#F6F7F9]" aria-hidden />
                   )}
                 </button>
               )}
-              <div className="size-9 rounded-full overflow-hidden ring-1 ring-[#EBEDF0]" aria-hidden>
+              <div className="size-9 overflow-hidden rounded-full ring-1 ring-black/[0.08]" aria-hidden>
                 {user?.photoUrl
                   ? <img loading="lazy" decoding="async" src={user.photoUrl} alt="" className="h-full w-full object-cover"/>
                   : <UserAvatar name={user?.displayName ?? 'Я'} className="h-full w-full" />}
@@ -334,22 +324,22 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
               if (v) setRecentQ(saveRecentQuery(v))
             }}
           >
-            <div className="flex items-center gap-2 bg-[#F0F1F5] rounded-[12px] px-3.5 h-11">
-              <Search size={18} className="text-[#8B8F99] shrink-0" aria-hidden />
+            <div className="flex h-11 items-center gap-2 rounded-full bg-white px-4 ring-1 ring-black/[0.08]">
+              <Search size={18} className="shrink-0 text-black/35" aria-hidden />
               <input
                 ref={inputRef}
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Искать на Resale"
                 aria-label="Искать на Resale"
-                className="bg-transparent outline-none text-[15px] w-full text-black placeholder:text-[#8B8F99]"
+                className="w-full bg-transparent text-[15px] text-[#141414] outline-none placeholder:text-black/35"
               />
               {q && (
                 <button
                   type="button"
                   onClick={() => { setQ(''); setQuery('') }}
                   aria-label="Очистить поиск"
-                  className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[#8B8F99] active:bg-black/[0.06]"
+                  className="flex size-7 shrink-0 items-center justify-center rounded-full text-black/35 transition-colors active:bg-black/[0.06]"
                 >
                   <X size={15} aria-hidden />
                 </button>
@@ -359,7 +349,7 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
             {/* подсказки: категории/сохранённые/недавние/пульс — fuzzy по вводу; тап = применить */}
             {showSuggest && (
               <div
-                className="absolute inset-x-0 top-full z-30 mt-1.5 overflow-hidden rounded-[14px] bg-white shadow-[0_14px_40px_-10px_rgba(0,0,0,0.3)] ring-1 ring-[#EBEDF0]"
+                className="absolute inset-x-0 top-full z-30 mt-1.5 overflow-hidden rounded-[16px] bg-white shadow-[0_14px_40px_-10px_rgba(0,0,0,0.25)] ring-1 ring-black/[0.05]"
                 role="listbox"
                 aria-label="Подсказки поиска"
               >
@@ -374,13 +364,13 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
                       setQuery(m.value)
                       setRecentQ(saveRecentQuery(m.value))
                     }}
-                    className="flex min-h-[42px] w-full items-center gap-2.5 px-3.5 py-2 text-left transition-colors active:bg-[#F7F8FA]"
+                    className="flex min-h-[44px] w-full items-center gap-2.5 px-4 py-2 text-left transition-colors active:bg-[#F6F7F9]"
                   >
-                    <Search size={14} className="shrink-0 text-[#8B8F99]" aria-hidden />
-                    <span className="min-w-0 flex-1 truncate text-[14px] text-black">
+                    <Search size={14} className="shrink-0 text-black/35" aria-hidden />
+                    <span className="min-w-0 flex-1 truncate text-[14px] text-[#141414]">
                       <Highlight text={m.value} query={qTrim} />
                     </span>
-                    <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-[#8B8F99]">искать</span>
+                    <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.08em] text-black/35">искать</span>
                   </button>
                 ))}
               </div>
@@ -389,71 +379,70 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
           {searchMode && onCancelSearch && (
             <button
               onClick={cancelSearch}
-              className="shrink-0 h-11 px-1 text-[15px] font-medium text-black active:opacity-70"
+              className="h-11 shrink-0 px-1 text-[15px] font-medium text-[#141414] transition-opacity active:opacity-70"
             >
               Отмена
             </button>
           )}
         </div>
 
-        {/* категории — горизонтальный скролл чипов, активный чёрный */}
+        {/* категории — горизонтальный скролл чипов-пилюль */}
         {!searchMode && !lockCategory && (
-          <div className="flex gap-2 mt-2.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-0.5" role="tablist" aria-label="Категории">
-            <CatChip label="Все" active={category === 'all'} onClick={() => setCategory('all')} role="tab" ariaSelected={category === 'all'} />
+          <div className="mt-3 flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Категории">
+            <Chip role="tab" aria-selected={category === 'all'} active={category === 'all'} onClick={() => setCategory('all')}>
+              Все
+            </Chip>
             {CATEGORIES.map((c) => (
-              <CatChip
+              <Chip
                 key={c.key}
-                label={c.label}
+                role="tab"
+                aria-selected={category === c.key}
                 active={category === c.key}
                 onClick={() => setCategory(c.key)}
-                role="tab"
-                ariaSelected={category === c.key}
-              />
+              >
+                {c.label}
+              </Chip>
             ))}
           </div>
         )}
 
         {/* акцент-баннер вкладки (Авто/Номера) */}
-        {headerHero && !searchMode && <div className="mt-2.5">{headerHero}</div>}
+        {headerHero && !searchMode && <div className="mt-3">{headerHero}</div>}
 
-        {/* фильтры — светлые пилюли с иконками */}
-        <div className="flex gap-2 mt-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Фильтры и сортировка">
-          <FilterPill
-            icon={<SlidersHorizontal size={13} aria-hidden />}
-            label="Фильтры"
-            active={showSort}
-            ariaExpanded={showSort}
-            onClick={() => setShowSort((s) => !s)}
-          />
-          <FilterPill
-            icon={<ArrowUpDown size={13} aria-hidden />}
-            label={`Сортировка: ${SORT_LABEL[sort]}`}
-            ariaExpanded={showSort}
-            onClick={() => setShowSort((s) => !s)}
-          />
+        {/* сервисы (Авто/Номера) — только на главной */}
+        {headerExtra && !searchMode && !lockCategory && <div className="mt-2.5">{headerExtra}</div>}
+
+        {/* фильтры — пилюли с иконками */}
+        <div className="mt-2.5 flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Фильтры и сортировка">
+          <Chip active={showSort} aria-expanded={showSort} onClick={() => setShowSort((s) => !s)}>
+            <SlidersHorizontal size={13} aria-hidden />
+            Фильтры
+          </Chip>
+          <Chip aria-expanded={showSort} onClick={() => setShowSort((s) => !s)}>
+            <ArrowUpDown size={13} aria-hidden />
+            Сортировка: {SORT_LABEL[sort]}
+          </Chip>
           {(query || category !== 'all') && (
-            <FilterPill
-              icon={<BellPlus size={13} aria-hidden />}
-              label="Сохранить поиск"
-              accent
-              onClick={() => saveCurrent()}
-            />
+            <Chip onClick={() => saveCurrent()} className="bg-[#14532D]/[0.07] text-[#14532D] ring-[#14532D]/20" aria-label="Сохранить поиск">
+              <BellPlus size={13} aria-hidden />
+              Сохранить поиск
+            </Chip>
           )}
         </div>
 
         {/* панель фильтров: сортировка + город */}
         {showSort && (
-          <div className="flex flex-col gap-2 mt-2.5">
+          <div className="mt-2.5 flex flex-col gap-2">
             <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Сортировка">
               {([['new', 'По дате'], ['cheap', 'Сначала дешевле'], ['expensive', 'Сначала дороже']] as const).map(([k, label]) => (
-                <CatChip key={k} label={label} active={sort === k} onClick={() => setSort(k)} />
+                <Chip key={k} active={sort === k} onClick={() => setSort(k)}>{label}</Chip>
               ))}
             </div>
             {cities.length > 1 && (
               <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Фильтр по городу">
-                <CatChip label="Вся Россия" active={city === 'all'} onClick={() => setCity('all')} />
+                <Chip active={city === 'all'} onClick={() => setCity('all')}>Вся Россия</Chip>
                 {cities.map((c) => (
-                  <CatChip key={c.city} label={`${c.city} · ${c.count}`} active={city === c.city} onClick={() => setCity(c.city)} />
+                  <Chip key={c.city} active={city === c.city} onClick={() => setCity(c.city)}>{c.city} · {c.count}</Chip>
                 ))}
               </div>
             )}
@@ -462,15 +451,15 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
 
         {/* сохранённые поиски */}
         {saved.length > 0 && (
-          <div className="flex gap-2 mt-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Сохранённые поиски">
+          <div className="mt-2 flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Сохранённые поиски">
             {saved.map((s) => (
               <span
                 key={s.id}
-                className="shrink-0 flex items-center gap-1.5 h-8 pl-3 pr-1.5 rounded-full border border-[#0AC760]/40 bg-[#E6F9EF] text-xs font-medium text-[#067A47]"
+                className="flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-[#14532D]/[0.07] pl-3 pr-1.5 text-xs font-medium text-[#14532D]"
               >
                 <button
                   onClick={() => applySaved(s)}
-                  className="flex items-center gap-1.5 active:opacity-70"
+                  className="flex items-center gap-1.5 transition-opacity active:opacity-70"
                   aria-label={`Применить поиск ${s.query || CATEGORY_LABEL[s.category ?? ''] || ''}`}
                 >
                   <Search size={12} aria-hidden />
@@ -479,7 +468,7 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
                 <button
                   onClick={() => removeSaved(s.id)}
                   aria-label="Удалить поиск"
-                  className="w-5 h-5 rounded-full flex items-center justify-center text-[#067A47]/60 active:bg-black/[0.06]"
+                  className="flex size-5 items-center justify-center rounded-full text-[#14532D]/60 transition-colors active:bg-black/[0.06]"
                 >
                   <X size={12} aria-hidden />
                 </button>
@@ -489,12 +478,15 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
         )}
       </div>
 
-      {/* лента: заголовок секции + 2 колонки белых карточек */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto [scrollbar-width:thin] overscroll-contain pb-4">
-        <div className="px-4 pt-1.5 pb-2.5">
-          <h2 className="text-[20px] font-bold text-black leading-tight">{sectionTitle}</h2>
-          {!favoritesMode && !filtered && total > 0 && !loading && (
-            <p className="text-[12px] text-[#8B8F99] mt-0.5">{fmtNum(total)} объявлений рядом с вами</p>
+      {/* лента: заголовок секции + сетка 2 колонки */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain pb-4 [scrollbar-width:thin]">
+        <div className="flex items-baseline justify-between px-4 pb-2.5 pt-1.5">
+          <h2 className="text-[18px] font-bold tracking-tight text-[#141414]">{sectionTitle}</h2>
+          {!favoritesMode && total > 0 && !loading && (
+            <p className="text-[12px] text-black/40">{fmtNum(total)} объявл.</p>
+          )}
+          {favoritesMode && visibleItems.length > 0 && (
+            <p className="text-[12px] text-black/40">{visibleItems.length}</p>
           )}
         </div>
 
@@ -506,7 +498,7 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
             onClear={() => { clearViewed(); setViewed([]) }}
           />
         )}
-        {/* Пульс рынка — блок «Рынок»: новость волн + топ-5 движений цен (час+день) */}
+        {/* Пульс рынка — новость волн + топ-5 движений цен (час) */}
         {!favoritesMode && !query && category === 'all' && (pulse.length > 0 || pulseHeadline) && !loading && (
           <MarketPulseStrip
             items={pulse}
@@ -517,31 +509,25 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
         )}
 
         {error && (
-          <div className="shrink-0 mx-4 bg-[#FDEBEB] text-[#D14343] text-sm rounded-2xl p-3">{error}</div>
+          <div className="mx-4 shrink-0 rounded-[16px] bg-red-500/[0.08] p-3 text-sm text-red-600">{error}</div>
         )}
         {loading && items.length === 0 ? (
-          <div className="px-3 grid grid-cols-2 gap-x-2.5 gap-y-3 content-start">
+          <div className="grid grid-cols-2 content-start gap-3 px-4">
             {Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} />)}
           </div>
         ) : visibleItems.length === 0 ? (
-          <div className="text-center pt-10 px-8 space-y-3">
-            <div className="mx-auto w-16 h-16 rounded-3xl bg-[#F0F1F5] flex items-center justify-center" aria-hidden>
-              <SearchX size={28} className="text-[#8B8F99]" />
-            </div>
-            <p className="text-[15px] text-black font-semibold">
-              {favoritesMode ? (qTrim ? 'В избранном нет такого' : 'В избранном пусто') : 'Ничего не нашлось'}
-            </p>
-            <p className="text-[13px] text-[#8B8F99] leading-relaxed">
-              {favoritesMode
-                ? qTrim
-                  ? 'Попробуйте другой запрос — опечатки не страшны'
-                  : 'Нажимайте на сердечко у объявлений — они появятся здесь'
-                : 'Попробуйте другой запрос или сохраните поиск — сообщим, когда товар появится'}
-            </p>
-          </div>
+          <EmptyState
+            icon={<SearchX size={28} />}
+            title={favoritesMode ? (qTrim ? 'В избранном нет такого' : 'В избранном пусто') : 'Ничего не нашлось'}
+            note={favoritesMode
+              ? qTrim
+                ? 'Попробуйте другой запрос. Опечатки не страшны'
+                : 'Нажимайте на сердечко у объявлений. Они появятся здесь'
+              : 'Попробуйте другой запрос или сохраните поиск. Сообщим, когда товар появится'}
+          />
         ) : (
           <>
-            <div className="px-3 grid grid-cols-2 gap-x-2.5 gap-y-3 content-start">
+            <div className="grid grid-cols-2 content-start gap-3 px-4">
               {visibleItems.map((l) => (
                 <ListingCard
                   key={l.id}
@@ -555,11 +541,11 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
               ))}
             </div>
             {!favoritesMode && items.length < total && (
-              <div className="px-4 pt-3">
+              <div className="px-4 pt-3.5">
                 <button
                   onClick={() => load(pageRef.current + 1)}
                   disabled={loading}
-                  className="h-11 w-full rounded-[12px] bg-[#F0F1F5] text-sm font-semibold text-black active:bg-[#E6E8ED] transition-colors disabled:opacity-50"
+                  className="h-11 w-full rounded-full bg-white text-sm font-semibold text-[#141414] ring-1 ring-black/[0.08] transition-all active:scale-[0.98] disabled:opacity-50"
                 >
                   {loading ? 'Загрузка…' : 'Показать ещё'}
                 </button>
@@ -572,14 +558,14 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
       {/* панель сравнения — плавает над нижней навигацией */}
       {compare.length > 0 && !showCompare && (
         <div
-          className="shrink-0 mx-3 mb-2 rounded-2xl bg-white border border-[#EBEDF0] text-black shadow-lg shadow-black/[0.06] p-2 flex items-center gap-2 animate-in slide-in-from-bottom-2"
+          className="mx-3 mb-2 flex shrink-0 items-center gap-2 rounded-[20px] bg-white p-2 text-[#141414] shadow-[0_8px_28px_-8px_rgba(0,0,0,0.18)] ring-1 ring-black/[0.05] animate-in slide-in-from-bottom-2"
           role="toolbar"
           aria-label="Панель сравнения"
         >
-          <span className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-[#E6F9EF] shrink-0" aria-hidden>
-            <Scale size={16} className="text-[#067A47]" />
+          <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#14532D]/[0.08]" aria-hidden>
+            <Scale size={16} className="text-[#14532D]" />
             {compare.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#0AC760] text-white text-[9px] font-bold flex items-center justify-center">
+              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#16A34A] text-[9px] font-bold text-white">
                 {compare.length}
               </span>
             )}
@@ -590,14 +576,14 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
           <button
             onClick={() => setShowCompare(true)}
             disabled={compare.length < 2}
-            className="ml-auto h-9 px-4 rounded-[10px] bg-black text-white text-xs font-bold active:bg-[#1A1A1A] disabled:opacity-40"
+            className="ml-auto flex h-9 items-center rounded-full bg-[#14532D] px-4 text-xs font-bold text-white transition-all active:scale-[0.97] disabled:opacity-40"
           >
             Сравнить
           </button>
           <button
             onClick={() => setCompare([])}
             aria-label="Очистить сравнение"
-            className="w-9 h-9 rounded-xl bg-[#F0F1F5] flex items-center justify-center text-[#5C616B] active:bg-[#E6E8ED]"
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-black/[0.05] text-black/50 transition-colors active:bg-black/[0.09]"
           >
             <X size={14} aria-hidden />
           </button>
@@ -617,64 +603,14 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
   )
 }
 
-// Категория-чип: высота 36, радиус 10, активная — чёрная с белым текстом
-function CatChip({ label, active, onClick, role, ariaSelected }: {
-  label: string
-  active: boolean
-  onClick: () => void
-  role?: 'tab'
-  ariaSelected?: boolean
-}) {
-  return (
-    <button
-      onClick={onClick}
-      role={role}
-      aria-selected={ariaSelected}
-      className={`shrink-0 h-8 px-3.5 rounded-[10px] text-[13px] transition-colors active:scale-[0.97] ${
-        active ? 'bg-black font-semibold text-white' : 'bg-[#F0F1F5] text-[#5C616B] font-medium'
-      }`}
-    >
-      {label}
-    </button>
-  )
-}
-
-// Фильтр-пилюля с иконкой (Фильтры / Сортировка / Сохранить поиск)
-function FilterPill({ icon, label, onClick, active, accent, ariaExpanded }: {
-  icon: ReactNode
-  label: string
-  onClick: () => void
-  active?: boolean
-  accent?: boolean
-  ariaExpanded?: boolean
-}) {
-  return (
-    <button
-      onClick={onClick}
-      aria-expanded={ariaExpanded}
-      aria-pressed={active}
-      className={`shrink-0 flex items-center gap-1.5 h-8 px-3.5 rounded-[10px] text-[13px] transition-colors active:scale-[0.97] ${
-        active
-          ? 'bg-black font-semibold text-white'
-          : accent
-            ? 'bg-[#E6F9EF] text-[#067A47] font-semibold'
-            : 'bg-[#F0F1F5] text-[#5C616B] font-medium'
-      }`}
-    >
-      {icon}
-      {label}
-    </button>
-  )
-}
-
 function CardSkeleton() {
   return (
-    <div className="shrink-0 rounded-2xl bg-white overflow-hidden">
-      <div className="aspect-[4/3] animate-pulse bg-[#F0F1F5]" />
-      <div className="p-2.5 space-y-1.5">
-        <div className="h-4 animate-pulse bg-[#F0F1F5] rounded w-2/3" />
-        <div className="h-3 animate-pulse bg-[#F0F1F5] rounded w-full" />
-        <div className="h-3 animate-pulse bg-[#F0F1F5] rounded w-1/2" />
+    <div>
+      <Skeleton className="aspect-square w-full rounded-[16px]" />
+      <div className="space-y-1.5 px-0.5 pt-2">
+        <Skeleton className="h-4 w-2/3 rounded-md" />
+        <Skeleton className="h-3.5 w-full rounded-md" />
+        <Skeleton className="h-3 w-1/2 rounded-md" />
       </div>
     </div>
   )
@@ -687,13 +623,13 @@ function ViewedStrip({ items, onOpen, onClear }: {
   onClear: () => void
 }) {
   return (
-    <div className="shrink-0 mx-3 mb-3 rounded-2xl bg-white p-3">
-      <div className="flex items-center gap-1.5 mb-2">
-        <History size={13} className="text-[#8B8F99]" aria-hidden />
-        <h2 className="text-[13px] font-semibold text-black">Вы смотрели</h2>
+    <Card className="mx-4 mb-3 shrink-0 p-3.5">
+      <div className="mb-2.5 flex items-center gap-1.5">
+        <History size={13} className="text-black/35" aria-hidden />
+        <Overline>Вы смотрели</Overline>
         <button
           onClick={onClear}
-          className="ml-auto text-[11px] text-[#8B8F99] active:text-black px-1"
+          className="ml-auto px-1 text-[11px] text-black/40 transition-colors active:text-black/70"
           aria-label="Очистить историю просмотров"
         >
           Очистить
@@ -704,26 +640,26 @@ function ViewedStrip({ items, onOpen, onClear }: {
           <button
             key={v.id}
             onClick={() => onOpen(v.id)}
-            className="shrink-0 w-[96px] text-left active:scale-[0.97] transition-transform"
+            className="w-[96px] shrink-0 text-left transition-transform active:scale-[0.97]"
             aria-label={v.title}
           >
-            <div className="aspect-square rounded-xl overflow-hidden bg-[#F0F1F5]">
-              <img src={v.image} alt="" className="w-full h-full object-cover" loading="lazy" />
+            <div className="aspect-square overflow-hidden rounded-[12px] bg-[#F0F1F3]">
+              <img src={v.image} alt="" className="h-full w-full object-cover" loading="lazy" />
             </div>
-            <p className="mt-1 text-[12px] font-bold text-black leading-none tabular-nums">
+            <p className="mt-1 text-[12px] font-bold leading-none text-[#141414] tabular-nums">
               {v.price === 0 ? 'Даром' : `${fmtNum(v.price)} ₽`}
             </p>
-            <p className="text-[10px] text-[#8B8F99] truncate mt-0.5">{v.title}</p>
+            <p className="mt-0.5 truncate text-[10px] text-black/40">{v.title}</p>
           </button>
         ))}
       </div>
-    </div>
+    </Card>
   )
 }
 
-// Карточка ленты 1:1 как в настоящем Авито: белая, фото 4:3, сердечко в белом кружке,
-// цена bold 17 tabular-nums, название 14 (2 строки), «Москва • Сегодня 14:02», зелёная звезда.
-// memo: ре-рендер только той карточки, у которой реально сменились fav/comparing/listing
+// Карточка ленты по макету: квадратное фото rounded-[16px] на #F0F1F3,
+// сердечко в белом кружке/70, цена 15 extrabold, название 14 semibold,
+// состояние и город с MapPin 12 black/45. memo: ре-рендер только изменённых.
 const ListingCard = memo(function ListingCard({ listing: l, onOpen, onFav, fav, comparing, onCompareToggle }: {
   listing: FeedListing
   onOpen: (id: string) => void
@@ -734,72 +670,70 @@ const ListingCard = memo(function ListingCard({ listing: l, onOpen, onFav, fav, 
 }) {
   const cheap = cheaperPercent(l)
   return (
-    <div className={`press rounded-2xl bg-white overflow-hidden ${comparing ? 'ring-2 ring-black ring-offset-2 ring-offset-[#F7F8FA]' : ''}`}>
-      <div className="relative">
-        <button onClick={() => onOpen(l.id)} aria-label={l.title} className="block w-full text-left">
-          <div className="relative aspect-[4/3] bg-[#F0F1F5]">
-            <img src={l.image} alt="" className="w-full h-full object-cover" loading="lazy" />
-            {cheap >= 10 && (
-              <span className="absolute left-1.5 bottom-1.5 bg-[#E6F9EF]/95 text-[#067A47] text-[10px] font-bold px-1.5 py-0.5 rounded-md">
-                Дешевле рынка {cheap}%
-              </span>
-            )}
-            {l.boosted && (
-              <span className="absolute bottom-1.5 right-1.5 bg-black/70 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5 backdrop-blur-sm">
-                <Zap size={9} aria-hidden /> ТОП
-              </span>
-            )}
-          </div>
-        </button>
-        {onCompareToggle && (
-          <button
-            onClick={() => onCompareToggle?.(l)}
-            aria-label={comparing ? `Убрать ${l.title} из сравнения` : `Добавить ${l.title} к сравнению`}
-            aria-pressed={comparing}
-            className="absolute top-1.5 left-1.5 w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center active:scale-90 transition-transform duration-200 ease-out"
-          >
-            <Scale size={14} className={comparing ? 'text-[#0AC760]' : 'text-[#5C616B]'} aria-hidden />
-          </button>
-        )}
-        {onFav && (
-          <button
-            onClick={() => onFav?.(l.id)}
-            aria-label={fav ? 'Убрать из избранного' : 'В избранное'}
-            aria-pressed={fav}
-            className="absolute top-1.5 right-1.5 w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center active:scale-90 transition-transform duration-200 ease-out"
-          >
-            <Heart
-              size={16}
-              className={`transition-all duration-200 ease-out ${fav ? 'fill-[#F44250] text-[#F44250] scale-110' : 'text-[#8B8F99]'}`}
-              aria-hidden
-            />
-          </button>
-        )}
-      </div>
-      <button onClick={() => onOpen(l.id)} className="block w-full text-left p-2.5">
-        <p className={`text-[17px] font-bold leading-none tabular-nums ${l.price === 0 ? 'text-[#067A47]' : 'text-black'}`}>
-          {l.price === 0 ? 'Даром' : `${fmtNum(l.price)} ₽`}
-        </p>
-        {l.negotiable && (
-          <span className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-medium text-[#5C616B]">
-            <Handshake size={11} aria-hidden /> Торг
-          </span>
-        )}
-        <p className="mt-1 text-[14px] text-black leading-snug line-clamp-2 min-h-[36px]">{l.title}</p>
-        <p className="mt-1 text-[12px] text-[#8B8F99] truncate">{l.city} • {whenLabel(l.createdAt)}</p>
-        <p className="mt-1.5 flex items-center gap-1 text-[12px] text-[#8B8F99]">
-          <Star size={12} className="text-[#0AC760] fill-[#0AC760] shrink-0" aria-hidden />
-          <span className="font-semibold text-black">{l.seller.rating > 0 ? Math.min(5, l.seller.rating).toFixed(1) : 'новый'}</span>
-          <span className="truncate">{l.seller.displayName}</span>
-        </p>
+    <div className="relative">
+      <button onClick={() => onOpen(l.id)} aria-label={l.title} className="block w-full text-left">
+        <div className={cn(
+          'relative aspect-square overflow-hidden rounded-[16px] bg-[#F0F1F3] transition-all',
+          comparing && 'ring-2 ring-[#14532D] ring-offset-2 ring-offset-[#F6F7F9]',
+        )}>
+          <img src={l.image} alt="" className="h-full w-full object-cover" loading="lazy" />
+          {cheap >= 10 && (
+            <span className="absolute bottom-2 left-2 rounded-full bg-[#14532D] px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
+              Дешевле рынка на {cheap}%
+            </span>
+          )}
+          {l.boosted && (
+            <span className="absolute bottom-2 right-2 flex items-center gap-0.5 rounded-full bg-black/60 px-2 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
+              <Zap size={9} aria-hidden /> ТОП
+            </span>
+          )}
+        </div>
+        <div className="px-0.5 pt-2">
+          <p className={`text-[15px] font-extrabold leading-none tabular-nums ${l.price === 0 ? 'text-[#16A34A]' : 'text-[#141414]'}`}>
+            {l.price === 0 ? 'Даром' : `${fmtNum(l.price)} ₽`}
+          </p>
+          <p className="mt-1 min-h-[38px] text-[14px] font-semibold leading-snug text-[#141414] line-clamp-2">{l.title}</p>
+          <p className="mt-1 text-[12px] leading-none text-black/45">
+            {CONDITION_LABEL[l.condition] ?? 'Б/у'}
+            {l.negotiable && <span aria-hidden> · </span>}
+            {l.negotiable && <span className="inline-flex items-center gap-0.5"><Handshake size={10} className="-mt-px" aria-hidden />Торг</span>}
+          </p>
+          <p className="mt-1.5 flex items-center gap-1 text-[12px] leading-none text-black/45">
+            <MapPin size={11} className="shrink-0" aria-hidden />
+            <span className="truncate">{l.city}</span>
+          </p>
+        </div>
       </button>
+      {onCompareToggle && (
+        <button
+          onClick={() => onCompareToggle?.(l)}
+          aria-label={comparing ? `Убрать ${l.title} из сравнения` : `Добавить ${l.title} к сравнению`}
+          aria-pressed={comparing}
+          className="absolute left-2 top-2 flex size-8 items-center justify-center rounded-full bg-white/70 shadow-sm backdrop-blur-sm transition-transform duration-200 ease-out active:scale-90"
+        >
+          <Scale size={14} className={comparing ? 'text-[#14532D]' : 'text-black/50'} aria-hidden />
+        </button>
+      )}
+      {onFav && (
+        <button
+          onClick={() => onFav?.(l.id)}
+          aria-label={fav ? 'Убрать из избранного' : 'В избранное'}
+          aria-pressed={fav}
+          className="absolute right-2 top-2 flex size-8 items-center justify-center rounded-full bg-white/70 shadow-sm backdrop-blur-sm transition-transform duration-200 ease-out active:scale-90"
+        >
+          <Heart
+            size={16}
+            className={`transition-all duration-200 ease-out ${fav ? 'scale-110 fill-[#F44250] text-[#F44250]' : 'text-black/45'}`}
+            aria-hidden
+          />
+        </button>
+      )}
     </div>
   )
 })
 
-// ПУЛЬС РЫНКА (28-a): белая карточка — новостная строка волн рынка сверху,
-// затем горизонтальный скролл топ-5 движений цен (за час + за день из индекса).
-// Тап — применяем поиск по товару. deltaPct < 0 — подешевел (зелёный), > 0 — дороже (красный).
+// ПУЛЬС РЫНКА: белая карточка — новостная строка волн рынка сверху,
+// затем горизонтальный скролл топ-5 движений цен. Тап — применяем поиск.
 function MarketPulseStrip({ items, headline, flash, onPick }: {
   items: PulseItemDTO[]
   headline: string | null
@@ -811,63 +745,60 @@ function MarketPulseStrip({ items, headline, flash, onPick }: {
     return words.length <= 2 ? title : words.slice(0, 2).join(' ')
   }
   return (
-    <section
-      className={`shrink-0 mx-3 mb-3 rounded-2xl bg-white border overflow-hidden transition-shadow ${flash ? 'border-[#0AC760] shadow-md' : 'border-[#EBEDF0]'}`}
+    <Card
+      className={cn('mx-4 mb-3 shrink-0 overflow-hidden transition-shadow', flash && 'shadow-[0_4px_20px_rgba(22,163,74,0.18)] ring-[#16A34A]/40')}
       aria-label="Пульс рынка"
     >
-      <div className="flex items-baseline gap-2 px-3 pt-3 pb-1">
-        <Activity size={15} className="text-[#0AC760] self-center" aria-hidden />
-        <h2 className="text-[16px] font-bold text-black leading-none">Рынок</h2>
-        <span className="text-[12px] text-[#8B8F99]">час · индекс</span>
+      <div className="flex items-center gap-2 px-3.5 pb-1 pt-3">
+        <Activity size={14} className="text-[#16A34A]" aria-hidden />
+        <Overline>Пульс рынка</Overline>
+        <span className="text-[10px] text-black/35">час · индекс</span>
         {flash && (
-          <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-[#067A47]">
+          <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-[#16A34A]">
             <span className="relative flex h-1.5 w-1.5" aria-hidden>
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#0AC760] opacity-75" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#0AC760]" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#16A34A] opacity-75" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#16A34A]" />
             </span>
             живое
           </span>
         )}
       </div>
       {headline && (
-        <p className="px-3 pb-1.5 text-[11px] leading-snug text-[#5C616B] flex items-start gap-1">
-          <span className="shrink-0" aria-hidden>📰</span>
-          <span>{headline}</span>
-        </p>
+        <p className="px-3.5 pb-1.5 text-[11px] leading-snug text-black/55">{headline}</p>
       )}
-      <div className="flex gap-2 overflow-x-auto px-2.5 pb-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex gap-2 overflow-x-auto px-2.5 pb-3 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((p) => {
           const down = p.deltaPct < 0
           return (
             <button
               key={p.itemKey}
               onClick={() => onPick(queryOf(p.title))}
-              className="shrink-0 w-[124px] text-left rounded-xl border border-[#EBEDF0] overflow-hidden bg-white active:scale-[0.97] transition-transform"
+              className="w-[124px] shrink-0 overflow-hidden rounded-[14px] bg-[#F6F7F9] text-left ring-1 ring-black/[0.04] transition-transform active:scale-[0.97]"
               aria-label={`${p.title}, цена ${fmtNum(p.price)}, ${down ? 'подешевел' : 'подорожал'} на ${Math.abs(p.deltaPct)}%`}
             >
-              <div className="relative aspect-[16/10] bg-[#F0F1F5]">
+              <div className="relative aspect-[16/10] bg-[#F0F1F3]">
                 <img src={p.image} alt={p.title} className="h-full w-full object-cover" loading="lazy" />
                 <span
-                  className={`absolute top-1 left-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold shadow-sm ${
-                    down ? 'bg-[#E6F9EF] text-[#067A47]' : 'bg-[#FDEBEB] text-[#D14343]'
+                  className={`absolute left-1 top-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold shadow-sm ${
+                    down ? 'bg-[#14532D] text-white' : 'bg-red-500/[0.92] text-white'
                   }`}
                 >
                   {down ? '−' : '+'}
                   {Math.abs(p.deltaPct)}%
                 </span>
               </div>
-              <div className="p-1.5 space-y-0.5">
-                <p className="text-[10px] font-semibold text-black truncate">{p.title}</p>
+              <div className="space-y-0.5 p-1.5">
+                <p className="truncate text-[10px] font-semibold text-[#141414]">{p.title}</p>
                 <div className="flex items-baseline justify-between gap-1">
-                  <span className="text-[11px] font-bold text-black tabular-nums">{fmtNum(p.price)} ₽</span>
-                  <span className="text-[9px] text-[#8B8F99]">{p.moves} изм.</span>
+                  <span className="text-[11px] font-bold tabular-nums text-[#141414]">{fmtNum(p.price)} ₽</span>
+                  <span className="text-[9px] text-black/40">{p.moves} изм.</span>
                 </div>
               </div>
             </button>
           )
         })}
       </div>
-    </section>
+    </Card>
   )
 }
 
@@ -887,34 +818,34 @@ function CompareSheet({ items, onClose, onClear, onOpen }: {
   const rows: { label: string; render: (l: FeedListing) => React.ReactNode }[] = [
     {
       label: 'Состояние',
-      render: (l): ReactNode => <span className="text-[11px] font-medium text-black">{CONDITION_LABEL[l.condition] ?? l.condition}</span>,
+      render: (l): ReactNode => <span className="text-[11px] font-medium text-[#141414]">{CONDITION_LABEL[l.condition] ?? l.condition}</span>,
     },
     {
       label: 'Город',
-      render: (l): ReactNode => <span className="text-[11px] text-[#8B8F99]">{l.city}</span>,
+      render: (l): ReactNode => <span className="text-[11px] text-black/45">{l.city}</span>,
     },
     {
       label: 'Продавец',
       render: (l): ReactNode => (
-        <span className="flex items-center gap-1 min-w-0">
+        <span className="flex min-w-0 items-center gap-1">
           <span
-            className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[7px] font-bold text-white shrink-0"
+            className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[7px] font-bold text-white"
             style={{ background: hueColor(l.seller.id.length * 47 % 360) }}
             aria-hidden
           >
             {initials(l.seller.displayName)}
           </span>
-          <span className="text-[11px] text-[#8B8F99] truncate">{l.seller.displayName}</span>
+          <span className="truncate text-[11px] text-black/45">{l.seller.displayName}</span>
         </span>
       ),
     },
     {
       label: 'Рейтинг',
       render: (l): ReactNode => (
-        <span className="flex items-center gap-0.5 text-[11px] font-semibold text-black">
-          <Star size={10} className="text-[#0AC760] fill-[#0AC760]" aria-hidden />
+        <span className="flex items-center gap-0.5 text-[11px] font-semibold text-[#141414]">
+          <Star size={10} className="fill-[#16A34A] text-[#16A34A]" aria-hidden />
           {l.seller.rating > 0 ? Math.min(5, l.seller.rating).toFixed(1) : 'новый'}
-          {l.seller.ratingCount > 0 && <span className="text-[#8B8F99] font-normal">({l.seller.ratingCount})</span>}
+          {l.seller.ratingCount > 0 && <span className="font-normal text-black/40">({l.seller.ratingCount})</span>}
         </span>
       ),
     },
@@ -923,19 +854,19 @@ function CompareSheet({ items, onClose, onClear, onOpen }: {
       render: (l): ReactNode => {
         const cheap = cheaperPercent(l)
         return cheap >= 10 ? (
-          <span className="text-[11px] font-bold text-[#067A47]">Дешевле на {cheap}%</span>
+          <span className="text-[11px] font-bold text-[#14532D]">Дешевле на {cheap}%</span>
         ) : (
-          <span className="text-[11px] text-[#8B8F99]">По рынку</span>
+          <span className="text-[11px] text-black/40">По рынку</span>
         )
       },
     },
     {
       label: 'Смотрели',
-      render: (l): ReactNode => <span className="text-[11px] text-[#8B8F99]">{l.views} раз</span>,
+      render: (l): ReactNode => <span className="text-[11px] text-black/45">{l.views} раз</span>,
     },
     {
       label: 'Когда',
-      render: (l): ReactNode => <span className="text-[11px] text-[#8B8F99]">{timeAgo(l.createdAt)}</span>,
+      render: (l): ReactNode => <span className="text-[11px] text-black/45">{timeAgo(l.createdAt)}</span>,
     },
   ]
 
@@ -947,25 +878,25 @@ function CompareSheet({ items, onClose, onClear, onOpen }: {
       aria-label="Сравнение товаров"
     >
       <div
-        className="w-full max-h-[92%] rounded-t-3xl bg-white flex flex-col animate-[sheet-up_220ms_ease-out]"
+        className="flex max-h-[92%] w-full flex-col rounded-t-[24px] bg-white animate-[sheet-up_220ms_ease-out]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* шапка */}
-        <div className="shrink-0 px-4 pt-3 pb-2 border-b border-[#EBEDF0]">
-          <div className="mx-auto mb-2.5 h-1 w-10 rounded-full bg-[#EBEDF0]" aria-hidden />
+        <div className="shrink-0 border-b border-black/[0.05] px-4 pb-2 pt-3">
+          <div className="mx-auto mb-2.5 h-1 w-10 rounded-full bg-black/[0.08]" aria-hidden />
           <div className="flex items-center">
-            <Scale size={16} className="text-black" aria-hidden />
-            <h2 className="ml-1.5 text-sm font-bold text-black">Сравнение товаров</h2>
+            <Scale size={16} className="text-[#14532D]" aria-hidden />
+            <h2 className="ml-1.5 text-sm font-bold text-[#141414]">Сравнение товаров</h2>
             <button
               onClick={onClear}
-              className="ml-auto text-[11px] font-semibold text-[#8B8F99] active:text-black"
+              className="ml-auto text-[11px] font-semibold text-black/40 transition-colors active:text-black/70"
             >
               Очистить всё
             </button>
             <button
               onClick={onClose}
               aria-label="Закрыть сравнение"
-              className="ml-3 w-8 h-8 rounded-full bg-[#F0F1F5] flex items-center justify-center text-[#5C616B] active:bg-[#E6E8ED]"
+              className="ml-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/[0.05] text-black/50 transition-colors active:bg-black/[0.09]"
             >
               <X size={14} aria-hidden />
             </button>
@@ -974,25 +905,25 @@ function CompareSheet({ items, onClose, onClear, onOpen }: {
 
         {/* таблица */}
         <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-3 [scrollbar-width:thin]">
-          <div className="grid gap-x-1 min-w-0" style={gridCols}>
+          <div className="grid min-w-0 gap-x-1" style={gridCols}>
             {/* строка: фото, название, цена, кнопка */}
             <div />
             {items.map((l) => (
-              <div key={l.id} className="px-1.5 min-w-0">
+              <div key={l.id} className="min-w-0 px-1.5">
                 <button onClick={() => onOpen(l.id)} className="block w-full text-left" aria-label={`Открыть ${l.title}`}>
-                  <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-[#F0F1F5]">
-                    <img loading="lazy" decoding="async" src={l.image} alt={l.title} className="w-full h-full object-cover"/>
+                  <div className="relative aspect-[4/3] overflow-hidden rounded-[14px] bg-[#F0F1F3]">
+                    <img loading="lazy" decoding="async" src={l.image} alt={l.title} className="h-full w-full object-cover"/>
                   </div>
-                  <p className="mt-1.5 text-[11px] font-semibold text-black line-clamp-2 leading-snug min-h-[28px]">{l.title}</p>
+                  <p className="mt-1.5 min-h-[28px] text-[11px] font-semibold leading-snug text-[#141414] line-clamp-2">{l.title}</p>
                   <p
                     className={`text-base font-extrabold leading-tight tabular-nums ${
-                      l.price > 0 && l.price === bestPrice ? 'text-[#067A47]' : 'text-black'
+                      l.price > 0 && l.price === bestPrice ? 'text-[#14532D]' : 'text-[#141414]'
                     }`}
                   >
                     {l.price === 0 ? 'Даром' : `${fmtNum(l.price)} ₽`}
                   </p>
                   {l.price > 0 && l.price === bestPrice && (
-                    <span className="mt-0.5 inline-flex rounded bg-[#E6F9EF] px-1 py-0.5 text-[8px] font-bold text-[#067A47]">
+                    <span className="mt-0.5 inline-flex rounded bg-[#14532D]/[0.08] px-1 py-0.5 text-[8px] font-bold text-[#14532D]">
                       лучшая цена
                     </span>
                   )}
@@ -1003,9 +934,9 @@ function CompareSheet({ items, onClose, onClear, onOpen }: {
             {/* параметрные строки */}
             {rows.map((row) => (
               <div key={row.label} className="contents">
-                <div className="py-2 pr-1 text-[10px] font-semibold uppercase tracking-wide text-[#8B8F99] self-center">{row.label}</div>
+                <div className="self-center py-2 pr-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-black/40">{row.label}</div>
                 {items.map((l) => (
-                  <div key={l.id} className="px-1.5 py-2 border-t border-[#EBEDF0] min-w-0 flex items-center">
+                  <div key={l.id} className="flex min-w-0 items-center border-t border-black/[0.05] px-1.5 py-2">
                     {row.render(l)}
                   </div>
                 ))}
@@ -1015,10 +946,10 @@ function CompareSheet({ items, onClose, onClear, onOpen }: {
             {/* строка кнопок */}
             <div />
             {items.map((l) => (
-              <div key={l.id} className="px-1.5 pt-2 pb-1">
+              <div key={l.id} className="px-1.5 pb-1 pt-2">
                 <button
                   onClick={() => onOpen(l.id)}
-                  className="w-full h-9 rounded-[10px] bg-black text-white text-[11px] font-bold active:bg-[#1A1A1A]"
+                  className="h-9 w-full rounded-full bg-[#14532D] text-[11px] font-bold text-white transition-all active:scale-[0.97]"
                 >
                   Открыть
                 </button>

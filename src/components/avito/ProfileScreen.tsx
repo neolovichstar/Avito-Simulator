@@ -1,8 +1,8 @@
 'use client'
 
-// Профиль «Resale» — светлый дизайн 1:1 как настоящий Авито:
-// аватар 72, имя bold 20, зелёная звезда рейтинга, карточка кошелька #F0F1F5,
-// меню-список белых рядов с ChevronRight. Логика (цена/продвижение/снятие) сохранена.
+// Профиль «Resale» — светлый минимализм: аватар 72, имя 26 bold, бейдж ★ PRO,
+// белая карточка кошелька, меню-ряды с шевронами, разделы объявлений/склада/заказов.
+// Логика (цена/продвижение/снятие/отзывы) сохранена 1:1.
 import { useCallback, useEffect, useState } from 'react'
 import {
   Loader2, Star, Package, Tag, Zap, Trash2, ChevronRight, MessageSquareText, Wallet,
@@ -15,6 +15,7 @@ import { UserAvatar } from '@/components/shared/UserAvatar'
 import type { ProfileData, FeedListing, InventoryItemDTO, RivalsData, TransitItemDTO } from '@/lib/types'
 import { getFavs } from './FeedScreen'
 import { ConditionBadge } from './AvitoApp'
+import { Card, EmptyState, Overline, Skeleton, cn } from './ui'
 
 const SUB_TABS = [
   { key: 'listings' as const, icon: Tag, label: 'Мои объявления' },
@@ -127,30 +128,43 @@ export default function ProfileScreen({ onOpenListing, onGoSell, onGoFavorites }
 
   if (loading && !data) {
     return (
-      <div className="h-full bg-[#F7F8FA] flex items-center justify-center">
-        <Loader2 className="animate-spin text-[#8B8F99]" size={28} />
+      <div className="h-full overflow-y-auto bg-[#F6F7F9]">
+        <div className="flex items-center gap-3.5 px-4 pt-5">
+          <Skeleton className="h-[72px] w-[72px] shrink-0 rounded-full" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-6 w-40 rounded-md" />
+            <Skeleton className="h-3.5 w-48 rounded-md" />
+          </div>
+        </div>
+        <div className="px-4 pt-4">
+          <Skeleton className="h-[104px] w-full rounded-[20px]" />
+        </div>
+        <div className="px-4 pt-3">
+          <Skeleton className="h-[150px] w-full rounded-[20px]" />
+        </div>
       </div>
     )
   }
   if (error && !data) {
-    return <div className="p-6 text-sm text-[#D14343] text-center bg-[#F7F8FA] h-full">{error}</div>
+    return <div className="h-full bg-[#F6F7F9] p-6 text-center text-sm text-red-600">{error}</div>
   }
   if (!data) return null
 
   const rating = data.rating
 
   return (
-    <div className="h-full overflow-y-auto [scrollbar-width:thin] bg-[#F7F8FA] pb-4">
-      {/* шапка профиля: аватар 72, имя bold 20, зелёная звезда */}
-      <div className="px-4 pt-4">
-        <div className="flex items-center gap-3.5">
+    <div className="h-full overflow-y-auto bg-[#F6F7F9] pb-4 [scrollbar-width:thin]">
+      {/* шапка профиля: аватар 72, имя 26, бейдж ★ PRO */}
+      <div className="px-4 pt-5">
+        <Overline>Профиль</Overline>
+        <div className="mt-1.5 flex items-center gap-3.5">
           {data.user.photoUrl ? (
-            <img loading="lazy" decoding="async" src={data.user.photoUrl} alt={data.user.displayName} className="w-[72px] h-[72px] rounded-full object-cover ring-1 ring-[#EBEDF0]"/>
+            <img loading="lazy" decoding="async" src={data.user.photoUrl} alt={data.user.displayName} className="h-[72px] w-[72px] shrink-0 rounded-full object-cover ring-1 ring-black/[0.08]"/>
           ) : (
-            <UserAvatar name={data.user.displayName} className="w-[72px] h-[72px] rounded-full ring-1 ring-[#EBEDF0]" />
+            <UserAvatar name={data.user.displayName} className="h-[72px] w-[72px] shrink-0 rounded-full ring-1 ring-black/[0.08]" />
           )}
-          <div className="flex-1 min-w-0">
-            <p className="text-[20px] font-bold text-black leading-tight truncate flex items-center gap-1.5">
+          <div className="min-w-0 flex-1">
+            <p className="flex items-center gap-1.5 text-[26px] font-bold tracking-tight leading-tight text-[#141414]">
               <span className="truncate">{data.user.displayName}</span>
               {data.badge && (
                 <span title="Resale+" aria-label="Бейдж Resale+" className="shrink-0 rounded-md bg-gradient-to-br from-amber-300 to-amber-500 px-1.5 py-0.5 text-[10px] font-black leading-none text-[#3a2a05] shadow-sm">
@@ -158,126 +172,136 @@ export default function ProfileScreen({ onOpenListing, onGoSell, onGoFavorites }
                 </span>
               )}
             </p>
-            <p className="text-[13px] text-[#8B8F99] mt-1 flex items-center gap-1 flex-wrap">
-              <Star size={12} className="text-[#0AC760] fill-[#0AC760]" aria-hidden />
-              <span className="font-semibold text-black">{rating > 0 ? rating.toFixed(1) : '—'}</span>
-              <span aria-hidden>•</span>
+            <p className="mt-1 flex flex-wrap items-center gap-1 text-[13px] text-black/45">
+              <Star size={12} className="fill-[#16A34A] text-[#16A34A]" aria-hidden />
+              <span className="font-semibold text-[#141414]">{rating > 0 ? rating.toFixed(1) : '—'}</span>
+              <span aria-hidden>·</span>
               <span>{data.user.city}</span>
-              <span aria-hidden>•</span>
+              <span aria-hidden>·</span>
               <span>{data.user.level} уровень</span>
             </p>
           </div>
         </div>
-        {data.user.bio && <p className="text-[13px] text-[#5C616B] mt-2.5">{data.user.bio}</p>}
+        {data.user.bio && <p className="mt-2.5 text-[13px] leading-relaxed text-black/55">{data.user.bio}</p>}
       </div>
 
       {/* карточка кошелька */}
-      <div className="px-4 mt-3.5">
-        <div className="rounded-2xl bg-[#F0F1F5] p-4">
+      <div className="px-4 pt-4">
+        <Card className="p-4">
           <div className="flex items-center gap-2">
-            <Wallet size={15} className="text-[#8B8F99]" aria-hidden />
-            <span className="text-[12px] font-medium text-[#8B8F99]">Кошелёк</span>
+            <Wallet size={14} className="text-black/35" aria-hidden />
+            <Overline>Кошелёк</Overline>
           </div>
-          <p className="text-[22px] font-bold text-black mt-1 tabular-nums leading-none">{fmtMoney(data.user.balance)}</p>
-          <div className="flex items-center gap-4 mt-2.5 text-[12px] text-[#8B8F99]">
-            <span className="flex items-center gap-1"><TrendingUp size={12} aria-hidden /> Сделок: <b className="text-black">{data.soldCount}</b></span>
-            <span className="flex items-center gap-1"><Package size={12} aria-hidden /> Склад: <b className="text-black">{fmtMoney(data.inventoryValue)}</b></span>
+          <p className="mt-1 text-[26px] font-extrabold tracking-tight leading-none text-[#141414] tabular-nums">{fmtMoney(data.user.balance)}</p>
+          <div className="mt-2.5 flex items-center gap-4 text-[12px] text-black/45">
+            <span className="flex items-center gap-1"><TrendingUp size={12} aria-hidden /> Сделок: <b className="font-semibold text-[#141414]">{data.soldCount}</b></span>
+            <span className="flex items-center gap-1"><Package size={12} aria-hidden /> Склад: <b className="font-semibold text-[#141414]">{fmtMoney(data.inventoryValue)}</b></span>
           </div>
-        </div>
+        </Card>
       </div>
 
       {/* меню-список: белые ряды с шевронами */}
-      <div className="px-4 mt-3">
-        <div className="rounded-2xl bg-white overflow-hidden" role="tablist" aria-label="Разделы профиля">
+      <div className="px-4 pt-3">
+        <Card className="overflow-hidden" role="tablist" aria-label="Разделы профиля">
           {SUB_TABS.map(({ key, icon: Icon, label }) => (
             <button
               key={key}
               onClick={() => setSubTab(key)}
               role="tab"
               aria-selected={subTab === key}
-              className="w-full flex items-center gap-3 px-4 min-h-[50px] text-left transition-colors active:bg-[#F7F8FA] border-b border-[#EBEDF0] last:border-b-0"
+              className={cn(
+                'flex w-full min-h-[52px] items-center gap-3 border-b border-black/[0.05] px-4 text-left transition-colors last:border-b-0 active:bg-[#F6F7F9]',
+                subTab === key && 'bg-[#14532D]/[0.04]',
+              )}
             >
-              <Icon size={19} className={subTab === key ? 'text-black' : 'text-[#8B8F99]'} aria-hidden />
-              <span className={`flex-1 text-[14px] ${subTab === key ? 'font-semibold text-black' : 'font-medium text-black'}`}>{label}</span>
-              <span className="text-[12px] tabular-nums text-[#8B8F99]">
+              <Icon size={19} className={subTab === key ? 'text-[#14532D]' : 'text-black/35'} aria-hidden />
+              <span className={cn('flex-1 text-[14px]', subTab === key ? 'font-semibold text-[#14532D]' : 'font-medium text-[#141414]')}>{label}</span>
+              <span className="text-[12px] tabular-nums text-black/40">
                 {key === 'listings' ? myListings.length : key === 'inventory' ? items.length : data.purchases.length}
               </span>
-              <ChevronRight size={16} className="text-[#C4C8CF]" aria-hidden />
+              <ChevronRight size={16} className="text-black/20" aria-hidden />
             </button>
           ))}
-        </div>
+        </Card>
 
-        <div className="rounded-2xl bg-white overflow-hidden mt-2.5">
+        <Card className="mt-2.5 overflow-hidden">
           <button
             onClick={onGoFavorites}
-            className="w-full flex items-center gap-3 px-4 min-h-[50px] text-left active:bg-[#F7F8FA] border-b border-[#EBEDF0]"
+            className="flex w-full min-h-[52px] items-center gap-3 border-b border-black/[0.05] px-4 text-left transition-colors active:bg-[#F6F7F9]"
           >
-            <Heart size={19} className="text-[#8B8F99]" aria-hidden />
-            <span className="flex-1 text-[14px] font-medium text-black">Избранное</span>
-            <span className="text-[12px] tabular-nums text-[#8B8F99]">{favsCount}</span>
-            <ChevronRight size={16} className="text-[#C4C8CF]" aria-hidden />
+            <Heart size={19} className="text-black/35" aria-hidden />
+            <span className="flex-1 text-[14px] font-medium text-[#141414]">Избранное</span>
+            <span className="text-[12px] tabular-nums text-black/40">{favsCount}</span>
+            <ChevronRight size={16} className="text-black/20" aria-hidden />
           </button>
           <button
             onClick={() => setShowReviews((v) => !v)}
             aria-expanded={showReviews}
-            className="w-full flex items-center gap-3 px-4 min-h-[50px] text-left active:bg-[#F7F8FA]"
+            className="flex w-full min-h-[52px] items-center gap-3 px-4 text-left transition-colors active:bg-[#F6F7F9]"
           >
-            <MessageSquareText size={19} className="text-[#8B8F99]" aria-hidden />
-            <span className="flex-1 text-[14px] font-medium text-black">Отзывы</span>
-            <span className="text-[12px] tabular-nums text-[#8B8F99]">{data.reviews.length}</span>
-            <ChevronRight size={16} className={`text-[#C4C8CF] transition-transform ${showReviews ? 'rotate-90' : ''}`} aria-hidden />
+            <MessageSquareText size={19} className="text-black/35" aria-hidden />
+            <span className="flex-1 text-[14px] font-medium text-[#141414]">Отзывы</span>
+            <span className="text-[12px] tabular-nums text-black/40">{data.reviews.length}</span>
+            <ChevronRight size={16} className={cn('text-black/20 transition-transform', showReviews && 'rotate-90')} aria-hidden />
           </button>
-        </div>
+        </Card>
       </div>
 
       {/* контент выбранного раздела */}
       <div className="px-4 pt-3">
         {subTab === 'listings' && (
           myListings.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[#C4C8CF] bg-white p-8 text-center">
-              <p className="text-sm text-[#5C616B]">Нет активных объявлений</p>
-              <button onClick={onGoSell} className="mt-2.5 h-10 px-4 rounded-[12px] bg-black text-white text-xs font-bold active:bg-[#1A1A1A]">
-                Выставить вещь из инвентаря
-              </button>
-            </div>
+            <Card>
+              <EmptyState
+                icon={<Tag size={26} />}
+                title="Нет активных объявлений"
+                note="Выставите вещь из инвентаря. Её увидят покупатели в ленте"
+                action={
+                  <button onClick={onGoSell} className="flex h-11 items-center rounded-full bg-[#14532D] px-5 text-xs font-bold text-white shadow-[0_4px_14px_rgba(20,83,45,0.25)] transition-all active:scale-[0.98]">
+                    Выставить вещь из инвентаря
+                  </button>
+                }
+                className="py-8"
+              />
+            </Card>
           ) : (
             <div className="space-y-2.5">
               {myListings.map((l) => (
-                <div key={l.id} className="rounded-2xl bg-white p-3">
-                  <button onClick={() => onOpenListing(l.id)} className="w-full flex gap-3 text-left">
-                    <img loading="lazy" decoding="async" src={l.image} alt={l.title} className="w-16 h-16 rounded-xl object-cover bg-[#F0F1F5] shrink-0"/>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[14px] font-semibold text-black truncate">{l.title}</p>
-                      <p className="text-[15px] font-bold text-black mt-0.5 tabular-nums">{l.price === 0 ? 'Даром' : `${fmtNum(l.price)} ₽`}</p>
-                      <p className="text-[11px] text-[#8B8F99] mt-0.5 flex items-center gap-1">
+                <Card key={l.id} className="p-3">
+                  <button onClick={() => onOpenListing(l.id)} className="flex w-full gap-3 text-left">
+                    <img loading="lazy" decoding="async" src={l.image} alt={l.title} className="h-16 w-16 shrink-0 rounded-[12px] bg-[#F0F1F3] object-cover"/>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[14px] font-semibold text-[#141414]">{l.title}</p>
+                      <p className="mt-0.5 text-[15px] font-extrabold tabular-nums text-[#141414]">{l.price === 0 ? 'Даром' : `${fmtNum(l.price)} ₽`}</p>
+                      <p className="mt-0.5 flex items-center gap-1 text-[11px] text-black/45">
                         <MessageSquareText size={10} aria-hidden /> {l.views} просмотров
                       </p>
                     </div>
                   </button>
-                  <div className="flex gap-2 mt-2.5">
+                  <div className="mt-2.5 flex gap-2">
                     <button
                       onClick={() => openPriceEdit(l)}
                       disabled={busy === l.id}
-                      className="h-9 px-3.5 rounded-[10px] bg-[#F0F1F5] text-black text-[12px] font-semibold flex items-center gap-1 disabled:opacity-50 active:bg-[#E6E8ED]"
+                      className="flex h-9 items-center gap-1 rounded-full bg-black/[0.05] px-3.5 text-[12px] font-semibold text-[#141414] transition-all active:scale-[0.97] disabled:opacity-50"
                     >
                       <Pencil size={11} aria-hidden /> Цена
                     </button>
                     <button
                       onClick={() => boost(l.id)}
                       disabled={busy === l.id || l.boosted}
-                      className="flex-1 h-9 rounded-[10px] bg-[#F0F1F5] text-black text-[12px] font-semibold flex items-center justify-center gap-1 disabled:opacity-50 active:bg-[#E6E8ED]"
+                      className="flex h-9 flex-1 items-center justify-center gap-1 rounded-full bg-black/[0.05] text-[12px] font-semibold text-[#141414] transition-all active:scale-[0.97] disabled:opacity-50"
                     >
                       <Zap size={11} aria-hidden /> {l.boosted ? 'Продвинуто' : 'Продвинуть'}
                     </button>
                     <button
                       onClick={() => remove(l.id)}
                       disabled={busy === l.id}
-                      className="h-9 px-3.5 rounded-[10px] bg-[#FDEBEB] text-[#D14343] text-[12px] font-semibold flex items-center gap-1 disabled:opacity-50"
+                      className="flex h-9 items-center gap-1 rounded-full bg-red-500/[0.09] px-3.5 text-[12px] font-semibold text-red-600 transition-all active:scale-[0.97] disabled:opacity-50"
                     >
                       <Trash2 size={11} aria-hidden /> Снять
                     </button>
                   </div>
-                </div>
+                </Card>
               ))}
             </div>
           )
@@ -285,10 +309,14 @@ export default function ProfileScreen({ onOpenListing, onGoSell, onGoFavorites }
 
         {subTab === 'inventory' && (
           items.length === 0 && inTransit.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[#C4C8CF] bg-white p-8 text-center">
-              <p className="text-sm text-[#5C616B]">Инвентарь пуст</p>
-              <p className="text-xs text-[#8B8F99] mt-1">Купите товары на главной — или ловите «Отдам даром»</p>
-            </div>
+            <Card>
+              <EmptyState
+                icon={<Package size={26} />}
+                title="Инвентарь пуст"
+                note="Купите товары на главной. Или ловите «Отдам даром»"
+                className="py-8"
+              />
+            </Card>
           ) : (
             <div className="space-y-2.5">
               {/* ЛОГИСТИКА (28-b): вещи, которые ещё едут, — серой секцией с ETA. Тап → Доставки */}
@@ -298,20 +326,21 @@ export default function ProfileScreen({ onOpenListing, onGoSell, onGoFavorites }
                     type="button"
                     onClick={() => useOS.getState().openApp('delivery')}
                     aria-label={`В пути ${inTransit.length} — открыть Доставки`}
-                    className="mb-2 flex w-full items-center gap-2 rounded-2xl bg-[#EFF0F4] p-3 text-left active:opacity-80"
+                    className="mb-2 flex w-full items-center gap-2 rounded-[16px] bg-black/[0.04] p-3 text-left transition-opacity active:opacity-80"
                   >
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white text-[#8B8F99]" aria-hidden>
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white text-black/50" aria-hidden>
                       <Truck size={17} />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[13.5px] font-bold text-[#5C616B]">В пути ({inTransit.length})</span>
-                      <span className="block truncate text-[11px] text-[#8B8F99]">
+                      <span className="block text-[13.5px] font-bold text-black/60">В пути ({inTransit.length})</span>
+                      <span className="block truncate text-[11px] text-black/40">
                         {inTransit[0].title}
                         {inTransit.length > 1 ? ` и ещё ${inTransit.length - 1}` : ''} · заберите в Доставках
                       </span>
                     </span>
-                    <ChevronRight size={16} className="shrink-0 text-[#C4C8CF]" aria-hidden />
+                    <ChevronRight size={16} className="shrink-0 text-black/25" aria-hidden />
                   </button>
+
                   <div className="space-y-2">
                     {inTransit.slice(0, 3).map((t) => {
                       const etaLeft = new Date(t.eta).getTime() - Date.now()
@@ -327,16 +356,16 @@ export default function ProfileScreen({ onOpenListing, onGoSell, onGoFavorites }
                           type="button"
                           onClick={() => useOS.getState().openApp('delivery')}
                           aria-label={`${t.title}: ${label}. Открыть Доставки`}
-                          className="flex w-full items-center gap-3 rounded-2xl bg-[#F5F6F9] p-3 text-left opacity-80 transition active:opacity-60"
+                          className="flex w-full items-center gap-3 rounded-[16px] bg-black/[0.03] p-3 text-left opacity-80 transition active:opacity-60"
                         >
-                          <img loading="lazy" decoding="async" src={t.image} alt="" className="h-12 w-12 shrink-0 rounded-xl bg-[#EBEDF2] object-cover grayscale" />
+                          <img loading="lazy" decoding="async" src={t.image} alt="" className="h-12 w-12 shrink-0 rounded-[12px] bg-black/[0.05] object-cover grayscale" />
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-[13px] font-semibold text-[#5C616B]">{t.title}</span>
-                            <span className={`mt-0.5 block text-[11px] font-medium ${t.status === 'arrived' ? 'text-[#067A47]' : 'text-[#8B8F99]'}`}>
+                            <span className="block truncate text-[13px] font-semibold text-black/60">{t.title}</span>
+                            <span className={cn('mt-0.5 block text-[11px] font-medium', t.status === 'arrived' ? 'text-[#14532D]' : 'text-black/40')}>
                               {label}
                             </span>
                           </span>
-                          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white text-[#8B8F99]" aria-hidden>
+                          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white text-black/50" aria-hidden>
                             {t.status === 'arrived' ? <PackageCheck size={15} /> : <Truck size={15} />}
                           </span>
                         </button>
@@ -348,24 +377,24 @@ export default function ProfileScreen({ onOpenListing, onGoSell, onGoFavorites }
               {items.map((i) => {
               const profit = i.estValue - i.purchasePrice
               return (
-                <div key={i.id} className="rounded-2xl bg-white p-3 flex gap-3">
-                  <img loading="lazy" decoding="async" src={i.image} alt={i.title} className="w-16 h-16 rounded-xl object-cover bg-[#F0F1F5] shrink-0"/>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[14px] font-semibold text-black truncate">{i.title}</p>
-                    <div className="flex items-center gap-1.5 mt-1">
+                <Card key={i.id} className="flex gap-3 p-3">
+                  <img loading="lazy" decoding="async" src={i.image} alt={i.title} className="h-16 w-16 shrink-0 rounded-[12px] bg-[#F0F1F3] object-cover"/>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[14px] font-semibold text-[#141414]">{i.title}</p>
+                    <div className="mt-1 flex items-center gap-1.5">
                       <ConditionBadge condition={i.condition} />
-                      {i.listed && <span className="text-[10px] px-1.5 py-0.5 rounded-[10px] bg-[#E6F9EF] text-[#067A47] font-bold">ВЫСТАВЛЕНО</span>}
+                      {i.listed && <span className="rounded-full bg-[#14532D]/[0.08] px-1.5 py-0.5 text-[10px] font-bold leading-none text-[#14532D]">ВЫСТАВЛЕНО</span>}
                     </div>
-                    <p className="text-[11px] text-[#8B8F99] mt-1">
+                    <p className="mt-1 text-[11px] text-black/45">
                       за {fmtNum(i.purchasePrice)} ₽ · рынок ~{fmtNum(i.estValue)} ₽
                     </p>
                     {profit !== 0 && (
-                      <p className={`text-[11px] font-bold ${profit >= 0 ? 'text-[#067A47]' : 'text-[#D14343]'}`}>
+                      <p className={cn('text-[11px] font-bold', profit >= 0 ? 'text-[#14532D]' : 'text-red-600')}>
                         {profit >= 0 ? '+' : ''}{fmtNum(profit)} ₽
                       </p>
                     )}
                   </div>
-                </div>
+                </Card>
               )
             })}
           </div>
@@ -373,37 +402,41 @@ export default function ProfileScreen({ onOpenListing, onGoSell, onGoFavorites }
 
         {subTab === 'purchases' && (
           data.purchases.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[#C4C8CF] bg-white p-8 text-center">
-              <p className="text-sm text-[#5C616B]">Покупок пока нет</p>
-              <p className="text-xs text-[#8B8F99] mt-1">Купите что-нибудь — и оцените сделку</p>
-            </div>
+            <Card>
+              <EmptyState
+                icon={<ShoppingBag size={26} />}
+                title="Покупок пока нет"
+                note="Купите что-нибудь. И оцените сделку"
+                className="py-8"
+              />
+            </Card>
           ) : (
             <div className="space-y-2.5">
               {data.purchases.map((p) => (
-                <div key={p.listingId} className="rounded-2xl bg-white p-3">
-                  <button onClick={() => onOpenListing(p.listingId)} className="w-full flex gap-3 text-left">
-                    <img loading="lazy" decoding="async" src={p.image} alt={p.title} className="w-16 h-16 rounded-xl object-cover bg-[#F0F1F5] shrink-0"/>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[14px] font-semibold text-black truncate">{p.title}</p>
-                      <p className="text-[15px] font-bold text-black mt-0.5 tabular-nums">{p.price === 0 ? 'Даром' : `${fmtNum(p.price)} ₽`}</p>
-                      <p className="text-[11px] text-[#8B8F99] mt-0.5">{timeAgo(p.createdAt)}</p>
+                <Card key={p.listingId} className="p-3">
+                  <button onClick={() => onOpenListing(p.listingId)} className="flex w-full gap-3 text-left">
+                    <img loading="lazy" decoding="async" src={p.image} alt={p.title} className="h-16 w-16 shrink-0 rounded-[12px] bg-[#F0F1F3] object-cover"/>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[14px] font-semibold text-[#141414]">{p.title}</p>
+                      <p className="mt-0.5 text-[15px] font-extrabold tabular-nums text-[#141414]">{p.price === 0 ? 'Даром' : `${fmtNum(p.price)} ₽`}</p>
+                      <p className="mt-0.5 text-[11px] text-black/45">{timeAgo(p.createdAt)}</p>
                     </div>
                   </button>
-                  <div className="flex gap-2 mt-2.5">
+                  <div className="mt-2.5 flex gap-2">
                     {p.reviewed ? (
-                      <span className="h-9 px-3.5 rounded-[10px] bg-[#E6F9EF] text-[#067A47] text-[12px] font-semibold flex items-center gap-1">
+                      <span className="flex h-9 items-center gap-1 rounded-full bg-[#14532D]/[0.08] px-3.5 text-[12px] font-semibold text-[#14532D]">
                         <BadgeCheck size={12} aria-hidden /> Отзыв отправлен
                       </span>
                     ) : (
                       <button
                         onClick={() => onOpenListing(p.listingId)}
-                        className="h-9 px-3.5 rounded-[10px] bg-[#FFF4E5] text-[#B25E09] text-[12px] font-semibold flex items-center gap-1"
+                        className="flex h-9 items-center gap-1 rounded-full bg-amber-500/[0.12] px-3.5 text-[12px] font-semibold text-amber-700 transition-all active:scale-[0.97]"
                       >
                         <PenLine size={12} aria-hidden /> Оценить сделку
                       </button>
                     )}
                   </div>
-                </div>
+                </Card>
               ))}
             </div>
           )
@@ -412,26 +445,26 @@ export default function ProfileScreen({ onOpenListing, onGoSell, onGoFavorites }
         {/* отзывы — раскрываются из меню */}
         {showReviews && (
           <div className="mt-4">
-            <h3 className="text-[15px] font-semibold text-black mb-2">Отзывы обо мне</h3>
+            <Overline className="mb-2 px-1">Отзывы обо мне</Overline>
             {data.reviews.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-[#C4C8CF] bg-white p-6 text-center text-xs text-[#8B8F99]">
-                Отзывов пока нет — они появятся после первых сделок
-              </div>
+              <Card className="p-6 text-center text-xs text-black/45">
+                Отзывов пока нет. Они появятся после первых сделок
+              </Card>
             ) : (
               <div className="space-y-2">
                 {data.reviews.map((r) => (
-                  <div key={r.id} className="rounded-2xl bg-white p-3">
+                  <Card key={r.id} className="p-3.5">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-semibold text-black">{r.from}</span>
+                      <span className="text-xs font-semibold text-[#141414]">{r.from}</span>
                       <span className="flex gap-0.5">
                         {Array.from({ length: 5 }).map((_, i) => (
-                          <Star key={i} size={10} className={i < r.rating ? 'text-[#0AC760] fill-[#0AC760]' : 'text-[#EBEDF0]'} aria-hidden />
+                          <Star key={i} size={10} className={i < r.rating ? 'fill-[#16A34A] text-[#16A34A]' : 'text-black/[0.12]'} aria-hidden />
                         ))}
                       </span>
-                      <span className="text-[10px] text-[#8B8F99] ml-auto">{timeAgo(r.createdAt)}</span>
+                      <span className="ml-auto text-[10px] text-black/40">{timeAgo(r.createdAt)}</span>
                     </div>
-                    <p className="text-xs text-[#5C616B] mt-1">{r.text}</p>
-                  </div>
+                    <p className="mt-1 text-xs text-black/55">{r.text}</p>
+                  </Card>
                 ))}
               </div>
             )}
@@ -448,18 +481,18 @@ export default function ProfileScreen({ onOpenListing, onGoSell, onGoFavorites }
           aria-label="Изменение цены"
         >
           <div
-            className="w-full rounded-t-3xl bg-white p-5 max-h-[88%] overflow-y-auto [scrollbar-width:thin] animate-[sheet-up_220ms_ease-out]"
+            className="max-h-[88%] w-full overflow-y-auto rounded-t-[24px] bg-white p-5 [scrollbar-width:thin] animate-[sheet-up_220ms_ease-out]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[#EBEDF0]" />
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-black/[0.08]" />
             <div className="flex items-center gap-3">
-              <img loading="lazy" decoding="async" src={priceEdit.image} alt={priceEdit.title} className="w-12 h-12 rounded-xl object-cover bg-[#F0F1F5]"/>
+              <img loading="lazy" decoding="async" src={priceEdit.image} alt={priceEdit.title} className="h-12 w-12 rounded-[12px] bg-[#F0F1F3] object-cover"/>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-black truncate">{priceEdit.title}</p>
-                <p className="text-xs text-[#8B8F99]">Текущая цена: {priceEdit.price === 0 ? 'Даром' : `${fmtNum(priceEdit.price)} ₽`}</p>
+                <p className="truncate text-sm font-semibold text-[#141414]">{priceEdit.title}</p>
+                <p className="text-xs text-black/45">Текущая цена: {priceEdit.price === 0 ? 'Даром' : `${fmtNum(priceEdit.price)} ₽`}</p>
               </div>
             </div>
-            <label className="mt-4 block text-xs font-semibold text-[#8B8F99]" htmlFor="profile-price-input">Новая цена, ₽</label>
+            <label className="mt-4 block text-[11px] font-semibold uppercase tracking-[0.12em] text-black/40" htmlFor="profile-price-input">Новая цена, ₽</label>
             <div className="mt-1.5">
               <input
                 autoFocus
@@ -468,29 +501,29 @@ export default function ProfileScreen({ onOpenListing, onGoSell, onGoFavorites }
                 value={priceInput}
                 onChange={(e) => setPriceInput(e.target.value.replace(/[^\d]/g, ''))}
                 onKeyDown={(e) => { if (e.key === 'Enter') void savePrice() }}
-                placeholder="0 — отдать даром"
-                className="w-full h-12 rounded-[12px] bg-[#F0F1F5] px-4 text-base font-bold text-black outline-none focus:ring-1 focus:ring-[#C4C8CF] placeholder:text-[#8B8F99]"
+                placeholder="0 = отдать даром"
+                className="h-12 w-full rounded-[14px] bg-black/[0.04] px-4 text-base font-bold text-[#141414] outline-none focus:ring-1 focus:ring-black/[0.12] placeholder:text-black/30"
                 aria-label="Новая цена"
               />
             </div>
             {priceEdit.price >= 500 && priceEdit.price > 0 && (
-              <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-relaxed text-[#8B8F99]">
-                <Swords size={12} className="mt-0.5 shrink-0 text-[#067A47]" aria-hidden />
-                Если снизите цену — конкуренты с таким же товаром заметят и ответят: кто-то подрежет цену, кто-то напишет вам не самое приятное сообщение.
+              <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-relaxed text-black/45">
+                <Swords size={12} className="mt-0.5 shrink-0 text-[#14532D]" aria-hidden />
+                Если снизите цену, конкуренты с таким же товаром заметят и ответят: кто-то подрежет цену, кто-то напишет вам не самое приятное сообщение.
               </p>
             )}
 
             {/* Рынок этого товара: конкуренты и их цены */}
             {rivalsLoading && (
-              <div className="mt-3 flex items-center justify-center gap-2 rounded-xl bg-[#F7F8FA] py-3 text-[11px] text-[#8B8F99]">
+              <div className="mt-3 flex items-center justify-center gap-2 rounded-[14px] bg-[#F6F7F9] py-3 text-[11px] text-black/45">
                 <Loader2 size={12} className="animate-spin" aria-hidden /> Смотрим, кто ещё продаёт такой товар…
               </div>
             )}
             {rivals && rivals.rivals.length > 1 && (
-              <div className="mt-3 rounded-xl border border-[#EBEDF0] bg-white p-3" aria-label="Рынок этого товара">
+              <div className="mt-3 rounded-[14px] bg-[#F6F7F9] p-3" aria-label="Рынок этого товара">
                 <div className="flex items-baseline justify-between">
-                  <p className="text-[11px] font-bold text-black">Рынок этого товара</p>
-                  <p className="text-[10px] text-[#8B8F99]">
+                  <p className="text-[11px] font-bold text-[#141414]">Рынок этого товара</p>
+                  <p className="text-[10px] text-black/40">
                     {rivals.count} шт · средняя {fmtNum(rivals.avg)} ₽
                   </p>
                 </div>
@@ -501,29 +534,29 @@ export default function ProfileScreen({ onOpenListing, onGoSell, onGoFavorites }
                     return (
                       <div key={r.id} className="flex items-center gap-2">
                         <span
-                          className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white shrink-0"
-                          style={{ background: r.isMine ? '#0AC760' : hueColor(r.seller.length * 47 % 360) }}
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[8px] font-bold text-white"
+                          style={{ background: r.isMine ? '#14532D' : hueColor(r.seller.length * 47 % 360) }}
                           aria-hidden
                         >
                           {initials(r.seller)}
                         </span>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1">
-                            <p className={`text-[10px] truncate ${r.isMe ? 'font-bold text-[#067A47]' : 'text-[#5C616B]'}`}>
+                            <p className={cn('truncate text-[10px]', r.isMe ? 'font-bold text-[#14532D]' : 'text-black/55')}>
                               {r.isMe ? 'Вы' : r.seller}
                             </p>
                             {cheapest && !r.isMe && (
-                              <span className="shrink-0 rounded bg-[#E6F9EF] px-1 text-[8px] font-bold text-[#067A47]">мин</span>
+                              <span className="shrink-0 rounded bg-[#14532D]/[0.08] px-1 text-[8px] font-bold text-[#14532D]">мин</span>
                             )}
                           </div>
-                          <div className="mt-0.5 h-1 rounded-full bg-[#F0F1F5] overflow-hidden">
+                          <div className="mt-0.5 h-1 overflow-hidden rounded-full bg-black/[0.07]">
                             <div
-                              className={`h-full rounded-full ${r.isMe ? 'bg-[#0AC760]' : cheapest ? 'bg-[#8B8F99]' : 'bg-[#C4C8CF]'}`}
+                              className={cn('h-full rounded-full', r.isMe ? 'bg-[#14532D]' : cheapest ? 'bg-black/45' : 'bg-black/20')}
                               style={{ width: `${Math.max(8, Math.round((r.price / max) * 100))}%` }}
                             />
                           </div>
                         </div>
-                        <span className={`text-[11px] font-bold shrink-0 tabular-nums ${r.isMe ? 'text-[#067A47]' : 'text-black'}`}>
+                        <span className={cn('shrink-0 text-[11px] font-bold tabular-nums', r.isMe ? 'text-[#14532D]' : 'text-[#141414]')}>
                           {fmtNum(r.price)} ₽
                         </span>
                       </div>
@@ -533,36 +566,36 @@ export default function ProfileScreen({ onOpenListing, onGoSell, onGoFavorites }
               </div>
             )}
             {rivals && rivals.rivals.length <= 1 && (
-              <p className="mt-3 rounded-xl bg-[#F7F8FA] px-3 py-2 text-[11px] text-[#8B8F99]">
-                Вы единственный активный продавец такого товара — рынок пока ваш.
+              <p className="mt-3 rounded-[14px] bg-[#F6F7F9] px-3 py-2 text-[11px] text-black/45">
+                Вы единственный активный продавец такого товара. Рынок пока ваш.
               </p>
             )}
 
             {/* Позиция при новой цене */}
             {rivals && rivals.rivals.length > 1 && priceInput && Number(priceInput) > 0 && (
-              <p className="mt-2 text-[11px] font-medium text-[#5C616B]" aria-live="polite">
+              <p className="mt-2 text-[11px] font-medium text-black/55" aria-live="polite">
                 С ценой {fmtNum(Number(priceInput))} ₽ вы{' '}
                 {(() => {
                   const cheaper = rivals.rivals.filter((r) => !r.isMe && r.price < Number(priceInput)).length
                   const place = cheaper + 1
                   return place === 1
-                    ? <span className="text-[#067A47]">самый дешёвый — покупатели придут к вам</span>
+                    ? <span className="text-[#14532D]">самый дешёвый. Покупатели придут к вам</span>
                     : <span>будете №{place} из {rivals.rivals.length} по цене</span>
                 })()}
               </p>
             )}
-            {priceError && <p className="mt-2 text-[11px] text-[#D14343]">{priceError}</p>}
-            <div className="mt-4 grid grid-cols-2 gap-2">
+            {priceError && <p className="mt-2 text-[11px] text-red-600">{priceError}</p>}
+            <div className="mt-4 grid grid-cols-2 gap-2 pb-[max(0px,env(safe-area-inset-bottom))]">
               <button
                 onClick={() => !priceBusy && setPriceEdit(null)}
-                className="h-12 rounded-[12px] bg-[#F0F1F5] text-sm font-semibold text-black active:bg-[#E6E8ED]"
+                className="h-12 rounded-full bg-black/[0.05] text-sm font-semibold text-[#141414] transition-all active:scale-[0.98]"
               >
                 Отмена
               </button>
               <button
                 onClick={() => void savePrice()}
                 disabled={priceBusy}
-                className="h-12 rounded-[12px] bg-black text-sm font-bold text-white active:bg-[#1A1A1A] disabled:opacity-60 flex items-center justify-center"
+                className="flex h-12 items-center justify-center rounded-full bg-[#14532D] text-sm font-bold text-white shadow-[0_4px_14px_rgba(20,83,45,0.25)] transition-all active:scale-[0.98] disabled:opacity-60"
               >
                 {priceBusy ? <Loader2 size={16} className="animate-spin" aria-hidden /> : 'Сохранить'}
               </button>

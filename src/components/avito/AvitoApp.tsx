@@ -1,10 +1,10 @@
 'use client'
 
-// «Resale» — маркетплейс в стиле настоящего Авито: светлая тема, чистая лента,
-// нижняя таб-навигация (Главная / Поиск / Избранное / Сообщения / Профиль)
-// и чёрная круглая кнопка «+» для продажи.
+// «Resale» — светлый минималистичный маркетплейс по фирменному макету:
+// лента с категориями, поиск, чаты, профиль и центральная ЗЕЛЁНАЯ круглая
+// кнопка «+» для продажи. Разделы «Авто» и «Номера» открываются из ленты.
 import { useCallback, useEffect, useState } from 'react'
-import { Car, Hash, Home, MessageCircle, User, Plus } from 'lucide-react'
+import { Car, Hash, Home, MessageCircle, Plus, Search, User } from 'lucide-react'
 import { api } from '@/lib/api'
 import NotificationCenter from '@/components/os/NotificationCenter'
 import FeedScreen from './FeedScreen'
@@ -21,11 +21,11 @@ type Tab = 'feed' | 'auto' | 'numbers' | 'search' | 'fav' | 'chats' | 'profile' 
 // Внутренняя навигация: стек экранов (объявление → продавец → объявление …)
 type View = { type: 'listing' | 'seller' | 'chat'; id: string }
 
+// Табы нижней панели: центральная зелёная «+» вставляется между Поиском и Чатами
 const TABS: { key: Tab; label: string; icon: typeof Home }[] = [
   { key: 'feed', label: 'Главная', icon: Home },
-  { key: 'auto', label: 'Авто', icon: Car },
-  { key: 'numbers', label: 'Номера', icon: Hash },
-  { key: 'chats', label: 'Сообщения', icon: MessageCircle },
+  { key: 'search', label: 'Поиск', icon: Search },
+  { key: 'chats', label: 'Чаты', icon: MessageCircle },
   { key: 'profile', label: 'Профиль', icon: User },
 ]
 
@@ -34,8 +34,6 @@ export default function AvitoApp() {
   const [stack, setStack] = useState<View[]>([])
   const [unread, setUnread] = useState(0)
   const [notifOpen, setNotifOpen] = useState(false)
-  // панель сравнения открыта в ленте — прячем «+», чтобы не перекрывал её
-  const [compareActive, setCompareActive] = useState(false)
   const top = stack[stack.length - 1] ?? null
 
   const refreshUnread = useCallback(async () => {
@@ -68,12 +66,42 @@ export default function AvitoApp() {
   const openSeller = (id: string) => push({ type: 'seller', id })
   const openSell = () => { reset(); setTab('sell') }
   const goTab = (t: Tab) => { reset(); setTab(t) }
-  const onCompareActiveChange = useCallback((v: boolean) => setCompareActive(v), [])
+
+  // Сервисы на главной: разделы «Авто» и «Номера» (вне нижнего таб-бара)
+  const servicesRow = (
+    <div className="flex gap-2.5" role="group" aria-label="Сервисы">
+      <button
+        onClick={() => goTab('auto')}
+        className="flex min-h-[52px] flex-1 items-center gap-2.5 rounded-[16px] bg-white p-2.5 text-left ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all active:scale-[0.98]"
+      >
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#14532D]/[0.08] text-[#14532D]" aria-hidden>
+          <Car size={17} />
+        </span>
+        <span className="min-w-0">
+          <span className="block text-[13px] font-semibold leading-tight text-[#141414]">Авто</span>
+          <span className="block truncate text-[11px] leading-tight text-black/40">Авто и мото</span>
+        </span>
+      </button>
+      <button
+        onClick={() => goTab('numbers')}
+        className="flex min-h-[52px] flex-1 items-center gap-2.5 rounded-[16px] bg-white p-2.5 text-left ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all active:scale-[0.98]"
+      >
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#14532D]/[0.08] text-[#14532D]" aria-hidden>
+          <Hash size={17} />
+        </span>
+        <span className="min-w-0">
+          <span className="block text-[13px] font-semibold leading-tight text-[#141414]">Номера</span>
+          <span className="block truncate text-[11px] leading-tight text-black/40">Крутка знаков</span>
+        </span>
+      </button>
+    </div>
+  )
 
   return (
-    <div className="relative h-full flex flex-col bg-[#F7F8FA]">
+    // Фикс светлого фона в ЛЮБОЙ теме ОС: не полагаемся на CSS-переменные темы
+    <div className="relative flex h-full flex-col bg-[#F6F7F9] text-[#141414]">
       {/* контент */}
-      <div className="flex-1 overflow-hidden relative">
+      <div className="relative flex-1 overflow-hidden">
         {top?.type === 'listing' && (
           <ListingScreen
             key={top.id}
@@ -103,7 +131,7 @@ export default function AvitoApp() {
                 onOpenListing={openListing}
                 favoritesMode={false}
                 onOpenNotifications={() => setNotifOpen(true)}
-                onCompareActiveChange={onCompareActiveChange}
+                headerExtra={servicesRow}
               />
             )}
             {tab === 'search' && (
@@ -113,7 +141,6 @@ export default function AvitoApp() {
                 searchMode
                 onCancelSearch={() => goTab('feed')}
                 onOpenNotifications={() => setNotifOpen(true)}
-                onCompareActiveChange={onCompareActiveChange}
               />
             )}
             {tab === 'fav' && (
@@ -126,20 +153,19 @@ export default function AvitoApp() {
                 initialCategory="auto"
                 lockCategory
                 onOpenNotifications={() => setNotifOpen(true)}
-                onCompareActiveChange={onCompareActiveChange}
                 headerHero={
                   <button
                     onClick={() => goTab('numbers')}
-                    className="flex w-full items-center gap-3 rounded-2xl bg-gradient-to-r from-[#0F1210] to-[#232A24] p-3.5 text-left text-white transition-all active:scale-[0.99]"
+                    className="flex w-full items-center gap-3 rounded-[20px] bg-[#14532D] p-3.5 text-left text-white shadow-[0_4px_16px_rgba(20,83,45,0.25)] transition-all active:scale-[0.98]"
                   >
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/10">
-                      <Hash size={19} aria-hidden />
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/10" aria-hidden>
+                      <Hash size={19} />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-[14px] font-bold leading-tight">Автономера</span>
-                      <span className="block text-[11.5px] text-white/60">Крутите буквы и цифры — блатной знак украсит машину</span>
+                      <span className="block text-[11.5px] leading-snug text-white/60">Крутите буквы и цифры. Блатной знак украсит машину</span>
                     </span>
-                    <span className="shrink-0 rounded-full bg-white px-3.5 py-2 text-[12px] font-bold text-black">Крутить</span>
+                    <span className="shrink-0 rounded-full bg-white px-3.5 py-2 text-[12px] font-bold text-[#14532D]">Крутить</span>
                   </button>
                 }
               />
@@ -156,54 +182,42 @@ export default function AvitoApp() {
             )}
           </>
         )}
-
-        {/* чёрная круглая «+ Продать» — как в настоящем Авито */}
-        {!top && tab !== 'sell' && tab !== 'chats' && tab !== 'numbers' && !compareActive && (
-          <button
-            onClick={openSell}
-            aria-label="Продать вещь"
-            className="absolute bottom-4 right-4 z-20 size-14 rounded-full bg-black text-white flex items-center justify-center shadow-xl shadow-black/25 active:bg-[#1A1A1A] active:scale-95 transition-all"
-          >
-            <Plus size={26} strokeWidth={2.2} aria-hidden />
-          </button>
-        )}
       </div>
 
-      {/* нижняя таб-навигация: белый бар, 5 разделов */}
+      {/* нижний таб-бар: белый/95 blur, 4 таба + центральная зелёная круглая «+» */}
       <nav
-        className="shrink-0 bg-white border-t border-[#EBEDF0] flex items-stretch pb-[env(safe-area-inset-bottom)]"
+        className="relative z-20 shrink-0 border-t border-black/[0.05] bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md"
         aria-label="Разделы приложения"
       >
-        {TABS.map(({ key, label, icon: Icon }) => {
-          const active = tab === key && !top
-          const badge = key === 'chats' ? unread : 0
-          return (
+        <div className="flex items-stretch">
+          {TABS.slice(0, 2).map((t) => (
+            <TabButton key={t.key} tab={t} active={tab === t.key && !top} onClick={() => goTab(t.key)} />
+          ))}
+
+          {/* центральная зелёная круглая кнопка «Продать» */}
+          <div className="relative flex flex-1 items-start justify-center" aria-hidden={top !== null}>
             <button
-              key={key}
-              onClick={() => goTab(key)}
-              aria-label={label}
-              aria-current={active ? 'page' : undefined}
-              className="relative flex-1 h-14 flex flex-col items-center justify-center gap-1 active:bg-[#F7F8FA] transition-colors"
+              onClick={openSell}
+              disabled={top !== null}
+              aria-label="Продать вещь"
+              className={`-translate-y-4 flex size-[52px] items-center justify-center rounded-full bg-[#14532D] text-white shadow-[0_8px_20px_rgba(20,83,45,0.35)] transition-all active:scale-95 ${
+                top ? 'pointer-events-none opacity-0' : ''
+              }`}
             >
-              <span className="relative flex items-center justify-center">
-                <Icon
-                  size={22}
-                  strokeWidth={active ? 2.2 : 1.8}
-                  className={active ? 'text-black' : 'text-[#8B8F99]'}
-                  aria-hidden
-                />
-                {badge > 0 && (
-                  <span className="absolute -top-1.5 -right-2.5 min-w-[17px] h-[17px] px-1 rounded-full bg-[#0AC760] text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white">
-                    {badge > 99 ? '99+' : badge}
-                  </span>
-                )}
-              </span>
-              <span className={`text-[10px] leading-none ${active ? 'text-black font-semibold' : 'text-[#8B8F99] font-medium'}`}>
-                {label}
-              </span>
+              <Plus size={26} strokeWidth={2.4} aria-hidden />
             </button>
-          )
-        })}
+          </div>
+
+          {TABS.slice(2).map((t) => (
+            <TabButton
+              key={t.key}
+              tab={t}
+              active={tab === t.key && !top}
+              badge={t.key === 'chats' ? unread : 0}
+              onClick={() => goTab(t.key)}
+            />
+          ))}
+        </div>
       </nav>
 
       {/* центр уведомлений — открывается по колокольчику в шапке ленты */}
@@ -216,19 +230,52 @@ export default function AvitoApp() {
   )
 }
 
+function TabButton({ tab, active, badge, onClick }: {
+  tab: { key: Tab; label: string; icon: typeof Home }
+  active: boolean
+  badge?: number
+  onClick: () => void
+}) {
+  const Icon = tab.icon
+  return (
+    <button
+      onClick={onClick}
+      aria-label={tab.label}
+      aria-current={active ? 'page' : undefined}
+      className="relative flex h-16 flex-1 flex-col items-center justify-center gap-1 transition-colors active:bg-black/[0.03]"
+    >
+      <span className="relative flex items-center justify-center" aria-hidden>
+        <Icon
+          size={22}
+          strokeWidth={active ? 2.3 : 1.9}
+          className={active ? 'text-[#14532D]' : 'text-black/40'}
+        />
+        {badge !== undefined && badge > 0 && (
+          <span className="absolute -right-2.5 -top-1.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-[#16A34A] px-1 text-[10px] font-bold text-white ring-2 ring-white">
+            {badge > 99 ? '99+' : badge}
+          </span>
+        )}
+      </span>
+      <span className={`text-[10px] leading-none ${active ? 'font-semibold text-[#14532D]' : 'font-medium text-black/40'}`}>
+        {tab.label}
+      </span>
+    </button>
+  )
+}
+
 export function ConditionBadge({ condition }: { condition: string }) {
   const labels: Record<string, string> = {
     new: 'Новое', excellent: 'Отличное', good: 'Хорошее', used: 'Б/у', parts: 'На запчасти',
   }
   const colors: Record<string, string> = {
-    new: 'bg-[#E6F9EF] text-[#07843F]',
-    excellent: 'bg-[#E6F9EF] text-[#07843F]',
-    good: 'bg-[#F0F1F5] text-[#5C616B]',
-    used: 'bg-[#FFF4E5] text-[#B25E09]',
-    parts: 'bg-[#FDEBEB] text-[#D14343]',
+    new: 'bg-[#14532D]/[0.08] text-[#14532D]',
+    excellent: 'bg-[#14532D]/[0.08] text-[#14532D]',
+    good: 'bg-black/[0.05] text-black/55',
+    used: 'bg-amber-500/[0.12] text-amber-700',
+    parts: 'bg-red-500/[0.08] text-red-600',
   }
   return (
-    <span className={`text-[11px] px-2 py-0.5 rounded-[10px] font-medium ${colors[condition] ?? 'bg-[#F0F1F5] text-[#5C616B]'}`}>
+    <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-medium leading-none ${colors[condition] ?? 'bg-black/[0.05] text-black/55'}`}>
       {labels[condition] ?? condition}
     </span>
   )

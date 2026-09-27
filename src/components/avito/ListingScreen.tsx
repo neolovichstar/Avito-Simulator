@@ -1,8 +1,8 @@
 'use client'
 
-// Страница объявления — светлый дизайн 1:1 как настоящий Авито:
-// фото во всю ширину со счётчиком «1/3», цена bold 24, чипы параметров,
-// карточка продавца #F7F8FA, липкий низ с «Написать» (#F0F1F5) и «Купить» (чёрная).
+// Карточка товара «Resale» — светлый минимализм по фирменному макету:
+// большое фото со счётчиком, цена 18 extrabold, описание и характеристики
+// в белых карточках, блок продавца, липкий низ с «Купить» (тёмно-зелёная).
 // ВСЯ логика (покупка/чат/жалоба/блокировка/отзыв/продвижение) сохранена 1:1.
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import {
@@ -21,6 +21,7 @@ import type { ListingDetailData, PricePointDTO } from '@/lib/types'
 import type { SpecItem } from '@/lib/specs'
 import { addViewed } from '@/lib/viewed'
 import { ConditionBadge } from './AvitoApp'
+import { Card, Overline, Skeleton } from './ui'
 
 // Галерея карточки товара: кадров из одной реальной фотографии нет в API,
 // поэтому «снимки» — декоративные кропы (деталь/ракурс) того же изображения, как на макете
@@ -101,9 +102,9 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
       setBuyOpen(false)
       // ЛОГИСТИКА (28-b): товар больше не попадает в инвентарь мгновенно — едет посылкой
       setOkMsg(courier
-        ? 'Оплачено! Продавец собирает посылку — следите в Доставках'
+        ? 'Оплачено! Продавец собирает посылку. Следите в Доставках'
         : 'Оплачено! Заберите товар через приложение Доставки')
-      pushToast('Resale', courier ? 'Посылка собирается — следите в Доставках' : 'Заберите товар через Доставки')
+      pushToast('Resale', courier ? 'Посылка собирается. Следите в Доставках' : 'Заберите товар через Доставки')
       await load()
     } catch (e) {
       setMsg(e instanceof ApiError ? e.message : 'Не удалось купить')
@@ -182,7 +183,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
       pushToast(
         'Resale',
         res.blocked
-          ? `«${res.name ?? data.seller.displayName}» заблокирован — объявления скрыты из ленты`
+          ? `«${res.name ?? data.seller.displayName}» заблокирован. Объявления скрыты из ленты`
           : 'Продавец разблокирован',
       )
     } catch (e) {
@@ -194,22 +195,25 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
 
   if (loading && !data) {
     return (
-      <div className="h-full bg-white flex flex-col">
-        <div className="shrink-0 aspect-[4/3] bg-[#F0F1F5] animate-pulse" />
-        <div className="flex-1 p-4 space-y-3 animate-pulse">
-          <div className="h-7 bg-[#F0F1F5] rounded-lg w-1/2" />
-          <div className="h-4 bg-[#F0F1F5] rounded w-3/4" />
-          <div className="h-4 bg-[#F0F1F5] rounded w-1/3" />
-          <div className="h-[76px] bg-[#F0F1F5] rounded-2xl" />
+      <div className="flex h-full flex-col bg-[#F6F7F9]">
+        <Skeleton className="aspect-[4/3] w-full rounded-none" />
+        <div className="flex-1 space-y-3 p-4">
+          <Skeleton className="h-7 w-1/2 rounded-lg" />
+          <Skeleton className="h-4 w-3/4 rounded-md" />
+          <Skeleton className="h-4 w-1/3 rounded-md" />
+          <Skeleton className="h-24 w-full rounded-[20px]" />
+          <Skeleton className="h-16 w-full rounded-[20px]" />
         </div>
       </div>
     )
   }
   if (error && !data) {
     return (
-      <div className="h-full bg-white flex flex-col items-center justify-center gap-3 p-6 text-center">
-        <p className="text-sm text-[#D14343]">{error}</p>
-        <button onClick={onBack} className="h-11 px-5 rounded-[12px] bg-[#F0F1F5] text-sm font-semibold text-black">Вернуться в ленту</button>
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#F6F7F9] p-6 text-center">
+        <p className="text-sm text-red-600">{error}</p>
+        <button onClick={onBack} className="h-11 rounded-full bg-white px-5 text-sm font-semibold text-[#141414] ring-1 ring-black/[0.08] transition-all active:scale-[0.98]">
+          Вернуться в ленту
+        </button>
       </div>
     )
   }
@@ -225,10 +229,10 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
     : ''
 
   return (
-    <div className="h-full flex flex-col bg-white relative">
+    <div className="relative flex h-full flex-col bg-[#F6F7F9]">
       {/* фото со свайп-каруселью (нативный scroll-snap, touch-action pan-x — свайпы работают на телефоне) */}
-      <div className="flex-1 overflow-y-auto [scrollbar-width:thin] overscroll-contain">
-        <div className="relative aspect-[4/3] bg-[#F0F1F5]">
+      <div className="flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
+        <div className="relative aspect-[4/3] bg-[#F0F1F3]">
           <div
             ref={galleryRef}
             onScroll={() => {
@@ -252,148 +256,150 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
               </div>
             ))}
           </div>
-          {/* плавающая кнопка «назад» — как в настоящем приложении */}
+          {/* плавающая кнопка «назад» */}
           <button
             onClick={onBack}
             aria-label="Назад"
-            className="absolute top-3 left-3 z-10 w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center text-black active:bg-[#F0F1F5]"
+            className="absolute left-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#141414] shadow-md transition-colors active:bg-black/[0.06]"
           >
             <ChevronLeft size={22} aria-hidden />
           </button>
           <span
-            className="absolute bottom-2.5 right-2.5 rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-semibold text-black tabular-nums shadow-sm"
+            className="absolute bottom-2.5 right-2.5 rounded-full bg-white/85 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[#141414] backdrop-blur-sm"
             aria-label={`Фото ${shot + 1} из ${GALLERY_SHOTS.length}`}
           >
             {shot + 1}/{GALLERY_SHOTS.length}
           </span>
           {data.price === 0 && (
-            <span className="absolute top-3 right-3 bg-[#0AC760] text-white text-xs font-bold px-2 py-1 rounded-[10px]">Отдам даром</span>
+            <span className="absolute right-3 top-3 rounded-full bg-[#14532D] px-2.5 py-1 text-xs font-bold text-white">Отдам даром</span>
           )}
           {data.boosted && (
-            <span className="absolute top-3 left-14 bg-black/70 text-white text-xs font-bold px-2 py-1 rounded-[10px] flex items-center gap-1 backdrop-blur-sm">
+            <span className="absolute left-14 top-3 flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-xs font-bold text-white backdrop-blur-sm">
               <Zap size={12} aria-hidden /> ТОП
             </span>
           )}
           {sold && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/40" aria-hidden>
-              <span className="bg-white text-black font-extrabold text-lg px-5 py-2.5 rounded-2xl shadow-lg">Продано</span>
+              <span className="rounded-2xl bg-white px-5 py-2.5 text-lg font-extrabold text-[#141414] shadow-lg">Продано</span>
             </div>
           )}
         </div>
 
         <div className="pb-4">
-          {/* цена, название, чипы параметров, метрики */}
-          <div className="px-4 pt-3.5 space-y-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className={`text-[24px] font-extrabold tracking-tight tabular-nums leading-none ${data.price === 0 ? 'text-[#067A47]' : 'text-black'}`}>
+          {/* цена, название, чипы, метрики */}
+          <div className="space-y-2 px-4 pb-4 pt-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`text-[18px] font-extrabold tracking-tight leading-none tabular-nums ${data.price === 0 ? 'text-[#16A34A]' : 'text-[#141414]'}`}>
                 {data.price === 0 ? 'Даром' : `${fmtNum(data.price)} ₽`}
               </span>
               {data.price > 0 && data.marginHint > 0 && (
-                <span className="flex items-center gap-1 text-xs font-bold text-[#067A47] bg-[#E6F9EF] px-2 py-1 rounded-[10px]">
+                <span className="flex items-center gap-1 rounded-full bg-[#14532D]/[0.08] px-2 py-1 text-xs font-bold text-[#14532D]">
                   <TrendingDown size={12} aria-hidden /> Дешевле рынка на {data.marginHint}%
                 </span>
               )}
               {!isMine && data.negotiable && (
-                <span className="flex items-center gap-1 text-xs font-semibold text-[#5C616B] bg-[#F0F1F5] px-2 py-1 rounded-[10px]">
+                <span className="flex items-center gap-1 rounded-full bg-black/[0.05] px-2 py-1 text-xs font-semibold text-black/55">
                   <Handshake size={12} aria-hidden /> Торг уместен
                 </span>
               )}
             </div>
-            <h1 className="text-[16px] font-semibold text-black leading-snug">{data.title}</h1>
-            <div className="flex items-center gap-1.5 flex-wrap">
+            <h1 className="text-[16px] font-semibold leading-snug text-[#141414]">{data.title}</h1>
+            <div className="flex flex-wrap items-center gap-1.5">
               <ConditionBadge condition={data.condition} />
-              <span className="text-[11px] px-2 py-0.5 rounded-[10px] font-medium bg-[#F0F1F5] text-[#5C616B]">
+              <span className="rounded-full bg-black/[0.05] px-2 py-0.5 text-[11px] font-medium leading-none text-black/55">
                 {CATEGORY_LABEL[data.category] ?? 'Товар'}
               </span>
             </div>
-            <div className="flex items-center gap-1.5 text-[12px] text-[#8B8F99] pt-0.5">
-              <MapPin size={12} aria-hidden /> {data.city}
-              <span aria-hidden>•</span>
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5 text-[12px] text-black/45">
+              <span className="flex items-center gap-1"><MapPin size={12} aria-hidden /> {data.city}</span>
+              <span aria-hidden>·</span>
               <span className="flex items-center gap-1"><Eye size={12} aria-hidden /> {data.views}</span>
-              <span aria-hidden>•</span>
+              <span aria-hidden>·</span>
               <span className="flex items-center gap-1"><Clock size={12} aria-hidden /> {timeAgo(data.createdAt)}</span>
             </div>
           </div>
 
           {/* описание */}
-          <div className="px-4 pt-4 mt-3.5 border-t border-[#EBEDF0]">
-            <h2 className="text-[15px] font-semibold text-black mb-1">Описание</h2>
-            <p className={`text-[14px] text-[#333333] leading-relaxed ${!showDesc && longDesc ? 'line-clamp-4' : ''}`}>{data.description}</p>
+          <Card className="mx-4 p-4">
+            <Overline className="mb-1.5">Описание</Overline>
+            <p className={`text-[14px] leading-relaxed text-[#3F4650] ${!showDesc && longDesc ? 'line-clamp-4' : ''}`}>{data.description}</p>
             {longDesc && (
               <button
                 onClick={() => setShowDesc((s) => !s)}
                 aria-expanded={showDesc}
-                className="text-[14px] font-semibold text-black mt-1.5 active:opacity-70"
+                className="mt-1.5 text-[14px] font-semibold text-[#14532D] transition-opacity active:opacity-70"
               >
                 {showDesc ? 'Свернуть' : 'Показать полностью'}
               </button>
             )}
-          </div>
+          </Card>
 
-          {/* характеристики — чипы-параметры */}
+          {/* характеристики — строки «параметр: значение» */}
           {data.specs && data.specs.length > 0 && (
-            <div className="px-4 pt-4">
-              <div className="flex flex-wrap gap-1.5">
+            <Card className="mx-4 mt-3 p-4">
+              <Overline className="mb-1">Характеристики</Overline>
+              <div className="divide-y divide-black/[0.05]">
                 {data.specs.map((s) => (
-                  <span key={s.label} className="text-[12px] px-2.5 py-1 rounded-[10px] bg-[#F0F1F5] text-[#5C616B]">
-                    {s.label}: <span className="font-semibold text-black">{s.value}</span>
-                  </span>
+                  <div key={s.label} className="flex items-baseline justify-between gap-3 py-2">
+                    <span className="shrink-0 text-[13px] text-black/45">{s.label}</span>
+                    <span className="min-w-0 text-right text-[13px] font-semibold text-[#141414]">{s.value}</span>
+                  </div>
                 ))}
               </div>
-            </div>
+            </Card>
           )}
 
           {/* продавец — тап открывает страницу продавца */}
-          <div className="px-4 pt-4 mt-3.5 border-t border-[#EBEDF0]">
+          <Card className="mx-4 mt-3 overflow-hidden">
             <button
               onClick={() => onOpenSeller?.(data.seller.id)}
               disabled={!onOpenSeller}
-              className="w-full text-left rounded-2xl bg-[#F7F8FA] p-3 active:opacity-80 transition-opacity disabled:cursor-default"
+              className="w-full p-4 text-left transition-opacity active:opacity-80 disabled:cursor-default"
               aria-label={`Все объявления продавца ${data.seller.displayName}`}
             >
               <div className="flex items-center gap-3">
-                <UserAvatar name={data.seller.displayName} className="w-11 h-11 rounded-full" />
-                <div className="flex-1 min-w-0">
+                <UserAvatar name={data.seller.displayName} className="h-11 w-11 rounded-full" />
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[14px] font-bold text-black truncate">{data.seller.displayName}</span>
-                    {data.sellerOnline && <span className="w-2 h-2 rounded-full bg-[#0AC760] shrink-0" aria-label="Продавец онлайн" />}
+                    <span className="truncate text-[14px] font-bold text-[#141414]">{data.seller.displayName}</span>
+                    {data.sellerOnline && <span className="size-2 shrink-0 rounded-full bg-[#16A34A]" aria-label="Продавец онлайн" />}
                   </div>
-                  <div className="text-[12px] text-[#8B8F99] flex items-center gap-1 mt-0.5">
-                    <Star size={11} className="text-[#0AC760] fill-[#0AC760]" aria-hidden />
+                  <div className="mt-0.5 flex items-center gap-1 text-[12px] text-black/45">
+                    <Star size={11} className="fill-[#16A34A] text-[#16A34A]" aria-hidden />
                     {data.sellerRating > 0 ? Math.min(5, data.sellerRating).toFixed(1) : 'новый'}
                     <span>({data.seller.ratingCount})</span>
                   </div>
                 </div>
-                {onOpenSeller && <ChevronRight size={16} className="text-[#8B8F99] shrink-0" aria-hidden />}
+                {onOpenSeller && <ChevronRight size={16} className="shrink-0 text-black/25" aria-hidden />}
               </div>
               {joined && (
-                <div className="flex items-center gap-1 text-[12px] text-[#8B8F99] mt-2.5 pt-2.5 border-t border-[#EBEDF0]">
-                  <BadgeCheck size={12} className="text-[#0AC760]" aria-hidden />
+                <div className="mt-3 flex items-center gap-1 border-t border-black/[0.05] pt-3 text-[12px] text-black/45">
+                  <BadgeCheck size={12} className="text-[#16A34A]" aria-hidden />
                   На Resale с {joined}
                 </div>
               )}
             </button>
-          </div>
+          </Card>
 
           {/* отзывы о продавце */}
           {sellerReviews && sellerReviews.length > 0 && (
-            <div className="px-4 pt-4">
-              <h2 className="text-[15px] font-semibold text-black mb-2">Отзывы о продавце</h2>
+            <div className="px-4 pt-3">
+              <Overline className="mb-2 px-1">Отзывы о продавце</Overline>
               <div className="space-y-2">
                 {sellerReviews.map((r) => (
-                  <div key={r.id} className="rounded-2xl bg-[#F7F8FA] p-3">
+                  <Card key={r.id} className="p-3.5">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-semibold text-black truncate">{r.from}</span>
+                      <span className="truncate text-xs font-semibold text-[#141414]">{r.from}</span>
                       <span className="flex gap-0.5" aria-label={`Оценка ${r.rating} из 5`}>
                         {Array.from({ length: 5 }).map((_, i) => (
-                          <Star key={i} size={10} className={i < r.rating ? 'text-[#0AC760] fill-[#0AC760]' : 'text-[#EBEDF0]'} aria-hidden />
+                          <Star key={i} size={10} className={i < r.rating ? 'fill-[#16A34A] text-[#16A34A]' : 'text-black/[0.12]'} aria-hidden />
                         ))}
                       </span>
-                      <span className="text-[10px] text-[#8B8F99] ml-auto shrink-0">{timeAgo(r.createdAt)}</span>
+                      <span className="ml-auto shrink-0 text-[10px] text-black/40">{timeAgo(r.createdAt)}</span>
                     </div>
-                    <p className="text-xs text-[#5C616B] mt-1 line-clamp-2">{r.text}</p>
-                    <p className="text-[10px] text-[#8B8F99] mt-0.5 truncate">{r.listing}</p>
-                  </div>
+                    <p className="mt-1 line-clamp-2 text-xs text-black/55">{r.text}</p>
+                    <p className="mt-0.5 truncate text-[10px] text-black/40">{r.listing}</p>
+                  </Card>
                 ))}
               </div>
             </div>
@@ -401,14 +407,14 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
 
           {/* динамика цен на этот товар */}
           {data.priceHistory && data.priceHistory.filter((p) => p.price > 0).length >= 2 && (
-            <div className="px-4 pt-4">
+            <div className="px-4 pt-3">
               <PriceHistoryCard points={data.priceHistory} />
             </div>
           )}
 
           {/* похожие объявления: конкуренты по этому же товару */}
           {data.similar && data.similar.length > 0 && (
-            <div className="pt-4 pl-4">
+            <div className="pl-4 pt-4">
               <SimilarStrip items={data.similar} currentPrice={data.price} onOpen={(lid) => onOpenListing?.(lid)} />
             </div>
           )}
@@ -416,14 +422,14 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
           {/* отзыв о сделке */}
           {sold && data.purchasedByMe && (
             <div className="px-4 pt-4">
-              <div className="rounded-2xl bg-[#FFF4E5] p-3 space-y-2.5">
-                <div className="text-xs font-semibold text-black flex items-center gap-1.5">
-                  <PenLine size={14} className="text-[#B25E09]" aria-hidden />
+              <div className="space-y-2.5 rounded-[20px] bg-amber-500/[0.1] p-4">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-[#141414]">
+                  <PenLine size={14} className="text-amber-700" aria-hidden />
                   Оцените сделку
                 </div>
                 {data.reviewedByMe || revSent ? (
-                  <p className="text-xs text-[#5C616B] flex items-center gap-1.5">
-                    <BadgeCheck size={14} className="text-[#0AC760]" aria-hidden />
+                  <p className="flex items-center gap-1.5 text-xs text-black/55">
+                    <BadgeCheck size={14} className="text-[#16A34A]" aria-hidden />
                     Отзыв отправлен. Продавец увидит вашу оценку
                   </p>
                 ) : (
@@ -437,9 +443,9 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
                           aria-label={`${n} из 5`}
                           onClick={() => setRevStars(n)}
                           onMouseEnter={() => setRevHover(n)}
-                          className="p-1 active:scale-90 transition-transform"
+                          className="p-1 transition-transform active:scale-90"
                         >
-                          <Star size={26} className={(revHover || revStars) >= n ? 'text-[#0AC760] fill-[#0AC760]' : 'text-white'} aria-hidden />
+                          <Star size={26} className={(revHover || revStars) >= n ? 'fill-[#16A34A] text-[#16A34A]' : 'text-white'} aria-hidden />
                         </button>
                       ))}
                     </div>
@@ -449,7 +455,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
                       placeholder="Расскажите, как прошла сделка (необязательно)"
                       rows={2}
                       maxLength={300}
-                      className="w-full rounded-[12px] border border-[#EBEDF0] bg-white p-2.5 text-sm resize-none text-black placeholder:text-[#8B8F99] outline-none focus:border-[#8B8F99]"
+                      className="w-full resize-none rounded-[14px] bg-white p-3 text-sm text-[#141414] outline-none ring-1 ring-black/[0.06] placeholder:text-black/35 focus:ring-black/[0.14]"
                     />
                     <div className="flex items-center gap-2">
                       <button
@@ -460,7 +466,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
                           try {
                             await api.leaveReview(id, revStars, revText)
                             setRevSent(true)
-                            setOkMsg('Отзыв сохранён — +20 XP')
+                            setOkMsg('Отзыв сохранён. +20 XP')
                           } catch (e) {
                             setMsg(e instanceof ApiError ? e.message : 'Не удалось отправить отзыв')
                           } finally {
@@ -468,11 +474,11 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
                           }
                         }}
                         disabled={busy || revStars < 1}
-                        className="h-11 px-5 rounded-[12px] bg-black text-white font-bold text-sm disabled:opacity-40 active:bg-[#1A1A1A] transition-colors"
+                        className="flex h-11 items-center rounded-full bg-[#14532D] px-5 text-sm font-bold text-white transition-all active:scale-[0.98] disabled:opacity-40"
                       >
                         Отправить
                       </button>
-                      <span className="text-[11px] text-[#8B8F99]">+20 XP за отзыв</span>
+                      <span className="text-[11px] text-black/40">+20 XP за отзыв</span>
                     </div>
                   </>
                 )}
@@ -484,14 +490,14 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
           {!isMine && !sold && (
             <div className="px-4 pt-4">
               {complaintSent ? (
-                <p className="text-xs text-[#8B8F99] flex items-center gap-1.5">
-                  <ShieldCheck size={13} className="text-[#0AC760]" aria-hidden />
+                <p className="flex items-center gap-1.5 text-xs text-black/45">
+                  <ShieldCheck size={13} className="text-[#16A34A]" aria-hidden />
                   Жалоба отправлена. Модератор проверит объявление
                 </p>
               ) : (
                 <button
                   onClick={openComplaint}
-                  className="h-11 px-3 text-xs text-[#8B8F99] font-medium flex items-center gap-1.5 rounded-2xl active:bg-[#F0F1F5]"
+                  className="flex h-11 items-center gap-1.5 rounded-2xl px-3 text-xs font-medium text-black/45 transition-colors active:bg-black/[0.05]"
                 >
                   <Flag size={13} aria-hidden /> Пожаловаться на объявление
                 </button>
@@ -501,41 +507,41 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
 
           {isMine && (
             <div className="px-4 pt-4">
-              <div className="rounded-2xl bg-[#F7F8FA] p-3 space-y-2.5">
-                <div className="text-xs text-[#5C616B] flex items-center gap-1.5">
-                  <PackageCheck size={14} className="text-[#0AC760]" aria-hidden />
+              <Card className="space-y-2.5 p-4">
+                <div className="flex items-center gap-1.5 text-xs text-black/55">
+                  <PackageCheck size={14} className="text-[#16A34A]" aria-hidden />
                   Это ваше объявление
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={boost}
                     disabled={busy || data.boosted}
-                    className="flex-1 h-11 rounded-[12px] bg-black text-white text-xs font-bold flex items-center justify-center gap-1.5 disabled:opacity-40 active:bg-[#1A1A1A]"
+                    className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full bg-[#14532D] text-xs font-bold text-white transition-all active:scale-[0.98] disabled:opacity-40"
                   >
                     <Zap size={14} aria-hidden /> {data.boosted ? 'Уже продвинуто' : `Продвинуть · ${fmtMoney(149)}`}
                   </button>
                   <button
                     onClick={remove}
                     disabled={busy}
-                    className="h-11 px-4 rounded-[12px] bg-[#F0F1F5] text-black text-xs font-semibold disabled:opacity-50 active:bg-[#E6E8ED]"
+                    className="h-11 rounded-full bg-black/[0.05] px-4 text-xs font-semibold text-[#141414] transition-all active:scale-[0.98] disabled:opacity-50"
                   >
                     Снять
                   </button>
                 </div>
-                <button onClick={onGoSell} className="text-xs text-[#5C616B] font-semibold h-8 flex items-center active:opacity-70">
+                <button onClick={onGoSell} className="flex h-8 items-center text-xs font-semibold text-black/55 transition-opacity active:opacity-70">
                   Продать что-то ещё
                 </button>
-              </div>
+              </Card>
             </div>
           )}
         </div>
       </div>
 
-      {/* ЛИПАЮЩИЙ низ: «Написать» (серая) + «Купить» (чёрная пилюля) */}
+      {/* ЛИПАЮЩИЙ низ: «Написать» (белая) + «Купить» (тёмно-зелёная пилюля) */}
       {!isMine && (
-        <div className="shrink-0 px-3 py-2.5 border-t border-[#EBEDF0] bg-white pb-[max(10px,env(safe-area-inset-bottom))]">
+        <div className="shrink-0 border-t border-black/[0.05] bg-white/95 px-3 py-2.5 pb-[max(10px,env(safe-area-inset-bottom))] backdrop-blur-md">
           {sold ? (
-            <div className="w-full h-12 rounded-[12px] bg-[#F0F1F5] text-[#8B8F99] font-bold text-sm flex items-center justify-center gap-2">
+            <div className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-black/[0.05] text-sm font-bold text-black/40">
               <PackageCheck size={17} aria-hidden /> Продано
             </div>
           ) : (
@@ -543,14 +549,14 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
               <button
                 onClick={chat}
                 disabled={busy}
-                className="h-12 px-5 rounded-[12px] bg-[#F0F1F5] text-black text-[15px] font-bold flex items-center justify-center gap-2 active:bg-[#E6E8ED] disabled:opacity-50"
+                className="flex h-12 items-center justify-center gap-2 rounded-full bg-white px-5 text-[15px] font-bold text-[#141414] ring-1 ring-black/[0.1] transition-all active:scale-[0.98] disabled:opacity-50"
               >
                 <MessageSquare size={17} aria-hidden /> Написать
               </button>
               <button
                 onClick={() => { setMode('pickup'); setBuyOpen(true); setMsg('') }}
                 disabled={busy || balance < data.price}
-                className="flex-1 h-12 rounded-[12px] bg-black text-white text-[15px] font-bold flex items-center justify-center gap-2 active:bg-[#1A1A1A] disabled:opacity-40"
+                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-[#14532D] text-[15px] font-bold text-white shadow-[0_4px_14px_rgba(20,83,45,0.25)] transition-all active:scale-[0.98] disabled:opacity-40 disabled:shadow-none"
               >
                 <ShoppingBag size={17} aria-hidden />
                 {data.price === 0 ? 'Забрать даром' : `Купить за ${fmtNum(data.price)} ₽`}
@@ -559,41 +565,41 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
           )}
         </div>
       )}
-      {msg && !buyOpen && <div className="shrink-0 px-4 pb-2 text-xs text-[#D14343]">{msg}</div>}
+      {msg && !buyOpen && <div className="shrink-0 px-4 pb-2 text-xs text-red-600">{msg}</div>}
       {okMsg && !buyOpen && (
-        <div className="shrink-0 px-4 pb-2 text-xs text-[#067A47] flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1 px-4 pb-2 text-xs text-[#14532D]">
           <PackageCheck size={12} aria-hidden /> {okMsg}
         </div>
       )}
 
       {/* выбор способа получения */}
       {buyOpen && (
-        <div className="absolute inset-0 z-40 bg-black/50 flex items-end" onClick={() => { if (!busy) setBuyOpen(false) }}>
-          <div className="bg-white w-full rounded-t-3xl animate-in slide-in-from-bottom-4" onClick={(e) => e.stopPropagation()}>
-            <div className="pt-3 flex justify-center">
-              <span className="w-10 h-1 rounded-full bg-[#EBEDF0]" aria-hidden />
+        <div className="absolute inset-0 z-40 flex items-end bg-black/50" onClick={() => { if (!busy) setBuyOpen(false) }}>
+          <div className="w-full rounded-t-[24px] bg-white animate-in slide-in-from-bottom-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-center pt-3">
+              <span className="h-1 w-10 rounded-full bg-black/[0.08]" aria-hidden />
             </div>
-            <h3 className="text-base font-bold text-black px-4 pt-2">Как получите товар?</h3>
-            <div role="radiogroup" aria-label="Способ получения" className="p-3 space-y-2">
+            <h3 className="px-4 pt-2 text-base font-bold text-[#141414]">Как получите товар?</h3>
+            <div role="radiogroup" aria-label="Способ получения" className="space-y-2 p-3">
               <button
                 role="radio"
                 aria-checked={mode === 'pickup'}
                 onClick={() => setMode('pickup')}
                 disabled={busy}
-                className={`w-full text-left rounded-2xl border-2 p-3 flex items-start gap-3 transition-colors disabled:opacity-50 ${
-                  mode === 'pickup' ? 'border-black bg-white' : 'border-[#EBEDF0] bg-[#F7F8FA]'
+                className={`flex w-full items-start gap-3 rounded-[18px] border-2 p-3.5 text-left transition-colors disabled:opacity-50 ${
+                  mode === 'pickup' ? 'border-[#14532D] bg-white' : 'border-black/[0.06] bg-[#F6F7F9]'
                 }`}
               >
-                <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${mode === 'pickup' ? 'border-black' : 'border-[#C4C8CF]'}`} aria-hidden>
-                  {mode === 'pickup' && <span className="w-2.5 h-2.5 rounded-full bg-black" />}
+                <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${mode === 'pickup' ? 'border-[#14532D]' : 'border-black/20'}`} aria-hidden>
+                  {mode === 'pickup' && <span className="h-2.5 w-2.5 rounded-full bg-[#14532D]" />}
                 </span>
-                <HandCoins size={20} className="text-[#067A47] shrink-0 mt-0.5" aria-hidden />
-                <span className="flex-1 min-w-0">
+                <HandCoins size={20} className="mt-0.5 shrink-0 text-[#14532D]" aria-hidden />
+                <span className="min-w-0 flex-1">
                   <span className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-black">Самовывоз</span>
-                    <span className="text-sm font-bold text-black tabular-nums">{data.price === 0 ? 'Даром' : `${fmtNum(data.price)} ₽`}</span>
+                    <span className="text-sm font-semibold text-[#141414]">Самовывоз</span>
+                    <span className="text-sm font-bold tabular-nums text-[#141414]">{data.price === 0 ? 'Даром' : `${fmtNum(data.price)} ₽`}</span>
                   </span>
-                  <span className="block text-xs text-[#8B8F99] mt-0.5">Осмотр и торг при встрече</span>
+                  <span className="mt-0.5 block text-xs text-black/45">Осмотр и торг при встрече</span>
                 </span>
               </button>
               <button
@@ -601,33 +607,33 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
                 aria-checked={mode === 'courier'}
                 onClick={() => setMode('courier')}
                 disabled={busy || data.price === 0}
-                className={`w-full text-left rounded-2xl border-2 p-3 flex items-start gap-3 transition-colors disabled:opacity-50 ${
-                  mode === 'courier' ? 'border-black bg-white' : 'border-[#EBEDF0] bg-[#F7F8FA]'
+                className={`flex w-full items-start gap-3 rounded-[18px] border-2 p-3.5 text-left transition-colors disabled:opacity-50 ${
+                  mode === 'courier' ? 'border-[#14532D] bg-white' : 'border-black/[0.06] bg-[#F6F7F9]'
                 }`}
               >
-                <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${mode === 'courier' ? 'border-black' : 'border-[#C4C8CF]'}`} aria-hidden>
-                  {mode === 'courier' && <span className="w-2.5 h-2.5 rounded-full bg-black" />}
+                <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${mode === 'courier' ? 'border-[#14532D]' : 'border-black/20'}`} aria-hidden>
+                  {mode === 'courier' && <span className="h-2.5 w-2.5 rounded-full bg-[#14532D]" />}
                 </span>
-                <Truck size={20} className="text-[#B25E09] shrink-0 mt-0.5" aria-hidden />
-                <span className="flex-1 min-w-0">
+                <Truck size={20} className="mt-0.5 shrink-0 text-amber-700" aria-hidden />
+                <span className="min-w-0 flex-1">
                   <span className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-black">Курьер</span>
-                    <span className="text-sm font-bold text-black">+{fmtMoney(DELIVERY_FEE)}</span>
+                    <span className="text-sm font-semibold text-[#141414]">Курьер</span>
+                    <span className="text-sm font-bold text-[#141414]">+{fmtMoney(DELIVERY_FEE)}</span>
                   </span>
-                  <span className="block text-xs text-[#8B8F99] mt-0.5 flex items-center gap-1">
-                    <AlertTriangle size={11} className="text-[#B25E09] shrink-0" aria-hidden />
+                  <span className="mt-0.5 flex items-center gap-1 text-xs text-black/45">
+                    <AlertTriangle size={11} className="shrink-0 text-amber-700" aria-hidden />
                     Без осмотра и торга
                   </span>
                 </span>
               </button>
             </div>
-            {msg && <div className="px-4 pb-2 text-xs text-[#D14343]">{msg}</div>}
-            {busy && <div className="flex justify-center pb-2"><Loader2 size={18} className="animate-spin text-[#8B8F99]" aria-hidden /></div>}
-            <div className="p-3 border-t border-[#EBEDF0]">
+            {msg && <div className="px-4 pb-2 text-xs text-red-600">{msg}</div>}
+            {busy && <div className="flex justify-center pb-2"><Loader2 size={18} className="animate-spin text-black/35" aria-hidden /></div>}
+            <div className="border-t border-black/[0.05] p-3 pb-[max(12px,env(safe-area-inset-bottom))]">
               <button
                 onClick={() => buy(mode === 'courier')}
                 disabled={busy || balance < total}
-                className="w-full h-12 rounded-[12px] bg-black text-white text-[15px] font-bold flex items-center justify-center gap-2 active:bg-[#1A1A1A] disabled:opacity-40"
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#14532D] text-[15px] font-bold text-white shadow-[0_4px_14px_rgba(20,83,45,0.25)] transition-all active:scale-[0.98] disabled:opacity-40 disabled:shadow-none"
               >
                 <ShoppingBag size={17} aria-hidden />
                 {data.price === 0 ? 'Забрать даром' : `Купить за ${fmtNum(total)} ₽`}
@@ -639,14 +645,14 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
 
       {/* жалоба — bottom sheet */}
       {complaintOpen && (
-        <div className="absolute inset-0 z-40 bg-black/50 flex items-end" onClick={() => { if (!complaintBusy) setComplaintOpen(false) }}>
-          <div className="bg-white w-full rounded-t-3xl max-h-[86%] overflow-y-auto [scrollbar-width:thin] animate-in slide-in-from-bottom-4" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Жалоба на объявление">
-            <div className="pt-3 flex justify-center">
-              <span className="w-10 h-1 rounded-full bg-[#EBEDF0]" aria-hidden />
+        <div className="absolute inset-0 z-40 flex items-end bg-black/50" onClick={() => { if (!complaintBusy) setComplaintOpen(false) }}>
+          <div className="max-h-[86%] w-full overflow-y-auto rounded-t-[24px] bg-white [scrollbar-width:thin] animate-in slide-in-from-bottom-4" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Жалоба на объявление">
+            <div className="flex justify-center pt-3">
+              <span className="h-1 w-10 rounded-full bg-black/[0.08]" aria-hidden />
             </div>
-            <h3 className="text-base font-bold text-black px-4 pt-2">Причина жалобы</h3>
-            <p className="text-xs text-[#8B8F99] px-4 pt-1">Модератор проверит объявление и примет решение</p>
-            <div role="radiogroup" aria-label="Причина жалобы" className="p-3 space-y-2">
+            <h3 className="px-4 pt-2 text-base font-bold text-[#141414]">Причина жалобы</h3>
+            <p className="px-4 pt-1 text-xs text-black/45">Модератор проверит объявление и примет решение</p>
+            <div role="radiogroup" aria-label="Причина жалобы" className="space-y-2 p-3">
               {([
                 ['spam', 'Реклама или спам'],
                 ['fake', 'Товар не существует'],
@@ -660,27 +666,27 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
                   aria-checked={complaintReason === key}
                   onClick={() => setComplaintReason(key)}
                   disabled={complaintBusy}
-                  className={`w-full text-left rounded-2xl border-2 p-3 flex items-center gap-3 transition-colors disabled:opacity-50 ${
-                    complaintReason === key ? 'border-black bg-white' : 'border-[#EBEDF0] bg-[#F7F8FA]'
+                  className={`flex w-full items-center gap-3 rounded-[18px] border-2 p-3.5 text-left transition-colors disabled:opacity-50 ${
+                    complaintReason === key ? 'border-[#14532D] bg-white' : 'border-black/[0.06] bg-[#F6F7F9]'
                   }`}
                 >
-                  <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${complaintReason === key ? 'border-black' : 'border-[#C4C8CF]'}`} aria-hidden>
-                    {complaintReason === key && <span className="w-2.5 h-2.5 rounded-full bg-black" />}
+                  <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${complaintReason === key ? 'border-[#14532D]' : 'border-black/20'}`} aria-hidden>
+                    {complaintReason === key && <span className="h-2.5 w-2.5 rounded-full bg-[#14532D]" />}
                   </span>
-                  <span className="text-sm font-medium text-black">{label}</span>
+                  <span className="text-sm font-medium text-[#141414]">{label}</span>
                 </button>
               ))}
             </div>
             {complaintSent ? (
-              <div className="p-3 border-t border-[#EBEDF0] text-sm text-[#067A47] font-semibold flex items-center gap-2">
+              <div className="flex items-center gap-2 border-t border-black/[0.05] p-3 text-sm font-semibold text-[#14532D]">
                 <ShieldCheck size={16} aria-hidden /> Жалоба отправлена
               </div>
             ) : (
-              <div className="p-3 border-t border-[#EBEDF0]">
+              <div className="border-t border-black/[0.05] p-3">
                 <button
                   onClick={sendComplaint}
                   disabled={complaintBusy}
-                  className="w-full h-12 rounded-[12px] bg-black text-white text-[15px] font-bold flex items-center justify-center gap-2 active:bg-[#1A1A1A] disabled:opacity-40"
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#14532D] text-[15px] font-bold text-white transition-all active:scale-[0.98] disabled:opacity-40"
                 >
                   {complaintBusy ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Flag size={16} aria-hidden />}
                   Отправить жалобу
@@ -689,14 +695,14 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
             )}
             {/* чёрный список: действует мгновенно, объявления скрываются из ленты */}
             {!data.mine && (
-              <div className="border-t border-[#EBEDF0] p-3">
+              <div className="border-t border-black/[0.05] p-3 pb-[max(12px,env(safe-area-inset-bottom))]">
                 <button
                   onClick={toggleBlockSeller}
                   disabled={blockBusy}
-                  className={`w-full h-12 rounded-[12px] text-sm font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-40 ${
+                  className={`flex h-12 w-full items-center justify-center gap-2 rounded-full text-sm font-semibold transition-all active:scale-[0.98] disabled:opacity-40 ${
                     sellerBlocked
-                      ? 'bg-[#F0F1F5] text-black'
-                      : 'bg-[#FDEBEB] text-[#D14343]'
+                      ? 'bg-black/[0.05] text-[#141414]'
+                      : 'bg-red-500/[0.09] text-red-600'
                   }`}
                 >
                   {blockBusy ? (
@@ -708,7 +714,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
                   )}
                   {sellerBlocked ? `Разблокировать ${data.seller.displayName}` : `Заблокировать ${data.seller.displayName}`}
                 </button>
-                <p className="mt-1.5 text-[10px] leading-relaxed text-[#8B8F99]">
+                <p className="mt-1.5 text-[10px] leading-relaxed text-black/40">
                   {sellerBlocked
                     ? 'Объявления продавца снова появятся в ленте.'
                     : 'Его объявления исчезнут из вашей ленты, а боты-продавцы перестанут вам писать.'}
@@ -748,36 +754,36 @@ function PriceHistoryCard({ points }: { points: PricePointDTO[] }) {
   const period = days >= 25 ? 'за месяц' : days >= 5 ? `за ${days} дн.` : 'за неделю'
 
   return (
-    <div className="rounded-2xl bg-[#F7F8FA] p-3">
-      <div className="flex items-center gap-1.5 mb-1">
-        <LineChart size={14} className="text-[#067A47]" aria-hidden />
-        <h2 className="text-sm font-semibold text-black">Динамика цен</h2>
+    <Card className="p-4">
+      <div className="mb-1 flex items-center gap-1.5">
+        <LineChart size={14} className="text-[#14532D]" aria-hidden />
+        <Overline>Динамика цен</Overline>
         <span
-          className={`ml-auto text-[11px] font-bold px-2 py-0.5 rounded-[10px] ${
-            up ? 'bg-[#FDEBEB] text-[#D14343]' : 'bg-[#E6F9EF] text-[#067A47]'
+          className={`ml-auto rounded-full px-2 py-0.5 text-[11px] font-bold ${
+            up ? 'bg-red-500/[0.09] text-red-600' : 'bg-[#14532D]/[0.08] text-[#14532D]'
           }`}
         >
           {up ? '+' : ''}
           {delta}% {period}
         </span>
       </div>
-      <p className="text-[11px] text-[#8B8F99] mb-2">
+      <p className="mb-2 text-[11px] text-black/45">
         По {ps.length} объявлениям на рынке · min {fmtNum(min)} ₽ / max {fmtNum(max)} ₽
       </p>
-      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-[72px]" role="img" aria-label={`График цен от ${fmtNum(min)} до ${fmtNum(max)} рублей`}>
+      <svg viewBox={`0 0 ${w} ${h}`} className="h-[72px] w-full" role="img" aria-label={`График цен от ${fmtNum(min)} до ${fmtNum(max)} рублей`}>
         <defs>
           <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#0AC760" stopOpacity="0.22" />
-            <stop offset="100%" stopColor="#0AC760" stopOpacity="0" />
+            <stop offset="0%" stopColor="#14532D" stopOpacity="0.2" />
+            <stop offset="100%" stopColor="#14532D" stopOpacity="0" />
           </linearGradient>
         </defs>
-        <line x1={padX} y1={padY} x2={w - padX} y2={padY} stroke="#000000" strokeOpacity="0.06" strokeWidth="1" strokeDasharray="3 4" />
-        <line x1={padX} y1={h - padY} x2={w - padX} y2={h - padY} stroke="#000000" strokeOpacity="0.06" strokeWidth="1" strokeDasharray="3 4" />
+        <line x1={padX} y1={padY} x2={w - padX} y2={padY} stroke="#141414" strokeOpacity="0.06" strokeWidth="1" strokeDasharray="3 4" />
+        <line x1={padX} y1={h - padY} x2={w - padX} y2={h - padY} stroke="#141414" strokeOpacity="0.06" strokeWidth="1" strokeDasharray="3 4" />
         <path d={area} fill={`url(#${gid})`} />
-        <path d={line} fill="none" stroke="#0AC760" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx={x(ps.length - 1)} cy={y(last)} r="3.5" fill="#0AC760" stroke="#FFFFFF" strokeWidth="1.5" />
+        <path d={line} fill="none" stroke="#14532D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx={x(ps.length - 1)} cy={y(last)} r="3.5" fill="#14532D" stroke="#FFFFFF" strokeWidth="1.5" />
       </svg>
-    </div>
+    </Card>
   )
 }
 
@@ -789,9 +795,9 @@ function SimilarStrip({ items, currentPrice, onOpen }: {
 }) {
   return (
     <div>
-      <div className="flex items-center gap-1.5 mb-2 pr-4">
-        <h2 className="text-[15px] font-semibold text-black">Похожие объявления</h2>
-        <span className="text-[11px] text-[#8B8F99]">{items.length} шт.</span>
+      <div className="mb-2 flex items-center gap-1.5 pr-4">
+        <Overline>Похожие объявления</Overline>
+        <span className="text-[11px] text-black/35">{items.length} шт.</span>
       </div>
       <div className="flex gap-2.5 overflow-x-auto pb-1 pr-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" style={{ touchAction: 'pan-x' }}>
         {items.map((s) => {
@@ -802,32 +808,32 @@ function SimilarStrip({ items, currentPrice, onOpen }: {
             <button
               key={s.id}
               onClick={() => onOpen(s.id)}
-              className="shrink-0 w-[150px] text-left bg-white rounded-2xl overflow-hidden border border-[#EBEDF0] active:scale-[0.98] transition-transform"
+              className="w-[150px] shrink-0 overflow-hidden rounded-[16px] bg-white text-left ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-transform active:scale-[0.98]"
             >
-              <div className="relative aspect-[4/3] bg-[#F0F1F5]">
-                <img src={s.image} alt="" className="w-full h-full object-cover" loading="lazy" />
+              <div className="relative aspect-[4/3] bg-[#F0F1F3]">
+                <img src={s.image} alt="" className="h-full w-full object-cover" loading="lazy" />
                 {s.boosted && (
-                  <span className="absolute top-1.5 left-1.5 bg-black/70 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5 backdrop-blur-sm">
+                  <span className="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-md bg-black/60 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
                     <Zap size={9} aria-hidden /> ТОП
                   </span>
                 )}
                 {s.mine && (
-                  <span className="absolute top-1.5 right-1.5 bg-white text-black text-[9px] font-bold px-1.5 py-0.5 rounded-md shadow-sm">
+                  <span className="absolute right-1.5 top-1.5 rounded-md bg-white px-1.5 py-0.5 text-[9px] font-bold text-[#141414] shadow-sm">
                     Ваше
                   </span>
                 )}
               </div>
-              <div className="p-2 space-y-1">
-                <p className="text-[14px] font-extrabold text-black leading-none tabular-nums">
+              <div className="space-y-1 p-2">
+                <p className="text-[14px] font-extrabold leading-none tabular-nums text-[#141414]">
                   {s.price === 0 ? 'Даром' : `${fmtNum(s.price)} ₽`}
                 </p>
                 {!equal && currentPrice > 0 && s.price > 0 && (
-                  <p className={`text-[10px] font-semibold ${cheaper ? 'text-[#067A47]' : 'text-[#8B8F99]'}`}>
+                  <p className={`text-[10px] font-semibold ${cheaper ? 'text-[#14532D]' : 'text-black/40'}`}>
                     {cheaper ? 'дешевле' : 'дороже'} на {Math.abs(diff)}%
                   </p>
                 )}
-                <p className="text-[10px] text-[#5C616B] truncate">{s.sellerName}</p>
-                <p className="text-[10px] text-[#8B8F99] flex items-center gap-0.5">
+                <p className="truncate text-[10px] text-black/55">{s.sellerName}</p>
+                <p className="flex items-center gap-0.5 text-[10px] text-black/40">
                   <MapPin size={9} aria-hidden /> {s.city}
                 </p>
               </div>

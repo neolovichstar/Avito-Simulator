@@ -1,31 +1,73 @@
 'use client'
 
-// Приложение «Доставки» — светлая система (как Resale/Сбер):
-// фон #F5F6FA, белые карточки radius 20 (тень 0 2px 8px rgba(0,0,0,0.04)),
-// акцент изумрудный #0AA06E, «в пути» — янтарный #E8A020, вторичный текст #9AA0A8.
-// ЛОГИСТИКА (28-b): две вкладки (Активные / История), живой прогресс-бар + ETA мин,
-// фазы «Собираем → В пути → Прибыл в ПВЗ → Получено», возврат невостребованного за 24 ч.
-// Покупки И продажи игрока: у продаж — «Курьер забирает → Деньги зачислены».
+// Приложение «Доставки» — редизайн по макету upload/mockups/01-dostavki.png.
+// Светлая система: фон #F6F7F9, белые карточки rounded-[20px] ring-black/[0.05],
+// акцент зелёный #12894B, статус «В пути» синий #2B7BF3 (плашка #EBF2FE),
+// вторичный текст #6B7280/#9CA3AF, капс-лейблы text-[11px] tracking-[0.12em].
+//
+// Экраны (нижний таб-бар: Доставки / Карта / История / Профиль):
+//  1. Список посылок: чипы-фильтры Все/В пути/Доставлены/Архив, карточки
+//     с фото, трек-номером, статусной точкой (синяя/зелёная) и подписью.
+//  2. Трекинг: шапка с фото/названием/треком, синяя плашка статуса с
+//     грузовиком, ВЕРТИКАЛЬНЫЙ таймлайн шагов (синие/серые точки + даты + город).
+//  3. Детали: кнопки «Отследить» (зелёная) и «Поделиться», характеристики
+//     с иконками (Отправитель, Получатель, Адрес, Плановая доставка,
+//     Содержимое, Вес).
+//  4. Курьер: 2D игровая карта (GameMap) с маршрутом и пузырём ETA,
+//     нижняя карточка курьера (аватар, рейтинг, звонок/чат, машина).
+//
+// Логистика 28-b сохранена полностью: api.deliveries/pickupDelivery, фазы
+// collecting -> in_transit -> arrived -> delivered/returned, возврат 24 ч
+// (минус 5%), подтверждение получения, живые ETA-тайминги, тихий refetch 5 с.
+
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import {
-  AlertTriangle, Banknote, Check, CheckCircle2, ChevronLeft, ChevronRight, Copy, Home, Package,
-  PackageCheck, Plus, Search, Star, Truck, X,
+  AlertTriangle, Banknote, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Copy, Crosshair,
+  History, Home, Map as MapIcon, MapPin, MessageCircle, Navigation, Package, PackageCheck, Phone,
+  Plus, RotateCcw, Search, Share2, ShieldCheck, Star, Truck, User, UserRound, Weight, X,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
-import { fmtMoney, fmtDateTime, timeAgo } from '@/lib/format'
+import { fmtMoney, fmtDateTime, fmtTime, timeAgo } from '@/lib/format'
 import { CONDITION_LABEL, CONDITION_MULT } from '@/lib/catalog-types'
 import { useOS } from '@/lib/store'
 import { sound } from '@/lib/sound'
 import type { DeliveryDTO } from '@/lib/types'
+import GameMap from '@/components/delivery/GameMap'
 
-// Токены светлой системы
-const EMERALD = '#0AA06E'
-const AMBER = '#E8A020'
-const CARD = 'rounded-[20px] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.04)]'
+// Токены дизайн-системы
+const GREEN = '#12894B'
+const BLUE = '#2B7BF3'
+const RED = '#B3382E'
+const AMBER = '#F5A623'
+const CARD = 'rounded-[20px] bg-white ring-1 ring-black/[0.05]'
+const CAPS = 'text-[11px] font-semibold uppercase tracking-[0.12em] text-black/40'
 
-type TabKey = 'active' | 'history'
+type Tone = 'blue' | 'green' | 'red'
+const TONE: Record<Tone, { text: string; sub: string; plate: string }> = {
+  blue: { text: BLUE, sub: '#6C93E8', plate: '#EBF2FE' },
+  green: { text: GREEN, sub: '#57A078', plate: '#E6F3EB' },
+  red: { text: RED, sub: '#C97068', plate: '#FDECEA' },
+}
 
-// Тик раз в секунду через useSyncExternalStore — ETA-таймер живой, без setState внутри эффектов
+type TabKey = 'deliveries' | 'map' | 'history' | 'profile'
+type FilterKey = 'all' | 'transit' | 'delivered' | 'archive'
+
+const TABS: { key: TabKey; label: string; icon: typeof Package }[] = [
+  { key: 'deliveries', label: 'Доставки', icon: Package },
+  { key: 'map', label: 'Карта', icon: MapIcon },
+  { key: 'history', label: 'История', icon: History },
+  { key: 'profile', label: 'Профиль', icon: UserRound },
+]
+
+const FILTERS: { key: FilterKey; label: string }[] = [
+  { key: 'all', label: 'Все' },
+  { key: 'transit', label: 'В пути' },
+  { key: 'delivered', label: 'Доставлены' },
+  { key: 'archive', label: 'Архив' },
+]
+
+// Тик раз в секунду через useSyncExternalStore: живые ETA-отсчёты,
+// без setState внутри эффектов (правило next-16 eslint)
 function useTick(intervalMs = 1000): number {
   return useSyncExternalStore(
     (cb) => {
@@ -59,7 +101,21 @@ function hueOf(key: string): number {
   return h % 360
 }
 
-// У хуже ли реальное состояние по сравнению с заявленным (логика осмотра — как была)
+function hashOf(key: string): number {
+  let h = 7
+  for (let i = 0; i < key.length; i++) h = (h * 131 + key.charCodeAt(i)) >>> 0
+  return h
+}
+
+function isToday(date: Date, nowMs: number): boolean {
+  return date.toDateString() === new Date(nowMs).toDateString()
+}
+
+function dateOnly(date: Date): string {
+  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+}
+
+// Ухе ли реальное состояние по сравнению с заявленным (логика осмотра)
 function isWorse(d: DeliveryDTO): boolean {
   return (
     d.status === 'delivered' &&
@@ -71,15 +127,7 @@ function isWorse(d: DeliveryDTO): boolean {
 
 const isActive = (d: DeliveryDTO) => d.status === 'collecting' || d.status === 'in_transit' || d.status === 'arrived'
 
-// Общий прогресс 0..1 от создания до eta (живая полоска)
-function progressOf(d: DeliveryDTO, nowMs: number): number {
-  const start = new Date(d.createdAt).getTime()
-  const end = new Date(d.eta).getTime()
-  if (!(end > start)) return d.status === 'collecting' ? 0.05 : 1
-  return Math.min(1, Math.max(0.02, (nowMs - start) / (end - start)))
-}
-
-// Стадии жизненного цикла (kind-aware): для деталей — вертикальный таймлайн
+// Стадии жизненного цикла (kind-aware): для вертикального таймлайна
 function stagesOf(d: DeliveryDTO): { label: string; icon: typeof Package }[] {
   if (d.kind === 'sale') {
     return [
@@ -111,118 +159,65 @@ function stageIndex(d: DeliveryDTO): number {
   return -1 // delivered / returned
 }
 
-// ---------- стилизованная светлая SVG-карта с изумрудным пунктирным маршрутом ----------
-function RouteMap() {
-  return (
-    <div className="overflow-hidden rounded-[20px] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-      <svg viewBox="0 0 320 140" className="h-36 w-full" role="img" aria-label="Карта маршрута курьера">
-        <rect width="320" height="140" fill="#F0F1F5" />
-        {/* «кварталы» — едва заметные белые улицы */}
-        <g stroke="#FFFFFF" strokeOpacity="0.9" strokeWidth="8" strokeLinecap="round">
-          <path d="M-10 40 H330" />
-          <path d="M-10 96 H330" />
-          <path d="M70 -10 V150" />
-          <path d="M180 -10 V150" />
-          <path d="M262 -10 V150" />
-        </g>
-        {/* маршрут: сортировочный центр → адрес */}
-        <path
-          d="M34 108 C 92 100, 96 52, 150 50 S 246 66, 284 34"
-          fill="none"
-          stroke={EMERALD}
-          strokeWidth="2.5"
-          strokeDasharray="6 7"
-          strokeLinecap="round"
-        />
-        {/* точка старта */}
-        <circle cx="34" cy="108" r="5" fill={EMERALD} />
-        <circle cx="34" cy="108" r="9" fill="none" stroke={EMERALD} strokeOpacity="0.35" strokeWidth="2" />
-        {/* курьер в пути */}
-        <circle cx="178" cy="57" r="6" fill={EMERALD} stroke="#FFFFFF" strokeWidth="2" className="animate-pulse" />
-        {/* адрес */}
-        <circle cx="284" cy="34" r="6" fill="none" stroke={EMERALD} strokeWidth="2" className="animate-pulse" />
-        <text x="22" y="130" fill="#9AA0A8" fontSize="10">Сортировочный центр</text>
-        <text x="222" y="20" fill="#9AA0A8" fontSize="10">Пункт выдачи</text>
-      </svg>
-    </div>
-  )
+function statusMeta(d: DeliveryDTO): { label: string; tone: Tone } {
+  if (d.status === 'returned') return { label: 'Возврат', tone: 'red' }
+  if (d.status === 'collecting') return { label: d.kind === 'sale' ? 'Курьер забирает' : 'Собираем', tone: 'blue' }
+  if (d.status === 'in_transit') return { label: 'В пути', tone: 'blue' }
+  if (d.status === 'arrived') return { label: 'Готов к выдаче', tone: 'green' }
+  return { label: 'Доставлен', tone: 'green' }
 }
 
-function StatusBadge({ d }: { d: DeliveryDTO }) {
-  if (d.status === 'returned') {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-[#FDEEEE] px-2.5 py-1 text-[11px] font-semibold text-[#B3382E]">
-        <AlertTriangle className="size-3" aria-hidden />
-        Возврат
-      </span>
-    )
-  }
-  const label =
-    d.status === 'collecting'
-      ? d.kind === 'sale' ? 'Курьер забирает' : 'Собираем'
-      : d.status === 'in_transit'
-        ? 'В пути'
-        : d.status === 'arrived'
-          ? 'Прибыл — заберите'
-          : d.kind === 'sale' ? 'Доставлено' : 'Доставлено'
-  const color = d.status === 'in_transit' || d.status === 'collecting' ? AMBER : EMERALD
-  const dark = d.status === 'in_transit' || d.status === 'collecting' ? '#9A6B10' : EMERALD
-  return (
-    <span
-      className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
-      style={{ backgroundColor: `${color}1F`, color: dark }}
-    >
-      <span className="size-1.5 animate-pulse rounded-full" style={{ backgroundColor: color }} aria-hidden />
-      {label}
-    </span>
-  )
-}
-
-function KindBadge({ d }: { d: DeliveryDTO }) {
-  return d.kind === 'sale' ? (
-    <span className="inline-flex items-center gap-1 rounded-full bg-[#F0F1F5] px-2 py-1 text-[10px] font-bold text-[#5C616B]">
-      <Banknote className="size-3" aria-hidden /> Продажа
-    </span>
-  ) : null
-}
-
-function DefectBadge() {
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-[#FDEEEE] px-2.5 py-1 text-[11px] font-semibold text-[#B3382E]">
-      <AlertTriangle className="size-3" aria-hidden />
-      Есть дефекты
-    </span>
-  )
-}
-
-function SectionHeader({ title, sub }: { title: string; sub?: string }) {
-  return (
-    <div className="px-1">
-      <h2 className="text-[18px] font-bold text-[#1A1A1A]">{title}</h2>
-      {sub && <p className="mt-0.5 text-[12px] text-[#9AA0A8]">{sub}</p>}
-    </div>
-  )
-}
-
-// ---------- строка-посылка: прогресс-бар + ETA + фаза ----------
-function ParcelRow({ d, onOpen, nowMs }: { d: DeliveryDTO; onOpen: () => void; nowMs: number }) {
-  const pct = Math.round(progressOf(d, nowMs) * 100)
+// Серая подпись под статусом в карточке (как в макете: «Доставка сегодня»)
+function captionOf(d: DeliveryDTO, nowMs: number): string {
   const etaLeft = new Date(d.eta).getTime() - nowMs
-  const arrivedWait = new Date(d.pickupDeadline ?? d.eta).getTime() - nowMs
-  const sub =
-    d.status === 'collecting'
-      ? d.kind === 'sale' ? 'Курьер выехал к вам за товаром' : 'Продавец собирает посылку'
-      : d.status === 'in_transit'
-        ? etaLeft > 0
-          ? `Прибудет через ${fmtRemain(etaLeft)}`
-          : 'Курьер уже совсем рядом'
-        : d.status === 'arrived'
-          ? arrivedWait > 0
-            ? `Ждёт в пункте выдачи · ${fmtRemain(arrivedWait)}`
-            : 'Курьер оформляет возврат…'
-          : d.status === 'returned'
-            ? 'Возврат: деньги вернулись на счёт'
-            : d.kind === 'sale' ? 'Деньги зачислены на счёт' : 'Получено'
+  const deadline = new Date(d.pickupDeadline ?? d.eta).getTime() - nowMs
+  switch (d.status) {
+    case 'collecting':
+      return d.kind === 'sale' ? 'Курьер выехал к вам' : 'Продавец собирает посылку'
+    case 'in_transit': {
+      if (etaLeft <= 0) return 'Курьер уже совсем рядом'
+      const etaDate = new Date(d.eta)
+      return isToday(etaDate, nowMs) ? 'Доставка сегодня' : `Ожидается ${dateOnly(etaDate)}`
+    }
+    case 'arrived':
+      return deadline > 0 ? 'Можно забрать сегодня' : 'Оформляем возврат'
+    case 'returned':
+      return 'Возвращено продавцу'
+    default:
+      return d.deliveredAt ? fmtDateTime(d.deliveredAt) : 'Доставлено'
+  }
+}
+
+// Декоративные, но детерминированные данные деталей заказа
+const SENDER_NAMES = ['А. Смирнов', 'М. Козлова', 'Д. Волков', 'Е. Соколова', 'И. Петров', 'С. Орлов', 'Н. Фёдорова', 'П. Белов']
+const STREETS = ['ул. Лесная', 'ул. Садовая', 'пр. Мира', 'ул. Полевая', 'ул. Липовая']
+const CITIES_OUT = ['Санкт-Петербург', 'Казань', 'Екатеринбург', 'Нижний Новгород', 'Самара']
+const CARS = ['Белый фургон · ГАЗель Next', 'Серый фургон · Соболь ГНА', 'Белый универсал · Lada Largus', 'Голубой фургон · Peugeot Partner']
+const PLATE_LETTERS = 'АВЕКМНОРСТУХ'
+
+function plateOf(key: string): string {
+  const h = hashOf(key)
+  const l = (i: number) => PLATE_LETTERS[(h >>> (i * 3)) % PLATE_LETTERS.length]
+  return `${l(0)} ${100 + ((h >>> 9) % 900)} ${l(1)}${l(2)} ${77 + ((h >>> 15) % 23)}`
+}
+
+// тост/баланс через стор ОС (без импорт-циклов в хелперах)
+function pushToastSafe(title: string, body: string) {
+  try {
+    useOS.getState().pushToast(title, body)
+  } catch { /* стор не готов, не критично */ }
+}
+function refreshBalance(balance: number) {
+  try {
+    const s = useOS.getState()
+    if (s.session) s.refreshSession({ balance })
+  } catch { /* не критично */ }
+}
+
+// ---------- карточка посылки в списке (макет: экран 1) ----------
+function ParcelCard({ d, nowMs, onOpen }: { d: DeliveryDTO; nowMs: number; onOpen: () => void }) {
+  const meta = statusMeta(d)
+  const t = TONE[meta.tone]
   return (
     <button
       type="button"
@@ -231,124 +226,174 @@ function ParcelRow({ d, onOpen, nowMs }: { d: DeliveryDTO; onOpen: () => void; n
       className={`${CARD} w-full p-3 text-left transition-transform active:scale-[0.99]`}
     >
       <div className="flex items-center gap-3">
-        <img loading="lazy" decoding="async" src={d.image} alt="" className="size-14 shrink-0 rounded-xl bg-[#F0F1F5] object-cover"/>
+        <img
+          loading="lazy"
+          decoding="async"
+          src={d.image}
+          alt=""
+          className="size-14 shrink-0 rounded-[14px] bg-[#F1F2F4] object-cover"
+        />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="truncate text-[14px] font-semibold text-[#1A1A1A]">{d.title}</span>
+          <div className="truncate text-[14px] font-semibold text-[#141414]">{d.title}</div>
+          <div className="mt-0.5 flex items-center gap-1.5">
+            <span className="truncate font-mono text-[11px] text-[#9CA3AF]">{trackOf(d.id)} · {d.courier}</span>
+            {d.kind === 'sale' && (
+              <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-[#F1F2F4] px-1.5 py-0.5 text-[9.5px] font-bold text-[#6B7280]">
+                <Banknote className="size-2.5" aria-hidden /> Продажа
+              </span>
+            )}
+            {isWorse(d) && (
+              <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-[#FDECEA] px-1.5 py-0.5 text-[9.5px] font-bold text-[#B3382E]">
+                <AlertTriangle className="size-2.5" aria-hidden /> Дефекты
+              </span>
+            )}
           </div>
-          <div className="mt-0.5 truncate font-mono text-[11px] text-[#9AA0A8]">{trackOf(d.id)} · {d.courier}</div>
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            <StatusBadge d={d} />
-            <KindBadge d={d} />
-            {isWorse(d) && <DefectBadge />}
+          <div className="mt-1.5 flex items-center gap-1.5">
+            {meta.label === 'Доставлен' ? (
+              <CheckCircle2 className="size-3.5 shrink-0" style={{ color: t.text }} aria-hidden />
+            ) : d.status === 'returned' ? (
+              <AlertTriangle className="size-3.5 shrink-0" style={{ color: t.text }} aria-hidden />
+            ) : (
+              <span className="size-2 shrink-0 animate-pulse rounded-full" style={{ backgroundColor: t.text }} aria-hidden />
+            )}
+            <span className="shrink-0 text-[12px] font-semibold" style={{ color: t.text }}>{meta.label}</span>
+            <span className="truncate text-[12px] text-[#9CA3AF]">{captionOf(d, nowMs)}</span>
           </div>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1 self-stretch py-0.5">
-          <span className="text-[13px] font-bold tabular-nums text-[#1A1A1A]">
-            {d.kind === 'sale' ? '+' : ''}{fmtMoney(d.price)}
-          </span>
-          <span className="text-[11px] text-[#9AA0A8]">{timeAgo(d.createdAt)}</span>
-          <ChevronRight className="mt-auto size-4 text-[#C1C5CB]" />
-        </div>
+        <ChevronRight className="size-4 shrink-0 text-[#C6CAD1]" aria-hidden />
       </div>
-      {isActive(d) && (
-        <div className="mt-2.5 flex items-center gap-2">
-          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#F0F1F5]">
-            <div
-              className="h-full rounded-full transition-[width] duration-700 ease-linear"
-              style={{ width: `${pct}%`, backgroundColor: d.status === 'arrived' ? EMERALD : AMBER }}
-            />
-          </div>
-          <span className="shrink-0 text-[11px] font-semibold tabular-nums text-[#5C616B]">
-            {d.status === 'arrived' ? 'готово' : d.status === 'in_transit' ? fmtRemain(etaLeft) : `${pct}%`}
-          </span>
-        </div>
-      )}
     </button>
   )
 }
 
-// ---------- ВЕРТИКАЛЬНЫЙ таймлайн статусов: точки + линии ----------
-function VerticalTimeline({ d, nowMs }: { d: DeliveryDTO; nowMs: number }) {
+// ---------- статус-плашка (макет: синяя с грузовиком «В пути / Сегодня до 18:00») ----------
+function StatusPlate({ d, nowMs }: { d: DeliveryDTO; nowMs: number }) {
+  const meta = statusMeta(d)
+  const t = TONE[meta.tone]
+  const etaLeft = new Date(d.eta).getTime() - nowMs
+  const deadline = new Date(d.pickupDeadline ?? d.eta).getTime() - nowMs
+  const Icon =
+    d.status === 'collecting' ? Package
+      : d.status === 'in_transit' ? Truck
+        : d.status === 'arrived' ? Home
+          : d.status === 'delivered' ? CheckCircle2
+            : AlertTriangle
+  const when =
+    d.status === 'delivered' || d.status === 'returned' ? d.deliveredAt ?? d.eta
+      : d.status === 'arrived' ? d.pickupDeadline ?? d.eta
+        : d.eta
+  const whenDate = new Date(when)
+  const closed = d.status === 'delivered' || d.status === 'returned'
+  const sub =
+    d.status === 'collecting'
+      ? d.kind === 'sale' ? 'Курьер выехал к вам' : 'Продавец собирает посылку'
+      : d.status === 'in_transit'
+        ? etaLeft > 0 ? 'Курьер в вашем городе' : 'Курьер уже рядом'
+        : d.status === 'arrived'
+          ? deadline > 0 ? 'Ждёт в пункте выдачи' : 'Оформляем возврат'
+          : d.status === 'returned'
+            ? 'Деньги вернулись, комиссия 5%'
+            : d.kind === 'sale' ? 'Деньги зачислены на счёт' : 'Получение подтверждено'
+  return (
+    <div className="flex items-center gap-3 rounded-[20px] px-3.5 py-3" style={{ backgroundColor: t.plate }}>
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white" style={{ color: t.text }} aria-hidden>
+        <Icon className="size-5" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="text-[14.5px] font-bold leading-tight" style={{ color: t.text }}>{meta.label}</div>
+        <div className="mt-0.5 truncate text-[12px]" style={{ color: t.sub }}>{sub}</div>
+      </div>
+      <div className="shrink-0 text-right">
+        <div className="text-[13px] font-bold" style={{ color: t.text }}>
+          {isToday(whenDate, nowMs) ? 'Сегодня' : dateOnly(whenDate)}
+        </div>
+        <div className="mt-0.5 text-[11px]" style={{ color: t.sub }}>
+          {closed ? fmtTime(whenDate) : `до ${fmtTime(whenDate)}`}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---------- ВЕРТИКАЛЬНЫЙ таймлайн (макет: экран 2) ----------
+function VerticalTimeline({ d, nowMs, city }: { d: DeliveryDTO; nowMs: number; city: string }) {
   const stages = stagesOf(d)
   const cur = stageIndex(d)
   const returned = d.status === 'returned'
   const etaLeft = new Date(d.eta).getTime() - nowMs
   const deadline = new Date(d.pickupDeadline ?? d.eta).getTime()
-  const subs = stages.map((s, i) => {
+  const origin = CITIES_OUT[hashOf(d.id) % CITIES_OUT.length]
+  const dest = CITIES_OUT[hashOf(`${d.id}d`) % CITIES_OUT.length]
+  const cityAt = (i: number) => (d.kind === 'purchase' ? (i <= 2 ? origin : city) : i <= 1 ? city : dest)
+
+  const rows = stages.map((stage, i) => {
     const done = cur === -1 || i < cur
-    const base = fmtDateTime(d.createdAt)
-    if (i === 0) return base
-    if (i === 1) {
-      return d.status === 'collecting'
+    let date = ''
+    if (i === 0) date = fmtDateTime(d.createdAt)
+    else if (i === 1) {
+      date = d.status === 'collecting'
         ? d.kind === 'sale' ? 'Курьер выехал к вам' : 'Готовится к отправке'
         : `Забран · ${fmtDateTime(d.collectEndsAt)}`
+    } else if (i === 2) {
+      date = d.status === 'in_transit'
+        ? etaLeft > 0 ? `Прибудет через ${fmtRemain(etaLeft)}` : 'Курьер уже в вашем городе'
+        : done ? `Прибыл · ${fmtDateTime(d.eta)}` : `Ожидается ${fmtDateTime(d.eta)}`
+    } else if (i === 3 && d.kind === 'purchase') {
+      date = d.status === 'arrived'
+        ? deadline > nowMs ? `Хранится ещё ${fmtRemain(deadline - nowMs)}` : 'Оформляется возврат'
+        : returned ? 'Не забрали за 24 ч, вернули продавцу' : `Заберите до ${fmtDateTime(d.pickupDeadline ?? d.eta)}`
+    } else {
+      date = d.status === 'delivered' || d.status === 'returned'
+        ? d.deliveredAt ? `Вручение · ${fmtDateTime(d.deliveredAt)}` : ''
+        : 'Ожидается'
     }
-    if (i === 2) {
-      if (d.status === 'in_transit') return etaLeft > 0 ? `Прибудет через ${fmtRemain(etaLeft)}` : 'Курьер уже в вашем городе'
-      return done ? `Прибыл · ${fmtDateTime(d.eta)}` : `Ожидается ${fmtDateTime(d.eta)}`
-    }
-    if (i === 3 && d.kind === 'purchase') {
-      if (d.status === 'arrived') return deadline > nowMs ? `Хранится ещё ${fmtRemain(deadline - nowMs)}` : 'Возврат…'
-      return returned ? 'Не забрали за 24 ч — вернули продавцу' : `Заберите до ${fmtDateTime(d.pickupDeadline ?? d.eta)}`
-    }
-    if (d.status === 'delivered' || d.status === 'returned') return d.deliveredAt ? `Вручение · ${fmtDateTime(d.deliveredAt)}` : '—'
-    return 'Ожидается'
+    return { stage, done, date, city: cityAt(i) }
   })
+
   return (
     <ol className="flex flex-col" aria-label="Статусы доставки">
-      {stages.map((s, i) => {
-        const done = cur === -1 || i < cur
+      {rows.map((row, i) => {
         const active = i === cur
-        const isLast = i === stages.length - 1
+        const isLast = i === rows.length - 1
+        const lineBlue = cur === -1 || i < cur
         return (
-          <li key={s.label} className="relative flex gap-3 pb-5 last:pb-0">
-            {/* линия к следующей точке: пройденный участок — изумрудный, будущий — серый */}
+          <li key={row.stage.label} className="relative flex gap-3 pb-5 last:pb-0">
             {!isLast && (
               <span
-                className="absolute left-[11px] top-7 h-[calc(100%-28px)] w-0.5 rounded-full"
-                style={{ backgroundColor: done ? EMERALD : '#E8EAED' }}
+                className="absolute left-[8px] top-6 h-[calc(100%-24px)] w-[2px] rounded-full"
+                style={{ backgroundColor: lineBlue ? BLUE : '#E8EAEE' }}
                 aria-hidden
               />
             )}
+            {/* точка: текущая залита синим, прошедшая — синее кольцо, будущая серая */}
             <span
-              className={
-                'relative z-10 flex size-6 shrink-0 items-center justify-center rounded-full ' +
-                (active ? 'animate-pulse' : '')
+              className={'relative z-10 mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-full' + (active ? ' animate-pulse' : '')}
+              style={
+                active
+                  ? { backgroundColor: BLUE, boxShadow: '0 0 0 4px rgba(43,123,243,0.15)' }
+                  : row.done
+                    ? { backgroundColor: '#FFFFFF', border: `2.5px solid ${BLUE}` }
+                    : { backgroundColor: '#EEF0F3', border: '2px solid #E1E4E9' }
               }
-              style={{
-                backgroundColor: done || active ? EMERALD : '#F0F1F5',
-                color: done || active ? '#FFFFFF' : '#C1C5CB',
-              }}
               aria-hidden
-            >
-              {active && (
-                <span
-                  className="absolute -inset-1 animate-ping rounded-full opacity-40"
-                  style={{ border: `2px solid ${EMERALD}` }}
-                />
-              )}
-              {done ? <Check className="size-3.5" /> : <s.icon className="size-3.5" />}
-            </span>
+            />
             <div className="min-w-0 flex-1 pt-0.5">
               <div
-                className={
-                  'text-[13px] font-semibold leading-tight ' +
-                  (done || active ? 'text-[#1A1A1A]' : 'text-[#9AA0A8]')
-                }
+                className={'text-[13.5px] font-semibold leading-tight ' + (row.done || active ? 'text-[#141414]' : 'text-[#9CA3AF]')}
               >
-                {s.label}
+                {row.stage.label}
               </div>
-              <div className="mt-0.5 text-[11px] leading-snug text-[#9AA0A8]">{subs[i]}</div>
+              {row.date && <div className="mt-0.5 text-[12px] leading-snug text-black/45">{row.date}</div>}
+              <div className="text-[12px] leading-snug text-black/35">{row.city}</div>
             </div>
           </li>
         )
       })}
       {returned && (
-        <li className="flex gap-2 rounded-xl bg-[#FDEEEE] p-3">
+        <li className="mt-1 flex gap-2 rounded-xl bg-[#FDECEA] p-3">
           <AlertTriangle className="size-4 shrink-0 text-[#B3382E]" aria-hidden />
-          <p className="text-[11px] leading-relaxed text-[#B3382E]">
-            Посылку не забрали за 24 ч — курьер вернул её. Возврат {fmtMoney(Math.round(d.price * 0.95))} (комиссия 5%).
+          <p className="text-[11.5px] leading-relaxed text-[#B3382E]">
+            Посылку не забрали за 24 ч, курьер вернул её продавцу. Возврат {fmtMoney(Math.round(d.price * 0.95))}, комиссия 5%.
           </p>
         </li>
       )}
@@ -356,16 +401,18 @@ function VerticalTimeline({ d, nowMs }: { d: DeliveryDTO; nowMs: number }) {
   )
 }
 
-// ---------- экран деталей посылки ----------
-function ParcelDetails({ d, onBack, nowMs, onPicked }: { d: DeliveryDTO; onBack: () => void; nowMs: number; onPicked: () => void }) {
+// ---------- экран посылки: трекинг + детали (макет: экраны 2 и 3) ----------
+function ParcelScreen({ d, onBack, onTrack, nowMs }: { d: DeliveryDTO; onBack: () => void; onTrack: () => void; nowMs: number }) {
+  const session = useOS((s) => s.session)
   const [copied, setCopied] = useState(false)
-  const [mapOpen, setMapOpen] = useState(true)
+  const [shared, setShared] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const etaLeft = new Date(d.eta).getTime() - nowMs
-  const deadline = new Date(d.pickupDeadline ?? d.eta).getTime() - nowMs
   const worse = isWorse(d)
   const canPickup = d.status === 'arrived' && d.kind === 'purchase'
+  const meta = statusMeta(d)
+  const playerCity = session?.city ?? 'Москва'
 
   const copyTrack = () => {
     try {
@@ -375,6 +422,19 @@ function ParcelDetails({ d, onBack, nowMs, onPicked }: { d: DeliveryDTO; onBack:
     setTimeout(() => setCopied(false), 1600)
   }
 
+  const share = async () => {
+    const text = `Resale Доставка · ${trackOf(d.id)} · ${d.title} · статус: ${meta.label}`
+    try {
+      if (typeof navigator !== 'undefined' && navigator.share) {
+        await navigator.share({ title: 'Resale Доставка', text })
+      } else {
+        await navigator.clipboard?.writeText(text)
+        setShared(true)
+        setTimeout(() => setShared(false), 1800)
+      }
+    } catch { /* отмена шаринга, не критично */ }
+  }
+
   const pickup = async () => {
     if (busy) return
     setBusy(true)
@@ -382,9 +442,9 @@ function ParcelDetails({ d, onBack, nowMs, onPicked }: { d: DeliveryDTO; onBack:
     try {
       const res = await api.pickupDelivery(d.id)
       sound.success()
-      pushToastSafe('Resale Доставка', `«${d.title}» — посылка получена, вещь в инвентаре`)
+      pushToastSafe('Resale Доставка', `«${d.title}»: посылка получена, вещь в инвентаре`)
       if (typeof res.balance === 'number') refreshBalance(res.balance)
-      onPicked()
+      onBack()
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : 'Не удалось получить посылку')
     } finally {
@@ -392,37 +452,59 @@ function ParcelDetails({ d, onBack, nowMs, onPicked }: { d: DeliveryDTO; onBack:
     }
   }
 
+  const hash = hashOf(d.id)
+  const sender = d.kind === 'sale' ? (session?.displayName ?? 'Вы') : SENDER_NAMES[hash % SENDER_NAMES.length]
+  const receiver = d.kind === 'sale' ? 'Покупатель Resale' : (session?.displayName ?? 'Вы')
+  const address = `г. ${playerCity}, ${STREETS[hash % STREETS.length]}, д. ${1 + ((hash >>> 7) % 38)}`
+  const planned = isToday(new Date(d.eta), nowMs) ? `Сегодня, до ${fmtTime(d.eta)}` : fmtDateTime(d.eta)
+  const weight = `${((3 + (hashOf(`${d.id}w`) % 97)) / 10).toFixed(1)} кг`
+  const details: { icon: typeof Package; label: string; value: string }[] = [
+    { icon: UserRound, label: 'Отправитель', value: sender },
+    { icon: User, label: 'Получатель', value: receiver },
+    { icon: MapPin, label: 'Адрес доставки', value: address },
+    { icon: CalendarDays, label: 'Плановая доставка', value: planned },
+    { icon: Package, label: 'Содержимое', value: d.title },
+    { icon: Weight, label: 'Вес посылки', value: weight },
+  ]
+
   return (
     <div className="flex h-full flex-col">
-      {/* белая шапка-бар с border-b #E8EAED */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-[#E8EAED] bg-white px-3 py-2.5">
+      {/* шапка */}
+      <div className="flex shrink-0 items-center gap-2.5 px-3 pb-2 pt-3">
         <button
           type="button"
           onClick={onBack}
           aria-label="Назад к посылкам"
-          className="flex size-10 items-center justify-center rounded-full bg-[#F0F1F5] text-[#1A1A1A] transition active:scale-95"
+          className="flex size-10 items-center justify-center rounded-full bg-white text-[#141414] ring-1 ring-black/[0.05] transition active:scale-95"
         >
           <ChevronLeft className="size-5" aria-hidden />
         </button>
-        <span className="truncate text-[16px] font-bold text-[#1A1A1A]">
-          {d.kind === 'sale' ? 'Продажа · доставка' : 'Посылка'}
-        </span>
+        <div className="min-w-0">
+          <div className="truncate text-[16px] font-bold leading-tight text-[#141414]">
+            {d.kind === 'sale' ? 'Продажа · доставка' : 'Посылка'}
+          </div>
+          <div className="font-mono text-[11px] text-[#9CA3AF]">{trackOf(d.id)}</div>
+        </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 overflow-y-auto bg-[#F5F6FA] p-4 [scrollbar-width:thin]">
-        {/* фото + название + цена + трек */}
-        <div className={`${CARD} p-4`}>
+      <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4 pt-1 [scrollbar-width:thin]">
+        {/* товар: фото + название + цена + трек с копированием */}
+        <div className={`${CARD} p-3.5`}>
           <div className="flex gap-3">
-            <img loading="lazy" decoding="async" src={d.image} alt="" className="size-20 shrink-0 rounded-xl bg-[#F0F1F5] object-cover"/>
+            <img
+              loading="lazy"
+              decoding="async"
+              src={d.image}
+              alt=""
+              className="size-[72px] shrink-0 rounded-2xl bg-[#F1F2F4] object-cover"
+            />
             <div className="min-w-0 flex-1">
-              <div className="line-clamp-2 text-[14px] font-semibold text-[#1A1A1A]">{d.title}</div>
-              <div className="mt-1 text-[18px] font-bold tabular-nums text-[#1A1A1A]">
+              <div className="line-clamp-2 text-[15px] font-semibold leading-snug text-[#141414]">{d.title}</div>
+              <div className="mt-1 text-[17px] font-bold tabular-nums text-[#141414]">
                 {d.kind === 'sale' ? '+' : ''}{fmtMoney(d.price)}
               </div>
-              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                <StatusBadge d={d} />
-                <KindBadge d={d} />
-                {worse && <DefectBadge />}
+              <div className="mt-1 text-[11px] text-[#9CA3AF]">
+                {d.kind === 'sale' ? 'Продажа' : 'Покупка'} · {timeAgo(d.createdAt)}
               </div>
             </div>
           </div>
@@ -430,86 +512,61 @@ function ParcelDetails({ d, onBack, nowMs, onPicked }: { d: DeliveryDTO; onBack:
             type="button"
             onClick={copyTrack}
             aria-label="Скопировать трек-номер"
-            className="mt-3 flex w-full items-center justify-between rounded-xl bg-[#F0F1F5] px-3 py-2.5 text-left transition active:scale-[0.98]"
+            className="mt-3 flex h-11 w-full items-center justify-between rounded-xl bg-[#F1F2F4] px-3 text-left transition active:scale-[0.98]"
           >
-            <span className="text-[11px] text-[#9AA0A8]">
-              Трек: <span className="font-mono font-semibold text-[#1A1A1A]">{trackOf(d.id)}</span>
-            </span>
-            <span className="flex items-center gap-1 text-[10px] font-medium" style={{ color: EMERALD }}>
+            <span className="font-mono text-[12px] font-semibold text-[#141414]">{trackOf(d.id)}</span>
+            <span className="flex items-center gap-1 text-[11px] font-medium" style={{ color: GREEN }}>
               <Copy className="size-3" aria-hidden />
               {copied ? 'Скопировано' : 'Копировать'}
             </span>
           </button>
         </div>
 
-        {/* ВЕРТИКАЛЬНЫЙ таймлайн статусов */}
-        <div className={`${CARD} p-4`}>
-          <h3 className="mb-3 text-[15px] font-bold text-[#1A1A1A]">Движение посылки</h3>
-          <VerticalTimeline d={d} nowMs={nowMs} />
+        {/* статус-плашка */}
+        <StatusPlate d={d} nowMs={nowMs} />
+
+        {/* «Отследить» + «Поделиться» */}
+        <div className="flex gap-2.5">
+          <button
+            type="button"
+            onClick={onTrack}
+            className="flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl text-[15px] font-bold text-white transition-transform active:scale-[0.98]"
+            style={{ backgroundColor: GREEN }}
+          >
+            <Navigation className="size-4.5" aria-hidden />
+            Отследить
+          </button>
+          <button
+            type="button"
+            onClick={() => void share()}
+            className={`${CARD} flex h-12 flex-1 items-center justify-center gap-2 text-[15px] font-semibold text-[#141414] transition-transform active:scale-[0.98]`}
+          >
+            <Share2 className="size-4.5 text-[#6B7280]" aria-hidden />
+            {shared ? 'Готово' : 'Поделиться'}
+          </button>
         </div>
 
-        {/* курьер: аватар + имя + рейтинг + ETA-баннер */}
+        {/* вертикальный таймлайн статусов */}
         <div className={`${CARD} p-4`}>
-          <div className="flex items-center gap-3">
-            <span
-              className="flex size-11 shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-white"
-              style={{ backgroundColor: `hsl(${hueOf(d.courier)} 55% 45%)` }}
-              aria-hidden
-            >
-              {initialsOf(d.courier)}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[14px] font-semibold text-[#1A1A1A]">{d.courier}</div>
-              <div className="mt-0.5 flex items-center gap-1 text-[11px] text-[#9AA0A8]">
-                <Star className="size-3" style={{ color: AMBER }} fill={AMBER} aria-hidden />
-                4.9 · Курьер Resale
+          <h3 className={`${CAPS} mb-3`}>Статус доставки</h3>
+          <VerticalTimeline d={d} nowMs={nowMs} city={playerCity} />
+        </div>
+
+        {/* характеристики заказа с иконками */}
+        <div className={`${CARD} p-4`}>
+          <h3 className={CAPS}>Детали заказа</h3>
+          <div className="mt-2 divide-y divide-black/[0.05]">
+            {details.map((row) => (
+              <div key={row.label} className="flex items-center gap-3 py-2.5">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#F1F2F4] text-[#6B7280]" aria-hidden>
+                  <row.icon className="size-4" />
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[13px] text-[#6B7280]">{row.label}</span>
+                <span className="max-w-[55%] text-right text-[13px] font-medium leading-snug text-[#141414]">{row.value}</span>
               </div>
-            </div>
-            <span
-              className="flex size-9 shrink-0 items-center justify-center rounded-full"
-              style={{ backgroundColor: `${EMERALD}1A`, color: EMERALD }}
-              aria-hidden
-            >
-              <Truck className="size-4" />
-            </span>
+            ))}
           </div>
-          {d.status === 'in_transit' && (
-            <div className="mt-3 flex items-center gap-2 rounded-xl bg-[#F8F1E3] px-3 py-2.5">
-              <Truck className="size-4 shrink-0" style={{ color: AMBER }} aria-hidden />
-              <p className="text-[12px] font-semibold text-[#9A6B10]">
-                {etaLeft <= 0 ? 'Курьер уже близко' : `Прибудет через ${fmtRemain(etaLeft)}`}
-              </p>
-            </div>
-          )}
-          {d.status === 'collecting' && (
-            <div className="mt-3 flex items-center gap-2 rounded-xl bg-[#F8F1E3] px-3 py-2.5">
-              <Package className="size-4 shrink-0" style={{ color: AMBER }} aria-hidden />
-              <p className="text-[12px] font-semibold text-[#9A6B10]">
-                {d.kind === 'sale' ? 'Курьер забирает товар у вас' : 'Продавец собирает посылку'}
-              </p>
-            </div>
-          )}
-          {d.status === 'arrived' && (
-            <div className="mt-3 flex items-center gap-2 rounded-xl bg-[#E7F5EA] px-3 py-2.5">
-              <Home className="size-4 shrink-0" style={{ color: EMERALD }} aria-hidden />
-              <p className="text-[12px] font-semibold" style={{ color: EMERALD }}>
-                Ждёт в пункте выдачи{deadline > 0 ? ` · ещё ${fmtRemain(deadline)}` : ''}
-              </p>
-            </div>
-          )}
         </div>
-
-        {/* карта маршрута (декоративная) + кнопка «Показать на карте» */}
-        <button
-          type="button"
-          onClick={() => setMapOpen((v) => !v)}
-          aria-expanded={mapOpen}
-          className="h-12 w-full rounded-xl text-[15px] font-bold text-white transition-transform active:scale-[0.98]"
-          style={{ backgroundColor: EMERALD }}
-        >
-          {mapOpen ? 'Скрыть карту' : 'Показать на карте'}
-        </button>
-        {mapOpen && <RouteMap />}
 
         {/* КНОПКА ПОЛУЧЕНИЯ — главная фаза логистики */}
         {canPickup && (
@@ -518,39 +575,38 @@ function ParcelDetails({ d, onBack, nowMs, onPicked }: { d: DeliveryDTO; onBack:
               type="button"
               onClick={() => void pickup()}
               disabled={busy}
-              className="flex h-14 w-full items-center justify-center gap-2 rounded-xl text-[16px] font-bold text-white transition-transform active:scale-[0.98] disabled:opacity-60"
-              style={{ backgroundColor: EMERALD }}
+              className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl text-[16px] font-bold text-white transition-transform active:scale-[0.98] disabled:opacity-60"
+              style={{ backgroundColor: GREEN }}
             >
               <PackageCheck className="size-5" aria-hidden />
               {busy ? 'Оформляем…' : 'Забрать посылку'}
             </button>
-            <p className="text-center text-[10px] text-[#9AA0A8]">
-              Не забрали за 24 ч — курьер вернёт товар, возврат денег минус 5%
+            <p className="text-center text-[10px] text-[#9CA3AF]">
+              Не забрали за 24 ч: курьер вернёт товар, возврат денег минус 5%
             </p>
           </div>
         )}
         {err && <p className="text-center text-[12px] font-medium text-[#B3382E]">{err}</p>}
 
         {d.status === 'in_transit' && d.kind === 'purchase' && (
-          // предупреждение о риске (логика сохранена)
-          <div className="flex gap-2 rounded-[20px] bg-[#F8F1E3] p-3.5">
-            <AlertTriangle className="size-4 shrink-0" style={{ color: AMBER }} aria-hidden />
+          <div className="flex gap-2 rounded-[20px] bg-[#FBF3E2] p-3.5 ring-1 ring-[#F0E4C4]">
+            <AlertTriangle className="size-4 shrink-0 text-[#9A6B10]" aria-hidden />
             <p className="text-[11px] leading-relaxed text-[#8A6116]">
-              Осмотр при получении невозможен. Курьерская доставка — риск скрытых дефектов.
+              Осмотр при получении невозможен. Курьерская доставка: риск скрытых дефектов.
             </p>
           </div>
         )}
 
         {(d.status === 'delivered' || d.status === 'returned') && d.kind === 'purchase' && (
-          // итог осмотра (логика сохранена)
           <div className={`${CARD} p-4`}>
+            <h3 className={CAPS}>Осмотр при получении</h3>
             <div
               className={
-                'flex items-center justify-between gap-2 rounded-xl p-3 ' +
-                (worse || d.status === 'returned' ? 'bg-[#FDEEEE]' : 'bg-[#E7F5EA]')
+                'mt-3 flex items-center justify-between gap-2 rounded-xl p-3 ' +
+                (worse || d.status === 'returned' ? 'bg-[#FDECEA]' : 'bg-[#E6F3EB]')
               }
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5">
                 {worse || d.status === 'returned' ? (
                   <>
                     <span className="flex size-8 items-center justify-center rounded-full bg-white text-[#B3382E]" aria-hidden>
@@ -560,69 +616,377 @@ function ParcelDetails({ d, onBack, nowMs, onPicked }: { d: DeliveryDTO; onBack:
                       <div className="text-[13px] font-semibold text-[#B3382E]">
                         {d.status === 'returned' ? 'Возвращено продавцу' : 'Есть дефекты'}
                       </div>
-                      <div className="text-[10px] text-[#9AA0A8]">
+                      <div className="text-[10px] text-[#9CA3AF]">
                         {d.status === 'returned' ? 'Комиссия 5% удержана' : 'Продавец приукрасил состояние'}
                       </div>
                     </div>
                   </>
                 ) : (
                   <>
-                    <span className="flex size-8 items-center justify-center rounded-full bg-white" style={{ color: EMERALD }} aria-hidden>
+                    <span className="flex size-8 items-center justify-center rounded-full bg-white" style={{ color: GREEN }} aria-hidden>
                       <CheckCircle2 className="size-4" />
                     </span>
                     <div>
-                      <div className="text-[13px] font-semibold" style={{ color: EMERALD }}>Как в описании</div>
-                      <div className="text-[10px] text-[#9AA0A8]">Проверка пройдена</div>
+                      <div className="text-[13px] font-semibold" style={{ color: GREEN }}>Как в описании</div>
+                      <div className="text-[10px] text-[#9CA3AF]">Проверка пройдена</div>
                     </div>
                   </>
                 )}
               </div>
-              <span className="shrink-0 text-[10px] text-[#9AA0A8]">{d.deliveredAt ? timeAgo(d.deliveredAt) : null}</span>
+              <span className="shrink-0 text-[10px] text-[#9CA3AF]">{d.deliveredAt ? timeAgo(d.deliveredAt) : null}</span>
             </div>
             {!worse && d.status === 'delivered' && d.realCondition && (
-              <div className="mt-2 px-1 text-[11px] text-[#9AA0A8]">
+              <div className="mt-2 px-1 text-[11px] text-[#9CA3AF]">
                 Фактическое состояние:{' '}
-                <span className="font-medium text-[#1A1A1A]">{CONDITION_LABEL[d.realCondition] ?? d.realCondition}</span>
+                <span className="font-medium text-[#141414]">{CONDITION_LABEL[d.realCondition] ?? d.realCondition}</span>
               </div>
             )}
           </div>
         )}
 
-        <div className="pb-2 text-center text-[10px] text-[#9AA0A8]">Resale Доставка · это игра</div>
+        <div className="pb-2 pt-1 text-center text-[10px] text-[#9CA3AF]">Resale Доставка · осмотр при получении · это игра</div>
       </div>
     </div>
   )
 }
 
-// тост/баланс через стор ОС (без импорт-циклов в хелперах)
-function pushToastSafe(title: string, body: string) {
-  try {
-    useOS.getState().pushToast(title, body)
-  } catch { /* стор не готов — не критично */ }
-}
-function refreshBalance(balance: number) {
-  try {
-    const s = useOS.getState()
-    if (s.session) s.refreshSession({ balance })
-  } catch { /* не критично */ }
+// ---------- экран курьера: карта + нижняя карточка (макет: экран 4) ----------
+function CourierScreen({ d, nowMs, showBack, onBack }: { d: DeliveryDTO; nowMs: number; showBack: boolean; onBack?: () => void }) {
+  const pushToast = useOS((s) => s.pushToast)
+  const session = useOS((s) => s.session)
+  const etaLeft = new Date(d.eta).getTime() - nowMs
+  const etaMin = d.status === 'in_transit' ? Math.max(1, Math.min(180, Math.ceil(etaLeft / 60000))) : 15
+  const courierSub =
+    d.status === 'in_transit' ? 'Доставляет вашу посылку'
+      : d.status === 'arrived' ? 'Ждёт в пункте выдачи'
+        : d.kind === 'sale' ? 'Скоро заберёт ваш товар' : 'Продавец собирает посылку'
+  const mapBtn =
+    'flex size-11 items-center justify-center rounded-full bg-white text-[#141414] shadow-[0_4px_16px_rgba(0,0,0,0.12)] ring-1 ring-black/[0.05] transition active:scale-95'
+
+  return (
+    <div className="flex h-full flex-col bg-[#F6F7F9]">
+      {/* карта на весь остаток экрана */}
+      <div className="relative min-h-0 flex-1">
+        <GameMap etaMin={etaMin} className="absolute inset-0" />
+        {showBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Назад"
+            className={`${mapBtn} absolute left-3 top-3 z-10`}
+          >
+            <ChevronLeft className="size-5" aria-hidden />
+          </button>
+        )}
+        <div className="absolute right-3 top-3 z-10 flex flex-col gap-2.5">
+          <button
+            type="button"
+            aria-label="Построить маршрут"
+            className={mapBtn}
+            onClick={() => pushToast('Карта', 'Маршрут построен до пункта выдачи')}
+          >
+            <Navigation className="size-[19px]" style={{ color: GREEN }} aria-hidden />
+          </button>
+          <button
+            type="button"
+            aria-label="Моё местоположение"
+            className={mapBtn}
+            onClick={() => pushToast('Карта', `Вы в ${session?.city ?? 'Москве'} · это игра`)}
+          >
+            <Crosshair className="size-[19px]" aria-hidden />
+          </button>
+        </div>
+      </div>
+
+      {/* нижняя карточка курьера */}
+      <div className="shrink-0 rounded-t-[24px] bg-white px-4 pb-4 pt-2 shadow-[0_-6px_24px_rgba(0,0,0,0.06)]">
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-black/10" aria-hidden />
+        <div className="flex items-center gap-3">
+          <span
+            className="flex size-12 shrink-0 items-center justify-center rounded-full text-[13px] font-bold text-white"
+            style={{ backgroundColor: `hsl(${hueOf(d.courier)} 55% 45%)` }}
+            aria-hidden
+          >
+            {initialsOf(d.courier)}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[15px] font-bold text-[#141414]">{d.courier}</div>
+            <div className="mt-0.5 flex items-center gap-1 text-[12px] text-[#6B7280]">
+              <Star className="size-3" style={{ color: AMBER }} fill={AMBER} aria-hidden />
+              4.9 · Курьер Resale
+            </div>
+            <div className="mt-0.5 truncate text-[11px] text-[#9CA3AF]">{courierSub}</div>
+          </div>
+          <button
+            type="button"
+            aria-label="Позвонить курьеру"
+            onClick={() => pushToast('Курьер', `Соединяем с ${d.courier}…`)}
+            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[#F1F2F4] text-[#141414] transition active:scale-95"
+          >
+            <Phone className="size-[18px]" aria-hidden />
+          </button>
+          <button
+            type="button"
+            aria-label="Написать курьеру"
+            onClick={() => pushToast('Курьер', 'Чат с курьером скоро появится')}
+            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[#F1F2F4] text-[#141414] transition active:scale-95"
+          >
+            <MessageCircle className="size-[18px]" aria-hidden />
+          </button>
+        </div>
+        <div className="mt-3 flex items-center gap-3 border-t border-black/[0.06] pt-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#F1F2F4] text-[#6B7280]" aria-hidden>
+            <Truck className="size-[18px]" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[13.5px] font-semibold text-[#141414]">{CARS[hashOf(d.courier) % CARS.length]}</div>
+            <div className="mt-0.5 font-mono text-[12px] text-[#6B7280]">{plateOf(d.courier)}</div>
+          </div>
+          <span
+            className="shrink-0 rounded-lg px-2 py-1 text-[11px] font-semibold"
+            style={{ backgroundColor: TONE[statusMeta(d).tone].plate, color: TONE[statusMeta(d).tone].text }}
+          >
+            {statusMeta(d).label}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
 }
 
-const TABS: { key: TabKey; label: string }[] = [
-  { key: 'active', label: 'Активные' },
-  { key: 'history', label: 'История' },
-]
+// ---------- карта без активных доставок ----------
+function MapEmptyScreen({ onGo }: { onGo: () => void }) {
+  return (
+    <div className="flex h-full flex-col bg-[#F6F7F9]">
+      <div className="relative min-h-0 flex-1">
+        <GameMap className="absolute inset-0" />
+      </div>
+      <div className="shrink-0 rounded-t-[24px] bg-white px-6 pb-6 pt-2 text-center shadow-[0_-6px_24px_rgba(0,0,0,0.06)]">
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-black/10" aria-hidden />
+        <img
+          src="/img/empty/delivery.webp"
+          alt=""
+          aria-hidden="true"
+          loading="lazy"
+          decoding="async"
+          className="mx-auto h-20"
+        />
+        <div className="mt-2 text-[15px] font-bold text-[#141414]">Машины на маршруте нет</div>
+        <p className="mx-auto mt-1 max-w-[250px] text-[12.5px] leading-relaxed text-[#9CA3AF]">
+          Карта оживёт, когда посылка выйдет в путь. Загляните в список доставок.
+        </p>
+        <button
+          type="button"
+          onClick={onGo}
+          className="mt-3 h-11 w-full rounded-2xl text-[14px] font-bold text-white transition-transform active:scale-[0.98]"
+          style={{ backgroundColor: GREEN }}
+        >
+          К посылкам
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ---------- история: доставлены + возвраты ----------
+function HistoryScreen({ items, nowMs, onOpen }: { items: DeliveryDTO[]; nowMs: number; onOpen: (id: string) => void }) {
+  const delivered = items.filter((d) => d.status === 'delivered')
+  const returned = items.filter((d) => d.status === 'returned')
+  if (delivered.length === 0 && returned.length === 0) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center px-4 pb-16 text-center">
+        <img
+          src="/img/empty/deal-success.webp"
+          alt=""
+          aria-hidden="true"
+          loading="lazy"
+          decoding="async"
+          className="h-24"
+        />
+        <div className="mt-3 text-[15px] font-semibold text-[#141414]">История пуста</div>
+        <div className="mt-1 max-w-64 text-[13px] leading-relaxed text-[#9CA3AF]">
+          Завершённые доставки и возвраты появятся здесь
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto p-4 pt-1 [scrollbar-width:thin]">
+      {delivered.length > 0 && (
+        <>
+          <h2 className={`${CAPS} px-1 pb-1`}>Доставлены</h2>
+          {delivered.map((d) => (
+            <ParcelCard key={d.id} d={d} nowMs={nowMs} onOpen={() => onOpen(d.id)} />
+          ))}
+        </>
+      )}
+      {returned.length > 0 && (
+        <>
+          <h2 className={`${CAPS} px-1 pb-1 pt-2`}>Возвраты</h2>
+          {returned.map((d) => (
+            <ParcelCard key={d.id} d={d} nowMs={nowMs} onOpen={() => onOpen(d.id)} />
+          ))}
+        </>
+      )}
+      <div className="pb-2 pt-1 text-center text-[10px] text-[#9CA3AF]">Resale Доставка · это игра</div>
+    </div>
+  )
+}
+
+// ---------- профиль: сессия + статистика доставок ----------
+function ProfileScreen({ items }: { items: DeliveryDTO[] }) {
+  const session = useOS((s) => s.session)
+  const purchases = items.filter((d) => d.kind === 'purchase')
+  const sales = items.filter((d) => d.kind === 'sale')
+  const spent = purchases.reduce((s, d) => s + d.price, 0)
+  const earned = sales.reduce((s, d) => s + d.price, 0)
+  const rating = session && session.ratingCount > 0 ? (session.ratingSum / session.ratingCount).toFixed(1) : '5.0'
+  const stats = [
+    { n: items.length, label: 'всего посылок' },
+    { n: items.filter((d) => d.status === 'delivered').length, label: 'доставлено' },
+    { n: items.filter(isActive).length, label: 'в пути' },
+    { n: items.filter((d) => d.status === 'returned').length, label: 'возвраты' },
+  ]
+  return (
+    <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4 pt-1 [scrollbar-width:thin]">
+      <div className={`${CARD} p-4`}>
+        <div className="flex items-center gap-3.5">
+          {session?.photoUrl ? (
+            <img
+              src={session.photoUrl}
+              alt=""
+              className="size-16 shrink-0 rounded-full bg-[#F1F2F4] object-cover"
+            />
+          ) : (
+            <span
+              className="flex size-16 shrink-0 items-center justify-center rounded-full text-[18px] font-bold text-white"
+              style={{ backgroundColor: `hsl(${hueOf(session?.username ?? 'player')} 55% 45%)` }}
+              aria-hidden
+            >
+              {initialsOf(session?.displayName ?? 'Игрок')}
+            </span>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[17px] font-bold text-[#141414]">{session?.displayName ?? 'Игрок'}</div>
+            <div className="truncate text-[12.5px] text-[#6B7280]">{session?.username ? `@${session.username}` : 'игрок Resale'}</div>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#E6F3EB] px-2 py-0.5 text-[10.5px] font-semibold text-[#12894B]">
+                <MapPin className="size-2.5" aria-hidden />
+                {session?.city ?? 'Москва'}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#FBF3E2] px-2 py-0.5 text-[10.5px] font-semibold text-[#9A6B10]">
+                <Star className="size-2.5" aria-hidden />
+                {rating}
+              </span>
+              <span className="inline-flex items-center rounded-full bg-[#F1F2F4] px-2 py-0.5 text-[10.5px] font-semibold text-[#6B7280]">
+                Уровень {session?.level ?? 1}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h2 className={`${CAPS} px-1`}>Доставки</h2>
+      <div className={`${CARD} p-4`}>
+        <div className="grid grid-cols-2 gap-2.5">
+          {stats.map((s) => (
+            <div key={s.label} className="rounded-2xl bg-[#F6F7F9] p-3">
+              <div className="text-[20px] font-bold tabular-nums text-[#141414]">{s.n}</div>
+              <div className="mt-0.5 text-[11px] text-[#6B7280]">{s.label}</div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 divide-y divide-black/[0.05]">
+          <div className="flex items-center gap-3 py-2.5">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#F1F2F4] text-[#6B7280]" aria-hidden>
+              <Banknote className="size-4" />
+            </span>
+            <span className="min-w-0 flex-1 truncate text-[13px] text-[#6B7280]">Потрачено на доставки</span>
+            <span className="text-[13px] font-semibold tabular-nums text-[#141414]">{fmtMoney(spent)}</span>
+          </div>
+          <div className="flex items-center gap-3 py-2.5">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#F1F2F4] text-[#6B7280]" aria-hidden>
+              <PackageCheck className="size-4" />
+            </span>
+            <span className="min-w-0 flex-1 truncate text-[13px] text-[#6B7280]">Выручка с продаж</span>
+            <span className="text-[13px] font-semibold tabular-nums" style={{ color: GREEN }}>{fmtMoney(earned)}</span>
+          </div>
+        </div>
+      </div>
+
+      <h2 className={`${CAPS} px-1`}>О сервисе</h2>
+      <div className={`${CARD} p-4`}>
+        <div className="divide-y divide-black/[0.05]">
+          {[
+            { icon: Truck, title: 'Курьеры Resale', sub: 'От продавца до пункта выдачи за пару часов' },
+            { icon: ShieldCheck, title: 'Осмотр при получении', sub: 'Проверяйте вещь, когда забираете посылку' },
+            { icon: RotateCcw, title: 'Возврат 24 часа', sub: 'Не забрали за 24 ч, вернём деньги (комиссия 5%)' },
+          ].map((row) => (
+            <div key={row.title} className="flex items-center gap-3 py-2.5">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#F1F2F4] text-[#6B7280]" aria-hidden>
+                <row.icon className="size-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[13px] font-semibold text-[#141414]">{row.title}</div>
+                <div className="truncate text-[11.5px] text-[#9CA3AF]">{row.sub}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="pb-2 pt-1 text-center text-[10px] text-[#9CA3AF]">Resale Доставка · версия 1.0 · это игра</div>
+    </div>
+  )
+}
+
+// ---------- нижний таб-бар (макет: Доставки / Карта / История / Профиль) ----------
+function TabBar({ tab, onChange }: { tab: TabKey; onChange: (t: TabKey) => void }) {
+  return (
+    <nav className="shrink-0 bg-white ring-1 ring-black/[0.05]" aria-label="Разделы доставок">
+      <div className="grid grid-cols-4">
+        {TABS.map((t) => {
+          const on = tab === t.key
+          const Icon = t.icon
+          return (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              onClick={() => onChange(t.key)}
+              className="flex h-[62px] flex-col items-center justify-center gap-0.5 transition active:scale-[0.97]"
+              style={{ color: on ? GREEN : '#9CA3AF' }}
+            >
+              <span
+                className="flex h-7 items-center rounded-full px-3.5"
+                style={{ backgroundColor: on ? 'rgba(18,137,75,0.10)' : 'transparent' }}
+              >
+                <Icon className="size-[19px]" aria-hidden />
+              </span>
+              <span className={'text-[10px] leading-none ' + (on ? 'font-bold' : 'font-medium')}>{t.label}</span>
+            </button>
+          )
+        })}
+      </div>
+    </nav>
+  )
+}
 
 export default function DeliveryApp() {
   const [data, setData] = useState<DeliveryDTO[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [tab, setTab] = useState<TabKey>('active')
+  const [tab, setTab] = useState<TabKey>('deliveries')
+  const [filter, setFilter] = useState<FilterKey>('all')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [view, setView] = useState<'parcel' | 'courier' | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [q, setQ] = useState('')
   const pushToast = useOS((s) => s.pushToast)
 
-  useTick(1000) // живой отсчёт ETA и прогресс-бара
+  useTick(1000) // живой отсчёт ETA
+  const nowMs = Date.now()
 
   const load = useCallback(async (silent = false) => {
     try {
@@ -640,7 +1004,7 @@ export default function DeliveryApp() {
     void load()
   }, [load])
 
-  // Тихий refetch каждые 5 секунд — доставки приходят в реальном времени
+  // Тихий refetch каждые 5 секунд: доставки приходят в реальном времени
   useEffect(() => {
     const id = setInterval(() => {
       void load(true)
@@ -648,14 +1012,14 @@ export default function DeliveryApp() {
     return () => clearInterval(id)
   }, [load])
 
-  const nowMs = Date.now()
   const items = data ?? []
-  // Хронологический порядок: новые сверху (как было)
+  // Хронологический порядок: новые сверху
   const sorted = [...items].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   )
   const active = sorted.filter(isActive)
-  const history = sorted.filter((d) => !isActive(d))
+  const deliveredAll = sorted.filter((d) => d.status === 'delivered')
+  const returnedAll = sorted.filter((d) => d.status === 'returned')
 
   // локальный поиск по названию/треку — чисто UI, данные те же
   const needle = q.trim().toLowerCase()
@@ -664,197 +1028,250 @@ export default function DeliveryApp() {
         (d) => d.title.toLowerCase().includes(needle) || trackOf(d.id).toLowerCase().includes(needle),
       )
     : sorted
-  const list = tab === 'active' ? searched.filter(isActive) : searched.filter((d) => !isActive(d))
+  const filtered =
+    filter === 'all' ? searched
+      : filter === 'transit' ? searched.filter(isActive)
+        : filter === 'delivered' ? searched.filter((d) => d.status === 'delivered')
+          : searched.filter((d) => d.status === 'returned')
 
   const selected = selectedId ? sorted.find((d) => d.id === selectedId) ?? null : null
+  const activeDelivery =
+    sorted.find((d) => d.status === 'in_transit') ??
+    sorted.find((d) => d.status === 'arrived') ??
+    sorted.find((d) => d.status === 'collecting') ??
+    null
+
+  const counts: Record<FilterKey, number> = {
+    all: sorted.length,
+    transit: active.length,
+    delivered: deliveredAll.length,
+    archive: returnedAll.length,
+  }
+
+  const openParcel = (id: string) => {
+    setSelectedId(id)
+    setView('parcel')
+  }
 
   return (
-    <div className="flex h-full flex-col bg-[#F5F6FA]">
-      {selected ? (
-        <ParcelDetails
+    <div className="flex h-full flex-col bg-[#F6F7F9] text-[#141414]">
+      {/* ---------- оверлеи: посылка / курьер ---------- */}
+      {view === 'parcel' && selected ? (
+        <ParcelScreen
           d={selected}
-          onBack={() => setSelectedId(null)}
+          onBack={() => setView(null)}
+          onTrack={() => setView('courier')}
           nowMs={nowMs}
-          onPicked={() => { setSelectedId(null); void load() }}
+        />
+      ) : view === 'courier' && (selected ?? activeDelivery) ? (
+        <CourierScreen
+          d={(selected ?? activeDelivery) as DeliveryDTO}
+          nowMs={nowMs}
+          showBack
+          onBack={() => setView(selected ? 'parcel' : null)}
         />
       ) : (
         <>
-          {/* ---------- шапка: заголовок bold 22 + подзаголовок 13 + Search + Plus ---------- */}
-          <div className="shrink-0 px-4 pb-3 pt-4">
-            <div className="flex items-center gap-3">
-              <div className="flex size-11 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: `${EMERALD}1A`, color: EMERALD }}>
-                <Package className="size-5" aria-hidden />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h1 className="text-[22px] font-bold leading-tight text-[#1A1A1A]">Доставки</h1>
-                <p className="mt-0.5 text-[13px] text-[#9AA0A8]">
-                  {active.length > 0 ? `${active.length} едут — обновляем сами` : 'Посылки и выплаты с продаж'}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSearchOpen((v) => !v)}
-                aria-label="Поиск по посылкам"
-                aria-pressed={searchOpen}
-                className={
-                  'flex size-10 shrink-0 items-center justify-center rounded-full transition-colors active:scale-95 ' +
-                  (searchOpen ? 'text-white' : 'bg-white text-[#1A1A1A] shadow-[0_2px_8px_rgba(0,0,0,0.04)]')
-                }
-                style={searchOpen ? { backgroundColor: EMERALD } : undefined}
-              >
-                <Search className="size-4.5" aria-hidden />
-              </button>
-              <button
-                type="button"
-                onClick={() => pushToast('Доставки', 'Посылка появится здесь после покупки или продажи')}
-                aria-label="Как работает доставка"
-                className="flex size-10 shrink-0 items-center justify-center rounded-full text-white transition-transform active:scale-95"
-                style={{ backgroundColor: EMERALD }}
-              >
-                <Plus className="size-4.5" aria-hidden />
-              </button>
-            </div>
-
-            {searchOpen && (
-              <div className="mt-3 flex items-center gap-2 rounded-xl bg-[#F0F1F5] px-3.5">
-                <Search className="size-4 shrink-0 text-[#9AA0A8]" aria-hidden />
-                <input
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="Название или трек-номер"
-                  aria-label="Поиск по посылкам"
-                  className="h-11 w-full bg-transparent text-[14px] text-[#1A1A1A] outline-none placeholder:text-[#9AA0A8]"
-                />
-                {q && (
+          {tab === 'deliveries' && (
+            <>
+              {/* ---------- шапка: заголовок + поиск + подсказка ---------- */}
+              <div className="shrink-0 px-4 pb-2 pt-4">
+                <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <h1 className="text-[26px] font-bold leading-tight tracking-[-0.02em] text-[#141414]">Доставки</h1>
+                    <p className="mt-0.5 text-[13px] text-[#6B7280]">
+                      {active.length > 0 ? `${active.length} едут · обновляем сами` : 'Посылки и выплаты с продаж'}
+                    </p>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => setQ('')}
-                    aria-label="Очистить поиск"
-                    className="flex size-8 shrink-0 items-center justify-center rounded-full text-[#9AA0A8] active:bg-black/5"
+                    onClick={() => setSearchOpen((v) => !v)}
+                    aria-label="Поиск по посылкам"
+                    aria-pressed={searchOpen}
+                    className={
+                      'flex size-10 shrink-0 items-center justify-center rounded-full transition active:scale-95 ' +
+                      (searchOpen ? 'text-white' : 'bg-white text-[#141414] ring-1 ring-black/[0.05]')
+                    }
+                    style={searchOpen ? { backgroundColor: GREEN } : undefined}
                   >
-                    <X className="size-4" aria-hidden />
+                    <Search className="size-[18px]" aria-hidden />
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => pushToast('Доставки', 'Посылка появится здесь после покупки или продажи')}
+                    aria-label="Как работает доставка"
+                    className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-[#141414] ring-1 ring-black/[0.05] transition active:scale-95"
+                  >
+                    <Plus className="size-[18px]" aria-hidden />
+                  </button>
+                </div>
+
+                {searchOpen && (
+                  <div className="mt-3 flex items-center gap-2 rounded-xl bg-white px-3.5 ring-1 ring-black/[0.05]">
+                    <Search className="size-4 shrink-0 text-[#9CA3AF]" aria-hidden />
+                    <input
+                      value={q}
+                      onChange={(e) => setQ(e.target.value)}
+                      placeholder="Название или трек-номер"
+                      aria-label="Поиск по посылкам"
+                      className="h-11 w-full bg-transparent text-[14px] text-[#141414] outline-none placeholder:text-[#9CA3AF]"
+                    />
+                    {q && (
+                      <button
+                        type="button"
+                        onClick={() => setQ('')}
+                        aria-label="Очистить поиск"
+                        className="flex size-8 shrink-0 items-center justify-center rounded-full text-[#9CA3AF] active:bg-black/5"
+                      >
+                        <X className="size-4" aria-hidden />
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* ---------- чипы-фильтры: Все / В пути / Доставлены / Архив ---------- */}
+                <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]" role="tablist" aria-label="Фильтры посылок">
+                  {FILTERS.map((f) => {
+                    const on = filter === f.key
+                    const count = counts[f.key]
+                    return (
+                      <button
+                        key={f.key}
+                        type="button"
+                        role="tab"
+                        aria-selected={on}
+                        onClick={() => setFilter(f.key)}
+                        className={
+                          'flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] transition active:scale-[0.97] ' +
+                          (on ? 'font-semibold text-white' : 'bg-white font-medium text-[#141414] ring-1 ring-black/[0.05]')
+                        }
+                        style={on ? { backgroundColor: GREEN } : undefined}
+                      >
+                        {f.label}
+                        {count > 0 && (
+                          <span
+                            className={
+                              'inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums ' +
+                              (on ? 'bg-white/25 text-white' : 'bg-black/5 text-[#6B7280]')
+                            }
+                          >
+                            {count}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* ---------- список посылок ---------- */}
+              <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto p-4 pt-1 [scrollbar-width:thin]">
+                {loading && !data ? (
+                  <div className="flex flex-col gap-2.5">
+                    <div className="h-9 w-44 animate-pulse rounded-full bg-white" />
+                    <div className="h-[86px] animate-pulse rounded-[20px] bg-white" />
+                    <div className="h-[86px] animate-pulse rounded-[20px] bg-white" />
+                    <div className="h-[86px] animate-pulse rounded-[20px] bg-white" />
+                  </div>
+                ) : error && !data ? (
+                  <div className="flex flex-col items-center gap-1 rounded-[20px] bg-[#FDECEA] p-6 text-center">
+                    <img
+                      src="/img/empty/deal-fail.webp"
+                      alt=""
+                      aria-hidden="true"
+                      loading="lazy"
+                      decoding="async"
+                      className="h-24"
+                    />
+                    <p className="text-sm font-medium text-[#B3382E]">{error}</p>
+                    <button
+                      type="button"
+                      onClick={() => void load()}
+                      className="h-11 rounded-2xl px-6 text-sm font-bold text-white transition active:scale-95"
+                      style={{ backgroundColor: GREEN }}
+                    >
+                      Повторить
+                    </button>
+                  </div>
+                ) : sorted.length === 0 ? (
+                  <div className={`${CARD} flex flex-col items-center px-4 py-10 text-center`}>
+                    <img
+                      src="/img/empty/delivery.webp"
+                      alt=""
+                      aria-hidden="true"
+                      loading="lazy"
+                      decoding="async"
+                      className="h-24"
+                    />
+                    <div className="mt-3 text-[15px] font-semibold text-[#141414]">Доставок пока нет</div>
+                    <div className="mt-1 max-w-64 text-[13px] leading-relaxed text-[#9CA3AF]">
+                      Каждая покупка едет посылкой: собираем, в пути, забирайте в пункте выдачи.
+                    </div>
+                  </div>
+                ) : filtered.length === 0 ? (
+                  <div className={`${CARD} flex flex-col items-center px-4 py-10 text-center`}>
+                    <img
+                      src="/img/empty/deal-success.webp"
+                      alt=""
+                      aria-hidden="true"
+                      loading="lazy"
+                      decoding="async"
+                      className="h-24"
+                    />
+                    <div className="mt-3 text-[15px] font-semibold text-[#141414]">
+                      {needle ? 'Ничего не нашлось' : 'Здесь пока пусто'}
+                    </div>
+                    <div className="mt-1 text-[13px] text-[#9CA3AF]">
+                      {needle ? 'Попробуйте другое название или трек' : 'Смените фильтр, чтобы увидеть другие посылки'}
+                    </div>
+                  </div>
+                ) : (
+                  filtered.map((d) => (
+                    <ParcelCard key={d.id} d={d} nowMs={nowMs} onOpen={() => openParcel(d.id)} />
+                  ))
+                )}
+                {sorted.length > 0 && filtered.length > 0 && (
+                  <div className="pb-2 pt-1 text-center text-[10px] text-[#9CA3AF]">
+                    Resale Доставка · осмотр при получении · это игра
+                  </div>
                 )}
               </div>
-            )}
+            </>
+          )}
 
-            {/* ---------- 2 вкладки: Активные / История ---------- */}
-            <div className="mt-3 flex gap-2" role="tablist" aria-label="Разделы доставок">
-              {TABS.map((t) => {
-                const isActiveTab = tab === t.key
-                const count = t.key === 'active' ? active.length : history.length
-                return (
-                  <button
-                    key={t.key}
-                    type="button"
-                    role="tab"
-                    aria-selected={isActiveTab}
-                    onClick={() => setTab(t.key)}
-                    className={
-                      'flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full px-4 text-[13px] transition-colors active:scale-[0.97] ' +
-                      (isActiveTab
-                        ? 'font-semibold text-white'
-                        : 'bg-white font-medium text-black/70 shadow-[0_2px_8px_rgba(0,0,0,0.04)]')
-                    }
-                    style={isActiveTab ? { backgroundColor: EMERALD } : undefined}
-                  >
-                    {t.label}
-                    {count > 0 && (
-                      <span
-                        className={
-                          'inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums ' +
-                          (isActiveTab ? 'bg-white/25 text-white' : 'bg-black/5 text-black/60')
-                        }
-                      >
-                        {count}
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* ---------- контент ---------- */}
-          <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4 pt-0 [scrollbar-width:thin]">
-            {loading && !data ? (
-              <div className="flex flex-col gap-3">
-                <div className="h-9 animate-pulse rounded-full bg-white" />
-                <div className="h-24 animate-pulse rounded-[20px] bg-white" />
-                <div className="h-24 animate-pulse rounded-[20px] bg-white" />
-              </div>
-            ) : error && !data ? (
-              <div className="flex flex-col items-center gap-1 rounded-[20px] bg-[#FDEEEE] p-6 text-center">
-                <img
-                  src="/img/empty/deal-fail.webp"
-                  alt=""
-                  aria-hidden="true"
-                  loading="lazy"
-                  decoding="async"
-                  className="h-24"
-                />
-                <p className="text-sm font-medium text-[#B3382E]">{error}</p>
-                <button
-                  type="button"
-                  onClick={() => void load()}
-                  className="h-11 rounded-xl px-6 text-sm font-bold text-white transition active:scale-95"
-                  style={{ backgroundColor: EMERALD }}
-                >
-                  Повторить
-                </button>
-              </div>
-            ) : sorted.length === 0 ? (
-              <div className="flex flex-col items-center rounded-[20px] bg-white px-4 py-10 text-center shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-                <img
-                  src="/img/empty/delivery.webp"
-                  alt=""
-                  aria-hidden="true"
-                  loading="lazy"
-                  decoding="async"
-                  className="h-24"
-                />
-                <div className="mt-3 text-[15px] font-semibold text-[#1A1A1A]">Доставок пока нет</div>
-                <div className="mt-1 max-w-64 text-[13px] leading-relaxed text-[#9AA0A8]">
-                  Каждая покупка едет посылкой: собираем → в пути → забирайте в пункте выдачи.
-                </div>
-              </div>
-            ) : list.length === 0 ? (
-              <div className="flex flex-col items-center rounded-[20px] bg-white px-4 py-10 text-center shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-                <img
-                  src="/img/empty/deal-success.webp"
-                  alt=""
-                  aria-hidden="true"
-                  loading="lazy"
-                  decoding="async"
-                  className="h-24"
-                />
-                <div className="mt-3 text-[15px] font-semibold text-[#1A1A1A]">
-                  {tab === 'active' ? 'Всё доставлено' : 'История пуста'}
-                </div>
-                <div className="mt-1 text-[13px] text-[#9AA0A8]">
-                  {tab === 'active' ? 'Активных посылок нет — загляните в историю' : 'Завершённые доставки появятся здесь'}
-                </div>
-              </div>
+          {tab === 'map' && (
+            activeDelivery ? (
+              <CourierScreen d={activeDelivery} nowMs={nowMs} showBack={false} />
             ) : (
-              <>
-                <SectionHeader
-                  title={tab === 'active' ? 'Едут к вам' : 'История доставок'}
-                  sub={tab === 'active' ? 'Статусы обновляются сами' : undefined}
-                />
-                <div className="flex flex-col gap-2.5">
-                  {list.map((d) => (
-                    <ParcelRow key={d.id} d={d} onOpen={() => setSelectedId(d.id)} nowMs={nowMs} />
-                  ))}
-                </div>
-              </>
-            )}
+              <MapEmptyScreen onGo={() => setTab('deliveries')} />
+            )
+          )}
 
-            {sorted.length > 0 && (
-              <div className="pb-2 pt-1 text-center text-[10px] text-[#9AA0A8]">
-                Resale Доставка · осмотр при получении, это игра
+          {tab === 'history' && (
+            <>
+              <div className="shrink-0 px-4 pb-2 pt-4">
+                <h1 className="text-[26px] font-bold leading-tight tracking-[-0.02em] text-[#141414]">История</h1>
+                <p className="mt-0.5 text-[13px] text-[#6B7280]">
+                  {deliveredAll.length + returnedAll.length > 0
+                    ? `${deliveredAll.length} доставлено · ${returnedAll.length} возвратов`
+                    : 'Доставленное и возвраты'}
+                </p>
               </div>
-            )}
-          </div>
+              <HistoryScreen items={sorted} nowMs={nowMs} onOpen={openParcel} />
+            </>
+          )}
+
+          {tab === 'profile' && (
+            <>
+              <div className="shrink-0 px-4 pb-2 pt-4">
+                <h1 className="text-[26px] font-bold leading-tight tracking-[-0.02em] text-[#141414]">Профиль</h1>
+                <p className="mt-0.5 text-[13px] text-[#6B7280]">Resale Доставка</p>
+              </div>
+              <ProfileScreen items={sorted} />
+            </>
+          )}
+
+          <TabBar tab={tab} onChange={setTab} />
         </>
       )}
     </div>

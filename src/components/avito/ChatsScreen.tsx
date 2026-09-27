@@ -1,15 +1,16 @@
 'use client'
 
-// Список чатов «Resale» — светлый дизайн 1:1 как настоящий Авито:
-// поиск сверху, круглые аватары 48, имя bold 15, сниппет 14, время 11,
-// зелёный бейдж непрочитанных. Живой: «печатает…» из realtime и черновики из localStorage.
+// Список чатов «Resale» — светлый минимализм: заголовок 26px, белая пилюля
+// поиска, аватары 48, имя bold, сниппет, зелёный бейдж непрочитанных.
+// Живой: «печатает…» из realtime и черновики из localStorage.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Loader2, Search, X } from 'lucide-react'
+import { Search, X, MessageCircle } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { getSocket } from '@/lib/use-realtime'
 import { timeAgo } from '@/lib/format'
 import { UserAvatar } from '@/components/shared/UserAvatar'
 import type { ChatListItem } from '@/lib/types'
+import { Card, EmptyState, Overline, ScreenTitle, Skeleton, cn } from './ui'
 
 export default function ChatsScreen({ onOpenChat }: { onOpenChat: (id: string) => void }) {
   const [items, setItems] = useState<ChatListItem[]>([])
@@ -108,33 +109,26 @@ export default function ChatsScreen({ onOpenChat }: { onOpenChat: (id: string) =
     )
   }, [items, q])
 
-  if (loading) {
-    return (
-      <div className="h-full bg-white flex items-center justify-center">
-        <Loader2 className="animate-spin text-[#8B8F99]" size={28} />
-      </div>
-    )
-  }
-
   return (
-    <div className="h-full overflow-y-auto [scrollbar-width:thin] bg-white">
+    <div className="h-full overflow-y-auto bg-[#F6F7F9] [scrollbar-width:thin]">
       {/* шапка: заголовок + поиск */}
-      <div className="sticky top-0 z-10 bg-white px-4 pt-3 pb-2.5 border-b border-[#EBEDF0]">
-        <h1 className="text-[20px] font-bold text-black leading-tight mb-2.5">Сообщения</h1>
-        <div className="flex items-center gap-2 bg-[#F0F1F5] rounded-[12px] px-3.5 h-10">
-          <Search size={17} className="text-[#8B8F99] shrink-0" aria-hidden />
+      <div className="sticky top-0 z-10 bg-[#F6F7F9] px-4 pb-2.5 pt-3">
+        <Overline>Resale</Overline>
+        <ScreenTitle className="mb-3">Чаты</ScreenTitle>
+        <div className="flex h-11 items-center gap-2 rounded-full bg-white px-4 ring-1 ring-black/[0.08]">
+          <Search size={17} className="shrink-0 text-black/35" aria-hidden />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Поиск по чатам"
             aria-label="Поиск по чатам"
-            className="bg-transparent outline-none text-[15px] w-full text-black placeholder:text-[#8B8F99]"
+            className="w-full bg-transparent text-[15px] text-[#141414] outline-none placeholder:text-black/35"
           />
           {q && (
             <button
               onClick={() => setQ('')}
               aria-label="Очистить поиск"
-              className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[#8B8F99] active:bg-black/[0.06]"
+              className="flex size-7 shrink-0 items-center justify-center rounded-full text-black/35 transition-colors active:bg-black/[0.06]"
             >
               <X size={14} aria-hidden />
             </button>
@@ -142,21 +136,29 @@ export default function ChatsScreen({ onOpenChat }: { onOpenChat: (id: string) =
         </div>
       </div>
 
-      {error && <div className="bg-[#FDEBEB] text-[#D14343] text-sm rounded-xl p-3 m-3">{error}</div>}
-      {items.length === 0 ? (
-        <div className="text-center pt-10 px-8">
-          <div className="mx-auto max-w-[240px]" aria-hidden>
-            <img src="/img/empty/chat.webp" alt="" className="w-full" loading="lazy" decoding="async" />
-          </div>
-          <p className="text-[15px] text-black font-semibold mt-3">Сообщений пока нет</p>
-          <p className="text-[13px] text-[#8B8F99] mt-1 leading-relaxed">
-            Напишите продавцу с карточки товара — или боты сами напишут вам, когда увидят ваши объявления
-          </p>
+      {error && <div className="m-4 rounded-[16px] bg-red-500/[0.08] p-3 text-sm text-red-600">{error}</div>}
+      {loading ? (
+        <div className="space-y-2 px-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Card key={i} className="flex items-center gap-3 p-3">
+              <Skeleton className="h-12 w-12 shrink-0 rounded-full" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-3.5 w-32 rounded-md" />
+                <Skeleton className="h-3 w-3/4 rounded-md" />
+              </div>
+            </Card>
+          ))}
         </div>
+      ) : items.length === 0 ? (
+        <EmptyState
+          icon={<MessageCircle size={28} />}
+          title="Сообщений пока нет"
+          note="Напишите продавцу с карточки товара. Или боты сами напишут вам, когда увидят ваши объявления"
+        />
       ) : filtered.length === 0 ? (
-        <p className="text-center text-[13px] text-[#8B8F99] pt-10 px-8">Никого не нашлось по запросу «{q.trim()}»</p>
+        <p className="px-8 pt-10 text-center text-[13px] text-black/45">Никого не нашлось по запросу «{q.trim()}»</p>
       ) : (
-        <div className="divide-y divide-[#EBEDF0]">
+        <Card className="mx-4 divide-y divide-black/[0.05] overflow-hidden">
           {filtered.map((c) => {
             const isTyping = Boolean(typing[c.id])
             const draft = drafts[c.id]
@@ -164,56 +166,59 @@ export default function ChatsScreen({ onOpenChat }: { onOpenChat: (id: string) =
               <button
                 key={c.id}
                 onClick={() => onOpenChat(c.id)}
-                className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-[#F7F8FA] transition-colors"
+                className="flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors active:bg-[#F6F7F9]"
               >
                 {/* круглый аватар 48 + зелёная точка онлайн */}
                 <span className="relative shrink-0">
-                  <UserAvatar name={c.counterpart.displayName} className="w-12 h-12 rounded-full" />
+                  <UserAvatar name={c.counterpart.displayName} className="h-12 w-12 rounded-full" />
                   {c.counterpart.online && (
-                    <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-[#0AC760] ring-2 ring-white" aria-label="Онлайн" />
+                    <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-[#16A34A] ring-2 ring-white" aria-label="Онлайн" />
                   )}
                   {isTyping && (
-                    <span className="absolute -bottom-1 -right-1 flex h-4 items-center gap-[3px] rounded-full bg-white px-1 shadow-sm ring-1 ring-[#EBEDF0]">
+                    <span className="absolute -bottom-1 -right-1 flex h-4 items-center gap-[3px] rounded-full bg-white px-1 shadow-sm ring-1 ring-black/[0.06]">
                       {[0, 1, 2].map((i) => (
-                        <span key={i} className="size-1 rounded-full bg-[#0AC760] animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
+                        <span key={i} className="size-1 animate-bounce rounded-full bg-[#16A34A]" style={{ animationDelay: `${i * 150}ms` }} />
                       ))}
                     </span>
                   )}
                 </span>
-                <div className="flex-1 min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[15px] font-bold text-black truncate">{c.counterpart.displayName}</span>
+                    <span className="truncate text-[15px] font-bold text-[#141414]">{c.counterpart.displayName}</span>
                     {c.role === 'seller' && (
-                      <span className="text-[9px] px-1 py-0.5 rounded bg-[#FFF4E5] text-[#B25E09] font-bold shrink-0">ПРОДАЖА</span>
+                      <span className="shrink-0 rounded bg-amber-500/[0.12] px-1 py-0.5 text-[9px] font-bold text-amber-700">ПРОДАЖА</span>
                     )}
-                    <span className="text-[11px] text-[#8B8F99] ml-auto shrink-0">
+                    <span className="ml-auto shrink-0 text-[11px] text-black/40">
                       {c.lastMessage ? timeAgo(c.lastMessage.createdAt) : ''}
                     </span>
                   </div>
                   {isTyping ? (
-                    <p className="text-[14px] font-medium text-[#067A47] truncate mt-0.5">печатает…</p>
+                    <p className="mt-0.5 truncate text-[14px] font-medium text-[#16A34A]">печатает…</p>
                   ) : draft ? (
-                    <p className="text-[14px] truncate mt-0.5 text-[#5C616B]">
+                    <p className="mt-0.5 truncate text-[14px] text-black/55">
                       <span className="font-semibold">Черновик:</span> {draft.slice(0, 60)}
                     </p>
                   ) : (
-                    <p className="text-[14px] text-[#8B8F99] truncate mt-0.5">
+                    <p className="mt-0.5 truncate text-[14px] text-black/45">
                       {c.lastMessage
                         ? `${c.lastMessage.mine ? 'Вы: ' : ''}${c.lastMessage.kind === 'invoice' ? `Счёт на ${c.lastMessage.text.replace(/[^\d\s₽]/g, '')}` : c.lastMessage.text}`
                         : `Товар: ${c.listingTitle}`}
                     </p>
                   )}
-                  <p className="text-[12px] text-[#8B8F99] truncate mt-0.5">{c.listingTitle}</p>
+                  <p className="mt-0.5 truncate text-[12px] text-black/35">{c.listingTitle}</p>
                 </div>
                 {c.unread > 0 && (
-                  <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#0AC760] text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                  <span className={cn(
+                    'flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full px-1.5 text-[11px] font-bold text-white',
+                    'bg-[#16A34A]',
+                  )}>
                     {c.unread}
                   </span>
                 )}
               </button>
             )
           })}
-        </div>
+        </Card>
       )}
     </div>
   )

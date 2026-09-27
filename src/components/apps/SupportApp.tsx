@@ -92,7 +92,7 @@ export default function SupportApp() {
             className="flex size-10 items-center justify-center rounded-[14px] shadow-lg shadow-teal-900/40"
             style={{ background: 'linear-gradient(145deg,#12777C,#0A4B4E)' }}
           >
-            <img src="/img/apps/support.png?v=3" alt="" aria-hidden className="size-9 rounded-[12px] object-cover" draggable={false} />
+            <img src="/img/apps/support.png?v=4" alt="" aria-hidden className="size-9 rounded-[12px] object-cover" draggable={false} />
           </div>
           <span aria-hidden="true" className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-[#071510] bg-emerald-400" />
         </div>
@@ -123,7 +123,7 @@ export default function SupportApp() {
               className="flex size-16 items-center justify-center rounded-[22px] shadow-xl shadow-teal-900/40"
               style={{ background: 'linear-gradient(145deg,#12777C,#0A4B4E)' }}
             >
-                <img src="/img/apps/support.png?v=3" alt="" aria-hidden className="size-14 rounded-[18px] object-cover" draggable={false} />
+                <img src="/img/apps/support.png?v=4" alt="" aria-hidden className="size-14 rounded-[18px] object-cover" draggable={false} />
             </div>
             <h2 className="text-[16px] font-semibold">Чем поможем?</h2>
             <p className="text-[12.5px] leading-relaxed text-white/45">
