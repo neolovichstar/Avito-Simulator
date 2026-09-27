@@ -193,7 +193,7 @@ function TasksCard({ dark, onOpenApp }: { dark: boolean; onOpenApp: (a: AppKey) 
         <button
           type="button"
           onClick={() => onOpenApp('career')}
-          className="flex min-h-[44px] min-w-0 items-center gap-0.5 py-1 text-[13px] font-medium text-[#0A84FF] outline-none"
+          className="flex min-h-[44px] min-w-0 shrink-0 items-center gap-0.5 whitespace-nowrap py-1 text-[13px] font-medium text-[#0A84FF] outline-none"
         >
           Смотреть все
           <ChevronRight className="size-3.5" aria-hidden="true" />
@@ -363,6 +363,33 @@ export default function Shade({
       }
     },
   })
+  // iOS-поведение: свайп вверх из ЛЮБОГО свободного места (поля вокруг карточки,
+  // зона за граббером) закрывает шторку. Скролл-контейнеры и контролы защищены.
+  const sectionCloseDrag = useDrag({
+    ignoreWithin: 'button, input, [role="slider"], [data-shade-scroll]',
+    onEnd: (_dx, dy, fling) => {
+      if (dy < -36 || fling.vy < -0.55) {
+        sound.swipe()
+        onClose()
+      }
+    },
+  })
+  // Список уведомлений: если контент помещается без скролла — свайп вверх тоже
+  // закрывает шторку; если скроллится — жест остаётся скроллом.
+  const listRef = useRef<HTMLDivElement | null>(null)
+  const listCanScroll = useRef(false)
+  const listCloseDrag = useDrag({
+    onStart: () => {
+      const el = listRef.current
+      listCanScroll.current = !!el && el.scrollHeight > el.clientHeight + 4
+    },
+    onEnd: (_dx, dy, fling) => {
+      if (!listCanScroll.current && (dy < -36 || fling.vy < -0.55)) {
+        sound.swipe()
+        onClose()
+      }
+    },
+  })
 
   const BRIGHT_MIN = 0.4
   const BRIGHT_SPAN = 0.6
@@ -387,6 +414,8 @@ export default function Shade({
       {/* панель на весь экран; ЦУ живёт плавающей карточкой со скруглением 34px */}
       <section
         aria-label={expanded ? 'Центр управления' : 'Уведомления'}
+        onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+        {...sectionCloseDrag}
         className={`pointer-events-auto absolute inset-0 flex flex-col backdrop-blur-2xl transition-[transform,background-color] duration-[360ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
           expanded
             ? dark
@@ -401,11 +430,11 @@ export default function Shade({
           /* ─────────── ЦЕНТР УПРАВЛЕНИЯ ─────────── */
           <div
             key={animKey}
-            className={`sheet-rise mx-3 mb-3 mt-12 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[34px] shadow-2xl ring-1 backdrop-blur-3xl ${
+            className={`sheet-rise mx-3 mb-3 mt-12 flex max-h-[calc(100%-60px)] min-h-0 flex-initial flex-col overflow-hidden rounded-[34px] shadow-2xl ring-1 backdrop-blur-3xl ${
               dark ? 'bg-[#1C1C1E]/[0.78] text-white ring-white/[0.08]' : `bg-white/70 ${TXT_PRIMARY} ring-black/[0.06]`
             }`}
           >
-            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-3 pt-2 [scrollbar-width:none]">
+            <div data-shade-scroll className="flex min-h-0 flex-initial flex-col overflow-y-auto px-3 pb-1 pt-2 [scrollbar-width:none]">
             {/* статус-строка */}
             <div className="flex items-center justify-between px-2 pb-3">
               <span className={`text-[12.5px] font-semibold ${dark ? 'text-white/70' : TXT_SECOND}`} suppressHydrationWarning>
@@ -566,17 +595,17 @@ export default function Shade({
               ))}
             </div>
 
+            </div>
             {/* зона закрытия */}
             <button
               type="button"
               aria-label="Закрыть центр управления"
               onClick={onClose}
               {...closeDrag}
-              className={`mx-auto mt-2 flex h-9 w-40 shrink-0 items-center justify-center rounded-full outline-none ${dark ? 'bg-white/15' : 'bg-black/[0.08]'}`}
+              className={`mx-auto mb-2 mt-2 flex h-9 w-40 shrink-0 items-center justify-center rounded-full outline-none ${dark ? 'bg-white/15' : 'bg-black/[0.08]'}`}
             >
               <span aria-hidden="true" className={`block h-1 w-12 rounded-full ${dark ? 'bg-white/50' : 'bg-neutral-500/60'}`} />
             </button>
-            </div>
           </div>
         ) : (
           /* ─────────── УВЕДОМЛЕНИЯ ─────────── */
@@ -589,7 +618,7 @@ export default function Shade({
                 {now ? now.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' }) : '\u00A0'}
               </p>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto pb-3 pt-2 [scrollbar-width:none]">
+            <div data-shade-scroll ref={listRef} {...listCloseDrag} className="min-h-0 flex-1 overflow-y-auto pb-3 pt-2 [scrollbar-width:none]">
               <NotificationList tone={dark ? 'dark' : 'light'} onOpenApp={(a) => { onClose(); onOpenApp(a) }} />
             </div>
             <button

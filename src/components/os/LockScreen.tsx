@@ -268,7 +268,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
       <div className="relative z-10 flex h-full flex-col px-5 pb-4 pt-14">
         {/* ─── Дата + тонкие часы по макету ─── */}
         <div className="shrink-0 text-center" suppressHydrationWarning>
-          <p className={`text-[16px] font-medium capitalize ${T.date}`}>
+          <p className={`text-[16px] font-medium ${T.date}`}>
             {now ? now.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' }) : '\u00A0'}
           </p>
           <p className={`os-thin-clock mt-2 text-[96px] ${T.clock}`}>

@@ -242,7 +242,10 @@ function TodayWidget({
 }) {
   const now = useClock()
   const dateStr = now
-    ? now.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' })
+    ? (() => {
+        const s = now.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' })
+        return s.charAt(0).toUpperCase() + s.slice(1)
+      })()
     : '\u00A0'
 
   const rows: { key: string; dot: string; label: string; value: string; run: () => void }[] = []
@@ -293,7 +296,7 @@ function TodayWidget({
       } ${enterDelay !== undefined ? 'os-enter' : ''}`}
     >
       <div className="flex items-center justify-between gap-1">
-        <p className={`truncate text-[15px] font-semibold capitalize ${dark ? 'text-white' : TXT_PRIMARY}`} suppressHydrationWarning>
+        <p className={`truncate text-[15px] font-semibold ${dark ? 'text-white' : TXT_PRIMARY}`} suppressHydrationWarning>
           {dateStr}
         </p>
         <button
