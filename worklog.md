@@ -2460,3 +2460,20 @@ Stage Summary:
 - Каталог расширен 134 → 289 товаров (+155) во всех 13 категориях, без дублей ключей; баланс цен 300р-150к, дорогих товаров втрое больше — аукцион и дорогие сделки стали живыми
 - Рынок ботов вырос втрое: капа активных объявлений 50 → 140 (MARKET_CAP в engine.ts), сид досыпает ленту до 120 идемпотентно (MARKET_SEED в seed.ts)
 - tsc по src/ чист, lint 0 ошибок, ключи уникальны; dev/build не запускались, коммитов нет
+---
+Task ID: 54
+Agent: main (Z.ai Code)
+Task: Каталог товаров x2 (+155) и оптимизация Vercel Storage (Functions 8.44/10GB)
+
+Work Log:
+- 54-a (субагент): catalog-data.ts 134 → 289 товаров (все 13 категорий, реалистичные б/у цены РФ; товары ≥12000₽: ~40 → 100 — пул аукциона x3; desc без длинных тире); engine.ts MARKET_CAP=140 (было 50); seed.ts идемпотентный досид до 120 объявлений
+- Supabase досеижено: listings 122, auction lots 8, pricePoints 674 (seed + seed-extra через pg-клиент; клиент возвращён на sqlite)
+- STORAGE ДИАГНОЗ: Functions Storage 8.44/10GB = старые деплои копят комплекты лямбд (Prisma engine ~18MB на функцию) + пустые git-коммиты крона плодят деплои
+- ФИКСЫ (27a84ce): next.config.ts — output:standalone только вне Vercel (isVercel → обычный output, компактнее) + outputFileTracingExcludes (shots/upload/tool-results/agent-ctx/db/prisma *.db); удалены неиспользуемые зависимости @mdxeditor/editor, @reactuses/core, @tanstack/react-table; untrack shots/ upload/ tool-results/ (19+84+29MB) из git (d50c8b2), .gitignore дополнен
+- Прод-проверка: /api/health ok (416ms), activeListings 102 (боты торгуют, движок добьёт до капы 140), / 200
+- Dev-сервер падал после bun remove (postinstall) — перезапущен, /api/market 200; tsc 0 в src, lint 0
+
+Stage Summary:
+- Каталог удвоен (289), рынок 140 + сид 120, аукцион x3; всё на проде
+- Vercel: будущие функции компактнее (без standalone, без лишних node_modules, без мусора в трейсах); Deployment Storage −130MB за счёт untrack
+- КРИТИЧНО ДЛЯ ЮЗЕРА: разово удалить старые деплои в Vercel дашборде (Deployments → Delete) — это освободит основную часть 8.44GB; крону предписана дисциплина: пушить только реальные изменения
