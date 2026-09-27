@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { RefreshCw, WifiOff } from 'lucide-react'
 import { useOS, type AppKey, WALLPAPER_TOP } from '@/lib/store'
+import { isLightWallpaper } from '@/lib/wallpapers'
 import { hydratePrefs } from '@/lib/prefs'
 import { hydrateVolume, initVolumeEngineBridge } from '@/lib/volume'
 import { api, getToken, setToken } from '@/lib/api'
@@ -47,7 +48,7 @@ import PlateApp from '@/components/apps/PlateApp'
 
 const BATTERY_KEY = 'avito_sim_battery'
 const THEME_KEY = 'avito_sim_theme'
-const WALLPAPER_KEY = 'avito_sim_wallpaper_v2' // v2: дефолт — зелёные обои Resale
+const WALLPAPER_KEY = 'avito_sim_wallpaper_v3' // v3: дефолт — светлые «Волны» Resale OS
 const WIDGETS_KEY = 'avito_sim_widgets'
 const DND_KEY = 'avito_sim_dnd'
 const DESKTOP_MIN_WIDTH = 1024
@@ -171,23 +172,29 @@ export default function Home() {
     }
   }, [])
 
-  // Светлый хром ОС — только когда открыто светлое приложение и тема светлая
-  // (в тёмной теме все приложения перекрашиваются в тёмные через .theme-dark):
-  // статус-бар получает тёмные иконки на светлой полосе, Telegram — светлые рамки.
-  const lightChrome = !!(session && currentApp && LIGHT_APPS[currentApp] && theme !== 'dark')
-
-  // Перекрашиваем рамки Telegram под текущий экран: локскрин/загрузка — чёрно-зелёные,
-  // дом — верх обоев, тёмные приложения — их фирменный фон #050D09,
+  // Перекрашиваем рамки Telegram под текущий экран: локскрин/загрузка —
+  // верх обоев, тёмные приложения — их фирменный фон #050D09,
   // светлые приложения — светло-серый #F7F8FA.
   const wallpaper = useOS((s) => s.wallpaper)
+
+  // Светлый хром ОС: светлые приложения и лончер/локскрин на светлых обоях
+  // (в тёмной теме всё остаётся тёмным).
+  const darkChrome = useOS((s) => s.darkChrome)
+  const wallLight = isLightWallpaper(wallpaper) && theme !== 'dark'
+  const lightChrome = !!(
+    session &&
+    !darkChrome &&
+    ((currentApp && LIGHT_APPS[currentApp] && theme !== 'dark') || (!currentApp && wallLight))
+  )
+
   useEffect(() => {
     const chrome = locked || !session
-      ? '#050d09'
+      ? (wallLight ? '#F5F6F8' : '#050d09')
       : currentApp
-        ? (LIGHT_APPS[currentApp] && theme !== 'dark' ? '#F7F8FA' : '#050d09')
-        : (WALLPAPER_TOP[wallpaper] ?? '#07130d')
+        ? (LIGHT_APPS[currentApp] && theme !== 'dark' && !darkChrome ? '#F7F8FA' : '#050d09')
+        : (wallLight ? '#F5F6F8' : (WALLPAPER_TOP[wallpaper] ?? '#07130d'))
     applyTelegramChrome(chrome)
-  }, [locked, session, currentApp, wallpaper, theme, applyTelegramChrome])
+  }, [locked, session, currentApp, wallpaper, theme, wallLight, darkChrome, applyTelegramChrome])
 
   // ---------- AUTH (3 ретрая, затем экран повтора) ----------
   const doAuth = useCallback(async () => {
@@ -484,14 +491,27 @@ export default function Home() {
       {/* портрет-лок: нативный screen.orientation.lock + оверлей-страховка (Task 29) */}
       <OrientationGate />
       <PhoneFrame>
+        {/* подложка за статус-баром: на светлых поверхностях перекрашиваем
+            чёрный фон рамки в тон верха экрана */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-x-0 top-0 z-30 h-10"
+          style={{ background: lightChrome ? '#F7F8FA' : (!currentApp || locked) && wallLight ? '#F5F6F8' : undefined }}
+        />
         {/* статус-бар: тёмные иконки на тёмных экранах,
-            над светлыми приложениями (Resale/Банк) — тёмные иконки на светлой полосе */}
-        <StatusBar variant={lightChrome ? 'light' : 'dark'} onBell={() => { setShadeQs(false); setShadeOpen(true) }} />
+            над светлыми поверхностями — тёмные иконки; над лончером/локскрином
+            и приложениями — разный фон (plain — прозрачный) */}
+        <StatusBar
+          variant={lightChrome || (locked && wallLight) ? 'light' : 'dark'}
+          plain={!currentApp || locked}
+          raised={locked}
+          onBell={() => { setShadeQs(false); setShadeOpen(true) }}
+        />
 
         {/* контент — до самого низа: пилюля-жест накладывается поверх.
             Приложения живут в СЛОЯХ внутри RecentsOverlay (keep-alive как в
             настоящем телефоне): recents показывает их живые миниатюры. */}
-        <div className={`absolute inset-0 top-10 bottom-6 overflow-hidden bg-black ${theme === 'dark' ? 'theme-dark' : ''}`}>
+        <div className={`absolute inset-0 top-10 bottom-6 overflow-hidden ${lightChrome || (locked && wallLight) ? 'bg-[#F1F2F5]' : 'bg-black'} ${theme === 'dark' ? 'theme-dark' : ''}`}>
           {!session ? (
             authError ? (
               <OfflineScreen compact onRetry={doAuth} />

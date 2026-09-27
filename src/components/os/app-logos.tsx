@@ -543,3 +543,62 @@ export const DOCK_APPS: AppKey[] = ['avito', 'bank', 'auction', 'career']
 /** Приложения-«функции» для страницы 2 и системные. */
 export const PAGE1_APPS = HOME_GRID.slice(0, 8)
 export const PAGE2_APPS = HOME_GRID.slice(8)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// «О приложении»: карточка по долгому тапу на иконке (как в настоящей ОС).
+// ─────────────────────────────────────────────────────────────────────────────
+export interface AppInfo {
+  desc: string
+  category: string
+  size: string
+  age: string
+}
+
+export const APP_INFO: Record<AppKey, AppInfo> = {
+  avito: { desc: 'Площадка перепродажи: покупай, продавай и торгуйся с живыми продавцами.', category: 'Платформа', size: '84,2 МБ', age: '12+' },
+  bank: { desc: 'Столичный Банк: карты, кредиты, копилка и вся история операций.', category: 'Финансы', size: '61,7 МБ', age: '12+' },
+  taxes: { desc: 'Налоговая служба: начисления, пени и оплата в пару тапов.', category: 'Финансы', size: '28,4 МБ', age: '12+' },
+  leaderboard: { desc: 'Топ игроков площадки по балансу, сделкам и уровню.', category: 'Платформа', size: '12,9 МБ', age: '12+' },
+  calc: { desc: 'Обычный калькулятор: проценты и смена знака, ничего лишнего.', category: 'Утилиты', size: '4,1 МБ', age: '4+' },
+  clock: { desc: 'Часы городов мира и таймер обратного отсчёта.', category: 'Утилиты', size: '9,3 МБ', age: '4+' },
+  calendar: { desc: 'Календарь месяца: планы и важные даты под рукой.', category: 'Утилиты', size: '7,8 МБ', age: '4+' },
+  notes: { desc: 'Быстрые заметки: список дел сохраняется на устройстве.', category: 'Утилиты', size: '5,5 МБ', age: '4+' },
+  weather: { desc: 'Прогноз по городам: температура, ветер, влажность и давление.', category: 'Погода', size: '18,6 МБ', age: '4+' },
+  gallery: { desc: 'Фотографии товаров и сделок в одном месте.', category: 'Медиа', size: '33,0 МБ', age: '4+' },
+  music: { desc: 'Музыка с глобальным плеером ОС: трек не прерывается.', category: 'Медиа', size: '47,2 МБ', age: '12+' },
+  repair: { desc: 'Сервисные работы: ремонт и обслуживание ваших товаров.', category: 'Платформа', size: '21,4 МБ', age: '12+' },
+  auction: { desc: 'Аукцион в реальном времени: ставки, автоставка, антиснайпинг.', category: 'Платформа', size: '26,8 МБ', age: '12+' },
+  career: { desc: 'Задания и достижения: выполняй и получай награды.', category: 'Платформа', size: '14,7 МБ', age: '12+' },
+  delivery: { desc: 'Доставка покупок: трек посылки от склада до двери.', category: 'Платформа', size: '19,5 МБ', age: '12+' },
+  settings: { desc: 'Настройки Resale OS: сеть, звук, приватность и оформление.', category: 'Система', size: '3,6 МБ', age: '4+' },
+  browser: { desc: 'Браузер с поиском и быстрыми ссылками на сайты.', category: 'Интернет', size: '39,9 МБ', age: '12+' },
+  phone: { desc: 'Звонки: контакты, журнал вызовов и набор номера.', category: 'Связь', size: '11,2 МБ', age: '4+' },
+  gosuslugi: { desc: 'Госуслуги: документы и справки без очередей.', category: 'Сервисы', size: '55,3 МБ', age: '12+' },
+  numbers: { desc: 'Красивые телефонные номера: крутки, редкости и выкуп.', category: 'Платформа', size: '23,1 МБ', age: '12+' },
+  plates: { desc: 'Автономера по ГОСТ: крутка знаков и коллекция.', category: 'Платформа', size: '24,0 МБ', age: '12+' },
+  support: { desc: 'Поддержка Resale: ответим на любой вопрос о приложении.', category: 'Сервисы', size: '6,4 МБ', age: '4+' },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Библиотека приложений: разделы как в макете Resale OS.
+// ─────────────────────────────────────────────────────────────────────────────
+export type LibChip = 'all' | 'work' | 'util' | 'media' | 'other'
+export const LIB_CHIPS: { key: LibChip; label: string }[] = [
+  { key: 'all', label: 'Все' },
+  { key: 'work', label: 'Работа' },
+  { key: 'util', label: 'Утилиты' },
+  { key: 'media', label: 'Медиа' },
+  { key: 'other', label: 'Другое' },
+]
+
+export const LIB_SECTIONS: { key: string; title: string; chip: Exclude<LibChip, 'all'>; apps: AppKey[] }[] = [
+  { key: 'docs', title: 'Документы', chip: 'other', apps: ['gosuslugi', 'plates', 'numbers'] },
+  { key: 'work', title: 'Работа', chip: 'work', apps: ['career', 'delivery', 'leaderboard', 'support'] },
+  { key: 'util', title: 'Утилиты', chip: 'util', apps: ['clock', 'calendar', 'notes', 'calc', 'settings', 'phone'] },
+  { key: 'media', title: 'Медиа', chip: 'media', apps: ['weather', 'music', 'gallery', 'browser'] },
+  { key: 'fin', title: 'Финансы и торговля', chip: 'other', apps: ['avito', 'bank', 'taxes', 'auction', 'repair'] },
+]
+
+// Раскладка «Домашнего экрана» по умолчанию: док + сетка (как в макете).
+export const DEFAULT_DOCK: AppKey[] = ['avito', 'bank', 'phone', 'browser']
+export const DEFAULT_GRID: AppKey[] = HOME_GRID.filter((a) => !DEFAULT_DOCK.includes(a))

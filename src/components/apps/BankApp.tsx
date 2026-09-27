@@ -1,13 +1,12 @@
 'use client'
 
-// Приложение «Банк» — редизайн по макету 08-bank.png (светлый минимализм):
-// нижние табы Главная / Платежи / История / Аналитика; главный экран с приветствием,
-// общим балансом с глазом-скрытием, каруселью тёмно-зелёных карт VISA с точками-
-// страницами, 4 круглыми действиями (Перевести, Пополнить, Оплатить, По QR) и
-// промо-плашкой «Копите легче»; экран перевода с выбором получателя (вклад / кредит),
-// суммой и цифровой клавиатурой 3x4; история с чип-фильтрами Все/Поступления/Списания,
-// поиском и группировкой «Сегодня / Вчера»; аналитика с доначным кольцом на чистом SVG,
-// переключением месяца и списком категорий с процентами.
+// Приложение «Банк». Верх главного экрана (шапка с аватаром, поиском и QR,
+// приветствие по времени суток, 5 круглых действий с градиентными кольцами,
+// карусель карт с розово-малиновым волнистым артом и точки-страницы) вернул
+// тёмно-зелёный дизайн старого макета по скриншоту пользователя; контент ниже
+// (последние операции, промо вклада, безопасность) перекрашен в ту же палитру.
+// Вкладки Платежи / История / Аналитика и внутренние экраны (Перевод,
+// Кредитный центр) остаются в светлой системе макета 08-bank.png.
 //
 // Вся бизнес-логика сохранена 1:1: api.bank, api.takeLoan, api.repayLoan,
 // api.loanHistory, api.depositOp; мастер кредита (оффер → анкета → договор →
@@ -15,14 +14,14 @@
 // вклад «Копилка» (пополнение/снятие), CSV-экспорт истории, prefs-переключатели
 // безопасности (пин, пуши операций) и кредитный рейтинг.
 //
-// Светлый фон в любой теме ОС: все цвета заданы произвольными hex-классами,
-// которые глобальный маппинг .theme-dark не переписывает.
+// Цвета заданы произвольными hex-классами, которые глобальный маппинг
+// .theme-dark не переписывает: тёмный главный экран выглядит одинаково в любой теме ОС.
 import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from 'react'
 import {
-  AlertTriangle, ArrowLeft, ArrowLeftRight, ArrowUpRight, BadgeCheck, BarChart3, Building2,
-  CalendarDays, Car, Check, ChevronLeft, ChevronRight, Clock, Eye, EyeOff, FileDown, FileText,
-  Gavel, Home, Info, Landmark, Loader2, PenLine, PiggyBank, Plus, QrCode, Receipt, Search, Send,
-  ShieldCheck, ShoppingBag, Smartphone, Sprout, Truck, Wifi, X, type LucideIcon,
+  AlertTriangle, ArrowLeft, ArrowLeftRight, BadgeCheck, BarChart3, Building2,
+  CalendarDays, Car, Check, ChevronLeft, ChevronRight, Clock, CreditCard, FileDown, FileText,
+  Gavel, Home, Info, Landmark, Loader2, Mic, PenLine, PiggyBank, PieChart, QrCode, Receipt,
+  Search, Send, ShieldCheck, ShoppingBag, Smartphone, Sprout, Truck, Wifi, X, type LucideIcon,
 } from 'lucide-react'
 import { api, ApiError, exportCsvUrl } from '@/lib/api'
 import { useOS } from '@/lib/store'
@@ -35,9 +34,10 @@ import { usePrefs } from '@/lib/prefs'
 import { Slider } from '@/components/ui/slider'
 import { sound } from '@/lib/sound'
 import {
-  CAPS, CARD_CLS, GREEN, BankCard, CategoryRow, Chip, CreditHistorySection, Donut, InfoRow,
-  LoanStatusChip, Numpad, PageDots, QuickAction, ScoreGauge, Segment, ServiceTile, Sheet,
-  SheetTile, Toggle, TxRow, buildCats, fmtDayMonth, mergeTxs, plural,
+  CAPS, CAPS_DARK, CARD_CLS, DARK_CARD, GREEN, CategoryRow, Chip, CreditHistorySection, DarkTxRow,
+  Donut, InfoRow, LoanStatusChip, Numpad, PageDots, RoundAction, ScoreGauge, Segment, ServiceTile,
+  Sheet, SheetTile, Toggle, TxRow, WaveCard, buildCats, fmtDayMonth, mergeTxs, plural,
+  RING_AMBER, RING_GREEN, RING_ROSE, RING_TEAL, RING_VIOLET,
 } from '@/components/apps/bank/parts'
 
 type Screen = 'main' | 'payments' | 'history' | 'analytics' | 'transfer' | 'credit'
@@ -78,10 +78,20 @@ export default function BankApp() {
   const session = useOS((s) => s.session)
   const openApp = useOS((s) => s.openApp)
   const pushToast = useOS((s) => s.pushToast)
+  const setDarkChrome = useOS((s) => s.setDarkChrome)
   const [data, setData] = useState<BankData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [screen, setScreen] = useState<Screen>('main')
+  // Вкладка «Главная» тёмная: статус-бар ОС переключается на белые иконки
+  useEffect(() => {
+    if (screen === 'main') {
+      setDarkChrome(true)
+      return () => { useOS.getState().setDarkChrome(false) }
+    }
+    setDarkChrome(false)
+    return undefined
+  }, [screen, setDarkChrome])
   const [sheet, setSheet] = useState<SheetKey>(null)
   const [busy, setBusy] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -271,15 +281,6 @@ export default function BankApp() {
   const rate = String(DEPOSIT_RATE_PER_HOUR * 100).replace('.', ',')
   const allTxs = data?.transactions ?? []
 
-  // Поступления за текущий месяц (реальные операции) для подписи под балансом
-  const monthIncome = useMemo(() => {
-    const n = new Date()
-    const start = new Date(n.getFullYear(), n.getMonth(), 1).getTime()
-    return allTxs
-      .filter((t) => t.amount > 0 && new Date(t.createdAt).getTime() >= start)
-      .reduce((s, t) => s + t.amount, 0)
-  }, [allTxs])
-
   // ===== Производные значения кредитного центра =====
   const score = data?.creditScore ?? 500
   const credit = creditLabel(score)
@@ -321,32 +322,44 @@ export default function BankApp() {
   const creditLast4 = cardNumberFor(`${session?.id ?? 'player'}-credit`).split(' ').pop() ?? '0000'
   const depositLast4 = cardNumberFor(`${session?.id ?? 'player'}-deposit`).split(' ').pop() ?? '0000'
 
-  const cards: { key: 'debit' | 'credit' | 'savings'; label: string; amount: string; masked: string; holder: string; aria: string; run: () => void }[] = data
+  const cards: {
+    key: 'debit' | 'credit' | 'savings'
+    badge: string
+    label: string
+    amount: string
+    masked: string
+    holder: string
+    aria: string
+    run: () => void
+  }[] = data
     ? [
         {
           key: 'debit',
+          badge: 'Дебетовая',
           label: 'Доступно',
           amount: balanceShown(animatedBalance),
-          masked: `•••• ${cardLast4}`,
-          holder: 'Дебетовая карта',
+          masked: `··• ${cardLast4}`,
+          holder: holderName.toUpperCase(),
           aria: `Дебетовая карта, доступно ${fmtMoney(data.balance)}`,
           run: () => setScreen('history'),
         },
         {
           key: 'credit',
+          badge: 'Кредитная',
           label: data.debt > 0 ? 'Задолженность' : 'Лимит',
           amount: balanceShown(data.debt > 0 ? data.debt : data.loanLimit),
-          masked: `•••• ${creditLast4}`,
-          holder: 'Кредитная карта',
+          masked: `··• ${creditLast4}`,
+          holder: `Лимит ${fmtMoney(data.loanLimit)}`.toUpperCase(),
           aria: 'Кредитная карта, открыть кредитный центр',
           run: () => openCredit(),
         },
         {
           key: 'savings',
+          badge: 'Копилка',
           label: 'На счёте',
           amount: balanceShown(data.deposit),
-          masked: `•••• ${depositLast4}`,
-          holder: 'Накопительный счёт',
+          masked: `··• ${depositLast4}`,
+          holder: holderName.toUpperCase(),
           aria: 'Накопительный счёт, пополнить или снять',
           run: () => openTransfer('deposit'),
         },
@@ -359,13 +372,19 @@ export default function BankApp() {
     setCardSlide(max <= 0 ? 0 : Math.round((el.scrollLeft / max) * Math.max(1, cards.length - 1)))
   }
 
-  // Быстрые действия главного экрана (как в макете)
-  const quickActions: { label: string; icon: LucideIcon; run: () => void; aria: string }[] = [
-    { label: 'Перевести', icon: ArrowUpRight, run: () => openTransfer('deposit'), aria: 'Перевести: пополнить вклад или погасить кредит' },
-    { label: 'Пополнить', icon: Plus, run: () => openTransfer('deposit'), aria: 'Пополнить накопительный счёт' },
-    { label: 'Оплатить', icon: Receipt, run: () => setScreen('payments'), aria: 'Платежи и услуги' },
-    { label: 'По QR', icon: QrCode, run: () => setSheet('qr'), aria: 'Оплата по QR-коду' },
+  // 5 круглых действий главного экрана (как на скриншоте старого дизайна):
+  // кольца сняты пипеткой со скриншота (зелёный, золото, розовый, бирюза, фиолет)
+  const roundActions: { label: string; icon: LucideIcon; ring: string; run: () => void; aria: string }[] = [
+    { label: 'Копилка', icon: PiggyBank, ring: RING_GREEN, run: () => openTransfer('deposit'), aria: 'Копилка: пополнить вклад или снять' },
+    { label: 'Кредит', icon: Landmark, ring: RING_AMBER, run: () => openCredit(), aria: 'Кредитный центр' },
+    { label: 'Налоги', icon: Receipt, ring: RING_ROSE, run: () => openApp('taxes'), aria: 'Оплатить налоги' },
+    { label: 'Оплатить', icon: QrCode, ring: RING_TEAL, run: () => setScreen('payments'), aria: 'Платежи и услуги' },
+    { label: 'Анализ', icon: PieChart, ring: RING_VIOLET, run: () => setScreen('analytics'), aria: 'Аналитика операций' },
   ]
+
+  // Оценка кредитного рейтинга в тёмной палитре (credit.cls заточен под светлый фон)
+  const creditDarkCls =
+    score >= 750 ? 'text-[#4ADE80]' : score >= 620 ? 'text-[#86EFAC]' : score >= 480 ? 'text-[#FBBF24]' : 'text-[#F87171]'
 
   // Раздел «Платежи»: услуги и быстрые переходы (весь функционал бывшего листа «Ещё»)
   const services: { icon: LucideIcon; label: string; sub: string; color: string; run: () => void; aria: string }[] = [
@@ -461,9 +480,11 @@ export default function BankApp() {
     key === 'main' ? screen === 'main' || screen === 'credit' : screen === key
 
   const transferAmount = Number(amountStr || 0)
+  // Главный экран — тёмный (скриншот старого дизайна), остальные вкладки светлые
+  const darkMain = screen === 'main'
 
   return (
-    <div className="relative flex h-full flex-col bg-[#F6F7F9] text-[#141414]">
+    <div className={`relative flex h-full flex-col ${darkMain ? 'bg-[#0B1B12] text-[#F2F5F3]' : 'bg-[#F6F7F9] text-[#141414]'}`}>
       {screen === 'transfer' && data ? (
         /* ===== ПЕРЕВОД: получатель + сумма с клавиатурой (по макету) ===== */
         <div key="transfer" className="screen-enter flex h-full min-h-0 flex-col">
@@ -639,37 +660,45 @@ export default function BankApp() {
         </div>
       ) : (
         <>
-          <div ref={scrollRef} className="flex-1 overflow-y-auto [scrollbar-width:thin]">
+          <div
+            ref={scrollRef}
+            className="flex-1 overflow-y-auto [scrollbar-width:thin]"
+            style={
+              darkMain
+                ? { background: 'linear-gradient(180deg, #03130B 0%, #0B2016 26%, #0F241B 52%, #111E19 78%, #131418 100%)' }
+                : undefined
+            }
+          >
             {loading && !data ? (
-              /* скелетон главного экрана */
-              <div className="space-y-4 p-4 pt-5">
-                <div className="flex items-center gap-3">
-                  <div className="size-11 animate-pulse rounded-full bg-black/[0.06]" />
-                  <div className="space-y-1.5">
-                    <div className="h-3 w-24 animate-pulse rounded-full bg-black/[0.06]" />
-                    <div className="h-4 w-16 animate-pulse rounded-full bg-black/[0.06]" />
-                  </div>
+              /* скелетон главного экрана (тёмный) */
+              <div className="space-y-4 p-4 pt-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="size-12 shrink-0 animate-pulse rounded-full bg-white/[0.06]" />
+                  <div className="h-11 min-w-0 flex-1 animate-pulse rounded-full bg-white/[0.06]" />
+                  <div className="size-11 shrink-0 animate-pulse rounded-[14px] bg-white/[0.06]" />
                 </div>
-                <div className="h-12 w-44 animate-pulse rounded-xl bg-black/[0.06]" />
-                <div className="h-44 animate-pulse rounded-[22px] bg-black/[0.06]" />
-                <div className="grid grid-cols-4 gap-2">
-                  {[0, 1, 2, 3].map((i) => (
-                    <div key={i} className="h-[88px] animate-pulse rounded-[20px] bg-black/[0.06]" />
+                <div className="h-7 w-52 animate-pulse rounded-xl bg-white/[0.06]" />
+                <div className="flex justify-between px-2 pt-1">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <div key={i} className="flex flex-col items-center gap-2">
+                      <div className="size-[58px] animate-pulse rounded-full bg-white/[0.06]" />
+                      <div className="h-2.5 w-12 animate-pulse rounded-full bg-white/[0.06]" />
+                    </div>
                   ))}
                 </div>
-                <div className="h-16 animate-pulse rounded-[20px] bg-black/[0.06]" />
-                <div className="flex items-center justify-center gap-2 text-[13px] text-[#9CA3AF]">
+                <div className="h-[152px] w-[82%] animate-pulse rounded-[24px] bg-white/[0.06]" />
+                <div className="flex items-center justify-center gap-2 pt-1 text-[13px] text-white/40">
                   <Loader2 className="size-4 animate-spin" aria-hidden="true" /> Загрузка банка…
                 </div>
               </div>
             ) : error && !data ? (
               <div className="p-4 pt-8">
-                <div className={`${CARD_CLS} p-6 text-center`}>
-                  <p className="text-[13px] text-[#E5584B]">{error}</p>
+                <div className="rounded-[20px] bg-white/[0.05] p-6 text-center ring-1 ring-white/10">
+                  <p className="text-[13px] text-[#F87171]">{error}</p>
                   <button
                     type="button"
                     onClick={load}
-                    className="mt-4 text-[13px] font-semibold text-[#0E7A3D] transition active:opacity-70"
+                    className="mt-4 text-[13px] font-semibold text-[#4ADE80] transition active:opacity-70"
                   >
                     Повторить
                   </button>
@@ -677,137 +706,176 @@ export default function BankApp() {
               </div>
             ) : data ? (
               <div key={screen} className="screen-enter pb-2">
-                {/* ===== ГЛАВНАЯ ===== */}
+                {/* ===== ГЛАВНАЯ (тёмная тема по скриншоту старого дизайна) ===== */}
                 {screen === 'main' && (
                   <div className="pb-2">
-                    {/* хедер: приветствие */}
-                    <div className="flex items-center gap-3 px-4 pb-1 pt-4">
+                    {/* шапка: аватар, поиск, QR */}
+                    <div className="flex items-center gap-2.5 px-4 pt-3">
                       {session?.photoUrl ? (
-                        <img loading="lazy" decoding="async" src={session.photoUrl} alt={holderName} className="size-11 shrink-0 rounded-full object-cover ring-2 ring-white" />
+                        <img
+                          loading="lazy"
+                          decoding="async"
+                          src={session.photoUrl}
+                          alt={holderName}
+                          className="size-12 shrink-0 rounded-full object-cover ring-2 ring-[#22C55E]/50"
+                        />
                       ) : (
-                        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[#0E7A3D] text-[13px] font-bold text-white">
+                        <span
+                          aria-hidden="true"
+                          className="flex size-12 shrink-0 items-center justify-center rounded-full bg-[#22C55E] text-[15px] font-extrabold text-white shadow-[0_6px_18px_rgba(34,197,94,0.35)]"
+                        >
                           {firstName.slice(0, 2).toUpperCase()}
                         </span>
                       )}
-                      <div className="min-w-0" suppressHydrationWarning>
-                        <div className="text-[12px] text-[#6B7280]">{greeting()},</div>
-                        <div className="text-[17px] font-bold leading-tight text-[#141414]">{firstName}</div>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setScreen('history')}
+                        aria-label="Поиск по операциям"
+                        className="flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-full bg-[#1B1F24] px-4 ring-1 ring-white/[0.07] transition active:scale-[0.98]"
+                      >
+                        <Search className="size-4.5 shrink-0 text-white/45" aria-hidden="true" />
+                        <span className="min-w-0 flex-1 truncate text-left text-[14px] text-white/45">Поиск</span>
+                        <Mic className="size-4.5 shrink-0 text-white/45" aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSheet('qr')}
+                        aria-label="Платежи и переводы по QR-коду"
+                        className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[#22C55E] text-white shadow-[0_6px_18px_rgba(34,197,94,0.35)] transition active:scale-95"
+                      >
+                        <QrCode className="size-5" strokeWidth={2.2} aria-hidden="true" />
+                      </button>
                     </div>
 
-                    {/* общий баланс */}
-                    <div className="px-4 pt-3">
-                      <div className="flex items-center gap-1">
-                        <span className={CAPS}>Общий баланс</span>
-                        <button
-                          type="button"
-                          onClick={() => setBalanceHidden((v) => !v)}
-                          aria-label={balanceHidden ? 'Показать баланс' : 'Скрыть баланс'}
-                          aria-pressed={balanceHidden}
-                          className="flex size-9 items-center justify-center rounded-full text-[#9CA3AF] transition active:scale-95"
-                        >
-                          {balanceHidden ? <EyeOff className="size-4.5" aria-hidden="true" /> : <Eye className="size-4.5" aria-hidden="true" />}
-                        </button>
-                      </div>
-                      <div className="mt-1 text-[32px] font-bold tracking-tight tabular-nums text-[#141414]">
-                        {balanceShown(animatedBalance)}
-                      </div>
-                      {monthIncome > 0 && !balanceHidden && (
-                        <div className="mt-0.5 text-[13px] font-semibold text-[#0E7A3D]" suppressHydrationWarning>
-                          + {fmtMoney(monthIncome)} за этот месяц
-                        </div>
-                      )}
+                    {/* приветствие по времени суток */}
+                    <h1
+                      className="px-4 pt-4 text-[24px] font-bold leading-tight tracking-tight text-white"
+                      suppressHydrationWarning
+                    >
+                      {greeting()}, {firstName}
+                    </h1>
+
+                    {/* 5 круглых действий с градиентными кольцами */}
+                    <div className="mt-3 grid grid-cols-5 gap-1 px-3" role="group" aria-label="Быстрые действия">
+                      {roundActions.map((a) => (
+                        <RoundAction key={a.label} icon={a.icon} label={a.label} ring={a.ring} onClick={a.run} aria={a.aria} />
+                      ))}
                     </div>
 
-                    {/* карусель карт VISA с точками-страницами */}
+                    {/* карусель карт с волнистым артом + точки-страницы */}
                     <div
                       role="region"
                       aria-label="Мои карты"
-                      className="mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                      className="mt-4 flex snap-x snap-mandatory gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                       style={{ touchAction: 'pan-x' }}
                       onScroll={onCardsScroll}
                     >
                       {cards.map((c) => (
-                        <BankCard
+                        <WaveCard
                           key={c.key}
+                          art={c.key}
+                          badge={c.badge}
                           label={c.label}
                           amount={c.amount}
                           masked={c.masked}
                           holder={c.holder}
                           aria={c.aria}
                           onClick={c.run}
+                          onAmountClick={() => setBalanceHidden((v) => !v)}
+                          amountPressed={balanceHidden}
+                          action={
+                            c.key === 'debit'
+                              ? { icon: CreditCard, label: 'Оформление', onClick: () => openCredit(), aria: 'Оформить кредитную карту' }
+                              : undefined
+                          }
                         />
                       ))}
                     </div>
                     <div className="mt-3">
-                      <PageDots count={cards.length} active={cardSlide} />
+                      <PageDots count={cards.length} active={cardSlide} tone="dark" />
                     </div>
 
-                    {/* 4 круглых действия */}
-                    <div className="mt-5 grid grid-cols-4 gap-2 px-4" role="group" aria-label="Быстрые действия">
-                      {quickActions.map((a) => (
-                        <QuickAction key={a.label} icon={a.icon} label={a.label} aria={a.aria} onClick={a.run} />
-                      ))}
-                    </div>
+                    {/* последние операции */}
+                    {allTxs.length > 0 && (
+                      <div className="mt-5 px-4">
+                        <div className="flex items-center justify-between px-1 pb-2">
+                          <span className={CAPS_DARK}>Последние операции</span>
+                          <button
+                            type="button"
+                            onClick={() => setScreen('history')}
+                            aria-label="Открыть всю историю операций"
+                            className="flex h-8 items-center gap-0.5 rounded-full px-2 text-[12px] font-semibold text-[#4ADE80] transition active:opacity-70"
+                          >
+                            Все
+                            <ChevronRight className="size-4" aria-hidden="true" />
+                          </button>
+                        </div>
+                        <div className={`${DARK_CARD} px-4 py-1`}>
+                          {mergeTxs(allTxs).slice(0, 3).map((m) => (
+                            <DarkTxRow key={m.tx.id} m={m} />
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* промо «Копите легче» */}
                     <div className="mt-4 px-4">
                       <button
                         type="button"
                         onClick={() => openTransfer('deposit')}
-                        className={`${CARD_CLS} flex w-full items-center gap-3 p-3.5 text-left transition active:scale-[0.98]`}
+                        className="flex w-full items-center gap-3 rounded-[20px] bg-white/[0.05] p-3.5 text-left ring-1 ring-white/10 transition active:scale-[0.98]"
                       >
-                        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[#0E7A3D]/10" aria-hidden="true">
-                          <Sprout className="size-5 text-[#0E7A3D]" />
+                        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[#22C55E]/15" aria-hidden="true">
+                          <Sprout className="size-5 text-[#4ADE80]" />
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block text-[14px] font-bold text-[#141414]">Копите легче</span>
-                          <span className="block truncate text-[12px] text-[#6B7280]">
+                          <span className="block text-[14px] font-bold text-white">Копите легче</span>
+                          <span className="block truncate text-[12px] text-white/55">
                             Накопительный счёт со ставкой {rate}% в час
                           </span>
                         </span>
-                        <ChevronRight className="size-5 shrink-0 text-[#9CA3AF]" aria-hidden="true" />
+                        <ChevronRight className="size-5 shrink-0 text-white/40" aria-hidden="true" />
                       </button>
                     </div>
 
                     {/* безопасность */}
                     <div className="mt-5 px-4">
-                      <div className={`${CAPS} px-1 pb-2`}>Безопасность</div>
-                      <div className={`${CARD_CLS} px-4 py-1.5`}>
+                      <div className={`${CAPS_DARK} px-1 pb-2`}>Безопасность</div>
+                      <div className="rounded-[20px] bg-white/[0.05] px-4 py-1.5 ring-1 ring-white/10">
                         <div className="flex items-center justify-between py-2.5">
                           <div className="flex items-center gap-2.5">
-                            <ShieldCheck className="size-4.5 text-[#0E7A3D]" aria-hidden="true" />
+                            <ShieldCheck className="size-4.5 text-[#4ADE80]" aria-hidden="true" />
                             <div>
-                              <div className="text-sm font-medium text-[#141414]">Вход по пину</div>
-                              <div className="text-[11px] text-[#9CA3AF]">Код при входе в банк</div>
+                              <div className="text-sm font-medium text-white">Вход по пину</div>
+                              <div className="text-[11px] text-white/45">Код при входе в банк</div>
                             </div>
                           </div>
-                          <Toggle checked={pinOn} onCheckedChange={(v) => setPref('bankPin', v)} label="Вход по пину" />
+                          <Toggle checked={pinOn} onCheckedChange={(v) => setPref('bankPin', v)} label="Вход по пину" tone="dark" />
                         </div>
-                        <div className="flex items-center justify-between border-t border-[#F0F1F5] py-2.5">
+                        <div className="flex items-center justify-between border-t border-white/[0.06] py-2.5">
                           <div className="flex items-center gap-2.5">
-                            <Receipt className="size-4.5 text-[#0E7A3D]" aria-hidden="true" />
+                            <Receipt className="size-4.5 text-[#4ADE80]" aria-hidden="true" />
                             <div>
-                              <div className="text-sm font-medium text-[#141414]">Уведомления об операциях</div>
-                              <div className="text-[11px] text-[#9CA3AF]">Пуш после каждой операции</div>
+                              <div className="text-sm font-medium text-white">Уведомления об операциях</div>
+                              <div className="text-[11px] text-white/45">Пуш после каждой операции</div>
                             </div>
                           </div>
-                          <Toggle checked={opsNotifOn} onCheckedChange={(v) => setPref('bankOpsNotif', v)} label="Уведомления об операциях" />
+                          <Toggle checked={opsNotifOn} onCheckedChange={(v) => setPref('bankOpsNotif', v)} label="Уведомления об операциях" tone="dark" />
                         </div>
-                        <div className="flex items-center justify-between border-t border-[#F0F1F5] py-2.5">
+                        <div className="flex items-center justify-between border-t border-white/[0.06] py-2.5">
                           <div className="flex items-center gap-2.5">
-                            <Info className="size-4.5 text-[#0E7A3D]" aria-hidden="true" />
+                            <Info className="size-4.5 text-[#4ADE80]" aria-hidden="true" />
                             <div>
-                              <div className="text-sm font-medium text-[#141414]">Рейтинг: {score}</div>
-                              <div className="text-[11px] text-[#9CA3AF]">Влияет на лимит и ставку</div>
+                              <div className="text-sm font-medium text-white">Рейтинг: {score}</div>
+                              <div className="text-[11px] text-white/45">Влияет на лимит и ставку</div>
                             </div>
                           </div>
-                          <span className={`text-xs font-semibold ${credit.cls}`}>{credit.label}</span>
+                          <span className={`text-xs font-semibold ${creditDarkCls}`}>{credit.label}</span>
                         </div>
                       </div>
                     </div>
 
-                    <p className="px-4 pb-1 pt-4 text-center text-[10px] text-[#9CA3AF]">
+                    <p className="px-4 pb-1 pt-4 text-center text-[10px] text-white/30">
                       Столичный Банк · вклады не застрахованы, это игра
                     </p>
                   </div>
@@ -1553,11 +1621,18 @@ export default function BankApp() {
             ) : null}
           </div>
 
-          {/* ===== НИЖНИЙ ТАБ-БАР ===== */}
-          <nav className="relative z-10 shrink-0 border-t border-black/[0.05] bg-[#FFFFFF]" aria-label="Навигация банка">
+          {/* ===== НИЖНИЙ ТАБ-БАР (на тёмном главном — тёмный) ===== */}
+          <nav
+            className={`relative z-10 shrink-0 border-t ${
+              darkMain ? 'border-white/[0.06] bg-[#0C1911]/95 backdrop-blur-xl' : 'border-black/[0.05] bg-[#FFFFFF]'
+            }`}
+            aria-label="Навигация банка"
+          >
             <div className="grid grid-cols-4 pb-[max(8px,env(safe-area-inset-bottom))] pt-1.5">
               {tabs.map((t) => {
                 const active = tabActive(t.key)
+                const activeCls = darkMain ? 'text-[#4ADE80]' : 'text-[#0E7A3D]'
+                const idleCls = darkMain ? 'text-white/40' : 'text-[#9CA3AF]'
                 return (
                   <button
                     key={t.key}
@@ -1566,8 +1641,8 @@ export default function BankApp() {
                     aria-current={active ? 'page' : undefined}
                     className="flex min-h-[52px] flex-col items-center justify-center gap-1 transition"
                   >
-                    <t.icon className={`size-[22px] ${active ? 'text-[#0E7A3D]' : 'text-[#9CA3AF]'}`} strokeWidth={active ? 2.3 : 2} aria-hidden="true" />
-                    <span className={`text-[10px] ${active ? 'font-semibold text-[#0E7A3D]' : 'text-[#9CA3AF]'}`}>{t.label}</span>
+                    <t.icon className={`size-[22px] ${active ? activeCls : idleCls}`} strokeWidth={active ? 2.3 : 2} aria-hidden="true" />
+                    <span className={`text-[10px] ${active ? `font-semibold ${darkMain ? 'text-white' : 'text-[#0E7A3D]'}` : idleCls}`}>{t.label}</span>
                   </button>
                 )
               })}

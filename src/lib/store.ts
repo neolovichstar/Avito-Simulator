@@ -21,6 +21,7 @@ export const ALL_WIDGETS: WidgetKey[] = ['clock', 'online', 'quest', 'delivery']
 
 /** Верхняя кромка обоев — для слияния рамки Telegram с фоном экрана. */
 export const WALLPAPER_TOP: Record<string, string> = {
+  snow: '#F5F6F8',
   resale: '#07130d',
   wave: '#14102b',
   peak: '#2b1d4d',
@@ -30,11 +31,11 @@ export const WALLPAPER_TOP: Record<string, string> = {
   ember: '#1c0f18',
 }
 export const WIDGET_LABEL: Record<WidgetKey, string> = {
-  clock: 'Часы и дата',
+  clock: 'Часы',
   wallet: 'Кошелёк',
-  online: 'Онлайн',
-  quest: 'Задания',
-  delivery: 'Доставки',
+  online: 'Онлайн в игре',
+  quest: 'Задание',
+  delivery: 'Посылка',
 }
 
 interface OSState {
@@ -61,6 +62,8 @@ interface OSState {
   brightness: number // 0.4..1
   theme: 'light' | 'dark'
   wallpaper: string // id из реестра обоев (src/lib/wallpapers.ts)
+  /** Текущее приложение рисует тёмный верх (Банк: вкладка «Главная»). */
+  darkChrome: boolean
   widgets: WidgetKey[] // какие виджеты показывать
 
   setBooted: (v: boolean) => void
@@ -90,6 +93,7 @@ interface OSState {
   setTheme: (t: 'light' | 'dark') => void
   toggleTheme: () => void
   setWallpaper: (id: string) => void
+  setDarkChrome: (v: boolean) => void
   setWidgets: (w: WidgetKey[]) => void
   refreshSession: (u: Partial<SessionUser>) => void
 }
@@ -116,8 +120,9 @@ export const useOS = create<OSState>((set, get) => ({
   flashlight: false,
   brightness: 1,
   theme: 'light',
-  wallpaper: 'resale',
-  widgets: ['clock', 'online'],
+  wallpaper: 'snow',
+  darkChrome: false,
+  widgets: ['clock', 'online', 'quest', 'delivery'],
 
   setBooted: (v) => set({ booted: v }),
   setLocked: (v) => set({ locked: v }),
@@ -169,7 +174,8 @@ export const useOS = create<OSState>((set, get) => ({
   setTheme: (t) => set({ theme: t }),
   toggleTheme: () => set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
   setWallpaper: (id) => set({ wallpaper: id }),
-  setWidgets: (w) => set({ widgets: w.length ? w.filter((k) => k !== 'wallet') : ['clock', 'online'] }),
+  setDarkChrome: (v) => set({ darkChrome: v }),
+  setWidgets: (w) => set({ widgets: w.length ? w.filter((k) => k !== 'wallet') : ['clock', 'online', 'quest', 'delivery'] }),
   refreshSession: (u) => {
     const s = get()
     if (!s.session) return

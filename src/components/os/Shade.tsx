@@ -1,27 +1,29 @@
 'use client'
 
-// Единая системная шторка Android 17 (Material 3 Expressive).
-// Одна панель на весь экран — как в настоящем Android:
-//   • ШАПКА: крупные часы + дата, пилюля батареи (тап — симуляция зарядки);
-//   • БЫСТРЫЕ НАСТРОЙКИ: плитки-пилюли в 2 колонки. Свёрнуто — 4 главных плитки
-//     + компактный слайдер яркости; потяните вниз (или тап по шеврону) — полная
-//     сетка из 9 плиток + крупный слайдер + футер с датой/сетью и кнопками
-//     настроек/питания;
-//   • МЕДИА-КАРТОЧКА: что играет сейчас (глобальный плеер ОС);
-//   • УВЕДОМЛЕНИЯ: M3-карточки (тап — развернуть, свайп — смахнуть).
-// Правая половина верхнего края открывает шторку сразу в режиме QS.
-import { useRef, useState, useSyncExternalStore } from 'react'
+// Центр управления и уведомления «Resale OS» по фирменному макету:
+//   • qs=true — Пункт управления: кружки связи, медиа-карточка, вертикальные
+//     слайдеры яркости и громкости, погода, задачи, «Не беспокоить» и заряд,
+//     нижний ряд кнопок (фонарик, таймер, тёмный режим, поворот экрана);
+//   • qs=false — Уведомления: живой список с разворачиванием и свайпом.
+// Светлый матовый минимализм (чб), тёмный вариант в тёмной теме ОС.
+
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
-  BatteryCharging, Bluetooth, ChevronDown, Flashlight, Moon, MoonStar, Power,
-  RotateCw, Settings, Sun, Vibrate, Wallet, Wifi, WifiOff, Zap,
+  BatteryFull, BatteryCharging, ChevronRight, Moon, MoonStar, Pause, Play,
+  SkipBack, SkipForward, Sun, Timer, Wifi, WifiOff, Flashlight, RotateCw,
+  Bluetooth, Volume2,
 } from 'lucide-react'
 import { useOS, type AppKey } from '@/lib/store'
 import { usePrefs } from '@/lib/prefs'
+import { useVolume } from '@/lib/volume'
 import { setTorch } from '@/lib/torch'
 import { sound } from '@/lib/sound'
 import { useDrag } from '@/lib/use-swipe'
-import NowPlayingShade from './NowPlayingShade'
+import { usePlayer } from '@/lib/player'
+import { api } from '@/lib/api'
+import { fmtDeg, weatherNow, type Condition } from '@/lib/weather'
 import { NotificationList } from './NotificationCenter'
+import type { CareerData, DeliveryDTO } from '@/lib/types'
 
 function useClock(): Date | null {
   const ts = useSyncExternalStore(
@@ -35,55 +37,247 @@ function useClock(): Date | null {
   return ts ? new Date(ts) : null
 }
 
-// ─── Плитка-пилюля Quick Settings ────────────────────────────────────────────
-// Активная — залита акцентом #21A038 (Material 3 «filled»), неактивная — white/10.
-function Tile({
-  active = false, icon, label, sub, onClick, disabled = false, delay = 0,
+// ─── Кружок-переключатель (связь/режимы) ─────────────────────────────────────
+function Circle({
+  active, label, onClick, children,
 }: {
-  active?: boolean
-  icon: React.ReactNode
+  active: boolean
   label: string
-  sub?: string
   onClick: () => void
-  disabled?: boolean
-  delay?: number
+  children: React.ReactNode
 }) {
   return (
     <button
       type="button"
-      onClick={onClick}
       aria-pressed={active}
-      aria-label={sub ? `${label}: ${sub}` : label}
-      disabled={disabled}
-      style={{ animationDelay: `${delay}ms` }}
-      className={`m3-rise-stagger flex h-16 items-center gap-3 rounded-[26px] px-4 text-left outline-none transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:ring-2 focus-visible:ring-white/70 ${
-        disabled ? 'cursor-default opacity-70' : 'active:scale-[0.96]'
-      } ${active ? 'bg-[#21A038] text-white shadow-[0_10px_26px_-10px_rgba(33,160,56,0.75)]' : 'bg-white/[0.10] text-white'}`}
+      aria-label={label}
+      onClick={onClick}
+      className={`flex size-[52px] items-center justify-center rounded-full outline-none transition-all duration-200 active:scale-90 focus-visible:ring-2 ${
+        active
+          ? 'bg-neutral-900 text-white shadow-[0_10px_22px_-10px_rgba(0,0,0,0.6)]'
+          : 'bg-white text-neutral-800 ring-1 ring-black/[0.04] shadow-[0_8px_20px_-14px_rgba(15,23,42,0.35)]'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+// ─── Вертикальный слайдер (яркость / громкость) ──────────────────────────────
+function VSlider({
+  value, onChange, label, icon, dark,
+}: {
+  value: number // 0..1
+  onChange: (v: number) => void
+  label: string
+  icon: React.ReactNode
+  dark: boolean
+}) {
+  const ref = useRef<HTMLButtonElement>(null)
+  const drag = useRef({ start: 0, h: 1, v: 0 })
+
+  const apply = (clientY: number) => {
+    const el = ref.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    onChange(Math.max(0, Math.min(1, (r.bottom - clientY) / r.height)))
+  }
+
+  const { onPointerDown } = useDrag({
+    onStart: (e) => {
+      drag.current = { start: e.clientY, h: ref.current?.getBoundingClientRect().height ?? 1, v: value }
+      apply(e.clientY)
+    },
+    onMove: (_dx, dy) => {
+      onChange(Math.max(0, Math.min(1, drag.current.v - dy / drag.current.h)))
+    },
+    onEnd: () => {},
+  })
+
+  const pct = Math.round(Math.max(0.06, value) * 100)
+  return (
+    <button
+      ref={ref}
+      type="button"
+      role="slider"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={pct}
+      {...onPointerDown}
+      className={`relative flex h-[118px] w-[52px] touch-none flex-col justify-end overflow-hidden rounded-[24px] outline-none transition-transform duration-150 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-black/30 ${
+        dark ? 'bg-white/[0.10] ring-1 ring-white/[0.08]' : 'bg-white ring-1 ring-black/[0.04] shadow-[0_10px_24px_-16px_rgba(15,23,42,0.4)]'
+      }`}
     >
       <span
-        className={`flex size-9 shrink-0 items-center justify-center rounded-full transition-colors duration-200 ${
-          active ? 'bg-white/20' : 'bg-white/[0.14]'
-        }`}
+        aria-hidden="true"
+        className="absolute inset-x-0 bottom-0 bg-neutral-900 transition-[height] duration-75 ease-linear"
+        style={{ height: `${pct}%` }}
+      />
+      <span
+        aria-hidden="true"
+        className="relative z-10 flex items-center justify-center pb-3"
+        style={{ color: value > 0.28 ? '#ffffff' : dark ? 'rgba(255,255,255,0.85)' : '#17181A' }}
       >
         {icon}
-      </span>
-      <span className="min-w-0">
-        <span className="block truncate text-[12.5px] font-bold leading-tight">{label}</span>
-        {sub && (
-          <span className={`mt-0.5 block truncate text-[10.5px] leading-tight ${active ? 'text-white/85' : 'text-white/55'}`}>
-            {sub}
-          </span>
-        )}
       </span>
     </button>
   )
 }
 
+// ─── Погода «сейчас» (данные с виджетом дома) ────────────────────────────────
+function CondGlyph({ cond, className }: { cond: Condition; className: string }) {
+  if (cond === 'Солнечно') return <span className={className}>☀️</span>
+  if (cond === 'Облачно') return <span className={className}>🌤️</span>
+  if (cond === 'Пасмурно') return <span className={className}>☁️</span>
+  if (cond === 'Дождь') return <span className={className}>🌧️</span>
+  if (cond === 'Снег') return <span className={className}>❄️</span>
+  if (cond === 'Гроза') return <span className={className}>⛈️</span>
+  return <span className={className}>🌈</span>
+}
+
+// ─── Задачи дня (реальные: квест, посылка, топ) ──────────────────────────────
+function useTasks() {
+  const [quest, setQuest] = useState<{ title: string; progress: number; target: number } | null>(null)
+  const [delivery, setDelivery] = useState<string | null>(null)
+  const [place, setPlace] = useState<number | null>(null)
+  useEffect(() => {
+    let alive = true
+    api.career().then((c: CareerData) => {
+      if (!alive) return
+      const q = c.quests.find((x) => !x.claimed && x.progress > 0) ?? c.quests.find((x) => !x.claimed)
+      if (q) setQuest({ title: q.title, progress: Math.min(q.progress, q.target), target: q.target })
+    }).catch(() => {})
+    api.deliveries().then((d: { items: DeliveryDTO[] }) => {
+      if (!alive) return
+      const act = d.items.find((x) => x.status === 'collecting' || x.status === 'in_transit' || x.status === 'arrived')
+      if (act) setDelivery(act.status === 'collecting' ? 'Собираем посылку' : act.status === 'in_transit' ? 'Посылка в пути' : 'Посылка прибыла')
+    }).catch(() => {})
+    api.leaderboard().then((b) => {
+      if (!alive) return
+      const me = b.balance.findIndex((r) => r.isMe)
+      setPlace(me >= 0 ? me + 1 : null)
+    }).catch(() => {})
+    return () => { alive = false }
+  }, [])
+  return { quest, delivery, place }
+}
+
+function TasksCard({ dark, onOpenApp }: { dark: boolean; onOpenApp: (a: AppKey) => void }) {
+  const t = useTasks()
+  const rows: { key: string; text: string; done: boolean }[] = []
+  if (t.quest) rows.push({ key: 'q', text: `${t.quest.title} · ${t.quest.progress}/${t.quest.target}`, done: t.quest.progress >= t.quest.target })
+  if (t.delivery) rows.push({ key: 'd', text: t.delivery, done: t.delivery.includes('прибыл') })
+  if (t.place) rows.push({ key: 'p', text: `Топ площадки: ${t.place} место`, done: false })
+
+  return (
+    <div className={`flex flex-1 flex-col rounded-[24px] p-3.5 ${dark ? 'bg-white/[0.10] ring-1 ring-white/[0.08]' : 'bg-white ring-1 ring-black/[0.04] shadow-[0_10px_26px_-18px_rgba(15,23,42,0.4)]'}`}>
+      <div className="flex items-center justify-between">
+        <p className={`text-[13px] font-bold ${dark ? 'text-white' : 'text-neutral-900'}`}>Задачи</p>
+        <button
+          type="button"
+          onClick={() => onOpenApp('career')}
+          className={`flex items-center gap-0.5 text-[11px] font-medium outline-none ${dark ? 'text-white/55' : 'text-neutral-400'}`}
+        >
+          Смотреть все
+          <ChevronRight className="size-3" aria-hidden="true" />
+        </button>
+      </div>
+      <div className="mt-2 flex flex-1 flex-col justify-between gap-1.5">
+        {rows.length === 0 && (
+          <p className={`text-[11px] leading-tight ${dark ? 'text-white/45' : 'text-neutral-400'}`}>На сегодня всё свободно</p>
+        )}
+        {rows.map((r) => (
+          <div key={r.key} className="flex items-center gap-2">
+            <span
+              aria-hidden="true"
+              className={`flex size-4 shrink-0 items-center justify-center rounded-full ${
+                r.done ? 'bg-sky-500 text-white' : dark ? 'bg-white/10' : 'bg-neutral-200'
+              }`}
+            >
+              {r.done && (
+                <svg viewBox="0 0 24 24" className="size-2.5" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M4 12.5 L9.5 18 L20 6.5" />
+                </svg>
+              )}
+            </span>
+            <span className={`truncate text-[11.5px] font-medium leading-tight ${dark ? 'text-white/80' : 'text-neutral-600'}`}>{r.text}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Медиа-карточка пункта управления ────────────────────────────────────────
+function MediaCard({ dark, onOpenApp }: { dark: boolean; onOpenApp: (a: AppKey) => void }) {
+  const current = usePlayer((s) => s.current)
+  const isPlaying = usePlayer((s) => s.isPlaying)
+  const toggle = usePlayer((s) => s.toggle)
+  const next = usePlayer((s) => s.next)
+  const prev = usePlayer((s) => s.prev)
+
+  return (
+    <div className={`flex min-w-0 flex-1 flex-col rounded-[24px] p-3 ${dark ? 'bg-white/[0.10] ring-1 ring-white/[0.08]' : 'bg-white ring-1 ring-black/[0.04] shadow-[0_10px_26px_-18px_rgba(15,23,42,0.4)]'}`}>
+      {current ? (
+        <>
+          <button
+            type="button"
+            onClick={() => onOpenApp('music')}
+            className="flex min-w-0 items-center gap-2.5 text-left outline-none"
+            aria-label={`Открыть музыку: ${current.title} — ${current.artist}`}
+          >
+            <span className="relative size-11 shrink-0 overflow-hidden rounded-[13px] bg-neutral-100">
+              {current.artworkSmall ? <img loading="lazy" decoding="async" src={current.artworkSmall} alt="" className="h-full w-full object-cover" /> : null}
+            </span>
+            <span className="min-w-0">
+              <span className={`block truncate text-[13px] font-bold leading-tight ${dark ? 'text-white' : 'text-neutral-900'}`}>{current.title}</span>
+              <span className={`block truncate text-[11.5px] leading-tight ${dark ? 'text-white/55' : 'text-neutral-500'}`}>{current.artist}</span>
+            </span>
+          </button>
+          <div className={`mt-2 flex items-center justify-around border-t pt-1.5 ${dark ? 'border-white/[0.06]' : 'border-black/[0.05]'}`}>
+            <button type="button" aria-label="Предыдущий трек" onClick={prev} className={`flex size-9 items-center justify-center rounded-full outline-none transition-transform active:scale-90 ${dark ? 'text-white/85' : 'text-neutral-700'}`}>
+              <SkipBack className="size-4.5" aria-hidden="true" />
+            </button>
+            <button type="button" aria-label={isPlaying ? 'Пауза' : 'Продолжить'} onClick={toggle} className={`flex size-10 items-center justify-center rounded-full outline-none transition-transform active:scale-90 ${dark ? 'bg-white text-neutral-900' : 'bg-neutral-900 text-white'}`}>
+              {isPlaying ? <Pause className="size-4.5" aria-hidden="true" /> : <Play className="size-4.5 translate-x-[1px]" aria-hidden="true" />}
+            </button>
+            <button type="button" aria-label="Следующий трек" onClick={next} className={`flex size-9 items-center justify-center rounded-full outline-none transition-transform active:scale-90 ${dark ? 'text-white/85' : 'text-neutral-700'}`}>
+              <SkipForward className="size-4.5" aria-hidden="true" />
+            </button>
+          </div>
+        </>
+      ) : (
+        <button type="button" onClick={() => onOpenApp('music')} className="flex flex-1 items-center gap-2.5 text-left outline-none">
+          <span className={`flex size-11 shrink-0 items-center justify-center rounded-[13px] ${dark ? 'bg-white/10' : 'bg-neutral-100'}`}>
+            <MusicNoteGlyph dark={dark} />
+          </span>
+          <span className="min-w-0">
+            <span className={`block text-[13px] font-bold leading-tight ${dark ? 'text-white' : 'text-neutral-900'}`}>Музыка</span>
+            <span className={`block text-[11.5px] leading-tight ${dark ? 'text-white/55' : 'text-neutral-500'}`}>Ничего не играет</span>
+          </span>
+        </button>
+      )}
+    </div>
+  )
+}
+
+function MusicNoteGlyph({ dark }: { dark: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" className={`size-5 ${dark ? 'text-white/70' : 'text-neutral-500'}`} fill="currentColor" aria-hidden="true">
+      <path d="M9 18.5V6.8l9-2v10.4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="7" cy="18.5" r="2.2" />
+      <circle cx="16" cy="15.2" r="2.2" />
+    </svg>
+  )
+}
+
+// ─── Шторка ──────────────────────────────────────────────────────────────────
 export default function Shade({
   open, qs, onClose, onOpenApp,
 }: {
   open: boolean
-  /** true — открыть сразу в режиме быстрых настроек (правая зона статус-бара) */
+  /** true — открыть сразу в центре управления (правая зона статус-бара) */
   qs?: boolean
   onClose: () => void
   onOpenApp: (app: AppKey) => void
@@ -95,40 +289,30 @@ export default function Shade({
   const charging = useOS((s) => s.charging)
   const setCharging = useOS((s) => s.setCharging)
   const batteryReal = useOS((s) => s.batteryReal)
-  const netOnline = useOS((s) => s.netOnline)
-  const netKind = useOS((s) => s.netKind)
+  const battery = useOS((s) => s.battery)
   const brightness = useOS((s) => s.brightness)
   const setBrightness = useOS((s) => s.setBrightness)
-  const battery = useOS((s) => s.battery)
   const pushToast = useOS((s) => s.pushToast)
   const theme = useOS((s) => s.theme)
   const toggleTheme = useOS((s) => s.toggleTheme)
+  const volume = useVolume((s) => s.volume)
+  const setVolume = useVolume((s) => s.setVolume)
   const now = useClock()
+  const dark = theme === 'dark'
+  const w = useMemo(() => weatherNow(0), [])
 
-  // Визуальные переключатели Wi-Fi/Bluetooth/автоповорота — ГЛОБАЛЬНЫЙ prefs-стор.
   const wifiOn = usePrefs((s) => s.wifi)
   const btOn = usePrefs((s) => s.bt)
   const rotateOn = usePrefs((s) => s.rotate)
   const setPref = usePrefs((s) => s.setPref)
 
-  // Вибро-отклик — реальный тумблер (общий с Настройками через sound.ts).
-  const vibro = useSyncExternalStore(
-    (cb) => sound.subscribe(cb),
-    () => sound.isEnabled(),
-    () => true,
-  )
-
-  // Режим QS: открыть в развёрнутом виде, если шторку вызвали из правой зоны.
+  // Режим QS: открыть в центре управления, если шторку вызвали из правой зоны.
   const [expanded, setExpanded] = useState(!!qs)
   const [prevOpen, setPrevOpen] = useState(open)
   if (open !== prevOpen) {
     setPrevOpen(open)
     if (open) setExpanded(!!qs)
   }
-
-  const netLabel = !netOnline
-    ? 'Нет сети'
-    : netKind === 'slow' ? 'Слабый сигнал' : netKind === 'wifi' ? 'Wi-Fi' : netKind === '4g' ? 'LTE' : netKind === '3g' ? '3G' : 'Сеть'
 
   const toggleFlash = async () => {
     const next = !flashlight
@@ -144,44 +328,17 @@ export default function Shade({
     pushToast('Не беспокоить', !useOS.getState().dnd ? 'Тосты снова всплывают' : 'Уведомления копятся в центре')
   }
 
-  // ─── Слайдер-капсула яркости: pointer-drag + клавиатура ──────────────────
-  const sliderRef = useRef<HTMLDivElement>(null)
-  const dragState = useRef({ startVal: 1, width: 1 })
-  const BRIGHT_MIN = 0.4
-  const BRIGHT_SPAN = 0.6
-  const setPct = (pct: number) => setBrightness(BRIGHT_MIN + Math.max(0, Math.min(1, pct)) * BRIGHT_SPAN)
-
-  const sliderDrag = useDrag({
-    onStart: (e) => {
-      const el = sliderRef.current
-      if (!el) return
-      const r = el.getBoundingClientRect()
-      dragState.current = { startVal: useOS.getState().brightness, width: Math.max(1, r.width) }
-      setPct((e.clientX - r.left) / r.width)
-    },
-    onMove: (dx) => {
-      const { startVal, width } = dragState.current
-      setBrightness(Math.max(BRIGHT_MIN, Math.min(1, startVal + (dx / width) * BRIGHT_SPAN)))
-    },
-    onEnd: () => {},
-  })
-
-  const brightPct = (brightness - BRIGHT_MIN) / BRIGHT_SPAN
-
-  // Потяните шеврон/зону grip вниз — раскрывается QS, вверх — сворачивается.
+  // Свайп вверх закрывает шторку; вниз в режиме уведомлений — центр управления.
   const gripDrag = useDrag({
-    ignoreWithin: 'button',
+    ignoreWithin: 'button, input',
     onEnd: (_dx, dy) => {
       if (!expanded && dy > 36) {
-        sound.swipe()
         setExpanded(true)
       } else if (expanded && dy < -36) {
         setExpanded(false)
       }
     },
   })
-
-  // Нижняя зона: свайп вверх (или флик) закрывает шторку — как в Android.
   const closeDrag = useDrag({
     onEnd: (_dx, dy, fling) => {
       if (dy < -36 || fling.vy < -0.55) {
@@ -191,288 +348,231 @@ export default function Shade({
     },
   })
 
-  const tiles = (full: boolean) => {
-    const list: React.ReactNode[] = [
-      <Tile
-        key="wifi"
-        delay={0}
-        active={wifiOn}
-        icon={<Wifi className="size-[17px]" aria-hidden="true" />}
-        label="Wi-Fi"
-        sub={wifiOn ? netLabel : 'Выключено'}
-        onClick={() => setPref('wifi', !wifiOn)}
-      />,
-      <Tile
-        key="bt"
-        delay={30}
-        active={btOn}
-        icon={<Bluetooth className="size-[17px]" aria-hidden="true" />}
-        label="Bluetooth"
-        sub={btOn ? 'Включено' : 'Выключено'}
-        onClick={() => setPref('bt', !btOn)}
-      />,
-      <Tile
-        key="flash"
-        delay={60}
-        active={flashlight}
-        icon={<Flashlight className="size-[18px]" aria-hidden="true" />}
-        label="Фонарик"
-        sub={flashlight ? 'Вспышка горит' : 'Выключен'}
-        onClick={() => void toggleFlash()}
-      />,
-      <Tile
-        key="dnd"
-        delay={90}
-        active={dnd}
-        icon={<MoonStar className="size-[18px]" aria-hidden="true" />}
-        label="Не беспокоить"
-        sub={dnd ? 'Тосты скрыты' : 'Всплывают'}
-        onClick={toggleDnd}
-      />,
-    ]
-    if (!full) return list
-    return [
-      ...list,
-      <Tile
-        key="vibro"
-        delay={120}
-        active={vibro}
-        icon={<Vibrate className="size-[18px]" aria-hidden="true" />}
-        label="Вибро"
-        sub={vibro ? 'Отклик включён' : 'Тихий режим'}
-        onClick={() => sound.setEnabled(!sound.isEnabled())}
-      />,
-      <Tile
-        key="rotate"
-        delay={150}
-        active={rotateOn}
-        icon={<RotateCw className="size-[18px]" aria-hidden="true" />}
-        label="Автоповорот"
-        sub={rotateOn ? 'Включён' : 'Портрет'}
-        onClick={() => setPref('rotate', !rotateOn)}
-      />,
-      <Tile
-        key="theme"
-        delay={180}
-        active={theme === 'dark'}
-        icon={theme === 'dark' ? <Moon className="size-[18px]" aria-hidden="true" /> : <Sun className="size-[18px]" aria-hidden="true" />}
-        label="Тема"
-        sub={theme === 'dark' ? 'Тёмная' : 'Светлая'}
-        onClick={() => {
-          toggleTheme()
-          pushToast('Тема ОС', useOS.getState().theme === 'dark' ? 'Тёмная тема включена' : 'Светлая тема включена')
-        }}
-      />,
-      <Tile
-        key="wallet"
-        delay={210}
-        icon={<Wallet className="size-[18px]" aria-hidden="true" />}
-        label="Кошелёк"
-        sub="Столичный Банк"
-        onClick={() => {
-          onClose()
-          onOpenApp('bank')
-        }}
-      />,
-      <Tile
-        key="settings"
-        delay={240}
-        icon={<Settings className="size-[18px]" aria-hidden="true" />}
-        label="Настройки"
-        sub="Система"
-        onClick={() => {
-          onClose()
-          onOpenApp('settings')
-        }}
-      />,
-    ]
-  }
+  const BRIGHT_MIN = 0.4
+  const BRIGHT_SPAN = 0.6
+  const brightNorm = (brightness - BRIGHT_MIN) / BRIGHT_SPAN
 
-  // key по open+expanded: переигрываем вступительные анимации при каждом открытии/развороте
-  const animKey = open ? (expanded ? 'qs-full' : 'qs-compact') : 'closed'
+  // key для переигрывания вступительных анимаций
+  const animKey = open ? (expanded ? 'cc' : 'notif') : 'closed'
 
   return (
     <div className={`pointer-events-none absolute inset-0 z-55 ${open ? '' : 'invisible'}`}>
-      {/* скрим под панелью */}
+      {/* скрим */}
       <button
         type="button"
         aria-label="Закрыть шторку"
         tabIndex={open ? 0 : -1}
         onClick={onClose}
-        className={`absolute inset-0 bg-black/60 transition-opacity duration-300 ${
+        className={`absolute inset-0 bg-black/35 transition-opacity duration-300 ${
           open ? 'pointer-events-auto opacity-100' : 'opacity-0'
         }`}
       />
 
-      {/* панель на весь экран — как шторка Android */}
+      {/* панель на весь экран */}
       <section
-        aria-label="Шторка уведомлений и быстрых настроек"
-        className={`pointer-events-auto absolute inset-0 flex flex-col bg-[#0B0F0D]/[0.96] text-white shadow-2xl backdrop-blur-2xl transition-transform duration-[350ms] ease-[cubic-bezier(0.2,0,0,1)] ${
-          open ? 'translate-y-0' : '-translate-y-[102%]'
-        }`}
+        aria-label={expanded ? 'Центр управления' : 'Уведомления'}
+        className={`pointer-events-auto absolute inset-0 flex flex-col shadow-2xl backdrop-blur-2xl transition-transform duration-[360ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          dark ? 'bg-[#0B0D10]/[0.94] text-white' : 'bg-[#EFF0F3]/[0.88] text-neutral-900'
+        } ${open ? 'translate-y-0' : '-translate-y-[102%]'}`}
       >
-        {/* ─── Шапка: крупные часы, дата, батарея ─── */}
-        <header className="flex shrink-0 items-start justify-between px-5 pb-1 pt-4">
-          <div suppressHydrationWarning>
-            <p className="text-[34px] font-medium leading-none tracking-[-0.02em] tabular-nums">
-              {now ? now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '\u00A0'}
-            </p>
-            <p className="mt-1.5 text-[12.5px] font-medium text-white/55">
-              {now ? now.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'long' }) : '\u00A0'}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              if (!batteryReal) setCharging(!charging)
-            }}
-            aria-label={charging ? 'Отключить зарядку' : 'Подключить зарядку'}
-            className="flex h-10 items-center gap-1.5 rounded-full bg-white/[0.09] px-3.5 text-[12px] font-bold tabular-nums outline-none transition-all duration-200 active:scale-[0.96] focus-visible:ring-2 focus-visible:ring-white/70"
-            title={batteryReal ? 'Батарея устройства' : 'Симулятор: тап — зарядка'}
-          >
-            {charging ? (
-              <BatteryCharging className="size-4 text-emerald-300" aria-hidden="true" />
-            ) : (
-              <Zap className="size-4 text-white/80" aria-hidden="true" />
-            )}
-            {Math.round(battery)}%
-          </button>
-        </header>
+        {expanded ? (
+          /* ─────────── ЦЕНТР УПРАВЛЕНИЯ ─────────── */
+          <div key={animKey} className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-2 pt-3 [scrollbar-width:none]">
+            {/* статус-строка */}
+            <div className="flex items-center justify-between px-2 pb-3">
+              <span className={`text-[12.5px] font-semibold ${dark ? 'text-white/70' : 'text-neutral-500'}`} suppressHydrationWarning>
+                {now ? now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '\u00A0'}
+              </span>
+              <span className={`flex items-center gap-1.5 text-[12px] font-semibold ${dark ? 'text-white/70' : 'text-neutral-500'}`}>
+                {wifiOn ? <Wifi className="size-3.5" aria-hidden="true" /> : <WifiOff className="size-3.5" aria-hidden="true" />}
+                Resale OS
+              </span>
+            </div>
 
-        {/* ─── Grip: потяните вниз — полные быстрые настройки ─── */}
-        <div
-          {...gripDrag}
-          className="flex shrink-0 cursor-grab touch-none items-center justify-between px-5 py-2 select-none"
-          aria-hidden="true"
-        >
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-white/40">
-            Быстрые настройки
-          </span>
-          <button
-            type="button"
-            aria-label={expanded ? 'Свернуть быстрые настройки' : 'Развернуть быстрые настройки'}
-            onClick={() => setExpanded((v) => !v)}
-            className="flex size-9 items-center justify-center rounded-full text-white/70 outline-none transition-colors active:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70"
-          >
-            <ChevronDown
-              className={`size-5 transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`}
-              aria-hidden="true"
-            />
-          </button>
-        </div>
+            {/* кружки связи/режимов */}
+            <div {...gripDrag} className="grid touch-none grid-cols-4 gap-2 px-1">
+              <Circle active={wifiOn} label="Wi-Fi" onClick={() => setPref('wifi', !wifiOn)}>
+                <Wifi className="size-5" aria-hidden="true" />
+              </Circle>
+              <Circle active={btOn} label="Bluetooth" onClick={() => setPref('bt', !btOn)}>
+                <Bluetooth className="size-5" aria-hidden="true" />
+              </Circle>
+              <Circle active={dnd} label="Не беспокоить" onClick={toggleDnd}>
+                <MoonStar className="size-5" aria-hidden="true" />
+              </Circle>
+              <Circle active={rotateOn} label="Автоповорот" onClick={() => setPref('rotate', !rotateOn)}>
+                <RotateCw className="size-5" aria-hidden="true" />
+              </Circle>
+            </div>
 
-        {/* ─── Контент ─── */}
-        <div key={animKey} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          {/* плитки QS: компактно 4, полностью 9 */}
-          <div className={`grid shrink-0 grid-cols-2 gap-2 px-4 ${expanded ? 'overflow-y-auto pb-1 [scrollbar-width:none]' : ''}`}>
-            {tiles(expanded)}
-          </div>
-
-          {/* слайдер яркости */}
-          <div
-            ref={sliderRef}
-            role="slider"
-            tabIndex={open ? 0 : -1}
-            aria-label="Яркость экрана"
-            aria-valuemin={40}
-            aria-valuemax={100}
-            aria-valuenow={Math.round(brightness * 100)}
-            onKeyDown={(e) => {
-              if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
-                e.preventDefault()
-                setPct(brightPct + 0.08)
-              } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
-                e.preventDefault()
-                setPct(brightPct - 0.08)
-              }
-            }}
-            {...sliderDrag}
-            className={`m3-rise relative mx-4 mt-2.5 shrink-0 cursor-pointer touch-none select-none overflow-hidden rounded-[28px] bg-white/[0.10] outline-none ring-1 ring-white/[0.08] transition-transform duration-200 active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-white/70 ${
-              expanded ? 'h-14' : 'h-12'
-            }`}
-            style={{ animationDelay: '60ms' }}
-          >
-            <span
-              aria-hidden="true"
-              className="absolute inset-y-0 left-0 bg-white/90 transition-[width] duration-100 ease-linear"
-              style={{ width: `${Math.max(6, brightPct * 100)}%` }}
-            />
-            <Sun
-              aria-hidden="true"
-              className="relative z-10 ml-4 size-[18px] transition-colors duration-150"
-              style={{ color: brightPct > 0.16 ? '#0b0f0d' : '#ffffff' }}
-            />
-            <span className="relative z-10 ml-3 text-[12px] font-bold" style={{ color: brightPct > 0.24 ? '#0b0f0d' : 'rgba(255,255,255,0.85)' }}>
-              {Math.round(brightness * 100)}%
-            </span>
-          </div>
-
-          {expanded ? (
-            /* ─── Полный QS: медиа + футер с датой/сетью и настройками/питанием ─── */
-            <div className="min-h-0 flex-1 overflow-y-auto pb-3 [scrollbar-width:none]">
-              <div className="m3-rise mt-2.5" style={{ animationDelay: '100ms' }}>
-                <NowPlayingShade onOpenApp={onOpenApp} />
-              </div>
-              <div className="m3-rise mt-3 flex items-center justify-between px-5" style={{ animationDelay: '140ms' }}>
-                <div className="flex min-w-0 items-center gap-2 text-[12px]">
-                  <span className="whitespace-nowrap text-white/55" suppressHydrationWarning>
-                    {now ? now.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' }) : '\u00A0'}
-                  </span>
-                  <span className="flex items-center gap-1.5 text-white/45">
-                    {netOnline ? (
-                      <Wifi className="size-3.5 text-emerald-300" aria-hidden="true" />
-                    ) : (
-                      <WifiOff className="size-3.5 text-red-400" aria-hidden="true" />
-                    )}
-                    {netLabel}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    aria-label="Открыть настройки"
-                    onClick={() => {
-                      onClose()
-                      onOpenApp('settings')
-                    }}
-                    className="flex size-11 items-center justify-center rounded-full bg-white/[0.09] text-white/80 outline-none transition-all duration-200 active:scale-90 active:bg-white/15 focus-visible:ring-2 focus-visible:ring-white/70"
-                  >
-                    <Settings className="size-[18px]" aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Питание"
-                    onClick={() => pushToast('Питание', 'Это симулятор — телефон остаётся включённым')}
-                    className="flex size-11 items-center justify-center rounded-full bg-white/[0.09] text-white/80 outline-none transition-all duration-200 active:scale-90 active:bg-white/15 focus-visible:ring-2 focus-visible:ring-white/70"
-                  >
-                    <Power className="size-[18px]" aria-hidden="true" />
-                  </button>
-                </div>
+            {/* медиа + слайдеры */}
+            <div className="mt-2.5 flex items-stretch gap-2 px-1">
+              <MediaCard dark={dark} onOpenApp={(a) => { onClose(); onOpenApp(a) }} />
+              <div className="flex gap-2">
+                <VSlider
+                  value={brightNorm}
+                  onChange={(v) => setBrightness(BRIGHT_MIN + v * BRIGHT_SPAN)}
+                  label="Яркость"
+                  icon={<Sun className="size-5" aria-hidden="true" />}
+                  dark={dark}
+                />
+                <VSlider
+                  value={volume}
+                  onChange={setVolume}
+                  label="Громкость"
+                  icon={<Volume2 className="size-5" aria-hidden="true" />}
+                  dark={dark}
+                />
               </div>
             </div>
-          ) : (
-            /* ─── Компакт: медиа + список уведомлений ─── */
-            <>
-              <div className="m3-rise mt-2.5 shrink-0" style={{ animationDelay: '100ms' }}>
-                <NowPlayingShade onOpenApp={onOpenApp} />
-              </div>
-              <div className="m3-rise min-h-0 flex-1 overflow-y-auto pb-2 pt-2.5 [scrollbar-width:none]" style={{ animationDelay: '140ms' }}>
-                <NotificationList onOpenApp={(a) => { onClose(); onOpenApp(a) }} />
-              </div>
-            </>
-          )}
-        </div>
 
-        {/* нижняя зона — свайп вверх или тап сворачивает шторку (полноширинная, как в Android) */}
-        <button
-          type="button"
-          aria-label="Свернуть шторку"
-          onClick={onClose}
-          {...closeDrag}
-          className="flex h-12 w-full shrink-0 items-start justify-center bg-gradient-to-b from-transparent to-white/[0.04] outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/70 active:to-white/[0.10]"
-        >
-          <span aria-hidden="true" className="mt-2 block h-1 w-16 rounded-full bg-white/30" />
-        </button>
+            {/* погода + задачи */}
+            <div className="mt-2.5 flex items-stretch gap-2 px-1">
+              <button
+                type="button"
+                aria-label="Открыть погоду"
+                onClick={() => { onClose(); onOpenApp('weather') }}
+                className={`flex w-[46%] shrink-0 flex-col rounded-[24px] p-3.5 text-left outline-none transition-transform duration-150 active:scale-[0.98] ${dark ? 'bg-white/[0.10] ring-1 ring-white/[0.08]' : 'bg-white ring-1 ring-black/[0.04] shadow-[0_10px_26px_-18px_rgba(15,23,42,0.4)]'}`}
+              >
+                <span className="flex items-center gap-1.5">
+                  <CondGlyph cond={w.cond} className="text-[18px] leading-none" />
+                  <span className={`text-[12.5px] font-semibold ${dark ? 'text-white' : 'text-neutral-800'}`}>{w.city}</span>
+                </span>
+                <span className={`mt-1 text-[26px] font-semibold leading-none tracking-tight ${dark ? 'text-white' : 'text-neutral-900'}`}>{fmtDeg(w.temp)}</span>
+                <span className={`mt-1.5 text-[10.5px] leading-tight ${dark ? 'text-white/55' : 'text-neutral-500'}`}>{w.cond}</span>
+                <span className={`mt-0.5 text-[10.5px] font-medium tabular-nums ${dark ? 'text-white/55' : 'text-neutral-500'}`}>
+                  ↑ {fmtDeg(w.tMax)} ↓ {fmtDeg(w.tMin)}
+                </span>
+              </button>
+              <TasksCard dark={dark} onOpenApp={(a) => { onClose(); onOpenApp(a) }} />
+            </div>
+
+            {/* не беспокоить + заряд */}
+            <div className="mt-2.5 grid grid-cols-2 gap-2 px-1">
+              <button
+                type="button"
+                aria-pressed={dnd}
+                onClick={toggleDnd}
+                className={`flex items-center gap-3 rounded-[24px] p-3.5 text-left outline-none transition-all duration-200 active:scale-[0.98] ${dark ? 'bg-white/[0.10] ring-1 ring-white/[0.08]' : 'bg-white ring-1 ring-black/[0.04] shadow-[0_10px_26px_-18px_rgba(15,23,42,0.4)]'}`}
+              >
+                <span className={`flex size-10 shrink-0 items-center justify-center rounded-full ${dnd ? 'bg-neutral-900 text-white' : dark ? 'bg-white/10 text-violet-300' : 'bg-violet-50 text-violet-500'}`}>
+                  <Moon className="size-5" aria-hidden="true" />
+                </span>
+                <span className="min-w-0">
+                  <span className={`block text-[12.5px] font-bold ${dark ? 'text-white' : 'text-neutral-900'}`}>Не беспокоить</span>
+                  <span className={`block truncate text-[11px] ${dark ? 'text-white/55' : 'text-neutral-500'}`}>{dnd ? 'Включено' : 'Выключено'}</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { if (!batteryReal) setCharging(!charging) }}
+                aria-label={charging ? 'Отключить зарядку' : 'Подключить зарядку'}
+                className={`flex items-center gap-3 rounded-[24px] p-3.5 text-left outline-none transition-all duration-200 active:scale-[0.98] ${dark ? 'bg-white/[0.10] ring-1 ring-white/[0.08]' : 'bg-white ring-1 ring-black/[0.04] shadow-[0_10px_26px_-18px_rgba(15,23,42,0.4)]'}`}
+              >
+                <span className={`flex size-10 shrink-0 items-center justify-center rounded-full ${dark ? 'bg-white/10 text-emerald-300' : 'bg-emerald-50 text-emerald-600'}`}>
+                  {charging ? <BatteryCharging className="size-5" aria-hidden="true" /> : <BatteryFull className="size-5" aria-hidden="true" />}
+                </span>
+                <span className="min-w-0">
+                  <span className={`block text-[12.5px] font-bold ${dark ? 'text-white' : 'text-neutral-900'}`}>Заряд</span>
+                  <span className={`block text-[11px] tabular-nums ${dark ? 'text-white/55' : 'text-neutral-500'}`}>{Math.round(battery)}%</span>
+                </span>
+              </button>
+            </div>
+
+            {/* нижний ряд кнопок */}
+            <div className="mt-2.5 grid grid-cols-4 gap-2 px-1 pb-1">
+              {[
+                {
+                  key: 'flash',
+                  label: 'Фонарик',
+                  active: flashlight,
+                  icon: <Flashlight className="size-5" aria-hidden="true" />,
+                  run: () => void toggleFlash(),
+                },
+                {
+                  key: 'timer',
+                  label: 'Таймер',
+                  active: false,
+                  icon: <Timer className="size-5" aria-hidden="true" />,
+                  run: () => { onClose(); onOpenApp('clock') },
+                },
+                {
+                  key: 'theme',
+                  label: 'Тёмный режим',
+                  active: dark,
+                  icon: dark ? <Moon className="size-5" aria-hidden="true" /> : <Sun className="size-5" aria-hidden="true" />,
+                  run: () => {
+                    toggleTheme()
+                    pushToast('Тема ОС', useOS.getState().theme === 'dark' ? 'Тёмная тема включена' : 'Светлая тема включена')
+                  },
+                },
+                {
+                  key: 'rotate',
+                  label: 'Поворот экрана',
+                  active: rotateOn,
+                  icon: <RotateCw className="size-5" aria-hidden="true" />,
+                  run: () => setPref('rotate', !rotateOn),
+                },
+              ].map((b) => (
+                <button
+                  key={b.key}
+                  type="button"
+                  aria-pressed={b.active}
+                  onClick={b.run}
+                  className="flex flex-col items-center gap-1.5 rounded-[20px] py-1 outline-none focus-visible:ring-2 focus-visible:ring-black/30"
+                >
+                  <span
+                    className={`flex size-[52px] items-center justify-center rounded-full transition-all duration-200 active:scale-90 ${
+                      b.active
+                        ? 'bg-neutral-900 text-white shadow-[0_10px_22px_-10px_rgba(0,0,0,0.6)]'
+                        : dark
+                          ? 'bg-white/[0.10] text-white ring-1 ring-white/[0.08]'
+                          : 'bg-white text-neutral-800 ring-1 ring-black/[0.04] shadow-[0_8px_20px_-14px_rgba(15,23,42,0.35)]'
+                    }`}
+                  >
+                    {b.icon}
+                  </span>
+                  <span className={`text-center text-[10.5px] font-medium leading-tight ${dark ? 'text-white/75' : 'text-neutral-600'}`}>{b.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* зона закрытия */}
+            <button
+              type="button"
+              aria-label="Закрыть центр управления"
+              onClick={onClose}
+              {...closeDrag}
+              className={`mx-auto mt-2 flex h-9 w-40 shrink-0 items-center justify-center rounded-full outline-none ${dark ? 'bg-white/15' : 'bg-neutral-900/10'}`}
+            >
+              <span aria-hidden="true" className={`block h-1 w-12 rounded-full ${dark ? 'bg-white/50' : 'bg-neutral-500/60'}`} />
+            </button>
+          </div>
+        ) : (
+          /* ─────────── УВЕДОМЛЕНИЯ ─────────── */
+          <>
+            <div key={animKey} className="shrink-0 px-5 pb-1 pt-4">
+              <p className={`text-[34px] font-medium leading-none tracking-[-0.02em] tabular-nums ${dark ? 'text-white' : 'text-neutral-900'}`} suppressHydrationWarning>
+                {now ? now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '\u00A0'}
+              </p>
+              <p className={`mt-1.5 text-[12.5px] font-medium ${dark ? 'text-white/55' : 'text-neutral-500'}`} suppressHydrationWarning>
+                {now ? now.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' }) : '\u00A0'}
+              </p>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto pb-3 pt-2 [scrollbar-width:none]">
+              <NotificationList tone={dark ? 'dark' : 'light'} onOpenApp={(a) => { onClose(); onOpenApp(a) }} />
+            </div>
+            <button
+              type="button"
+              aria-label="Свернуть уведомления"
+              onClick={onClose}
+              {...closeDrag}
+              className={`mx-auto mb-2 flex h-9 w-40 shrink-0 items-center justify-center rounded-full outline-none ${dark ? 'bg-white/15' : 'bg-neutral-900/10'}`}
+            >
+              <span aria-hidden="true" className={`block h-1 w-12 rounded-full ${dark ? 'bg-white/50' : 'bg-neutral-500/60'}`} />
+            </button>
+          </>
+        )}
       </section>
     </div>
   )

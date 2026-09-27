@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 
 /** Логотип из фирменного пака: картинка сама — плитка (фон уже «вшит» в PNG). */
 function TileImage({ src, bg, loading }: { src: string; bg?: string; loading: 'eager' | 'lazy' }) {
@@ -43,6 +43,12 @@ export default function AppIcon({
   small = false,
   hideLabel = false,
   loading = 'eager',
+  tone = 'dark',
+  staticTile = false,
+  tileClass,
+  tileStyle,
+  onPointerDown,
+  onLongPress,
   onClick,
 }: {
   icon: ReactNode
@@ -62,27 +68,70 @@ export default function AppIcon({
   hideLabel?: boolean
   /** Стратегия загрузки лого: экран 2 лончера — lazy (не тормозит старт). */
   loading?: 'eager' | 'lazy'
-  onClick: () => void
+  /** Тон подписи: 'dark' — белая (тёмные обои), 'light' — графитовая (светлые обои). */
+  tone?: 'dark' | 'light'
+  /** Плитка без нажатий и трансформаций: драг, редактирование, библиотека. */
+  staticTile?: boolean
+  /** Класс-модификатор на плитке (jiggle-анимация, подсветка и т.п.). */
+  tileClass?: string
+  /** Инлайн-стиль плитки (позиция призрака при перетаскивании). */
+  tileStyle?: React.CSSProperties
+  /** Прокидывание onPointerDown (драг-движок лончера). */
+  onPointerDown?: (e: React.PointerEvent) => void
+  onLongPress?: () => void
+  onClick: (e: React.MouseEvent) => void
 }) {
   const base = color ?? '#4B5563'
   const tileBackground =
     background ??
     `linear-gradient(145deg, ${shade(base, 45)}, ${shade(base, -40)})`
 
+  // Долгий тап: таймер на 480 мс без движения больше 9px
+  const lpTimer = useRef(0)
+  const lpStart = useRef({ x: 0, y: 0 })
+  const clearLp = () => {
+    window.clearTimeout(lpTimer.current)
+  }
+  const handlePointerDown = (e: React.PointerEvent) => {
+    onPointerDown?.(e)
+    if (!onLongPress || e.button > 0) return
+    lpStart.current = { x: e.clientX, y: e.clientY }
+    clearLp()
+    lpTimer.current = window.setTimeout(() => {
+      onLongPress()
+      lpTimer.current = 0
+    }, 480)
+  }
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!lpTimer.current) return
+    if (Math.hypot(e.clientX - lpStart.current.x, e.clientY - lpStart.current.y) > 9) clearLp()
+  }
+
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={label}
-      className={`flex w-full flex-col items-center outline-none transition-transform duration-200 active:scale-95 focus-visible:ring-2 focus-visible:ring-white/80 ${
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={clearLp}
+      onPointerCancel={clearLp}
+      onContextMenu={(e) => {
+        if (onLongPress) {
+          e.preventDefault()
+          clearLp()
+          onLongPress()
+        }
+      }}
+      className={`flex w-full flex-col items-center outline-none focus-visible:ring-2 focus-visible:ring-white/80 ${
         small ? 'gap-0.5' : 'gap-1'
-      }`}
+      } ${staticTile ? '' : 'transition-transform duration-200 active:scale-95'}`}
     >
       <span
-        className={`relative ${small ? 'w-[52px]' : 'w-full'} block ${small ? 'rounded-[0.95rem]' : 'rounded-[1.15rem]'} aspect-square overflow-hidden shadow-[0_8px_18px_-6px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.35),inset_0_-8px_12px_-10px_rgba(0,0,0,0.35)] ${
+        className={`relative ${small ? 'w-[52px]' : 'w-full'} block ${small ? 'rounded-[0.95rem]' : 'rounded-[1.15rem]'} aspect-square overflow-hidden shadow-[0_8px_18px_-6px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.35),inset_0_-8px_12px_-10px_rgba(0,0,0,0.35)] transition-[transform,box-shadow] duration-200 ease-out ${
           image ? 'ring-1 ring-white/15' : ''
-        }`}
-        style={image ? undefined : { backgroundImage: tileBackground }}
+        } ${tileClass ?? ''}`}
+        style={tileStyle ? { ...(image ? undefined : { backgroundImage: tileBackground }), ...tileStyle } : image ? undefined : { backgroundImage: tileBackground }}
       >
         {image ? (
           <TileImage src={image} bg={imageBg ?? background} loading={loading} />
@@ -106,7 +155,9 @@ export default function AppIcon({
       </span>
       {!hideLabel && (
         <span
-          className={`${small ? 'w-[52px] text-[9px]' : 'w-[62px] text-[10px]'} truncate text-center text-white/90 [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]`}
+          className={`${small ? 'w-[52px] text-[9px]' : 'w-[74px] text-[10px]'} truncate text-center ${
+            tone === 'light' ? 'text-neutral-700' : 'text-white/90 [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]'
+          }`}
         >
           {label}
         </span>

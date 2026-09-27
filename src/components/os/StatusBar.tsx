@@ -68,8 +68,20 @@ function useClock(): Date | null {
 }
 
 // variant: 'dark' — белые иконки (лончер, тёмные приложения, локскрин),
-// 'light' — тёмные иконки на светлой полосе (светлые приложения Resale/Банк).
-export default function StatusBar({ variant, onBell }: { variant?: 'light' | 'dark'; onBell?: () => void }) {
+// 'light' — тёмные иконки (светлые приложения, светлые обои Resale OS).
+// plain — прозрачный фон (лончер/локскрин поверх обоев), иначе светлая полоса.
+// raised — поднять над локскрином (z-52), чтобы статус-бар был виден на замке.
+export default function StatusBar({
+  variant,
+  onBell,
+  plain = false,
+  raised = false,
+}: {
+  variant?: 'light' | 'dark'
+  onBell?: () => void
+  plain?: boolean
+  raised?: boolean
+}) {
   const battery = useOS((s) => s.battery)
   const charging = useOS((s) => s.charging)
   const netOnline = useOS((s) => s.netOnline)
@@ -86,8 +98,10 @@ export default function StatusBar({ variant, onBell }: { variant?: 'light' | 'da
 
   return (
     <header
-      className={`absolute inset-x-0 top-0 z-40 flex h-10 items-center justify-between pl-6 pr-3.5 transition-colors duration-200 ${
-        isDark ? 'text-white' : 'bg-[#F7F8FA] text-black'
+      className={`absolute inset-x-0 top-0 flex h-10 items-center justify-between pl-6 pr-3.5 transition-colors duration-200 ${
+        raised ? 'z-[52]' : 'z-40'
+      } ${
+        isDark ? 'text-white' : plain ? 'text-black' : 'bg-[#F7F8FA] text-black'
       }`}
     >
       {/* время + иконки уведомлений слева, как в Android */}

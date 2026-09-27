@@ -1,26 +1,39 @@
 'use client'
 
-// Презентационный слой приложения «Банк» (редизайн по макету 08-bank.png).
+// Презентационный слой приложения «Банк».
 // Здесь живут дизайн-токены, чистые функции над DTO (категории, схлопывание
-// операций, даты) и все визуальные примитивы: тёмно-зелёная карта VISA,
-// быстрые действия, строка операции, доначное кольцо на чистом SVG,
-// цифровая клавиатура, нижний лист и примитивы кредитного центра.
+// операций, даты) и все визуальные примитивы. Верх главного экрана (шапка,
+// круглые действия, карты с волнистым артом) выполнен в тёмно-зелёной теме
+// по скриншоту старого дизайна; вкладки Платежи/История/Аналитика и кредитный
+// центр остаются в светлой системе.
 // Файл намеренно без api и стора: только внешний вид.
 
 import type { ReactNode } from 'react'
 import {
-  AlertTriangle, ArrowLeftRight, Banknote, Delete, FileText, Landmark, Percent, PiggyBank,
-  Receipt, Send, ShoppingBag, TrendingUp, Undo2, X, type LucideIcon,
+  AlertTriangle, ArrowLeftRight, Banknote, Delete, Eye, EyeOff, FileText, Landmark, Percent,
+  PiggyBank, Receipt, Send, ShoppingBag, TrendingUp, Undo2, X, type LucideIcon,
 } from 'lucide-react'
 import { fmtMoney, fmtTime } from '@/lib/format'
 import { TX_TYPE_LABEL } from '@/lib/types'
 import type { LoanHistoryItem, TransactionDTO } from '@/lib/types'
 
-// ---- Дизайн-токены макета ----
+// ---- Дизайн-токены светлых вкладок ----
 export const GREEN = '#0E7A3D'
 export const CARD_CLS =
   'rounded-[20px] bg-[#FFFFFF] ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)]'
 export const CAPS = 'text-[11px] font-semibold uppercase tracking-[0.12em] text-black/40'
+
+// ---- Дизайн-токены тёмного главного экрана (скриншот старого дизайна) ----
+export const DARK_CARD = 'rounded-[20px] bg-white/[0.05] ring-1 ring-white/10'
+export const CAPS_DARK = 'text-[11px] font-semibold uppercase tracking-[0.12em] text-white/40'
+
+// Градиентные кольца-ободки круглых действий (цвета сняты со скриншота:
+// зелёный, золотой, красно-розовый, бирюзовый, фиолетовый)
+export const RING_GREEN = 'linear-gradient(135deg, #9CF6B4 0%, #3FCB68 45%, #1E9E44 100%)'
+export const RING_AMBER = 'linear-gradient(135deg, #FFE7BC 0%, #FFC46A 50%, #F0A32C 100%)'
+export const RING_ROSE = 'linear-gradient(135deg, #FFD2CC 0%, #F8837A 50%, #E4574A 100%)'
+export const RING_TEAL = 'linear-gradient(135deg, #C9F6EC 0%, #63CDBB 50%, #23988A 100%)'
+export const RING_VIOLET = 'linear-gradient(135deg, #DED6FF 0%, #A490FF 50%, #7A63E8 100%)'
 
 export function plural(n: number, one: string, few: string, many: string): string {
   const m10 = n % 10
@@ -131,12 +144,16 @@ export function mergeTxs(txs: TransactionDTO[]): MergedTx[] {
 
 // ---- Примитивы ----
 
-// Переключатель (светлый, зелёный в включённом состоянии)
-export function Toggle({ checked, onCheckedChange, label }: {
+// Переключатель (светлый или тёмный тон, зелёный в включённом состоянии)
+export function Toggle({ checked, onCheckedChange, label, tone = 'light' }: {
   checked: boolean
   onCheckedChange: (v: boolean) => void
   label: string
+  tone?: 'light' | 'dark'
 }) {
+  const on = tone === 'dark' ? 'bg-[#22C55E]' : 'bg-[#0E7A3D]'
+  const off = tone === 'dark' ? 'bg-white/20' : 'bg-black/[0.14]'
+  const ring = tone === 'dark' ? 'focus-visible:ring-[#22C55E]/50' : 'focus-visible:ring-[#0E7A3D]/50'
   return (
     <button
       type="button"
@@ -144,7 +161,7 @@ export function Toggle({ checked, onCheckedChange, label }: {
       aria-checked={checked}
       aria-label={label}
       onClick={() => onCheckedChange(!checked)}
-      className={`relative h-6 w-11 shrink-0 rounded-full outline-none transition-colors duration-200 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:ring-2 focus-visible:ring-[#0E7A3D]/50 ${checked ? 'bg-[#0E7A3D]' : 'bg-black/[0.14]'}`}
+      className={`relative h-6 w-11 shrink-0 rounded-full outline-none transition-colors duration-200 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:ring-2 ${ring} ${checked ? on : off}`}
     >
       <span
         aria-hidden="true"
@@ -208,27 +225,34 @@ export function Chip({ active, onClick, children }: {
   )
 }
 
-// Точки-страницы карусели карт
-export function PageDots({ count, active }: { count: number; active: number }) {
+// Точки-страницы карусели карт (активная: тёмная пилюля на светлой теме,
+// зелёная пилюля на тёмной)
+export function PageDots({ count, active, tone = 'light' }: {
+  count: number
+  active: number
+  tone?: 'light' | 'dark'
+}) {
+  const activeCls = tone === 'dark' ? 'w-5 bg-[#22C55E]' : 'w-5 bg-[#141414]'
+  const idleCls = tone === 'dark' ? 'w-1.5 bg-white/20' : 'w-1.5 bg-black/15'
   return (
     <div className="flex justify-center gap-1.5" aria-hidden="true">
       {Array.from({ length: count }, (_, i) => (
         <span
           key={i}
-          className={`h-1.5 rounded-full transition-all ${i === active ? 'w-5 bg-[#141414]' : 'w-1.5 bg-black/15'}`}
+          className={`h-1.5 rounded-full transition-all ${i === active ? activeCls : idleCls}`}
         />
       ))}
     </div>
   )
 }
 
-// Банковская карта: тёмно-зелёный градиент, «Банк» + VISA, крупный баланс,
-// маскированный номер и название продукта внизу (как на главном экране макета)
-export function BankCard({ label, amount, masked, holder, onClick, aria }: {
+// ---- Тёмный главный экран (скриншот старого дизайна) ----
+
+// Круглое действие с градиентным кольцом-ободком и подписью снизу
+export function RoundAction({ icon: Icon, label, ring, onClick, aria }: {
+  icon: LucideIcon
   label: string
-  amount: string
-  masked: string
-  holder: string
+  ring: string
   onClick: () => void
   aria: string
 }) {
@@ -237,59 +261,148 @@ export function BankCard({ label, amount, masked, holder, onClick, aria }: {
       type="button"
       onClick={onClick}
       aria-label={aria}
-      className="relative h-[172px] w-[86%] shrink-0 snap-center overflow-hidden rounded-[22px] p-5 text-left text-white transition active:scale-[0.99]"
-      style={{ background: 'linear-gradient(135deg, #0B5C2E 0%, #0A3D20 100%)' }}
+      className="flex min-h-[44px] flex-col items-center gap-2 transition duration-150 active:scale-95"
     >
-      <span className="absolute -right-10 -top-14 size-44 rounded-full bg-white/[0.08]" aria-hidden="true" />
-      <span className="absolute -bottom-20 -left-12 size-48 rounded-full bg-white/[0.06]" aria-hidden="true" />
-      <span className="absolute right-6 top-10 size-24 rounded-full bg-white/[0.05]" aria-hidden="true" />
-      <span className="relative flex items-center justify-between">
-        <span className="flex items-center gap-2">
-          <span className="flex size-6 items-center justify-center rounded-full bg-white/15" aria-hidden="true">
-            <Landmark className="size-3.5" />
-          </span>
-          <span className="text-[12px] font-semibold tracking-wide">Банк</span>
-        </span>
-        <span className="text-[15px] font-extrabold italic tracking-tight">VISA</span>
-      </span>
-      <span className="relative mt-5 block">
-        <span className="block text-[11px] text-white/70">{label}</span>
-        <span className="value-pop block text-[26px] font-bold leading-tight tabular-nums">{amount}</span>
-      </span>
-      <span className="absolute inset-x-5 bottom-4 flex items-end justify-between">
-        <span className="min-w-0">
-          <span className="block text-[13px] font-medium tabular-nums tracking-[0.2em]">{masked}</span>
-          <span className="mt-0.5 block truncate text-[10px] uppercase tracking-[0.12em] text-white/70">{holder}</span>
-        </span>
-        <span className="flex shrink-0 gap-1 pb-1" aria-hidden="true">
-          <span className="size-1 rounded-full bg-white/80" />
-          <span className="size-1 rounded-full bg-white/80" />
-          <span className="size-1 rounded-full bg-white/80" />
+      <span
+        aria-hidden="true"
+        className="flex size-[58px] items-center justify-center rounded-full p-[2.5px] shadow-[0_6px_18px_rgba(0,0,0,0.35)]"
+        style={{ background: ring }}
+      >
+        <span className="flex size-full items-center justify-center rounded-full bg-[#191D22] ring-1 ring-white/[0.06]">
+          <Icon className="size-[22px] text-white/90" strokeWidth={2} />
         </span>
       </span>
+      <span className="text-[11px] font-medium leading-none text-white/90">{label}</span>
     </button>
   )
 }
 
-// Круглая карточка-действие (Перевести / Пополнить / Оплатить / По QR)
-export function QuickAction({ icon: Icon, label, onClick, aria }: {
-  icon: LucideIcon
+// Волнистый абстрактный арт карты: почти чёрная база + диагональные волны
+// (radial-свечения + линейные полосы) и светлые «гребни» сверху. Без картинок.
+export type WaveArt = 'debit' | 'credit' | 'savings'
+
+const WAVE_ART: Record<WaveArt, { base: string; crest: string }> = {
+  debit: {
+    base: [
+      'radial-gradient(120% 150% at 108% -10%, rgba(244,63,94,0.55) 0%, rgba(190,18,60,0.24) 36%, rgba(10,4,7,0) 62%)',
+      'radial-gradient(95% 120% at -12% 115%, rgba(190,18,60,0.48) 0%, rgba(10,4,7,0) 60%)',
+      'linear-gradient(113deg, rgba(10,4,7,0) 0%, rgba(10,4,7,0) 38%, rgba(190,18,60,0.44) 50%, rgba(159,18,57,0.20) 63%, rgba(10,4,7,0) 75%)',
+      'linear-gradient(113deg, rgba(10,4,7,0) 0%, rgba(10,4,7,0) 62%, rgba(225,29,72,0.34) 73%, rgba(251,113,133,0.16) 84%, rgba(10,4,7,0) 96%)',
+      '#0A0407',
+    ].join(', '),
+    crest: [
+      'linear-gradient(113deg, rgba(255,222,231,0) 0%, rgba(255,222,231,0) 44.5%, rgba(255,222,231,0.52) 48%, rgba(255,222,231,0.12) 51%, rgba(255,222,231,0) 55%)',
+      'linear-gradient(113deg, rgba(255,214,226,0) 0%, rgba(255,214,226,0) 70%, rgba(255,214,226,0.3) 74%, rgba(255,214,226,0) 79%)',
+    ].join(', '),
+  },
+  credit: {
+    base: [
+      'radial-gradient(120% 150% at 108% -10%, rgba(16,185,129,0.42) 0%, rgba(6,95,70,0.18) 40%, rgba(4,10,7,0) 62%)',
+      'radial-gradient(95% 120% at -12% 115%, rgba(6,78,59,0.55) 0%, rgba(4,10,7,0) 60%)',
+      'linear-gradient(113deg, rgba(4,10,7,0) 0%, rgba(4,10,7,0) 42%, rgba(16,185,129,0.30) 52%, rgba(6,95,70,0.16) 64%, rgba(4,10,7,0) 75%)',
+      'linear-gradient(113deg, rgba(4,10,7,0) 0%, rgba(4,10,7,0) 64%, rgba(52,211,153,0.26) 74%, rgba(4,10,7,0) 86%)',
+      '#040A07',
+    ].join(', '),
+    crest: [
+      'linear-gradient(113deg, rgba(167,243,208,0) 0%, rgba(167,243,208,0) 45.5%, rgba(167,243,208,0.42) 49%, rgba(167,243,208,0.1) 52%, rgba(167,243,208,0) 56%)',
+      'linear-gradient(113deg, rgba(167,243,208,0) 0%, rgba(167,243,208,0) 71%, rgba(167,243,208,0.26) 75%, rgba(167,243,208,0) 80%)',
+    ].join(', '),
+  },
+  savings: {
+    base: [
+      'radial-gradient(120% 150% at 108% -10%, rgba(245,158,11,0.44) 0%, rgba(180,83,9,0.20) 40%, rgba(11,7,3,0) 62%)',
+      'radial-gradient(95% 120% at -12% 115%, rgba(146,64,14,0.5) 0%, rgba(11,7,3,0) 60%)',
+      'linear-gradient(113deg, rgba(11,7,3,0) 0%, rgba(11,7,3,0) 42%, rgba(245,158,11,0.30) 52%, rgba(180,83,9,0.16) 64%, rgba(11,7,3,0) 75%)',
+      'linear-gradient(113deg, rgba(11,7,3,0) 0%, rgba(11,7,3,0) 64%, rgba(251,191,36,0.28) 74%, rgba(11,7,3,0) 86%)',
+      '#0B0703',
+    ].join(', '),
+    crest: [
+      'linear-gradient(113deg, rgba(253,230,138,0) 0%, rgba(253,230,138,0) 45.5%, rgba(253,230,138,0.48) 49%, rgba(253,230,138,0.1) 52%, rgba(253,230,138,0) 56%)',
+      'linear-gradient(113deg, rgba(253,230,138,0) 0%, rgba(253,230,138,0) 71%, rgba(253,230,138,0.28) 75%, rgba(253,230,138,0) 80%)',
+    ].join(', '),
+  },
+}
+
+// Карта тёмного главного экрана: бейдж продукта, маскированный номер,
+// подпись, крупная сумма (тап: скрыть или показать баланс), держатель снизу
+// и опциональная пилюля-действие справа (например «Оформление»)
+export function WaveCard({ art, badge, masked, label, amount, holder, aria, onClick, onAmountClick, amountPressed, action }: {
+  art: WaveArt
+  badge: string
+  masked: string
   label: string
-  onClick: () => void
+  amount: string
+  holder: string
   aria: string
+  onClick: () => void
+  onAmountClick?: () => void
+  amountPressed?: boolean
+  action?: { icon: LucideIcon; label: string; onClick: () => void; aria: string }
 }) {
+  const a = WAVE_ART[art]
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <div
+      role="button"
+      tabIndex={0}
       aria-label={aria}
-      className={`${CARD_CLS} flex min-h-[88px] flex-col items-center justify-center gap-2 px-1 py-3 transition active:scale-[0.98]`}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick()
+        }
+      }}
+      className="relative flex h-[152px] w-[82%] shrink-0 cursor-pointer select-none snap-center flex-col overflow-hidden rounded-[24px] text-white shadow-[0_16px_40px_rgba(0,0,0,0.5)] ring-1 ring-white/10 transition-transform duration-150 active:scale-[0.985]"
+      style={{ background: a.base }}
     >
-      <span className="flex size-11 items-center justify-center rounded-full bg-[#0E7A3D]" aria-hidden="true">
-        <Icon className="size-5 text-white" strokeWidth={2.1} />
+      <span aria-hidden="true" className="pointer-events-none absolute inset-0" style={{ background: a.crest }} />
+      <span className="relative flex items-center justify-between gap-3 px-4 pt-3.5">
+        <span className="rounded-full bg-black/35 px-3 py-1 text-[11px] font-semibold text-white/90 ring-1 ring-white/10 backdrop-blur-sm">{badge}</span>
+        <span className="text-[12px] font-semibold tabular-nums tracking-[0.16em] text-white/65">{masked}</span>
       </span>
-      <span className="text-[11px] font-medium leading-none text-[#141414]">{label}</span>
-    </button>
+      <span className="relative mt-auto block px-4 pb-3">
+        {onAmountClick ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onAmountClick()
+            }}
+            aria-label={amountPressed ? 'Показать баланс' : 'Скрыть баланс'}
+            aria-pressed={amountPressed}
+            className="flex min-h-[52px] flex-col justify-center gap-1 py-1 text-left transition active:opacity-70"
+          >
+            <span className="flex items-center gap-1.5 text-[11px] text-white/55">
+              {label}
+              {amountPressed ? <EyeOff className="size-3.5" aria-hidden="true" /> : <Eye className="size-3.5" aria-hidden="true" />}
+            </span>
+            <span className="value-pop block text-[26px] font-bold leading-none tracking-tight tabular-nums">{amount}</span>
+          </button>
+        ) : (
+          <span className="block">
+            <span className="block text-[11px] text-white/55">{label}</span>
+            <span className="value-pop mt-1 block text-[26px] font-bold leading-none tracking-tight tabular-nums">{amount}</span>
+          </span>
+        )}
+        <span className="mt-2 flex min-h-[32px] items-end justify-between gap-2">
+          <span className="min-w-0 truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-white/50">{holder}</span>
+          {action && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                action.onClick()
+              }}
+              aria-label={action.aria}
+              className="relative flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-black/40 px-3.5 text-[12px] font-semibold text-white ring-1 ring-white/15 backdrop-blur-sm transition active:scale-95 after:absolute after:-inset-x-2 after:-inset-y-1.5 after:content-['']"
+            >
+              <action.icon className="size-3.5" aria-hidden="true" />
+              {action.label}
+            </button>
+          )}
+        </span>
+      </span>
+    </div>
   )
 }
 
@@ -327,6 +440,46 @@ export function TxRow({ m }: { m: MergedTx }) {
           {fmtMoney(total)}
         </div>
         <div className="text-[11px] tabular-nums text-[#9CA3AF]" suppressHydrationWarning>
+          {count > 1 ? `${fmtTime(t.createdAt)} · ×${count} ${fmtMoney(t.amount)}` : fmtTime(t.createdAt)}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Строка операции для тёмного главного экрана (последние операции)
+export function DarkTxRow({ m }: { m: MergedTx }) {
+  const { tx: t, count, total } = m
+  const { icon: Icon, color } = txMeta(t)
+  const positive = total >= 0
+  return (
+    <div className="flex min-h-[56px] items-center gap-3 py-2.5">
+      <span
+        className="flex size-10 shrink-0 items-center justify-center rounded-full ring-1 ring-white/[0.06]"
+        style={{ backgroundColor: `${color}26`, color }}
+        aria-hidden="true"
+      >
+        <Icon className="size-[18px]" strokeWidth={2.1} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <span className="min-w-0 truncate text-[14.5px] font-semibold text-white/95">
+            {TX_TYPE_LABEL[t.type] ?? t.type}
+          </span>
+          {count > 1 && (
+            <span className="shrink-0 rounded-full bg-[#22C55E]/15 px-2 text-[11px] font-bold leading-5 text-[#4ADE80]">
+              ×{count}
+            </span>
+          )}
+        </div>
+        <div className="truncate text-[11.5px] text-white/45">{t.counterpartyName ?? t.note ?? 'Операция'}</div>
+      </div>
+      <div className="shrink-0 text-right">
+        <div className={`text-[14.5px] font-bold tabular-nums ${positive ? 'text-[#4ADE80]' : 'text-white/95'}`}>
+          {positive ? '+' : ''}
+          {fmtMoney(total)}
+        </div>
+        <div className="text-[10.5px] tabular-nums text-white/35" suppressHydrationWarning>
           {count > 1 ? `${fmtTime(t.createdAt)} · ×${count} ${fmtMoney(t.amount)}` : fmtTime(t.createdAt)}
         </div>
       </div>

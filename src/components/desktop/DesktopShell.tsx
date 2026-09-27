@@ -7,7 +7,7 @@ import {
   Bell, Lock, Power, Search, Wifi, BatteryMedium, Volume2, ChevronUp,
 } from 'lucide-react'
 import { useOS, type AppKey } from '@/lib/store'
-import { wallpaperClass } from '@/lib/wallpapers'
+import { wallpaperById, wallpaperClass } from '@/lib/wallpapers'
 import { fmtMoney } from '@/lib/format'
 import { APP_TILE, AppTileImage, HOME_GRID } from '@/components/os/app-logos'
 import { api } from '@/lib/api'
@@ -115,6 +115,7 @@ export default function DesktopShell({ locked, onUnlock, renderApp, theme }: Pro
     return (
       <div
         className={`fixed inset-0 z-[100] flex flex-col items-center justify-center ${wallpaperClass(wallpaper)}`}
+        style={wallpaperById(wallpaper).light ? { backgroundImage: 'linear-gradient(180deg, rgba(10,11,14,0.88), rgba(10,11,14,0.94))' } : undefined}
         role="dialog"
         aria-label="Экран блокировки"
       >

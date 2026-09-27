@@ -36,7 +36,7 @@ function useClock(): Date | null {
 // ─── Карточка уведомления (M3 Expressive) ────────────────────────────────────
 // Одна и та же для непрочитанных и прочитанных; непрочитанные — ярче + точка.
 function NotifCard({
-  n, open, expanded, isDrag, dx, willDelete,
+  n, open, expanded, isDrag, dx, willDelete, tone = 'dark',
   onToggle, onPointerDown, onOpen,
 }: {
   n: NotificationDTO
@@ -45,6 +45,8 @@ function NotifCard({
   isDrag: boolean
   dx: number
   willDelete: boolean
+  /** 'dark' — белые тексты на стекле, 'light' — графит на белой карточке */
+  tone?: 'dark' | 'light'
   onToggle: () => void
   onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void
   onOpen: (app: AppKey) => void
@@ -52,6 +54,39 @@ function NotifCard({
   const meta: NotifApp = KIND_APP[n.kind] ?? KIND_APP.system
   const AppIcon = meta.icon
   const unread = !n.readAt
+  const T = tone === 'light'
+    ? {
+        ring: 'focus-visible:ring-black/30',
+        card: willDelete
+          ? 'bg-red-100 ring-1 ring-red-300'
+          : expanded
+            ? 'bg-white ring-1 ring-black/[0.08]'
+            : unread
+              ? 'bg-white ring-1 ring-black/[0.05] shadow-[0_10px_26px_-18px_rgba(15,23,42,0.4)]'
+              : 'bg-white/60 ring-1 ring-black/[0.03]',
+        active: 'active:bg-neutral-100',
+        app: 'text-neutral-400',
+        time: 'text-neutral-400',
+        title: 'text-neutral-900',
+        body: 'text-neutral-600',
+        openBtn: 'bg-neutral-900 text-white focus-visible:ring-neutral-300',
+      }
+    : {
+        ring: 'focus-visible:ring-white/60',
+        card: willDelete
+          ? 'bg-red-500/30 ring-red-400/50'
+          : expanded
+            ? 'bg-white/[0.13] ring-white/[0.09]'
+            : unread
+              ? 'bg-white/[0.09] ring-white/[0.07]'
+              : 'bg-white/[0.04] ring-white/[0.04]',
+        active: 'active:bg-white/[0.1]',
+        app: 'text-white/50',
+        time: 'text-white/45',
+        title: 'text-white',
+        body: 'text-white/70',
+        openBtn: 'bg-[#21A038] text-white focus-visible:ring-emerald-300',
+      }
   return (
     <div
       role="button"
@@ -72,15 +107,9 @@ function NotifCard({
         opacity: isDrag ? Math.max(0, 1 - Math.abs(dx) / 170) : undefined,
         touchAction: 'pan-y',
       }}
-      className={`relative cursor-pointer touch-pan-y select-none overflow-hidden rounded-[26px] px-4 py-3.5 outline-none ring-1 transition-[background-color,box-shadow] duration-200 focus-visible:ring-2 focus-visible:ring-white/60 ${
-        willDelete
-          ? 'bg-red-500/30 ring-red-400/50'
-          : expanded
-            ? 'bg-white/[0.13] ring-white/[0.09]'
-            : unread
-              ? 'bg-white/[0.09] ring-white/[0.07]'
-              : 'bg-white/[0.04] ring-white/[0.04]'
-      } ${!isDrag && !willDelete ? 'active:bg-white/[0.1]' : ''}`}
+      className={`relative cursor-pointer touch-pan-y select-none overflow-hidden rounded-[24px] px-4 py-3.5 outline-none ring-1 transition-[background-color,box-shadow] duration-200 focus-visible:ring-2 ${T.ring} ${T.card} ${
+        !isDrag && !willDelete ? T.active : ''
+      }`}
     >
       <div className="flex items-start gap-3">
         {/* иконка приложения — скруглённый тайл, как на рабочем столе */}
@@ -92,17 +121,17 @@ function NotifCard({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">
-            <span className="truncate text-[10px] font-bold uppercase tracking-[0.08em] text-white/50">
+            <span className={`truncate text-[10px] font-bold uppercase tracking-[0.08em] ${T.app}`}>
               {meta.app}
             </span>
-            <span className="shrink-0 text-[11px] tabular-nums text-white/45">{timeAgo(n.createdAt)}</span>
+            <span className={`shrink-0 text-[11px] tabular-nums ${T.time}`}>{timeAgo(n.createdAt)}</span>
           </div>
-          <div className="truncate text-[13.5px] font-bold leading-snug text-white">{n.title}</div>
-          <p className={`mt-0.5 text-[12.5px] leading-snug text-white/70 ${expanded ? '' : 'line-clamp-2'}`}>
+          <div className={`truncate text-[13.5px] font-bold leading-snug ${T.title}`}>{n.title}</div>
+          <p className={`mt-0.5 text-[12.5px] leading-snug ${T.body} ${expanded ? '' : 'line-clamp-2'}`}>
             {n.body}
           </p>
         </div>
-        {unread && <span aria-hidden="true" className="mt-1 size-2 shrink-0 rounded-full bg-emerald-400" />}
+        {unread && <span aria-hidden="true" className={`mt-1 size-2 shrink-0 rounded-full ${tone === "light" ? "bg-emerald-500" : "bg-emerald-400"}`} />}
       </div>
 
       {expanded && (
@@ -114,7 +143,7 @@ function NotifCard({
               e.stopPropagation()
               onOpen(meta.openApp)
             }}
-            className="min-h-[44px] rounded-full bg-[#21A038] px-5 text-[13px] font-bold text-white outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-emerald-300"
+            className={`min-h-[44px] rounded-full px-5 text-[13px] font-bold outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 ${T.openBtn}`}
           >
             Открыть {accName(meta.app)}
           </button>
@@ -128,10 +157,13 @@ function NotifCard({
 export function NotificationList({
   onOpenApp,
   interactive = true,
+  tone = 'dark',
 }: {
   onOpenApp: (app: AppKey) => void
   /** false — список только для чтения (внутри свёрнутых состояний) */
   interactive?: boolean
+  /** 'dark' — стиль для тёмных панелей, 'light' — для светлого центра управления */
+  tone?: 'dark' | 'light'
 }) {
   const notifications = useOS((s) => s.notifications)
   const markNotificationsRead = useOS((s) => s.markNotificationsRead)
@@ -201,8 +233,8 @@ export function NotificationList({
           decoding="async"
           className="h-24"
         />
-        <p className="mt-2 text-sm text-white/50">Пока пусто</p>
-        <p className="mt-1 text-[11px] text-white/30">Здесь появятся сообщения и события</p>
+        <p className={`mt-2 text-sm ${tone === 'light' ? 'text-neutral-500' : 'text-white/50'}`}>Пока пусто</p>
+        <p className={`mt-1 text-[11px] ${tone === 'light' ? 'text-neutral-400' : 'text-white/30'}`}>Здесь появятся сообщения и события</p>
       </div>
     )
   }
@@ -211,7 +243,7 @@ export function NotificationList({
     <>
       {/* шапка действий: «прочитать всё» + «очистить» */}
       <div className="flex items-center justify-between px-5 pb-1.5">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-white/40">
+        <span className={`text-[11px] font-semibold uppercase tracking-wider ${tone === "light" ? "text-neutral-400" : "text-white/40"}`}>
           {unreadItems.length > 0
             ? `${unreadItems.length === 1 ? '1 новое' : `${unreadItems.length} новых`}`
             : 'Прочитано'}
@@ -226,7 +258,7 @@ export function NotificationList({
               }}
               disabled={unreadItems.length === 0}
               aria-label="Отметить всё прочитанным"
-              className="flex size-9 items-center justify-center rounded-full text-white/65 outline-none transition-colors duration-200 enabled:active:bg-white/10 enabled:hover:text-white disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-white/70"
+              className={`flex size-9 items-center justify-center rounded-full outline-none transition-colors duration-200 disabled:opacity-30 focus-visible:ring-2 ${tone === "light" ? "text-neutral-500 enabled:active:bg-black/5 enabled:hover:text-neutral-800 focus-visible:ring-black/30" : "text-white/65 enabled:active:bg-white/10 enabled:hover:text-white focus-visible:ring-white/70"}`}
             >
               <CheckCheck className="size-[17px]" aria-hidden="true" />
             </button>
@@ -234,7 +266,7 @@ export function NotificationList({
               type="button"
               onClick={clearAll}
               aria-label="Очистить уведомления"
-              className="flex size-9 items-center justify-center rounded-full text-white/65 outline-none transition-colors duration-200 enabled:active:bg-white/10 enabled:hover:text-white focus-visible:ring-2 focus-visible:ring-white/70"
+              className={`flex size-9 items-center justify-center rounded-full outline-none transition-colors duration-200 focus-visible:ring-2 ${tone === "light" ? "text-neutral-500 enabled:active:bg-black/5 enabled:hover:text-neutral-800 focus-visible:ring-black/30" : "text-white/65 enabled:active:bg-white/10 enabled:hover:text-white focus-visible:ring-white/70"}`}
             >
               <Trash2 className="size-[17px]" aria-hidden="true" />
             </button>
@@ -253,6 +285,7 @@ export function NotificationList({
               isDrag={dragging?.id === n.id}
               dx={dragging?.id === n.id ? clampX(dragging.dx) : 0}
               willDelete={dragging?.id === n.id && Math.abs(clampX(dragging.dx)) > SWIPE_DELETE}
+              tone={tone}
               onToggle={() => toggle(n.id)}
               onPointerDown={onCardPointerDown}
               onOpen={(a) => onOpenApp(a)}
@@ -260,7 +293,7 @@ export function NotificationList({
           </li>
         ))}
         {unreadItems.length > 0 && readItems.length > 0 && (
-          <li aria-hidden="true" className="px-1 pb-0.5 pt-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/35">
+          <li aria-hidden="true" className={`px-1 pb-0.5 pt-1.5 text-[11px] font-semibold uppercase tracking-wider ${tone === "light" ? "text-neutral-400" : "text-white/35"}`}>
             Ранее
           </li>
         )}
@@ -273,6 +306,7 @@ export function NotificationList({
               isDrag={dragging?.id === n.id}
               dx={dragging?.id === n.id ? clampX(dragging.dx) : 0}
               willDelete={dragging?.id === n.id && Math.abs(clampX(dragging.dx)) > SWIPE_DELETE}
+              tone={tone}
               onToggle={() => toggle(n.id)}
               onPointerDown={onCardPointerDown}
               onOpen={(a) => onOpenApp(a)}

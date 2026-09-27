@@ -9,9 +9,20 @@ export interface WallpaperDef {
   css: string // градиент-подложка (для превью-фона)
   /** Премиум-обои открываются за Telegram Stars (косметика, без p2w). */
   premium?: boolean
+  /** Светлые обои: оболочка ОС (локскрин/лончер) рисует тёмные тексты. */
+  light?: boolean
 }
 
 export const WALLPAPERS: WallpaperDef[] = [
+  // Обои Resale OS по фирменному макету: светлый минимализм, шёлковые волны.
+  {
+    id: 'snow',
+    name: 'Волны',
+    image: null,
+    css:
+      'linear-gradient(168deg, #F5F6F8 0%, #ECEEF1 42%, #E2E4E9 74%, #D8DBE1 100%)',
+    light: true,
+  },
   {
     id: 'resale',
     name: 'Resale',
@@ -69,7 +80,7 @@ export const WALLPAPERS: WallpaperDef[] = [
   { id: 'fabric', name: 'Ткань', image: '/img/wall/fabric.webp', css: 'linear-gradient(170deg, #161a20 0%, #0a0c10 100%)' },
   { id: 'depth', name: 'Глубина', image: '/img/wall/depth.webp', css: 'linear-gradient(180deg, #101216 0%, #0b0a09 100%)' },
   { id: 'onyx', name: 'Оникс', image: '/img/wall/marble-dark.webp', css: 'linear-gradient(160deg, #191714 0%, #2b241b 100%)', premium: true },
-  { id: 'paper', name: 'Бумага', image: '/img/wall/paper.webp', css: 'linear-gradient(180deg, #efe9e2 0%, #d9c8b4 100%)' },
+  { id: 'paper', name: 'Бумага', image: '/img/wall/paper.webp', css: 'linear-gradient(180deg, #efe9e2 0%, #d9c8b4 100%)', light: true },
   { id: 'emerald', name: 'Изумруд', image: '/img/wall/emerald.webp', css: 'linear-gradient(180deg, #06231a 0%, #0b3d2c 100%)' },
   { id: 'metropolis', name: 'Мегаполис', image: '/img/wall/metropolis.webp', css: 'linear-gradient(180deg, #0a0e14 0%, #1a2230 100%)', premium: true },
   { id: 'gold', name: 'Золото', image: '/img/wall/gold.webp', css: 'linear-gradient(180deg, #0d0a07 0%, #2a1f12 100%)', premium: true },
@@ -92,4 +103,9 @@ export function wallpaperPreviewStyle(id: string): React.CSSProperties {
   return w.image
     ? { backgroundImage: `url(${w.image}), ${w.css}`, backgroundSize: 'cover', backgroundPosition: 'center' }
     : { backgroundImage: w.css }
+}
+
+/** Светлые ли обои (тон текстов оболочки ОС подстраивается автоматически). */
+export function isLightWallpaper(id: string): boolean {
+  return wallpaperById(id).light === true
 }
