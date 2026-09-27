@@ -12,7 +12,13 @@ const mainSchema = join(prismaDir, 'schema.prisma')
 const postgresSchema = join(prismaDir, 'schema.postgres.prisma')
 
 const isVercel = process.env.VERCEL === '1' || process.env.VERCEL === 'true'
-const hasPostgresUrl = Boolean(process.env.POSTGRES_URL || process.env.POSTGRESPRISMA_POSTGRES_URL)
+// Postgres определяется по ЛЮБОЙ из переменных: POSTGRES_URL, POSTGRESPRISMA_POSTGRES_URL
+// или по протоколу самого DATABASE_URL (postgres:// / postgresql://) — так на Vercel
+// достаточно одной DATABASE_URL от Supabase/Neon, без дублирующих переменных.
+const dbUrl = process.env.DATABASE_URL ?? ''
+const hasPostgresUrl =
+  Boolean(process.env.POSTGRES_URL || process.env.POSTGRESPRISMA_POSTGRES_URL) ||
+  dbUrl.startsWith('postgres')
 
 if (isVercel && hasPostgresUrl && existsSync(postgresSchema)) {
   copyFileSync(postgresSchema, mainSchema)
