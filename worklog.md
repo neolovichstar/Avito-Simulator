@@ -2334,3 +2334,16 @@ Stage Summary:
 - Банк: возвращён старый тёмно-зелёный верх главной вкладки 1:1 по скриншоту юзера, логика не тронута
 - Файлы: os/{HomeScreen,LockScreen,Shade,StatusBar,AppIcon,MiniPlayer,NotificationCenter,AppInfoSheet(new),app-logos}, lib/{wallpapers,store,weather(new)}, page.tsx, globals.css, BankApp(+bank/parts), WeatherApp, DesktopShell
 - Звуки не добавлялись; длинных тире в новых текстах нет
+
+---
+Task ID: 51-final
+Agent: main (Z.ai Code)
+Task: Деплой и прод-проверка Task 51
+
+Work Log:
+- Коммит 7f63a63 запушен в main (вместе с чекпоинтом Task 50 448882e)
+- Прод https://avito-simulator.vercel.app поднял новую сборку (маркер home_layout_v1 найден в чанках)
+- Прод-проверка в браузере: онбординг региона → локскрин с новыми обоями → дом (виджеты/сетка/док) → Банк (тёмный топ: приветствие, 5 действий, карты с артом, операции, безопасность) — всё рендерится и отвечает
+
+Stage Summary:
+- Task 51 полностью закрыт и задеплоен на прод; лок-скрин/лончер/ЦУ/библиотека соответствуют макету, drag&drop и «О приложении» работают, банк-топ возвращён как было
