@@ -512,30 +512,33 @@ export function AppTileImage({ app, className }: { app: AppKey; className?: stri
   )
 }
 
-// Порядок иконок на домашнем экране (сетка 4 колонки) и в доке.
+// Порядок иконок на домашнем экране (сетка 4 колонки) и в доке — как в макете:
+// док: Перепродажа · Банк · Телефон · Браузер; страница 1: Лидеры, Налоги,
+// Сервис, Аукцион, Задания, Доставка, Поддержка, Погода, Музыка, Галерея,
+// Калькулятор, Часы, Календарь, Заметки, Настройки…
 export const HOME_GRID: AppKey[] = [
   'avito',
   'bank',
+  'phone',
+  'browser',
   'leaderboard',
   'taxes',
-  'calc',
-  'clock',
-  'calendar',
-  'notes',
-  'weather',
-  'music',
-  'gallery',
   'repair',
   'auction',
   'career',
   'delivery',
+  'support',
+  'weather',
+  'music',
+  'gallery',
+  'calc',
+  'clock',
+  'calendar',
+  'notes',
   'settings',
-  'browser',
-  'phone',
   'numbers',
   'plates',
   'gosuslugi',
-  'support',
 ]
 
 export const DOCK_APPS: AppKey[] = ['avito', 'bank', 'auction', 'career']

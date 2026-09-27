@@ -9,13 +9,17 @@
 //     у края, иконка-призрак на 120 fps: позиция пишется в DOM напрямую);
 //     если отпустить без движения, открывается меню («О приложении»,
 //     «Изменить экран», «Убрать с экрана»);
+//   • Папки: навести перетаскиваемую иконку на другую и подождать ~0,4 с —
+//     цель подсветится (os-merge), отпустить — создастся папка. Папку можно
+//     открыть, переименовать, дотянуть в неё ещё приложения и вытащить их
+//     обратно на экран (drag из открытой папки за её пределы).
 //   • Долгий тап в Библиотеке: «О приложении» и «На главный экран».
-// Раскладка сохраняется в localStorage; новые приложения из обновлений
-// автоматически добавляются в конец сетки.
+// Раскладка сохраняется в localStorage (v2, с миграцией v1); новые приложения
+// из обновлений автоматически добавляются в конец сетки.
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
-  ArrowDown, ArrowUp, Check, ChevronRight, Navigation, Plus, Search, X,
+  ArrowDown, ArrowUp, Check, ChevronRight, Navigation, Pencil, Plus, Search, X,
 } from 'lucide-react'
 import { useOS, type AppKey, type WidgetKey } from '@/lib/store'
 import { wallpaperById, wallpaperClass } from '@/lib/wallpapers'
@@ -29,29 +33,87 @@ import { APP_TILE, DEFAULT_DOCK, DEFAULT_GRID, LIB_CHIPS, LIB_SECTIONS, type Lib
 import type { CareerData, DeliveryDTO } from '@/lib/types'
 
 // ─── Раскладка домашнего экрана ──────────────────────────────────────────────
-const LAYOUT_KEY = 'avito_sim_home_layout_v1'
-type Zone = 'grid' | 'dock'
-interface HomeLayout { grid: AppKey[]; dock: AppKey[] }
+const LAYOUT_KEY = 'avito_sim_home_layout_v2'
+const LAYOUT_KEY_V1 = 'avito_sim_home_layout_v1'
+type Zone = 'grid' | 'dock' | 'folder'
+export type HomeItem = { t: 'app'; app: AppKey } | { t: 'folder'; id: string; name: string; apps: AppKey[] }
+type FolderItem = Extract<HomeItem, { t: 'folder' }>
+interface HomeLayout { grid: HomeItem[]; dock: AppKey[] }
+interface DragInfo { item: HomeItem; zone: Zone; index: number; folderId: string | null }
+type MenuTargetBase =
+  | { kind: 'app'; app: AppKey; ctx: 'home' | 'lib' | 'folder'; folderId?: string }
+  | { kind: 'folder'; folderId: string }
+type MenuTarget = MenuTargetBase & { x: number; y: number }
+
 const DOCK_MAX = 4
 const PAGE0_SLOTS = 16 // виджеты + сетка 4×4
 const PAGES = 3 // две страницы сетки + библиотека
+const FOLDER_MAX = 9
+const HOLD_MS = 300
+const MERGE_MS = 380 // сколько держать иконку над другой, чтобы «слиплись»
+
+const genFolderId = () => `f_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
+const itemApps = (it: HomeItem): AppKey[] => (it.t === 'app' ? [it.app] : it.apps)
+const itemKey = (it: HomeItem): string => (it.t === 'app' ? it.app : it.id)
+const buzz = (ms: number | number[]) => {
+  if (typeof navigator !== 'undefined' && navigator.vibrate) {
+    try { navigator.vibrate(ms) } catch { /* ignore */ }
+  }
+}
+
+const validApps = (arr: unknown): AppKey[] =>
+  Array.isArray(arr) ? arr.filter((a): a is AppKey => typeof a === 'string' && a in APP_TILE) : []
 
 function loadLayout(): HomeLayout {
+  const mkItems = (arr: AppKey[]): HomeItem[] => arr.map((app) => ({ t: 'app', app }))
   try {
     const raw = localStorage.getItem(LAYOUT_KEY)
     if (raw) {
       const obj = JSON.parse(raw) as { grid?: unknown; dock?: unknown }
-      const valid = (arr: unknown): AppKey[] =>
-        Array.isArray(arr) ? arr.filter((a): a is AppKey => typeof a === 'string' && a in APP_TILE) : []
-      const dock = valid(obj.dock).slice(0, DOCK_MAX)
-      const grid = valid(obj.grid).filter((a) => !dock.includes(a))
+      const dock = validApps(obj.dock).slice(0, DOCK_MAX)
+      const seen = new Set<AppKey>(dock)
+      const grid: HomeItem[] = []
+      const rawGrid = Array.isArray(obj.grid) ? (obj.grid as unknown[]) : []
+      for (const it of rawGrid) {
+        const rec = it as { t?: unknown; app?: unknown; id?: unknown; name?: unknown; apps?: unknown } | null
+        if (!rec) continue
+        if (rec.t === 'app' && typeof rec.app === 'string' && rec.app in APP_TILE && !seen.has(rec.app as AppKey)) {
+          const appKey = rec.app as AppKey
+          grid.push({ t: 'app', app: appKey })
+          seen.add(appKey)
+        } else if (rec.t === 'folder') {
+          const apps = validApps(rec.apps).filter((a) => !seen.has(a)).slice(0, FOLDER_MAX)
+          if (apps.length >= 2) {
+            apps.forEach((a) => seen.add(a))
+            grid.push({
+              t: 'folder',
+              id: typeof rec.id === 'string' && rec.id ? rec.id : genFolderId(),
+              name: typeof rec.name === 'string' && rec.name.trim() ? rec.name.trim().slice(0, 24) : 'Папка',
+              apps,
+            })
+          } else {
+            apps.forEach((a) => { if (!seen.has(a)) { grid.push({ t: 'app', app: a }); seen.add(a) } })
+          }
+        }
+      }
       // Приложения, появившиеся в обновлениях, автоматически встают в конец сетки
-      const known = new Set([...grid, ...dock])
+      for (const a of [...DEFAULT_DOCK, ...DEFAULT_GRID]) {
+        if (!seen.has(a)) { grid.push({ t: 'app', app: a }); seen.add(a) }
+      }
+      return { grid, dock: dock.length ? dock : [...DEFAULT_DOCK] }
+    }
+    // миграция v1 (плоские массивы) → v2
+    const rawV1 = localStorage.getItem(LAYOUT_KEY_V1)
+    if (rawV1) {
+      const obj = JSON.parse(rawV1) as { grid?: unknown; dock?: unknown }
+      const dock = validApps(obj.dock).slice(0, DOCK_MAX)
+      const gridApps = validApps(obj.grid).filter((a) => !dock.includes(a))
+      const known = new Set([...dock, ...gridApps])
       const missing = [...DEFAULT_DOCK, ...DEFAULT_GRID].filter((a) => !known.has(a))
-      return { grid: [...grid, ...missing], dock: dock.length ? dock : [...DEFAULT_DOCK] }
+      return { grid: mkItems([...gridApps, ...missing]), dock: dock.length ? dock : [...DEFAULT_DOCK] }
     }
   } catch { /* приватный режим — дефолтная раскладка */ }
-  return { grid: [...DEFAULT_GRID], dock: [...DEFAULT_DOCK] }
+  return { grid: mkItems(DEFAULT_GRID), dock: [...DEFAULT_DOCK] }
 }
 
 // Живые тики часов (виджет «Сегодня») без ре-рендера лончера.
@@ -237,16 +299,168 @@ function TodayWidget({
   )
 }
 
-// ─── Контекстное меню иконки ────────────────────────────────────────────────
-function IconMenu({
-  menu, dark, onAbout, onEditScreen, onRemove, onAddHome, onClose,
+// ─── Стеклянная плитка папки (мини-иконки внутри) ───────────────────────────
+function FolderGlass({ apps, dark, className, style }: { apps: AppKey[]; dark: boolean; className?: string; style?: React.CSSProperties }) {
+  const minis = apps.slice(0, 9)
+  const cols = minis.length > 4 ? 3 : 2
+  return (
+    <span
+      style={style}
+      className={`relative block aspect-square w-full overflow-hidden rounded-[1.15rem] ring-1 backdrop-blur-md ${
+        dark ? 'bg-white/[0.13] ring-white/[0.14]' : 'bg-white/50 ring-white/80 shadow-[0_10px_26px_-14px_rgba(15,23,42,0.5)]'
+      } ${className ?? ''}`}
+    >
+      <span aria-hidden="true" className="absolute inset-0 grid place-items-center px-[9%]">
+        <span className="grid w-full" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: '8%' }}>
+          {minis.map((a) => (
+            <img
+              key={a}
+              src={APP_TILE[a].image}
+              alt=""
+              draggable={false}
+              loading="lazy"
+              decoding="async"
+              className="aspect-square w-full select-none rounded-[26%] object-cover shadow-[0_2px_5px_rgba(0,0,0,0.28)]"
+            />
+          ))}
+        </span>
+      </span>
+    </span>
+  )
+}
+
+function FolderTile({
+  item, dark, tone, tileClass, badge, onPointerDown, onClick,
 }: {
-  menu: { app: AppKey; x: number; y: number; lib: boolean }
+  item: FolderItem
+  dark: boolean
+  tone: 'dark' | 'light'
+  tileClass?: string
+  badge?: number
+  onPointerDown?: (e: React.PointerEvent) => void
+  onClick: (e: React.MouseEvent) => void
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={`Папка «${item.name}»`}
+      onClick={onClick}
+      onPointerDown={onPointerDown}
+      onContextMenu={(e) => e.preventDefault()}
+      className="flex w-full flex-col items-center gap-1 outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+    >
+      <span className={`relative block w-full transition-[transform,box-shadow] duration-200 ease-out ${tileClass ?? ''}`}>
+        <FolderGlass apps={item.apps} dark={dark} />
+        {badge !== undefined && badge > 0 && (
+          <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#E5484D] px-1 text-[10px] font-semibold leading-none text-white shadow-md">
+            {badge > 99 ? '99+' : badge}
+          </span>
+        )}
+      </span>
+      <span className={`w-[74px] truncate text-center text-[10px] ${tone === 'light' ? 'text-neutral-700' : 'text-white/90 [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]'}`}>
+        {item.name}
+      </span>
+    </button>
+  )
+}
+
+// ─── Открытая папка: стеклянная панель поверх домашнего экрана ──────────────
+function FolderView({
+  item, dark, tone, unreadChats, jiggle, armedIndex, dragApp, closing, extracting, panelRef,
+  onPointerDownIcon, onIconClick, onClose, onRename,
+}: {
+  item: FolderItem
+  dark: boolean
+  tone: 'dark' | 'light'
+  unreadChats: number
+  jiggle: boolean
+  armedIndex: number | null
+  dragApp: AppKey | null
+  closing: boolean
+  extracting: boolean
+  panelRef: React.RefObject<HTMLDivElement | null>
+  onPointerDownIcon: (app: AppKey, index: number) => (e: React.PointerEvent) => void
+  onIconClick: (app: AppKey) => (e: React.MouseEvent) => void
+  onClose: () => void
+  onRename: (name: string) => void
+}) {
+  const [name, setName] = useState(item.name)
+  return (
+    <div className="absolute inset-0 z-[68]" role="dialog" aria-label={`Папка «${item.name}»`}>
+      <button
+        type="button"
+        aria-label="Закрыть папку"
+        tabIndex={closing ? -1 : 0}
+        onClick={onClose}
+        className="sheet-fade absolute inset-0 cursor-default transition-colors duration-300"
+        style={{
+          background: extracting ? 'rgba(0,0,0,0.05)' : dark ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.25)',
+          backdropFilter: extracting ? 'blur(2px)' : 'blur(22px)',
+          WebkitBackdropFilter: extracting ? 'blur(2px)' : 'blur(22px)',
+        }}
+      />
+      <div
+        ref={panelRef}
+        className={`absolute left-1/2 top-[13%] w-[88%] max-w-[330px] rounded-[38px] p-4 ring-1 backdrop-blur-2xl ${
+          closing ? 'os-folder-panel-imploding' : 'os-folder-panel'
+        } ${
+          dark
+            ? 'bg-[#1C1C1E]/70 ring-white/[0.14] shadow-[0_44px_90px_-26px_rgba(0,0,0,0.8)]'
+            : 'bg-white/60 ring-white/80 shadow-[0_44px_90px_-28px_rgba(15,23,42,0.55)]'
+        }`}
+      >
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={() => onRename(name)}
+          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+          maxLength={24}
+          aria-label="Название папки"
+          className={`w-full rounded-lg bg-transparent px-1 py-0.5 text-center text-[15px] font-bold outline-none transition-colors focus:bg-black/5 ${dark ? 'text-white' : 'text-neutral-900'}`}
+        />
+        <div className="mt-3 grid grid-cols-3 gap-x-2 gap-y-4">
+          {item.apps.map((app, i) => (
+            <div
+              key={app}
+              data-slot={`folder:${i}`}
+              className="relative flex flex-col items-center"
+              style={dragApp === app ? { opacity: 0.3 } : undefined}
+            >
+              <AppIcon
+                icon={APP_TILE[app].icon}
+                label={APP_TILE[app].label}
+                image={APP_TILE[app].image || undefined}
+                imageBg={APP_TILE[app].background}
+                badge={app === 'avito' ? unreadChats : undefined}
+                tone={tone}
+                staticTile={jiggle}
+                tileClass={armedIndex === i ? 'os-lift' : jiggle ? `os-jiggle ${i % 2 ? 'os-jiggle-late' : ''}` : ''}
+                onPointerDown={onPointerDownIcon(app, i)}
+                onClick={onIconClick(app)}
+              />
+            </div>
+          ))}
+        </div>
+        <p className={`mt-3 text-center text-[10.5px] ${dark ? 'text-white/45' : 'text-neutral-500'}`}>
+          {item.apps.length} из {FOLDER_MAX} · зажмите иконку и тяните, чтобы вынести
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ─── Контекстное меню иконки / папки ────────────────────────────────────────
+function IconMenu({
+  menu, dark, onAbout, onEditScreen, onRemove, onAddHome, onRename, onUnfolder, onClose,
+}: {
+  menu: MenuTarget
   dark: boolean
   onAbout: () => void
   onEditScreen: () => void
   onRemove: () => void
   onAddHome: () => void
+  onRename: () => void
+  onUnfolder: () => void
   onClose: () => void
 }) {
   const item = 'flex w-full items-center gap-2.5 rounded-[12px] px-3 py-2.5 text-left text-[13px] font-medium outline-none transition-colors duration-150'
@@ -256,22 +470,37 @@ function IconMenu({
   const hover = dark ? 'hover:bg-white/10' : 'hover:bg-neutral-100'
 
   return (
-    <div className="absolute inset-0 z-[66]" role="menu" aria-label="Меню приложения">
+    <div className="absolute inset-0 z-[86]" role="menu" aria-label="Меню приложения">
       <button type="button" aria-label="Закрыть меню" tabIndex={-1} onClick={onClose} className="absolute inset-0 cursor-default" />
       <div
         className={`os-pop absolute w-[196px] overflow-hidden rounded-[18px] p-1.5 backdrop-blur-xl ${tone}`}
         style={{ left: menu.x, top: menu.y, transform: 'translate(-50%, -108%)' }}
       >
-        <button type="button" role="menuitem" onClick={onAbout} className={`${item} ${hover}`}>
-          <Search className="size-4 opacity-60" aria-hidden="true" />
-          О приложении
-        </button>
-        {menu.lib ? (
+        {menu.kind === 'app' && (
+          <button type="button" role="menuitem" onClick={onAbout} className={`${item} ${hover}`}>
+            <Search className="size-4 opacity-60" aria-hidden="true" />
+            О приложении
+          </button>
+        )}
+        {menu.kind === 'app' && menu.ctx === 'lib' && (
           <button type="button" role="menuitem" onClick={onAddHome} className={`${item} ${hover}`}>
             <Plus className="size-4 opacity-60" aria-hidden="true" />
             На главный экран
           </button>
-        ) : (
+        )}
+        {menu.kind === 'app' && menu.ctx === 'folder' && (
+          <button type="button" role="menuitem" onClick={onUnfolder} className={`${item} ${hover}`}>
+            <MinusGlyph />
+            Убрать из папки
+          </button>
+        )}
+        {menu.kind === 'folder' && (
+          <button type="button" role="menuitem" onClick={onRename} className={`${item} ${hover}`}>
+            <Pencil className="size-4 opacity-60" aria-hidden="true" />
+            Переименовать
+          </button>
+        )}
+        {menu.kind === 'folder' ? (
           <>
             <button type="button" role="menuitem" onClick={onEditScreen} className={`${item} ${hover}`}>
               <LayoutGridGlyph />
@@ -282,6 +511,19 @@ function IconMenu({
               Убрать с экрана
             </button>
           </>
+        ) : (
+          menu.ctx !== 'lib' && menu.ctx !== 'folder' && (
+            <>
+              <button type="button" role="menuitem" onClick={onEditScreen} className={`${item} ${hover}`}>
+                <LayoutGridGlyph />
+                Изменить экран
+              </button>
+              <button type="button" role="menuitem" onClick={onRemove} className={`${item} ${hover}`}>
+                <MinusGlyph />
+                Убрать с экрана
+              </button>
+            </>
+          )
         )}
       </div>
     </div>
@@ -320,6 +562,7 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
   const wall = wallpaperById(wallpaper)
   // Тон текстов: светлые обои + светлая тема → графитовые подписи; иначе белые
   const lightTone = !!wall.light && !dark
+  const tone: 'dark' | 'light' = lightTone ? 'light' : 'dark'
 
   const [layout, setLayout] = useState<HomeLayout>(loadLayout)
   const layoutRef = useRef(layout)
@@ -328,10 +571,14 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
   }, [layout])
   const [page, setPage] = useState(0)
   const [edit, setEdit] = useState(false)
-  const [menu, setMenu] = useState<{ app: AppKey; x: number; y: number; lib: boolean } | null>(null)
+  const [menu, setMenu] = useState<MenuTarget | null>(null)
   const [info, setInfo] = useState<AppKey | null>(null)
-  const [drag, setDrag] = useState<{ app: AppKey; zone: Zone; index: number } | null>(null)
-  const [armed, setArmed] = useState<{ app: AppKey; zone: Zone; index: number } | null>(null)
+  const [drag, setDrag] = useState<DragInfo | null>(null)
+  const [armed, setArmed] = useState<DragInfo | null>(null)
+  const [mergeAt, setMergeAt] = useState<number | null>(null) // слот сетки под «слипание»
+  const [openFolderId, setOpenFolderId] = useState<string | null>(null)
+  const [folderClosing, setFolderClosing] = useState(false)
+  const [extracting, setExtracting] = useState(false) // тянем иконку из открытой папки наружу
   const [libChip, setLibChip] = useState<LibChip>('all')
   const [libQuery, setLibQuery] = useState('')
 
@@ -343,9 +590,18 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
     try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)) } catch { /* ignore */ }
   }, [layout])
 
-  const openMenuAt = useCallback((app: AppKey, clientX: number, clientY: number, lib: boolean) => {
+  const openAppFromHome = useCallback(
+    (a: AppKey) => {
+      setOpenFolderId(null)
+      setFolderClosing(false)
+      onOpenApp(a)
+    },
+    [onOpenApp],
+  )
+
+  const openMenuAt = useCallback((target: MenuTargetBase, clientX: number, clientY: number) => {
     const r = rootRef.current?.getBoundingClientRect()
-    setMenu({ app, x: clientX - (r?.left ?? 0), y: clientY - (r?.top ?? 0), lib })
+    setMenu({ ...target, x: clientX - (r?.left ?? 0), y: clientY - (r?.top ?? 0) })
   }, [])
 
   // ─── Свайп страниц (transform в DOM напрямую, 120 fps) ─────────────────────
@@ -429,13 +685,13 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
   }, [page])
 
   const measureSlots = useCallback(() => {
-    // ищем по всему корню: слоты живут и в треке страниц, и в доке
+    // ищем по всему корню: слоты живут в треке страниц, доке и открытой папке
     const root = rootRef.current
     if (!root) return
     const out: typeof slotsRef.current = []
     root.querySelectorAll<HTMLElement>('[data-slot]').forEach((el) => {
       const [zone, idx] = (el.dataset.slot ?? '').split(':')
-      if (zone !== 'grid' && zone !== 'dock') return // библиотека не участвует в драге
+      if (zone !== 'grid' && zone !== 'dock' && zone !== 'folder') return // библиотека не участвует в драге
       if (!el.offsetParent) return // слот на скрытой странице
       const r = el.getBoundingClientRect()
       out.push({ zone: zone as Zone, index: Number(idx), cx: r.left + r.width / 2, cy: r.top + r.height / 2, w: r.width, h: r.height })
@@ -450,17 +706,105 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
     g.style.transform = `translate3d(${clientX - w / 2}px, ${clientY - w * 0.66}px, 0)`
   }
 
-  const dragRef = useRef<{ app: AppKey; zone: Zone; index: number } | null>(null)
+  const dragRef = useRef<DragInfo | null>(null)
   const lastPointerRef = useRef({ x: 0, y: 0 })
+  const hoverKeyRef = useRef<string | null>(null)
+  const hoverTimerRef = useRef(0)
+  const mergeRef = useRef<number | null>(null)
+  const extractingRef = useRef(false)
+  const panelRef = useRef<HTMLDivElement | null>(null)
 
-  const startDrag = useCallback((app: AppKey, zone: Zone, index: number, clientX: number, clientY: number, tileW: number) => {
+  const closeFolderSoon = () => {
+    setFolderClosing(true)
+    window.setTimeout(() => {
+      setOpenFolderId(null)
+      setFolderClosing(false)
+      setExtracting(false)
+      extractingRef.current = false
+    }, 210)
+  }
+
+  // «Слипание»: из перетаскиваемого и целевого элемента собираем папку
+  const doMerge = (from: DragInfo, targetIndex: number) => {
+    const prev = layoutRef.current
+    const g = [...prev.grid]
+    const dk = [...prev.dock]
+    let dragged: HomeItem | null = null
+    let ti = targetIndex
+    if (from.zone === 'grid') {
+      if (from.index >= g.length) return
+      dragged = g.splice(from.index, 1)[0] ?? null
+      if (from.index < ti) ti -= 1
+    } else if (from.zone === 'dock') {
+      if (from.index >= dk.length) return
+      dragged = { t: 'app', app: dk.splice(from.index, 1)[0] }
+    } else return
+    const target = g[ti]
+    if (!target || !dragged) return
+    const full = () => pushToast('Папка', `В папке максимум ${FOLDER_MAX} приложений`)
+    if (target.t === 'app' && dragged.t === 'app') {
+      g[ti] = { t: 'folder', id: genFolderId(), name: 'Папка', apps: [target.app, dragged.app] }
+    } else if (target.t === 'folder' && dragged.t === 'app') {
+      if (target.apps.length >= FOLDER_MAX) { full(); return }
+      g[ti] = { ...target, apps: [...target.apps, dragged.app] }
+    } else if (target.t === 'app' && dragged.t === 'folder') {
+      if (dragged.apps.length >= FOLDER_MAX) { full(); return }
+      g[ti] = { ...dragged, apps: [target.app, ...dragged.apps] }
+    } else {
+      const a = target as FolderItem
+      const b = dragged as FolderItem
+      if (a.apps.length + b.apps.length > FOLDER_MAX) { full(); return }
+      g[ti] = { t: 'folder', id: a.id, name: a.name, apps: [...a.apps, ...b.apps] }
+    }
+    layoutRef.current = { grid: g, dock: dk }
+    setLayout(layoutRef.current)
+    buzz([12, 40, 18])
+  }
+
+  // Вынос приложения из папки на домашний экран (дроп за пределами панели)
+  const extractToHome = (app: AppKey, folderId: string) => {
+    const prev = layoutRef.current
+    const idx = prev.grid.findIndex((it) => it.t === 'folder' && it.id === folderId)
+    if (idx < 0) return
+    const f = prev.grid[idx] as FolderItem
+    if (!f.apps.includes(app)) return
+    const appsLeft = f.apps.filter((a) => a !== app)
+    const replacement: HomeItem | null =
+      appsLeft.length >= 2
+        ? { t: 'folder', id: folderId, name: f.name, apps: appsLeft }
+        : appsLeft.length === 1
+          ? { t: 'app', app: appsLeft[0] }
+          : null
+    const g: HomeItem[] = [...prev.grid]
+    if (replacement) g[idx] = replacement
+    else g.splice(idx, 1)
+    // ближайший к пальцу слот сетки; координаты старой раскладки — после idx сдвиг
+    const p = lastPointerRef.current
+    let insertAt = idx
+    let bestD = Infinity
+    for (const s of slotsRef.current) {
+      if (s.zone !== 'grid') continue
+      const d = Math.hypot(p.x - s.cx, p.y - s.cy)
+      if (d < Math.max(s.w, s.h) * 0.9 && d < bestD) {
+        bestD = d
+        insertAt = !replacement && s.index > idx ? s.index - 1 : s.index
+      }
+    }
+    g.splice(Math.max(0, Math.min(g.length, insertAt)), 0, { t: 'app', app })
+    layoutRef.current = { ...prev, grid: g }
+    setLayout(layoutRef.current)
+    pushToast('Домашний экран', `«${APP_TILE[app].label}» вынесен из папки`)
+    closeFolderSoon()
+  }
+
+  const startDrag = (item: HomeItem, zone: Zone, index: number, folderId: string | null, clientX: number, clientY: number, tileW: number) => {
     dragActiveRef.current = true
     ghostWRef.current = tileW || 72
     setGhostW(tileW || 72)
-    dragRef.current = { app, zone, index }
+    dragRef.current = { item, zone, index, folderId }
     lastPointerRef.current = { x: clientX, y: clientY }
     setArmed(null)
-    setDrag({ app, zone, index })
+    setDrag({ item, zone, index, folderId })
     requestAnimationFrame(() => {
       measureSlots()
       positionGhost(clientX, clientY)
@@ -472,17 +816,52 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
       if (ev.cancelable) ev.preventDefault()
       lastPointerRef.current = { x: ev.clientX, y: ev.clientY }
       positionGhost(ev.clientX, ev.clientY)
+      const from = dragRef.current
+      if (!from) return
 
-      // автопролистывание страниц у краёв
+      // ── Драг внутри открытой папки: реордер в панели, наружу — вынос ──
+      if (from.zone === 'folder') {
+        const pr = panelRef.current?.getBoundingClientRect()
+        const outside = !pr || ev.clientX < pr.left - 6 || ev.clientX > pr.right + 6 || ev.clientY < pr.top - 6 || ev.clientY > pr.bottom + 6
+        if (outside !== extractingRef.current) {
+          extractingRef.current = outside
+          setExtracting(outside)
+          if (outside) buzz(6)
+        }
+        if (outside) return
+        let bestF: { index: number; d: number } | null = null
+        for (const s of slotsRef.current) {
+          if (s.zone !== 'folder') continue
+          const d = Math.hypot(ev.clientX - s.cx, ev.clientY - s.cy)
+          const lim = Math.max(s.w, s.h) * 0.8
+          if (d < lim && (!bestF || d < bestF.d)) bestF = { index: s.index, d }
+        }
+        if (!bestF || bestF.index === from.index || !from.folderId) return
+        const f = layoutRef.current.grid.find((it): it is FolderItem => it.t === 'folder' && it.id === from.folderId)
+        if (!f) return
+        const apps = [...f.apps]
+        const [moved] = apps.splice(from.index, 1)
+        apps.splice(Math.max(0, Math.min(apps.length, bestF.index)), 0, moved)
+        layoutRef.current = {
+          ...layoutRef.current,
+          grid: layoutRef.current.grid.map((it) => (it.t === 'folder' && it.id === from.folderId ? { ...it, apps } : it)),
+        }
+        setLayout(layoutRef.current)
+        dragRef.current = { ...from, index: Math.max(0, Math.min(apps.length - 1, bestF.index)) }
+        requestAnimationFrame(measureSlots)
+        return
+      }
+
+      // ── Автопролистывание страниц у краёв ──
       const vw = window.innerWidth
       const dir: -1 | 0 | 1 = ev.clientX < 34 ? -1 : ev.clientX > vw - 34 ? 1 : 0
       const canFlip = dir !== 0 && pageRef.current + dir >= 0 && pageRef.current + dir <= PAGES - 2
       if (canFlip && flipDir.current !== dir) {
         flipDir.current = dir
+        const d = dir // фиксируем направление: апдейтер React выполнится позже
         window.clearTimeout(flipTimer.current)
         flipTimer.current = window.setTimeout(() => {
-          setPage((p) => Math.max(0, Math.min(PAGES - 1, p + flipDir.current)))
-          window.clearTimeout(flipTimer.current)
+          setPage((p) => Math.max(0, Math.min(PAGES - 1, p + d)))
           flipDir.current = 0
         }, 420)
       } else if (!canFlip && flipDir.current !== 0) {
@@ -490,60 +869,123 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
         flipDir.current = 0
       }
 
-      // ближайший слот: живо переупорядочиваем раскладку
-      let best: { zone: Zone; index: number; d: number } | null = null
+      // ── Ближайший слот сетки/дока ──
+      let best: { zone: Zone; index: number; d: number; w: number; h: number } | null = null
       for (const s of slotsRef.current) {
+        if (s.zone === 'folder') continue
         const d = Math.hypot(ev.clientX - s.cx, ev.clientY - s.cy)
         const lim = Math.max(s.w, s.h) * 0.8
-        if (d < lim && (!best || d < best.d)) best = { zone: s.zone, index: s.index, d }
+        if (d < lim && (!best || d < best.d)) best = { zone: s.zone, index: s.index, d, w: s.w, h: s.h }
       }
-      if (!best) return
-      const from = dragRef.current
-      if (!from) return
-      if (from.zone === best.zone && from.index === best.index) return
 
+      // ── «Слипание» в папку: наведение на иконку/папку сетки с задержкой ──
+      const slotKey = best ? `${best.zone}:${best.index}` : null
+      const tItem = best && best.zone === 'grid' ? layoutRef.current.grid[best.index] : null
+      const canMerge =
+        !!best && !!tItem && best.zone === 'grid' &&
+        !(from.zone === 'grid' && from.index === best.index) &&
+        best.d < Math.max(best.w, best.h) * 0.62
+      if (slotKey !== hoverKeyRef.current) {
+        window.clearTimeout(hoverTimerRef.current)
+        hoverTimerRef.current = 0
+        hoverKeyRef.current = slotKey
+        if (mergeRef.current !== null) {
+          mergeRef.current = null
+          setMergeAt(null)
+        }
+      }
+      if (canMerge && best && !hoverTimerRef.current && mergeRef.current === null) {
+        const idx = best.index
+        hoverTimerRef.current = window.setTimeout(() => {
+          hoverTimerRef.current = 0
+          mergeRef.current = idx
+          setMergeAt(idx)
+          buzz(8)
+        }, MERGE_MS)
+      } else if (!canMerge && hoverTimerRef.current) {
+        window.clearTimeout(hoverTimerRef.current)
+        hoverTimerRef.current = 0
+      }
+      const dwellPending = canMerge && hoverTimerRef.current !== 0
+      const merging = mergeRef.current !== null && !!best && best.zone === 'grid' && best.index === mergeRef.current
+      if (dwellPending || merging) return // ждём решения — раскладку не двигаем
+
+      if (!best) return
       const prev = layoutRef.current
       let g = [...prev.grid]
       let dk = [...prev.dock]
-      const item = from.zone === 'grid' ? g.splice(from.index, 1)[0] : dk.splice(from.index, 1)[0]
-      let nextFrom: { app: AppKey; zone: Zone; index: number }
+      const fromItem: HomeItem | null =
+        from.zone === 'grid'
+          ? g.splice(from.index, 1)[0] ?? null
+          : from.zone === 'dock'
+            ? { t: 'app', app: dk.splice(from.index, 1)[0] }
+            : null
+      if (!fromItem) return
+      let nextFrom: { zone: Zone; index: number }
       if (best.zone === 'grid') {
         // best.index — индекс целевого слота в текущей раскладке: после удаления
         // вставляем ровно в него, тогда иконка занимает место цели
         const at = Math.max(0, Math.min(g.length, best.index))
-        g.splice(at, 0, item)
-        nextFrom = { app: item, zone: 'grid', index: at }
+        g.splice(at, 0, fromItem)
+        nextFrom = { zone: 'grid', index: at }
+      } else if (fromItem.t === 'folder') {
+        return // папки в доке не живут
       } else if (dk.length >= DOCK_MAX && from.zone === 'dock') {
         // док полон: обмен внутри дока
         const t = Math.max(0, Math.min(dk.length - 1, best.index))
         dk[from.index] = dk[t]
-        dk[t] = item
-        nextFrom = { app: item, zone: 'dock', index: t }
+        dk[t] = fromItem.app
+        nextFrom = { zone: 'dock', index: t }
       } else if (dk.length >= DOCK_MAX) {
         // док полон, тащим из сетки: меняемся с иконкой дока
         const t = Math.max(0, Math.min(dk.length - 1, best.index))
         const displaced = dk[t]
-        dk[t] = item
-        g.splice(Math.max(0, Math.min(g.length, from.zone === 'grid' ? Math.min(from.index, g.length) : g.length)), 0, displaced)
-        nextFrom = { app: item, zone: 'dock', index: t }
+        dk[t] = fromItem.app
+        g.splice(Math.max(0, Math.min(g.length, from.zone === 'grid' ? Math.min(from.index, g.length) : g.length)), 0, { t: 'app', app: displaced })
+        nextFrom = { zone: 'dock', index: t }
       } else {
         const t = Math.max(0, Math.min(dk.length, best.index))
-        dk.splice(t, 0, item)
-        nextFrom = { app: item, zone: 'dock', index: t }
+        dk.splice(t, 0, fromItem.app)
+        nextFrom = { zone: 'dock', index: t }
       }
       layoutRef.current = { grid: g, dock: dk }
       setLayout(layoutRef.current)
-      dragRef.current = nextFrom
+      dragRef.current = { ...from, ...nextFrom }
       requestAnimationFrame(measureSlots)
     }
+
     const end = () => {
       cleanup()
+      window.clearTimeout(flipTimer.current)
+      flipDir.current = 0
+      window.clearTimeout(hoverTimerRef.current)
+      hoverTimerRef.current = 0
+      hoverKeyRef.current = null
+      const from = dragRef.current
+      const m = mergeRef.current
+      const wasFolder = from?.zone === 'folder'
+      const folderId = from?.folderId ?? null
+      const draggedItem = from?.item ?? null
       dragActiveRef.current = false
       movedRef.current = false
       dragRef.current = null
+      mergeRef.current = null
+      extractingRef.current = false
       setDrag(null)
-      window.clearTimeout(flipTimer.current)
-      flipDir.current = 0
+      setMergeAt(null)
+      setExtracting(false)
+      if (wasFolder && draggedItem && draggedItem.t === 'app' && folderId) {
+        // отпустили за пределами панели → выносим приложение на домашний экран
+        const pr = panelRef.current?.getBoundingClientRect()
+        const p = lastPointerRef.current
+        const outside = !pr || p.x < pr.left - 6 || p.x > pr.right + 6 || p.y < pr.top - 6 || p.y > pr.bottom + 6
+        if (outside) {
+          extractToHome(draggedItem.app, folderId)
+          buzz(12)
+        }
+        return
+      }
+      if (from && m !== null) doMerge(from, m)
     }
     const cleanup = () => {
       window.removeEventListener('pointermove', move)
@@ -553,7 +995,7 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
     window.addEventListener('pointermove', move, { passive: false })
     window.addEventListener('pointerup', end)
     window.addEventListener('pointercancel', end)
-  }, [measureSlots])
+  }
 
   // призрак позиционируется до первой отрисовки (rAF может сработать раньше маунта)
   useLayoutEffect(() => {
@@ -572,8 +1014,7 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
   }, [page, drag, measureSlots])
 
   // ─── Зажатие иконки: подъём → перетаскивание / меню ────────────────────────
-  const HOLD_MS = 300
-  const iconPointerDown = (app: AppKey, zone: Zone, index: number) => (e: React.PointerEvent) => {
+  const iconPointerDown = (item: HomeItem, zone: 'grid' | 'dock', index: number) => (e: React.PointerEvent) => {
     if (e.button > 0) return
     const startX = e.clientX
     const startY = e.clientY
@@ -582,44 +1023,84 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
     let done = false
     const liftTimer = window.setTimeout(() => {
       lifted = true
-      setArmed({ app, zone, index })
-      if (navigator.vibrate) { try { navigator.vibrate(10) } catch { /* ignore */ } }
+      setArmed({ item, zone, index, folderId: null })
+      buzz(10)
     }, HOLD_MS)
-
+    const clear = () => {
+      window.clearTimeout(liftTimer)
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+    }
     const onMove = (ev: PointerEvent) => {
       if (done) return
       const dist = Math.hypot(ev.clientX - startX, ev.clientY - startY)
       if (!lifted && dist > 8) {
         // движение до подъёма: в редактировании начинаем драг, иначе это свайп страниц
         done = true
-        window.clearTimeout(liftTimer)
-        window.removeEventListener('pointermove', onMove)
-        window.removeEventListener('pointerup', onUp)
-        window.removeEventListener('pointercancel', onUp)
-        if (editRef.current) startDrag(app, zone, index, ev.clientX, ev.clientY, el.getBoundingClientRect().width)
+        clear()
+        if (editRef.current) startDrag(item, zone, index, null, ev.clientX, ev.clientY, el.getBoundingClientRect().width)
         return
       }
       if (lifted && dist > 6) {
         // подъём был, палец поехал: перетаскивание
         done = true
-        window.clearTimeout(liftTimer)
-        window.removeEventListener('pointermove', onMove)
-        window.removeEventListener('pointerup', onUp)
-        window.removeEventListener('pointercancel', onUp)
-        startDrag(app, zone, index, ev.clientX, ev.clientY, el.getBoundingClientRect().width)
+        clear()
+        startDrag(item, zone, index, null, ev.clientX, ev.clientY, el.getBoundingClientRect().width)
       }
     }
     const onUp = () => {
+      clear()
+      if (lifted && !done) {
+        // зажал и отпустил без движения: меню («О приложении» / папка)
+        suppressClickRef.current = true
+        window.setTimeout(() => { suppressClickRef.current = false }, 400)
+        setArmed(null)
+        if (item.t === 'folder') openMenuAt({ kind: 'folder', folderId: item.id }, startX, startY)
+        else openMenuAt({ kind: 'app', app: item.app, ctx: 'home' }, startX, startY)
+      }
+    }
+    window.addEventListener('pointermove', onMove, { passive: true })
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
+  }
+
+  // зажатие иконки внутри открытой папки
+  const folderIconPointerDown = (folderId: string) => (app: AppKey, index: number) => (e: React.PointerEvent) => {
+    if (e.button > 0) return
+    const startX = e.clientX
+    const startY = e.clientY
+    const el = e.currentTarget as HTMLElement
+    let lifted = false
+    let done = false
+    const liftTimer = window.setTimeout(() => {
+      lifted = true
+      setArmed({ item: { t: 'app', app }, zone: 'folder', index, folderId })
+      buzz(10)
+    }, HOLD_MS)
+    const clear = () => {
       window.clearTimeout(liftTimer)
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onUp)
+    }
+    const onMove = (ev: PointerEvent) => {
+      if (done) return
+      const dist = Math.hypot(ev.clientX - startX, ev.clientY - startY)
+      if (!lifted && dist > 8) { done = true; clear(); return }
+      if (lifted && dist > 6) {
+        done = true
+        clear()
+        startDrag({ t: 'app', app }, 'folder', index, folderId, ev.clientX, ev.clientY, el.getBoundingClientRect().width)
+      }
+    }
+    const onUp = () => {
+      clear()
       if (lifted && !done) {
-        // зажал и отпустил без движения: меню «О приложении»
         suppressClickRef.current = true
         window.setTimeout(() => { suppressClickRef.current = false }, 400)
         setArmed(null)
-        openMenuAt(app, startX, startY, false)
+        openMenuAt({ kind: 'app', app, ctx: 'folder', folderId }, startX, startY)
       }
     }
     window.addEventListener('pointermove', onMove, { passive: true })
@@ -628,74 +1109,161 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
   }
 
   // в режиме редактирования тап по иконке открывает меню (быстро и понятно)
-  const iconClick = (app: AppKey) => (e: React.MouseEvent) => {
+  const slotClick = (item: HomeItem) => (e: React.MouseEvent) => {
     if (movedRef.current || dragActiveRef.current || suppressClickRef.current) return
-    if (edit) { openMenuAt(app, e.clientX, e.clientY, false); return }
-    onOpenApp(app)
+    if (edit) {
+      if (item.t === 'folder') openMenuAt({ kind: 'folder', folderId: item.id }, e.clientX, e.clientY)
+      else openMenuAt({ kind: 'app', app: item.app, ctx: 'home' }, e.clientX, e.clientY)
+      return
+    }
+    if (item.t === 'folder') setOpenFolderId(item.id)
+    else openAppFromHome(item.app)
+  }
+
+  const folderIconClick = (folderId: string) => (app: AppKey) => (e: React.MouseEvent) => {
+    if (movedRef.current || dragActiveRef.current || suppressClickRef.current) return
+    if (edit) { openMenuAt({ kind: 'app', app, ctx: 'folder', folderId }, e.clientX, e.clientY); return }
+    openAppFromHome(app)
   }
 
   // ─── Действия меню ─────────────────────────────────────────────────────────
+  const removeAppFromLayout = (app: AppKey) => {
+    const prev = layoutRef.current
+    const dock = prev.dock.filter((a) => a !== app)
+    const grid: HomeItem[] = []
+    for (const it of prev.grid) {
+      if (it.t === 'app') {
+        if (it.app !== app) grid.push(it)
+      } else {
+        const apps = it.apps.filter((a) => a !== app)
+        if (apps.length === 1) grid.push({ t: 'app', app: apps[0] })
+        else if (apps.length > 1) grid.push({ ...it, apps })
+      }
+    }
+    layoutRef.current = { grid, dock }
+    setLayout(layoutRef.current)
+  }
   const removeFromHome = (app: AppKey) => {
-    setLayout((prev) => ({ grid: prev.grid.filter((a) => a !== app), dock: prev.dock.filter((a) => a !== app) }))
+    removeAppFromLayout(app)
     pushToast('Домашний экран', `«${APP_TILE[app].label}» убран с экрана. Иконка осталась в Библиотеке`)
   }
   const addToHome = (app: AppKey) => {
-    setLayout((prev) => (prev.grid.includes(app) || prev.dock.includes(app) ? prev : { ...prev, grid: [...prev.grid, app] }))
+    const prev = layoutRef.current
+    if (prev.grid.some((it) => it.t === 'folder' && it.apps.includes(app))) {
+      // приложение в папке — выносим на главный экран
+      unfolderApp(app, (prev.grid.find((it): it is FolderItem => it.t === 'folder' && it.apps.includes(app)) as FolderItem).id)
+      return
+    }
+    if (prev.dock.includes(app) || prev.grid.some((it) => it.t === 'app' && it.app === app)) return
+    layoutRef.current = { ...prev, grid: [...prev.grid, { t: 'app', app }] }
+    setLayout(layoutRef.current)
     pushToast('Домашний экран', `«${APP_TILE[app].label}» добавлен на главный экран`)
+  }
+  const unfolderApp = (app: AppKey, folderId: string) => {
+    const prev = layoutRef.current
+    const idx = prev.grid.findIndex((it) => it.t === 'folder' && it.id === folderId)
+    if (idx < 0) return
+    const f = prev.grid[idx] as FolderItem
+    const appsLeft = f.apps.filter((a) => a !== app)
+    const g = [...prev.grid]
+    if (appsLeft.length >= 2) g[idx] = { t: 'folder', id: folderId, name: f.name, apps: appsLeft }
+    else if (appsLeft.length === 1) g[idx] = { t: 'app', app: appsLeft[0] }
+    else g.splice(idx, 1)
+    g.push({ t: 'app', app })
+    layoutRef.current = { ...prev, grid: g }
+    setLayout(layoutRef.current)
+    pushToast('Домашний экран', `«${APP_TILE[app].label}» вынесен из папки`)
+  }
+  const dissolveFolder = (folderId: string) => {
+    const prev = layoutRef.current
+    const f = prev.grid.find((it): it is FolderItem => it.t === 'folder' && it.id === folderId)
+    if (!f) return
+    const g = prev.grid.flatMap((it): HomeItem[] =>
+      it.t === 'folder' && it.id === folderId ? it.apps.map((app) => ({ t: 'app', app })) : [it],
+    )
+    layoutRef.current = { ...prev, grid: g }
+    setLayout(layoutRef.current)
+    pushToast('Домашний экран', `Папка «${f.name}» разобрана`)
+  }
+  const renameFolder = (folderId: string, name: string) => {
+    const clean = name.trim().slice(0, 24) || 'Папка'
+    layoutRef.current = {
+      ...layoutRef.current,
+      grid: layoutRef.current.grid.map((it) => (it.t === 'folder' && it.id === folderId ? { ...it, name: clean } : it)),
+    }
+    setLayout(layoutRef.current)
   }
   const openInfo = (app: AppKey) => {
     setMenu(null)
     setInfo(app)
   }
 
-  // Escape закрывает меню/шит/редактирование
+  // Escape закрывает меню/шит/папку/редактирование
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       if (menu) setMenu(null)
       else if (info) setInfo(null)
+      else if (openFolderId && !folderClosing) closeFolderSoon()
       else if (edit) setEdit(false)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [menu, info, edit])
+  }, [menu, info, openFolderId, folderClosing, edit])
 
   // ─── Слоты сетки/дока ──────────────────────────────────────────────────────
-  const page0Apps = layout.grid.slice(0, PAGE0_SLOTS)
-  const page1Apps = layout.grid.slice(PAGE0_SLOTS)
+  const page0Items = layout.grid.slice(0, PAGE0_SLOTS)
+  const page1Items = layout.grid.slice(PAGE0_SLOTS)
   const jiggleMode = edit || !!drag || !!armed
 
-  const renderIcon = (app: AppKey, zone: Zone, index: number, small: boolean) => {
-    const isDragging = drag?.zone === zone && drag.index === index && drag.app === app
-    const isArmed = armed?.zone === zone && armed.index === index && armed.app === app
+  const renderSlot = (item: HomeItem, zone: 'grid' | 'dock', index: number, small: boolean) => {
+    const isDragging = !!drag && drag.zone === zone && drag.index === index && itemKey(drag.item) === itemKey(item)
+    const isArmed = !!armed && armed.zone === zone && armed.index === index && itemKey(armed.item) === itemKey(item)
+    const isMerge = zone === 'grid' && mergeAt === index && drag?.zone !== 'folder' && !isDragging
+    const jiggleCls = isArmed ? 'os-lift' : jiggleMode ? `os-jiggle ${index % 2 ? 'os-jiggle-late' : ''}` : isMerge ? `os-merge ${dark ? 'os-merge-dark' : ''}` : ''
     return (
       <div
-        key={`${zone}-${app}-${index}`}
+        key={`${zone}:${index}:${itemKey(item)}`}
         data-slot={`${zone}:${index}`}
         className="relative flex flex-col items-center"
         style={isDragging ? { opacity: 0.3 } : undefined}
       >
-        <AppIcon
-          icon={APP_TILE[app].icon}
-          label={APP_TILE[app].label}
-          image={APP_TILE[app].image || undefined}
-          imageBg={APP_TILE[app].background}
-          badge={app === 'avito' ? unreadChats : undefined}
-          small={small}
-          hideLabel={small}
-          tone={lightTone ? 'light' : 'dark'}
-          staticTile={jiggleMode}
-          tileClass={isArmed ? 'os-lift' : jiggleMode ? `os-jiggle ${index % 2 ? 'os-jiggle-late' : ''}` : ''}
-          onPointerDown={iconPointerDown(app, zone, index)}
-          onClick={iconClick(app)}
-        />
+        {item.t === 'folder' ? (
+          <FolderTile
+            item={item}
+            dark={dark}
+            tone={tone}
+            tileClass={jiggleCls}
+            badge={item.apps.reduce((n, a) => n + (a === 'avito' ? unreadChats : 0), 0)}
+            onPointerDown={iconPointerDown(item, zone, index)}
+            onClick={slotClick(item)}
+          />
+        ) : (
+          <AppIcon
+            icon={APP_TILE[item.app].icon}
+            label={APP_TILE[item.app].label}
+            image={APP_TILE[item.app].image || undefined}
+            imageBg={APP_TILE[item.app].background}
+            badge={item.app === 'avito' ? unreadChats : undefined}
+            small={small}
+            hideLabel={small}
+            tone={tone}
+            staticTile={jiggleMode}
+            tileClass={jiggleCls}
+            onPointerDown={iconPointerDown(item, zone, index)}
+            onClick={slotClick(item)}
+          />
+        )}
       </div>
     )
   }
 
   // ─── Библиотека ────────────────────────────────────────────────────────────
   const q = libQuery.trim().toLowerCase()
-  const allApps = useMemo(() => [...layout.dock, ...layout.grid], [layout])
+  const allApps = useMemo(
+    () => [...layout.dock, ...layout.grid.flatMap((it) => itemApps(it))],
+    [layout],
+  )
   const foundApps = useMemo(() => {
     if (!q) return null
     return allApps
@@ -708,22 +1276,26 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
     return LIB_SECTIONS.filter((s) => libChip === 'all' || s.chip === libChip)
   }, [q, libChip])
 
-  const libIcon = (app: AppKey, i: number) => (
+  const libIcon = (app: AppKey) => (
     <div key={app} className="relative flex flex-col items-center">
       <AppIcon
         icon={APP_TILE[app].icon}
         label={APP_TILE[app].label}
         image={APP_TILE[app].image || undefined}
         imageBg={APP_TILE[app].background}
-        tone={lightTone ? 'light' : 'dark'}
+        tone={tone}
         staticTile
-        onLongPress={() => openMenuAt(app, window.innerWidth / 2, window.innerHeight / 2 - 40, true)}
+        onLongPress={() => openMenuAt({ kind: 'app', app, ctx: 'lib' }, window.innerWidth / 2, window.innerHeight / 2 - 40)}
         onClick={() => onOpenApp(app)}
       />
     </div>
   )
 
   const trackStyle = { transform: `translateX(${-page * (100 / PAGES)}%)`, transition: SETTLE_EASE, willChange: 'transform' as const }
+
+  const openFolderItem: FolderItem | null = openFolderId
+    ? (layout.grid.find((it) => it.t === 'folder' && it.id === openFolderId) as FolderItem | undefined) ?? null
+    : null
 
   return (
     <div
@@ -762,11 +1334,11 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
           {/* Панель 1: виджеты + сетка */}
           <section className="flex h-full w-1/3 flex-col" aria-label="Главный экран" aria-hidden={page !== 0}>
             <div className="flex items-stretch gap-2 px-3">
-              <WeatherWidget dark={dark} onOpenApp={onOpenApp} />
-              <TodayWidget dark={dark} widgets={widgets} online={online} day={day} onOpenApp={onOpenApp} />
+              <WeatherWidget dark={dark} onOpenApp={openAppFromHome} />
+              <TodayWidget dark={dark} widgets={widgets} online={online} day={day} onOpenApp={openAppFromHome} />
             </div>
             <div className="mt-5 grid grid-cols-4 gap-x-2 gap-y-4 px-4">
-              {page0Apps.map((app, i) => renderIcon(app, 'grid', i, false))}
+              {page0Items.map((item, i) => renderSlot(item, 'grid', i, false))}
             </div>
             <div className="flex-1" />
           </section>
@@ -774,7 +1346,7 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
           {/* Панель 2: продолжение сетки */}
           <section className="flex h-full w-1/3 flex-col" aria-label="Вторая страница" aria-hidden={page !== 1}>
             <div className="mt-2 grid grid-cols-4 content-start gap-x-2 gap-y-4 px-4">
-              {page1Apps.map((app, i) => renderIcon(app, 'grid', PAGE0_SLOTS + i, false))}
+              {page1Items.map((item, i) => renderSlot(item, 'grid', PAGE0_SLOTS + i, false))}
             </div>
             <div className="flex-1" />
           </section>
@@ -836,7 +1408,7 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
                     <p className="py-6 text-center text-[13px] font-medium text-neutral-400">Ничего не найдено</p>
                   ) : (
                     <div className="grid grid-cols-4 gap-x-2 gap-y-4">
-                      {foundApps.map((a, i) => libIcon(a, i))}
+                      {foundApps.map((a, i) => libIcon(a))}
                     </div>
                   )}
                 </div>
@@ -848,7 +1420,7 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
                       <ChevronRight className={`size-4 ${dark ? 'text-white/40' : 'text-neutral-300'}`} aria-hidden="true" />
                     </div>
                     <div className="grid grid-cols-4 gap-x-2 gap-y-4">
-                      {s.apps.map((a, i) => libIcon(a, i))}
+                      {s.apps.map((a) => libIcon(a))}
                     </div>
                   </div>
                 ))
@@ -864,7 +1436,7 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
       </div>
 
       {/* Мини-плеер над точками страниц */}
-      <MiniPlayer onOpenApp={onOpenApp} />
+      <MiniPlayer onOpenApp={openAppFromHome} />
 
       {/* Точки страниц */}
       <div className="z-10 mb-2 flex items-center justify-center gap-1.5" aria-hidden="true">
@@ -885,9 +1457,30 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
             dark ? 'bg-white/[0.10] ring-1 ring-white/[0.08]' : 'bg-white/55 ring-1 ring-white/70 shadow-[0_14px_34px_-18px_rgba(15,23,42,0.45)] backdrop-blur-xl'
           }`}
         >
-          {layout.dock.map((app, i) => renderIcon(app, 'dock', i, true))}
+          {layout.dock.map((app, i) => renderSlot({ t: 'app', app }, 'dock', i, true))}
         </div>
       </div>
+
+      {/* ─── Открытая папка ─── */}
+      {openFolderItem && (
+        <FolderView
+          key={openFolderItem.id}
+          item={openFolderItem}
+          dark={dark}
+          tone={tone}
+          unreadChats={unreadChats}
+          jiggle={jiggleMode}
+          armedIndex={armed?.zone === 'folder' && armed.folderId === openFolderItem.id ? armed.index : null}
+          dragApp={drag?.zone === 'folder' && drag.item.t === 'app' ? drag.item.app : null}
+          closing={folderClosing}
+          extracting={extracting}
+          panelRef={panelRef}
+          onPointerDownIcon={folderIconPointerDown(openFolderItem.id)}
+          onIconClick={folderIconClick(openFolderItem.id)}
+          onClose={closeFolderSoon}
+          onRename={(name) => renameFolder(openFolderItem.id, name)}
+        />
+      )}
 
       {/* ─── Призрак перетаскиваемой иконки ─── */}
       {drag && (
@@ -897,28 +1490,46 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
           style={{ width: ghostW, transform: 'translate3d(-500px,-500px,0)' }}
           aria-hidden="true"
         >
-          <AppIcon
-            icon={APP_TILE[drag.app].icon}
-            label={APP_TILE[drag.app].label}
-            image={APP_TILE[drag.app].image || undefined}
-            imageBg={APP_TILE[drag.app].background}
-            tone={lightTone ? 'light' : 'dark'}
-            staticTile
-            tileClass="os-ghost-tile"
-            onClick={() => {}}
-          />
+          {drag.item.t === 'folder' ? (
+            <span className={`os-ghost-tile block w-full ${dark ? 'os-merge-dark' : ''}`}>
+              <FolderGlass apps={drag.item.apps} dark={dark} />
+            </span>
+          ) : (
+            <AppIcon
+              icon={APP_TILE[drag.item.app].icon}
+              label={APP_TILE[drag.item.app].label}
+              image={APP_TILE[drag.item.app].image || undefined}
+              imageBg={APP_TILE[drag.item.app].background}
+              tone={tone}
+              staticTile
+              tileClass="os-ghost-tile"
+              onClick={() => {}}
+            />
+          )}
         </div>
       )}
 
-      {/* ─── Контекстное меню иконки ─── */}
+      {/* ─── Контекстное меню иконки / папки ─── */}
       {menu && (
         <IconMenu
           menu={menu}
           dark={dark}
-          onAbout={() => openInfo(menu.app)}
+          onAbout={() => { if (menu.kind === 'app') openInfo(menu.app) }}
           onEditScreen={() => { setMenu(null); setEdit(true) }}
-          onRemove={() => { setMenu(null); removeFromHome(menu.app) }}
-          onAddHome={() => { setMenu(null); addToHome(menu.app) }}
+          onRemove={() => {
+            setMenu(null)
+            if (menu.kind === 'folder') dissolveFolder(menu.folderId)
+            else removeFromHome(menu.app)
+          }}
+          onAddHome={() => { setMenu(null); if (menu.kind === 'app') addToHome(menu.app) }}
+          onRename={() => { setMenu(null); if (menu.kind === 'folder') setOpenFolderId(menu.folderId) }}
+          onUnfolder={() => {
+            setMenu(null)
+            if (menu.kind === 'app' && menu.ctx === 'folder' && menu.folderId) {
+              unfolderApp(menu.app, menu.folderId)
+              closeFolderSoon()
+            }
+          }}
           onClose={() => setMenu(null)}
         />
       )}
@@ -928,7 +1539,7 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
         <AppInfoSheet
           app={info}
           onClose={() => setInfo(null)}
-          onOpenApp={onOpenApp}
+          onOpenApp={openAppFromHome}
           canRemove
           onRemove={() => removeFromHome(info)}
         />
