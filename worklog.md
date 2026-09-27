@@ -2426,3 +2426,20 @@ Stage Summary:
 - Supabase полностью готов к прод: схема 35 таблиц + стартовые игровые данные
 - ОСТАЛОСЬ (делает юзер): в Vercel Settings → Environment Variables обновить DATABASE_URL и POSTGRESPRISMA_POSTGRES_URL на SUPABASE_DB_URL_POOLED → после подтверждения я пушу триггер-коммит → авто-деплой → прод-проверка /api/cities /api/market /api/stats
 - Если Vercel попросит DIRECT_URL — использовать session-URL (5432)
+---
+Task ID: 53-db-final
+Agent: main (Z.ai Code)
+Task: Прод переведён на Supabase — восстановлен после блокировки Prisma Postgres
+
+Work Log:
+- Юзер обновил DATABASE_URL в Vercel (Supabase pooled 6543); POSTGRESPRISMA_POSTGRES_URL не тронул/отсутствует
+- Первый деплой после смены env: health показал «the URL must start with the protocol file:» → сборка взяла SQLITE-схему: pick-schema требовал POSTGRESPRISMA_POSTGRES_URL, которого нет
+- ФИКС scripts/pick-schema.mjs: postgres определяется и по протоколу DATABASE_URL (postgres://) → на Vercel достаточно одной переменной (коммит c47c007)
+- После деплоя: /api/health {ok:true,db:up}, /api/cities 200, /api/market 200 (activeListings:50, индексы живые), /api/stats 200, / 200
+- Новые инструменты: /api/health (src/app/api/health/route.ts) — диагностика прод-БД без Vercel-логов
+- База засеидена заранее (Task 53-db): 24 бота, 50 объявлений, 2 лота аукциона, 313 PricePoint, 13 индексов, 2 события
+
+Stage Summary:
+- ПРОД ВОССТАНОВЛЕН на Supabase (aws-1-eu-west-3, pooled 6543 + pgbouncer): игра работает, рынок и боты на месте
+- Игровой прогресс старых игроков утерян (старая БД заблокирована Prisma) — старт с чистой базой
+- Local: sqlite, dev 200; .env содержит SUPABASE_DB_URL/SUPABASE_DB_URL_POOLED (в git не идут)
