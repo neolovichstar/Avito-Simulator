@@ -26,7 +26,9 @@ export async function GET(req: Request) {
   if (!me) return unauthorized()
 
   const rows = (await cache.getOrSet('lb:all', 20_000, async () => {
+    // ТОЛЬКО реальные игроки: боты-NPC в лидерах не участвуют (демо-игроков больше нет)
     const users = await db.user.findMany({
+      where: { isBot: false },
       select: { id: true, isBot: true, displayName: true, photoUrl: true, balance: true, xp: true, stats: true, lastSeenAt: true },
       take: 400,
     })

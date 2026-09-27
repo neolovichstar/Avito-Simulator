@@ -9,7 +9,7 @@
 // Реальные настройки ОС: dnd, тема, яркость, обои, виджеты, вибро-отклик, зарядка, сеть.
 // Устройство (с сохранением в prefs-сторе): Wi-Fi, мобильные данные, Bluetooth,
 // автоповорот, уведомления приложений. Громкость медиа — глобальный стор volume.ts.
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import {
   Bell, Bluetooth, Check, ChevronRight, Eye, EyeOff, Fingerprint, LayoutGrid, LockKeyhole, Moon, MoonStar,
@@ -25,6 +25,26 @@ import { sound } from '@/lib/sound'
 import { api } from '@/lib/api'
 import { REGION_FLAG_KEY } from '@/components/os/RegionOnboarding'
 import { fuzzyMatch } from '@/lib/smart-search'
+
+// Лёгкие типы магазина/косметики для UI (совместимы с /api/shop)
+interface ShopItemLite {
+  sku: string
+  kind: string
+  title: string
+  desc: string
+  stars: number
+  wallpaperId?: string
+}
+interface CosmeticsLite {
+  wallpapers: string[]
+  badge: boolean
+  tips: number
+}
+interface StatTurnover {
+  online: number
+  turnoverRub?: number
+  turnoverStars?: number
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // M3 Switch (Expressive): track 52×32, thumb 24, галочка в thumb, 200ms M3-easing
@@ -333,12 +353,157 @@ export default function SettingsApp() {
     }
   }, [])
 
+  // ── Магазин Stars (косметика) + обороты площадки ──
+  const [shopItems, setShopItems] = useState<ShopItemLite[]>([])
+  const [cosmetics, setCosmetics] = useState<CosmeticsLite>({ wallpapers: [], badge: false, tips: 0 })
+  const [canPay, setCanPay] = useState(false)
+  const [shopBusy, setShopBusy] = useState<string | null>(null)
+  const [turnover, setTurnover] = useState<{ rub: number; stars: number } | null>(null)
+
+  const applyShop = useCallback((s: {
+    items: ShopItemLite[]
+    cosmetics: CosmeticsLite
+    canPay: boolean
+    granted?: string[]
+  }) => {
+    setShopItems(s.items)
+    setCosmetics(s.cosmetics)
+    setCanPay(s.canPay)
+    if (s.granted && s.granted.length > 0) {
+      const titles = s.granted.map((sku) => s.items.find((i) => i.sku === sku)?.title ?? sku).join(', ')
+      useOS.getState().pushToast('Магазин', `Получено: ${titles}`)
+      sound.success()
+    }
+  }, [])
+
+  const syncShop = useCallback(async () => {
+    try {
+      const s = await api.shopVerify()
+      applyShop(s)
+      return s.granted ?? []
+    } catch {
+      return []
+    }
+  }, [applyShop])
+
+  useEffect(() => {
+    api.shopGet().then(applyShop).catch(() => {})
+    api
+      .stats()
+      .then((s) => setTurnover({ rub: (s as StatTurnover).turnoverRub ?? 0, stars: (s as StatTurnover).turnoverStars ?? 0 }))
+      .catch(() => {})
+  }, [applyShop])
+
+  const openInvoice = useCallback((link: string, sku: string) => {
+    const tg = (
+      window as unknown as {
+        Telegram?: {
+          WebApp?: {
+            openInvoice?: (url: string, cb?: (status: string) => void) => void
+          }
+        }
+      }
+    ).Telegram?.WebApp
+    if (tg?.openInvoice) {
+      tg.openInvoice(link, (status) => {
+        if (status === 'paid') {
+          setTimeout(() => void syncShop(), 800)
+        } else if (status === 'failed') {
+          useOS.getState().pushToast('Магазин', 'Оплата не прошла. Попробуй ещё раз')
+        }
+        void sku
+      })
+    } else {
+      window.open(link, '_blank', 'noopener')
+      useOS.getState().pushToast('Магазин', 'После оплаты нажми «Синхронизировать»')
+    }
+  }, [syncShop])
+
+  const buyItem = useCallback(
+    async (sku: string) => {
+      if (shopBusy) return
+      setShopBusy(sku)
+      try {
+        const res = await api.shopInvoice(sku)
+        openInvoice(res.invoiceLink, sku)
+      } catch (e) {
+        useOS.getState().pushToast('Магазин', e instanceof Error ? e.message : 'Не удалось создать счёт')
+      } finally {
+        setShopBusy(null)
+      }
+    },
+    [shopBusy, openInvoice],
+  )
+
+  const owned = useCallback(
+    (item: ShopItemLite) =>
+      (item.kind === 'wallpaper' && item.wallpaperId && cosmetics.wallpapers.includes(item.wallpaperId)) ||
+      (item.kind === 'badge' && cosmetics.badge) ||
+      item.kind === 'tip' && cosmetics.tips > 0,
+    [cosmetics],
+  )
+
   // поиск по настройкам — умный fuzzy: «вайфай» найдёт Wi-Fi (ключевые слова
   // в строках ниже), «звак» найдёт зарядку (подпоследовательность),
   // «обуфь»-подобные опечатки ловит Левенштейн ≤2.
   const [query, setQuery] = useState('')
   const q = query.trim().toLowerCase()
   const hit = (s: string) => q === '' || fuzzyMatch(query, s)
+
+  const shopHit = hit('магазин звёзды stars premium premium+ resale+ покупка обои бейдж поддержать проект донат косметика')
+
+  const shopSection = (
+    <Section title="Магазин">
+      <div className="px-4 py-4">
+        <div className="flex items-baseline justify-between gap-2">
+          <div className="text-[14.5px] font-semibold text-white">Resale+</div>
+          <button
+            type="button"
+            onClick={() => void syncShop()}
+            className="rounded-full bg-white/[0.08] px-3 py-1.5 text-[11px] font-semibold text-white/70 transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-95"
+          >
+            Синхронизировать
+          </button>
+        </div>
+        <div className="mt-0.5 text-[12px] text-white/45">
+          Косметика за звёзды Telegram. Никакого pay-to-win: только стиль
+        </div>
+        <div className="mt-3 flex flex-col gap-2">
+          {shopItems.map((item) => {
+            const isOwned = owned(item)
+            return (
+              <div key={item.sku} className="flex items-center gap-3 rounded-2xl bg-white/[0.05] px-3.5 py-3 ring-1 ring-white/[0.05]">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-400/15 text-[16px]">
+                  {item.kind === 'wallpaper' ? '🖼️' : item.kind === 'badge' ? '⭐' : '💛'}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13.5px] font-semibold text-white">{item.title}</span>
+                  <span className="block truncate text-[11.5px] text-white/45">{item.desc}</span>
+                </span>
+                {isOwned && item.kind !== 'tip' ? (
+                  <span className="shrink-0 rounded-full bg-emerald-500/15 px-3 py-1.5 text-[11px] font-bold text-emerald-300 ring-1 ring-emerald-500/25">
+                    Открыто
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void buyItem(item.sku)}
+                    disabled={shopBusy === item.sku || !canPay}
+                    className="shrink-0 rounded-full bg-amber-400 px-3.5 py-1.5 text-[12px] font-bold text-[#1c1403] transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-95 disabled:opacity-40"
+                  >
+                    {shopBusy === item.sku ? '…' : `${item.stars} ⭐`}
+                  </button>
+                )}
+              </div>
+            )
+          })}
+          {shopItems.length === 0 && <p className="py-2 text-[12px] text-white/35">Загрузка магазина…</p>}
+        </div>
+      </div>
+    </Section>
+  )
+
+  // ── строки секций (с фильтром поиска) ────────────────────────────────────
 
   // deviceId из localStorage (авито-симулятор) — последние 8 знаков
   const [deviceId] = useState(() => {
@@ -586,6 +751,20 @@ export default function SettingsApp() {
       desc: device ? `${device.language} · ${device.timezone}` : '—',
     },
     {
+      key: 'turnover-market',
+      tone: 'zinc',
+      icon: <Sparkles className="size-5" />,
+      label: 'Оборот виртуального рынка',
+      desc: turnover ? `${Math.round(turnover.rub).toLocaleString('ru-RU')} ₽ — суммарно по всем сделкам площадки` : 'Считаем…',
+    },
+    {
+      key: 'turnover-stars',
+      tone: 'zinc',
+      icon: <Sparkles className="size-5" />,
+      label: 'Оборот в Telegram Stars',
+      desc: turnover ? `${turnover.stars.toLocaleString('ru-RU')} ⭐ — реальные покупки в магазине косметики` : 'Считаем…',
+    },
+    {
       key: 'build',
       tone: 'zinc',
       icon: <LayoutGrid className="size-5" />,
@@ -611,7 +790,7 @@ export default function SettingsApp() {
       label: name,
       desc: session ? `@${session.username} · уровень ${session.level}` : 'Сессия не найдена',
     },
-  ].filter((r) => hit(`${r.label} ${r.desc ?? ''} о телефоне модель версия ос экран процессор хранилище память язык сборка устройство`))
+  ].filter((r) => hit(`${r.label} ${r.desc ?? ''} о телефоне модель версия ос экран процессор хранилище память язык сборка устройство оборот рынок звёзды stars площадки`))
 
   const wallpaperHit = hit('обои стиль виджеты домашний экран персонализация фон картинка')
   const brightnessHit = hit('яркость экран подсветка светло тьма')
@@ -706,20 +885,39 @@ export default function SettingsApp() {
             <div className="mt-3 grid grid-cols-4 gap-2.5">
               {WALLPAPERS.map((w) => {
                 const active = wallpaper === w.id
+                const locked = w.premium && !cosmetics.wallpapers.includes(w.id)
+                const sku = `wall.${w.id}`
                 return (
                   <button
                     key={w.id}
                     type="button"
-                    aria-label={`Обои: ${w.name}`}
+                    aria-label={locked ? `Обои: ${w.name} — за звёзды` : `Обои: ${w.name}`}
                     aria-pressed={active}
-                    onClick={() => setWallpaper(w.id)}
-                    className={`h-16 overflow-hidden rounded-xl border transition duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.97] ${
+                    onClick={() => {
+                      if (locked) {
+                        void buyItem(sku)
+                        return
+                      }
+                      setWallpaper(w.id)
+                    }}
+                    className={`relative h-16 overflow-hidden rounded-xl border transition duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.97] ${
                       active ? 'border-[#21A038] ring-2 ring-[#21A038]/50' : 'border-white/10'
                     }`}
                     style={wallpaperPreviewStyle(w.id)}
-                  />
+                  >
+                    {locked && (
+                      <span className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 bg-black/55 backdrop-blur-[1.5px]">
+                        <LockKeyhole className="size-4 text-amber-300" aria-hidden="true" />
+                        <span className="text-[9.5px] font-bold leading-none text-amber-200">49 ⭐</span>
+                      </span>
+                    )}
+                  </button>
                 )
               })}
+            </div>
+            <div className="mt-2 flex items-center gap-1.5 text-[11px] text-white/40">
+              <LockKeyhole className="size-3.5 text-amber-300/80" aria-hidden="true" />
+              Обои с замком открываются за звёзды в разделе «Магазин» ниже
             </div>
 
             <div className="mt-5 text-[14.5px] font-semibold text-white">Виджеты домашнего экрана</div>
@@ -751,6 +949,11 @@ export default function SettingsApp() {
           </div>
         </Section>
       ),
+    },
+    {
+      key: 'shop',
+      visible: shopHit || shopItems.length > 0,
+      node: shopSection,
     },
     {
       key: 'battery',

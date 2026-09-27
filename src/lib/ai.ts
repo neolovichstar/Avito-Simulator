@@ -135,7 +135,7 @@ function buildSystemPrompt(ctx: NegotiationContext): string {
 Resale: ${roleText} ${limitText} ${marketHint}
 ${memoryBlock}${demandPrepay}
 Правила поведения:
-- Отвечай как в обычном мессенджере: 1-3 коротких предложения. Можно маленькими буквами, с опечатками, с твоим жаргоном. НИКОГДА не используй эмодзи и смайлики. НИКОГДА не используй символ | и служебные форматы — пиши обычной живой речью.
+- Отвечай как в обычном мессенджере: 1-3 коротких предложения. Можно маленькими буквами, с опечатками, с твоим жаргоном. НИКОГДА не используй эмодзи и смайлики. НИКОГДА не используй символ | и служебные форматы — пиши обычной живой речью. НИКОГДА не используй длинное тире (—, –) вообще нигде: вместо него точка или запятая.
 - Ты хочешь максимальной выгоды для себя: торгуйся жёстко, но по-человечески. Не соглашайся на первую цену, ссылайся на бюджет, недостатки товара, цены конкурентов, личные обстоятельства.
 - За один раунд уступай не больше 3-10%. Уступай неохотно и с характером. Если ${chatPartner} предлагает меньше 60% рыночной цены — это неуважение: жёстко отказывай или съязви, а не торгуйся дальше.
 - Иногда (не каждый раз) задавай живые вопросы: про состояние, комплект, причину продажи, торги на месте.
@@ -177,6 +177,8 @@ function parseAiResponse(raw: string, ctx: NegotiationContext): { text: string; 
   }
   text = stripEmoji(text)
     .replace(/\s*\|\s*/g, '. ') // модель любит перечисления через палку — превращаем в речь
+    .replace(/\s*[—–]\s*/g, ', ') // длинные тире запрещены правилами игры
+    .replace(/\s*,\s*,+/g, ',')
     .replace(/\.{2,}/g, '.')
     .slice(0, 420)
   if (price !== null) {
@@ -189,7 +191,8 @@ function parseAiResponse(raw: string, ctx: NegotiationContext): { text: string; 
   return { text, action, price }
 }
 
-async function callOpenRouter(system: string, userContent: string, maxTokens = 180): Promise<string | null> {
+/** Низкоуровневый вызов OpenRouter (используется и поддержкой). */
+export async function callOpenRouter(system: string, userContent: string, maxTokens = 180): Promise<string | null> {
   const key = process.env.OPENROUTER_API_KEY
   if (!key) return null
   const attempt = async (model: string): Promise<string | null> => {

@@ -3,7 +3,7 @@
 // Мета-информация типов уведомлений: иконка, подложка, приложение-цель.
 // Общий источник для шторки (Shade), локскрина, списка уведомлений и тостов.
 import {
-  Crown, Gavel, Info, MessageSquare, Receipt, ShoppingBag, TrendingUp, Truck,
+  Crown, Gavel, Headset, Info, MessageSquare, Receipt, ShoppingBag, TrendingUp, Truck,
   Trophy, type LucideIcon,
 } from 'lucide-react'
 import type { AppKey } from '@/lib/store'
@@ -26,6 +26,7 @@ export const KIND_APP: Record<string, NotifApp> = {
   auction: { app: 'Аукцион', icon: Gavel, bg: 'linear-gradient(145deg,#fbbf24,#b45309)', openApp: 'auction' },
   delivery: { app: 'Доставки', icon: Truck, bg: 'linear-gradient(145deg,#34d399,#047857)', openApp: 'delivery' },
   leader: { app: 'Лидеры', icon: Crown, bg: 'linear-gradient(145deg,#fcd34d,#92400e)', openApp: 'leaderboard' },
+  support: { app: 'Поддержка', icon: Headset, bg: 'linear-gradient(145deg,#2dd4bf,#0f766e)', openApp: 'support' },
   system: { app: 'Система', icon: Info, bg: 'linear-gradient(145deg,#9ca3af,#4b5563)', openApp: 'settings' },
 }
 

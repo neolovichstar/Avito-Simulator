@@ -480,6 +480,8 @@ export interface CareerData {
 export interface ProfileData {
   user: SessionUser
   rating: number
+  /** Бейдж Resale+ (косметика за Stars). */
+  badge?: boolean
   reviews: { id: string; rating: number; text: string; from: string; createdAt: string }[]
   activeListings: number
   soldCount: number

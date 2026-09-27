@@ -36,6 +36,7 @@ import CalcApp from '@/components/apps/CalcApp'
 import ClockApp from '@/components/apps/ClockApp'
 import CalendarApp from '@/components/apps/CalendarApp'
 import NotesApp from '@/components/apps/NotesApp'
+import SupportApp from '@/components/apps/SupportApp'
 import WeatherApp from '@/components/apps/WeatherApp'
 import GalleryApp from '@/components/apps/GalleryApp'
 import MusicApp from '@/components/apps/MusicApp'
@@ -430,6 +431,7 @@ export default function Home() {
       case 'gosuslugi': return <GosuslugiApp />
       case 'numbers': return <NumbersApp />
       case 'plates': return <PlateApp />
+      case 'support': return <SupportApp />
       default: return null
     }
   }, [currentApp])

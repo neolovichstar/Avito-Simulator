@@ -150,7 +150,14 @@ export default function ProfileScreen({ onOpenListing, onGoSell, onGoFavorites }
             <UserAvatar name={data.user.displayName} className="w-[72px] h-[72px] rounded-full ring-1 ring-[#EBEDF0]" />
           )}
           <div className="flex-1 min-w-0">
-            <p className="text-[20px] font-bold text-black leading-tight truncate">{data.user.displayName}</p>
+            <p className="text-[20px] font-bold text-black leading-tight truncate flex items-center gap-1.5">
+              <span className="truncate">{data.user.displayName}</span>
+              {data.badge && (
+                <span title="Resale+" aria-label="Бейдж Resale+" className="shrink-0 rounded-md bg-gradient-to-br from-amber-300 to-amber-500 px-1.5 py-0.5 text-[10px] font-black leading-none text-[#3a2a05] shadow-sm">
+                  ★ PRO
+                </span>
+              )}
+            </p>
             <p className="text-[13px] text-[#8B8F99] mt-1 flex items-center gap-1 flex-wrap">
               <Star size={12} className="text-[#0AC760] fill-[#0AC760]" aria-hidden />
               <span className="font-semibold text-black">{rating > 0 ? rating.toFixed(1) : '—'}</span>

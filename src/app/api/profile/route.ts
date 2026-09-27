@@ -2,6 +2,7 @@ import { db } from '@/lib/db'
 import { getSessionUser, unauthorized } from '@/lib/session'
 import { ratingOf } from '@/lib/dto'
 import { itemImage } from '@/lib/item-images'
+import { parseCosmetics } from '@/lib/shop'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,6 +52,7 @@ export async function GET(req: Request) {
       city: user.city, bio: user.bio, isNew: false,
     },
     rating: ratingOf(user),
+    badge: parseCosmetics(user.cosmetics).badge,
     reviews: reviews.map((r) => ({
       id: r.id, rating: r.rating, text: r.text, from: r.from.displayName,
       createdAt: r.createdAt.toISOString(),

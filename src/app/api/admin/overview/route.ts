@@ -41,6 +41,8 @@ export async function GET(req: Request) {
       taxAgg,
       moneyAgg,
       intrusions,
+      gmvTotal,
+      starsTotal,
     ] = await Promise.all([
       db.user.count(),
       db.user.count({ where: { isBot: true } }),
@@ -80,6 +82,15 @@ export async function GET(req: Request) {
       db.user.aggregate({ _sum: { balance: true } }),
       // отказоустойчиво: если таблица аудита недоступна — просто 0 попыток взлома
       safe(() => db.adminAction.count({ where: { action: 'auth.fail', createdAt: { gte: since24 } } }), 0),
+      // обороты: весь рынок ₽ (реальные сделки) + звёзды (реальные покупки)
+      safe(
+        () =>
+          db.transaction
+            .aggregate({ where: { type: 'purchase', amount: { lt: 0 }, listingId: { not: null } }, _sum: { amount: true } })
+            .then((a) => Math.abs(a._sum.amount ?? 0)),
+        0,
+      ),
+      safe(() => db.starsPayment.aggregate({ where: { status: 'paid' }, _sum: { stars: true } }).then((a) => a._sum.stars ?? 0), 0),
     ])
 
     // бакеты по дням в JS — переносимо между SQLite и Postgres
@@ -129,6 +140,8 @@ export async function GET(req: Request) {
         chats24: recentChats,
         moneySupply: moneyAgg._sum.balance ?? 0,
         intrusions24: intrusions,
+        gmvTotal,
+        starsTotal,
       },
       gmvSeries,
       signupSeries: days.map((d) => ({ day: d.slice(5).replace('-', '.'), count: signupMap.get(d) ?? 0 })),
@@ -152,13 +165,9 @@ export async function GET(req: Request) {
   })
 
   // онлайн и GMV вчера — вне длинного кэша
-  const { realOnlineCount } = await import('@/lib/realtime-emit')
-  let online = 0
-  try {
-    online = await realOnlineCount()
-  } catch {}
-  const botsRecent = await db.user.count({
-    where: { isBot: true, lastSeenAt: { gt: new Date(Date.now() - 15 * 60_000) } },
+  // РЕАЛЬНЫЙ онлайн: живые игроки (не боты) за последние 3 минуты
+  const online = await db.user.count({
+    where: { isBot: false, lastSeenAt: { gt: new Date(Date.now() - 3 * 60_000) } },
   })
 
   const now = Date.now()
@@ -173,6 +182,6 @@ export async function GET(req: Request) {
 
   return Response.json({
     ...data,
-    kpis: { ...data.kpis, online: online + botsRecent, gmv24Prev },
+    kpis: { ...data.kpis, online, gmv24Prev },
   })
 }

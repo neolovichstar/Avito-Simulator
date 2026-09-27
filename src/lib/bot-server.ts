@@ -182,6 +182,12 @@ interface TgMessage {
   from?: TgUser
   chat: { id: number }
   text?: string
+  successful_payment?: {
+    currency: string
+    total_amount: number
+    payload?: string
+    telegram_payment_charge_id?: string
+  }
 }
 interface TgCallbackQuery {
   id: string
@@ -192,6 +198,7 @@ interface TgUpdate {
   update_id: number
   message?: TgMessage
   callback_query?: TgCallbackQuery
+  pre_checkout_query?: { id: string }
 }
 interface TgPhotoSize {
   file_id?: string
@@ -523,6 +530,57 @@ async function handleCallback(cb: TgCallbackQuery): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Платежи Telegram Stars (XTR): pre_checkout обязателен, иначе оплата не пройдёт.
+// Начисление идемпотентно по telegram_payment_charge_id; страхующий путь —
+// POST /api/shop {action:'verify'} через getStarTransactions.
+// ---------------------------------------------------------------------------
+async function handlePreCheckout(q: { id: string }): Promise<void> {
+  const res = await tg('answerPreCheckoutQuery', { pre_checkout_query_id: q.id, ok: true })
+  console.log('[tg-bot] pre_checkout answered ok=', res?.ok ?? null)
+}
+
+async function handleSuccessfulPayment(msg: TgMessage): Promise<void> {
+  const sp = msg.successful_payment
+  const chatId = msg.chat.id
+  if (!sp) return
+  console.log(`[tg-bot] successful_payment: ${sp.total_amount} ${sp.currency} payload=${sp.payload}`)
+  try {
+    const { db } = await import('./db')
+    const { grantCosmetics, shopItemBySku } = await import('./shop')
+    const { notifyUser } = await import('./deals')
+    const payload = sp.payload ?? ''
+    const payment = payload ? await db.starsPayment.findFirst({ where: { payload } }) : null
+    if (payment && payment.status !== 'paid') {
+      try {
+        await db.starsPayment.update({
+          where: { id: payment.id },
+          data: { status: 'paid', chargeId: sp.telegram_payment_charge_id ?? null, paidAt: new Date() },
+        })
+      } catch {
+        return // уже начислено (chargeId unique) — идемпотентность
+      }
+      const user = await db.user.findUnique({ where: { id: payment.userId }, select: { cosmetics: true } })
+      await db.user.update({
+        where: { id: payment.userId },
+        data: { cosmetics: grantCosmetics(user?.cosmetics ?? null, payment.sku) },
+      })
+      const item = shopItemBySku(payment.sku)
+      await notifyUser(
+        payment.userId,
+        'system',
+        '⭐ Покупка получена',
+        item ? `${item.title}: активировано. Спасибо за поддержку!` : 'Покупка активирована, спасибо!',
+      )
+      await sendSmart(chatId, '✅ Оплачено, всё выдал! Если вдруг не увидел покупку: Настройки → Магазин → синхронизация.')
+    } else if (!payment) {
+      await sendSmart(chatId, '✅ Оплата получена! Открой приложение: Настройки → Магазин → синхронизация, покупка привяжется автоматически.')
+    }
+  } catch (e) {
+    console.error('[tg-bot] successful_payment error', e)
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Long polling (один экземпляр! dev-скрипт без --hot, чтобы не плодить зомби-поллеры)
 // ---------------------------------------------------------------------------
 let offset = 0
@@ -544,7 +602,11 @@ async function pollLoop(): Promise<void> {
       if (!data.ok) console.warn('[tg-bot] getUpdates error:', data.description)
       for (const u of data.result ?? []) {
         offset = u.update_id + 1
-        if (u.message?.text) {
+        if (u.pre_checkout_query) {
+          await handlePreCheckout(u.pre_checkout_query).catch((e) => console.error('[tg-bot] pre_checkout error', e))
+        } else if (u.message?.successful_payment) {
+          await handleSuccessfulPayment(u.message).catch((e) => console.error('[tg-bot] sp error', e))
+        } else if (u.message?.text) {
           console.log(`[tg-bot] ← ${u.message.text.slice(0, 60)} from ${u.message.chat.id} (${u.message.from?.username ?? 'no username'})`)
           await handleCommand(u.message).catch((e) => console.error('[tg-bot] cmd error', e))
         } else if (u.message) {
@@ -573,6 +635,7 @@ const KIND_EMOJI: Record<string, string> = {
   tax: '🧾',
   market: '📈',
   system: '⚙️',
+  support: '💬',
 }
 
 interface PendingItem {

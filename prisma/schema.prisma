@@ -30,6 +30,7 @@ model User {
   bio          String?
   achievements String    @default("[]")
   stats        String    @default("{}")
+  cosmetics    String    @default("{}") // купленное за Stars: {wallpapers:[], badge:bool, tips:n} — косметика, без p2w
   questDay     String?
   rerollDay    String?
   bonusStreak  Int       @default(0)
@@ -64,6 +65,8 @@ model User {
   workshopTools  WorkshopTool[]
   repairJobs     RepairJob[]
   installedParts InstalledPart[]
+  supportMessages SupportMessage[]
+  starsPayments   StarsPayment[]
 }
 
 model Listing {
@@ -506,6 +509,47 @@ model InstalledPart {
   createdAt DateTime @default(now())
 
   @@index([userId, itemId])
+}
+
+// ───────────────────────── Поддержка (ИИ + админ) ─────────────────────────
+
+// Переписка игрока с поддержкой. Роль support пишут ИИ (author="ai") и админ
+// (author="admin") — для игрока это один саппорт; ИИ молчит, если последним
+// ответил админ (админ взял чат на себя).
+model SupportMessage {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  role        String // user | support
+  author      String   @default("ai") // ai | admin | system
+  text        String
+  readByUser  Boolean  @default(false) // игрок прочитал ответ поддержки
+  readByAdmin Boolean  @default(false) // админ прочитал сообщение игрока
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([readByAdmin, createdAt])
+}
+
+// Покупки за реальные Telegram Stars (монетизация без p2w: обои, бейдж, «спасибо»).
+// Создаётся как pending при выдаче invoice-ссылки, verify сверяет с
+// getStarTransactions и ставит chargeId + status="paid" (идемпотентно по chargeId).
+model StarsPayment {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  tgUserId  String
+  sku       String // wall.gold | wall.onyx | wall.metropolis | wall.jade | badge.pro | tip.developer
+  title     String
+  stars     Int
+  payload   String    @default("")
+  status    String    @default("pending") // pending | paid | cancelled
+  chargeId  String?   @unique // telegram_charge_id / telegram transaction id
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([tgUserId, status])
 }
 
 // ───────────────────────── Админ-панель ─────────────────────────

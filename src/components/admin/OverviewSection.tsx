@@ -82,7 +82,7 @@ export default function OverviewSection({ onToast, refreshKey = 0 }: { onToast: 
           loading={!data}
         />
         <StatCard
-          label="Онлайн"
+          label="Онлайн (реальный)"
           value={data ? String(data.kpis.online) : '—'}
           icon={<Activity className="size-4" />}
           loading={!data}
@@ -100,6 +100,18 @@ export default function OverviewSection({ onToast, refreshKey = 0 }: { onToast: 
           icon={<TrendingUp className="size-4" />}
           loading={!data}
           accent
+        />
+        <StatCard
+          label="Оборот рынка, весь"
+          value={data ? fmtShort(data.kpis.gmvTotal ?? 0) : '—'}
+          icon={<TrendingUp className="size-4" />}
+          loading={!data}
+        />
+        <StatCard
+          label="Оборот Stars"
+          value={data ? `${fmtShort(data.kpis.starsTotal ?? 0)} ⭐` : '—'}
+          icon={<Coins className="size-4" />}
+          loading={!data}
         />
         <StatCard
           label="Сделок за 24ч"

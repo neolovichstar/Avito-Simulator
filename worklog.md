@@ -2218,3 +2218,27 @@ Stage Summary:
 - Спам дублей исключён системно на трёх уровнях (тик-гард, атомарный бонус, dedupeKey+мягкая дедупликация)
 - Уведомления получили премиум-эмодзи и вариативность текстов
 - tsc 0 ошибок (src/), lint чисто; прод-БД синхронна (dedupeKey unique)
+
+---
+Task ID: 44-48
+Agent: main (Z.ai Code)
+Task: Новые иконки из двух пак-гридов (22 шт), приложение «Поддержка» с ИИ-оператором и авто-БЗ, чат поддержки в админке с паузой ИИ, реальный онлайн, удаление демо-игроков, обороты ₽/Stars, монетизация без p2w (Stars-косметика), human-style ИИ
+
+Work Log:
+- Иконки: скачаны packlogo1/packlogo2 с CDN, скрипт upload/extract_pack.py (scipy.label → компоненты → геометрический rounded-rect через проекции с ограничением по bbox компонента — баг «все иконки брали left соседа» исправлен → альфа 4x суперсэмплинг radius 22.5% → 512px). Заменены ВСЕ 22 иконки public/img/apps/*.png, включая numbers/plates/support из новых паков. app-logos.tsx: все image → ?v=3, добавлен SupportLogo (SVG fallback), ключ support в APP_TILE/HOME_GRID, градиенты плиток подогнаны под палитру иконок
+- Схема: SupportMessage (userId/role/author/readByUser/readByAdmin + индексы), StarsPayment (sku/stars/payload/status pending→paid/chargeId unique), User.cosmetics JSON, User.supportMessages/starsPayments. db push локально (sqlite) и на проде (postgres через schema.postgres.prisma)
+- Авто-БЗ: src/lib/support-kb.ts собирает системный промпт из ЖИВЫХ данных кода: CATALOG (цены по категориям), economy-константы (налог 4%, пеня 10%, кредит 15%, вклад 0.04%/ч, бонус 250+150/день cap 1000, буст 249, доставка 350), QUEST_POOL+ACHIEVEMENTS, REGIONS/GOLD_CODES/RESERVE_HOURS, RARITY_LABEL, SHOP_ITEMS, PERSONAS count. Кэш globalThis 30 мин → каждая обнова автопопадает в промпт. Скриптовый фолбэк по ключевым словам (18 тем)
+- ИИ-поддержка: src/lib/support-ai.ts (OpenRouter через экспортированный ai.ts callOpenRouter, свой бюджет AI_SUPPORT_DAILY_LIMIT=80/день, sanitize: длинные тире → ', ', чистка двойных запятых). Правила: никогда не признаётся что ИИ, 1-4 коротких предложения, лёгкие эмодзи
+- API: /api/support GET/POST (rate 12/мин; adminActive = последнее сообщение до нового юзер-сообщения — ответ админа <20 мин → ИИ молчит), /api/admin/support GET (треды+непрочитанные)/POST (ответ от лица поддержки + notifyUser 'support')
+- SupportApp.tsx: чат с пузырями, optimistic send, typing-индикатор, быстрые вопросы, поллинг 20с; свитч в page.tsx case 'support'
+- Админка: SupportSection.tsx (треды слева/чат справа, ответ от лица поддержки, бейдж supportUnread), admin-client supportThreads/supportThread/supportReply, badges API + supportUnread, вкладка в сайдбаре и мобильном баре
+- Реальный онлайн: /api/stats, /api/market, /api/admin/overview — db.user.count(isBot=false, lastSeenAt>3 мин); боты и socket-presence убраны из счётчика. Лидеры: where isBot:false (демо-игроки в топах больше не участвуют)
+- Магазин Stars: src/lib/shop.ts (6 SKU: 4 премиум-обои 49⭐, бейдж Resale+ 99⭐, «спасибо» 25⭐; grantCosmetics/parseCosmetics), /api/shop GET/invoice/verify (createInvoiceLink XTR — ВАЖНО: result это СТРОКА-ссылка; verify через getStarTransactions: матчинг pending StarsPayment по tgUserId+stars+date, идемпотентно по chargeId). Бот: pre_checkout_query → answerPreCheckoutQuery, successful_payment → начисление + уведомление. Настройки: секция «Магазин Resale+» + замки ⭐ на премиум-обоях + «Оборот рынка/Stars» в «О приложении», /api/stats отдаёт turnoverRub (Σ сделок purchase<0 c listingId) и turnoverStars
+- Профиль: /api/profile отдаёт badge, ProfileScreen рисует «★ PRO» бейдж
+- Human-style: ai.ts buildSystemPrompt + запрет длинных тире, parseAiResponse санитизирует тире; bot-server KIND_EMOJI support 💬
+
+Stage Summary:
+- E2E проверено локально scripts/test-support.ts: auth→чат→ИИ-ответ (живой, без тире), invoice wall.gold → https://t.me/$... ссылка (реальный Bot API), verify 200, админ-тред + ответ → adminActive=true и ИИ молчит, stats {online:2, turnoverRub:193591, turnoverStars:0}
+- agent-browser QA: новые иконки на домашнем экране и в доке, мобильный чат Поддержки (опрос/ответ ИИ), Настройки с Магазином и оборотами, desktop-тачбар со всеми 21 приложением
+- Грабли: createInvoiceLink result — строка; adminActive проверять ДО создания юзер-сообщения; у 'sale'/'purchase' транзакций бонус/квесты/ремонты — GMV считается только по purchase<0 c listingId
+- Глухарь синонимов: realOnlineCount (socket) оставлен в либе, но нигде не используется

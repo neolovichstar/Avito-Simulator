@@ -1,6 +1,5 @@
 import { db } from '@/lib/db'
 import { cache } from '@/lib/cache'
-import { realOnlineCount } from '@/lib/realtime-emit'
 import { CATEGORY_LABEL } from '@/lib/catalog-types'
 import type { MarketStats } from '@/lib/types'
 
@@ -8,9 +7,9 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
   const data = await cache.getOrSet('market:stats', 20_000, async () => {
-    const [real, botsRecent, activeListings, indexes, events] = await Promise.all([
-      realOnlineCount(),
-      db.user.count({ where: { isBot: true, lastSeenAt: { gt: new Date(Date.now() - 15 * 60_000) } } }),
+    const [online, activeListings, indexes, events] = await Promise.all([
+      // РЕАЛЬНЫЙ онлайн: живые игроки за последние 3 минуты, без ботов
+      db.user.count({ where: { isBot: false, lastSeenAt: { gt: new Date(Date.now() - 3 * 60_000) } } }),
       db.listing.count({ where: { status: 'active' } }),
       db.marketIndex.findMany(),
       db.marketEvent.findMany({
@@ -20,7 +19,7 @@ export async function GET() {
       }),
     ])
     return {
-      online: real + botsRecent,
+      online,
       activeListings,
       indexes: indexes
         .map((i) => ({ category: CATEGORY_LABEL[i.category] ?? i.category, multiplier: Math.round(i.multiplier * 100) / 100 }))

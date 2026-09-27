@@ -341,6 +341,19 @@ export function PlatesLogo() {
   )
 }
 
+// Поддержка: гарнитура оператора (наушники с микрофоном).
+export function SupportLogo() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false" className="h-7 w-7">
+      <path
+        transform="translate(3.6 3.6) scale(1.7)"
+        fill="#ffffff"
+        d="M12 1a9 9 0 0 0-9 9v7c0 1.66 1.34 3 3 3h3v-8H5v-2c0-3.87 3.13-7 7-7s7 3.13 7 7v2h-4v8h3c1.66 0 3-1.34 3-3v-7a9 9 0 0 0-9-9z"
+      />
+    </svg>
+  )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Реестр плиток: градиент фона + логотип + подпись для каждого AppKey.
 // image — вырезанный логотип из фирменного пака (public/img/apps/*.png):
@@ -350,129 +363,135 @@ export function PlatesLogo() {
 export const APP_TILE: Record<AppKey, { label: string; background: string; image: string; icon: ReactNode }> = {
   avito: {
     label: 'Resale',
-    background: 'linear-gradient(150deg, #2A5424 0%, #1A3A14 60%, #122A0E 100%)',
-    image: '/img/apps/avito.png?v=2',
+    background: 'linear-gradient(150deg, #8C1F2A 0%, #5A121A 60%, #400C12 100%)',
+    image: '/img/apps/avito.png?v=3',
     icon: <DealLogo />,
   },
   bank: {
     label: 'Банк',
-    background: 'linear-gradient(145deg, #1C6A2E 0%, #14491F 60%, #0E3616 100%)',
-    image: '/img/apps/bank.png?v=2',
+    background: 'linear-gradient(145deg, #14498A 0%, #0C2F5C 60%, #081F3E 100%)',
+    image: '/img/apps/bank.png?v=3',
     icon: <BankLogo />,
   },
   taxes: {
     label: 'Налоги',
-    background: 'linear-gradient(145deg, #1A55A0 0%, #123E74 60%, #0C2C54 100%)',
-    image: '/img/apps/taxes.png?v=2',
+    background: 'linear-gradient(145deg, #55408F 0%, #392B66 60%, #281D4A 100%)',
+    image: '/img/apps/taxes.png?v=3',
     icon: <TaxesLogo />,
   },
   browser: {
     label: 'Браузер',
     background: 'linear-gradient(145deg, #0F55C8, #05307A)',
-    image: '/img/apps/browser.png?v=2',
+    image: '/img/apps/browser.png?v=3',
     icon: <BrowserLogo />,
   },
   settings: {
     label: 'Настройки',
-    background: 'linear-gradient(145deg, #167032, #0B4520)',
-    image: '/img/apps/settings.png?v=2',
+    background: 'linear-gradient(145deg, #3E434B, #23262C)',
+    image: '/img/apps/settings.png?v=3',
     icon: <SettingsLogo />,
   },
   repair: {
     label: 'Сервис',
-    background: 'linear-gradient(145deg, #A44E12, #5F2706)',
-    image: '/img/apps/repair.png?v=2',
+    background: 'linear-gradient(145deg, #1E7A50, #0F4A2F)',
+    image: '/img/apps/repair.png?v=3',
     icon: <RepairLogo />,
   },
   auction: {
     label: 'Аукцион',
-    background: 'linear-gradient(145deg, #3E5423, #22300F)',
-    image: '/img/apps/auction.png?v=2',
+    background: 'linear-gradient(145deg, #7C4A1C, #4A2A0E)',
+    image: '/img/apps/auction.png?v=3',
     icon: <AuctionLogo />,
   },
   career: {
     label: 'Задания',
-    background: 'linear-gradient(145deg, #10703A, #08421F)',
-    image: '/img/apps/career.png?v=2',
+    background: 'linear-gradient(145deg, #6C4BC8, #422C80)',
+    image: '/img/apps/career.png?v=3',
     icon: <CareerLogo />,
   },
   delivery: {
     label: 'Доставки',
-    background: 'linear-gradient(145deg, #187030, #0C421A)',
-    image: '/img/apps/delivery.png?v=2',
+    background: 'linear-gradient(145deg, #C25E12, #7A3A08)',
+    image: '/img/apps/delivery.png?v=3',
     icon: <DeliveryLogo />,
   },
   leaderboard: {
     label: 'Лидеры',
-    background: 'linear-gradient(145deg, #7A4514 0%, #5A300C 60%, #3E1F06 100%)',
-    image: '/img/apps/leaderboard.png?v=2',
+    background: 'linear-gradient(145deg, #A87E12 0%, #6E5009 60%, #4E3705 100%)',
+    image: '/img/apps/leaderboard.png?v=3',
     icon: <LeaderboardLogo />,
   },
   calc: {
     label: 'Калькулятор',
-    background: 'linear-gradient(145deg, #B05A18, #6A3409)',
-    image: '/img/apps/calc.png?v=2',
+    background: 'linear-gradient(145deg, #2C3038, #17191E)',
+    image: '/img/apps/calc.png?v=3',
     icon: <CalcLogo />,
   },
   clock: {
     label: 'Часы',
     background: 'linear-gradient(145deg, #2C2B2E, #171618)',
-    image: '/img/apps/clock.png?v=2',
+    image: '/img/apps/clock.png?v=3',
     icon: <ClockLogo />,
   },
   calendar: {
     label: 'Календарь',
     background: 'linear-gradient(145deg, #D2CBCC, #ABA4A6)',
-    image: '/img/apps/calendar.png?v=2',
+    image: '/img/apps/calendar.png?v=3',
     icon: <CalendarLogo />,
   },
   notes: {
     label: 'Заметки',
     background: 'linear-gradient(145deg, #D6A51C, #8F6A0C)',
-    image: '/img/apps/notes.png?v=2',
+    image: '/img/apps/notes.png?v=3',
     icon: <NotesLogo />,
   },
   weather: {
     label: 'Погода',
     background: 'linear-gradient(145deg, #1E86D4, #0C5590)',
-    image: '/img/apps/weather.png?v=2',
+    image: '/img/apps/weather.png?v=3',
     icon: <WeatherLogo />,
   },
   gallery: {
     label: 'Галерея',
     background: 'linear-gradient(145deg, #CDD0D8, #A9ACB6)',
-    image: '/img/apps/gallery.png?v=2',
+    image: '/img/apps/gallery.png?v=3',
     icon: <GalleryLogo />,
   },
   music: {
     label: 'Музыка',
-    background: 'linear-gradient(145deg, #4A2288, #2A124E)',
-    image: '/img/apps/music.png?v=2',
+    background: 'linear-gradient(145deg, #B02040, #6E1226)',
+    image: '/img/apps/music.png?v=3',
     icon: <MusicLogo />,
   },
   phone: {
     label: 'Телефон',
     background: 'linear-gradient(145deg, #23803A, #134C22)',
-    image: '/img/apps/phone.png?v=2',
+    image: '/img/apps/phone.png?v=3',
     icon: <PhoneLogo />,
   },
   gosuslugi: {
     label: 'Госуслуги',
     background: 'linear-gradient(145deg, #1560C4, #0A3A78)',
-    image: '/img/apps/gosuslugi.png?v=2',
+    image: '/img/apps/gosuslugi.png?v=3',
     icon: <GosLogo />,
   },
   numbers: {
     label: 'Номера',
-    background: 'linear-gradient(145deg, #1E4423, #102413)',
-    image: '/img/apps/numbers.png?v=2',
+    background: 'linear-gradient(145deg, #5B3AA6, #341F66)',
+    image: '/img/apps/numbers.png?v=3',
     icon: <NumbersLogo />,
   },
   plates: {
     label: 'Автономера',
     background: 'linear-gradient(145deg, #3F4753, #171B21)',
-    image: '/img/apps/plates.png?v=1',
+    image: '/img/apps/plates.png?v=3',
     icon: <PlatesLogo />,
+  },
+  support: {
+    label: 'Поддержка',
+    background: 'linear-gradient(145deg, #12777C, #0A4B4E)',
+    image: '/img/apps/support.png?v=3',
+    icon: <SupportLogo />,
   },
 }
 
@@ -516,6 +535,7 @@ export const HOME_GRID: AppKey[] = [
   'numbers',
   'plates',
   'gosuslugi',
+  'support',
 ]
 
 export const DOCK_APPS: AppKey[] = ['avito', 'bank', 'auction', 'career']

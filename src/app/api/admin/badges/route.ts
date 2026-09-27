@@ -9,12 +9,13 @@ export async function GET(req: Request) {
   if (denied) return denied
 
   const now = new Date()
-  const [complaints, liveAuctions, stuckDeliveries, stuckRepairs] = await Promise.all([
+  const [complaints, liveAuctions, stuckDeliveries, stuckRepairs, supportUnread] = await Promise.all([
     db.complaint.count(),
     db.auctionLot.count({ where: { status: 'active' } }),
     db.delivery.count({ where: { eta: { lt: now }, status: { in: ['collecting', 'in_transit', 'arrived'] } } }),
     db.repairOrder.count({ where: { readyAt: { lt: now }, status: 'in_progress' } }),
+    db.supportMessage.count({ where: { role: 'user', readByAdmin: false } }),
   ])
 
-  return Response.json({ complaints, liveAuctions, opsStuck: stuckDeliveries + stuckRepairs })
+  return Response.json({ complaints, liveAuctions, opsStuck: stuckDeliveries + stuckRepairs, supportUnread })
 }

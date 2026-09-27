@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Command,
   Gavel,
+  Headset,
   History,
   LayoutDashboard,
   LayoutGrid,
@@ -43,6 +44,7 @@ import ComplaintsSection from '@/components/admin/ComplaintsSection'
 import FinanceSection from '@/components/admin/FinanceSection'
 import OpsSection from '@/components/admin/OpsSection'
 import AuditSection from '@/components/admin/AuditSection'
+import SupportSection from '@/components/admin/SupportSection'
 
 type Section =
   | 'overview'
@@ -52,12 +54,13 @@ type Section =
   | 'complaints'
   | 'auctions'
   | 'messages'
+  | 'support'
   | 'market'
   | 'finance'
   | 'broadcast'
   | 'audit'
 
-const NAV_GROUPS: { label: string; items: { key: Section; label: string; sub: string; icon: React.ReactNode; badge?: 'complaints' | 'liveAuctions' | 'opsStuck' }[] }[] = [
+const NAV_GROUPS: { label: string; items: { key: Section; label: string; sub: string; icon: React.ReactNode; badge?: 'complaints' | 'liveAuctions' | 'opsStuck' | 'supportUnread' }[] }[] = [
   {
     label: 'Аналитика',
     items: [
@@ -73,6 +76,7 @@ const NAV_GROUPS: { label: string; items: { key: Section; label: string; sub: st
       { key: 'complaints', label: 'Жалобы', sub: 'Очередь модерации', icon: <ShieldAlert className="size-[17px]" />, badge: 'complaints' },
       { key: 'auctions', label: 'Аукционы', sub: 'Живые торги', icon: <Gavel className="size-[17px]" />, badge: 'liveAuctions' },
       { key: 'messages', label: 'Чаты', sub: 'Модерация сообщений', icon: <MessagesSquare className="size-[17px]" /> },
+      { key: 'support', label: 'Поддержка', sub: 'Обращения игроков, ИИ + админ', icon: <Headset className="size-[17px]" />, badge: 'supportUnread' },
     ],
   },
   {
@@ -94,10 +98,10 @@ const NAV_GROUPS: { label: string; items: { key: Section; label: string; sub: st
 const NAV_FLAT = NAV_GROUPS.flatMap((g) => g.items.map((i) => ({ ...i, group: g.label })))
 
 /** Пять главных разделов нижнего мобильного бара. */
-const MOBILE_TABS: { key: Section; label: string; icon: React.ReactNode; badge?: 'complaints' | 'liveAuctions' | 'opsStuck' }[] = [
+const MOBILE_TABS: { key: Section; label: string; icon: React.ReactNode; badge?: 'complaints' | 'liveAuctions' | 'opsStuck' | 'supportUnread' }[] = [
   { key: 'overview', label: 'Обзор', icon: <LayoutDashboard className="size-[18px]" /> },
   { key: 'users', label: 'Игроки', icon: <Users className="size-[18px]" /> },
-  { key: 'auctions', label: 'Аукционы', icon: <Gavel className="size-[18px]" />, badge: 'liveAuctions' },
+  { key: 'support', label: 'Поддержка', icon: <Headset className="size-[18px]" />, badge: 'supportUnread' },
   { key: 'complaints', label: 'Жалобы', icon: <ShieldAlert className="size-[18px]" />, badge: 'complaints' },
 ]
 
@@ -192,9 +196,9 @@ export default function AdminPage() {
     window.location.assign('/admin/login')
   }
 
-  const badgeValue = (b?: 'complaints' | 'liveAuctions' | 'opsStuck') => {
+  const badgeValue = (b?: 'complaints' | 'liveAuctions' | 'opsStuck' | 'supportUnread') => {
     if (!b || !badges) return 0
-    return badges[b]
+    return badges[b] ?? 0
   }
 
   const current = NAV_FLAT.find((n) => n.key === section)
@@ -365,6 +369,7 @@ export default function AdminPage() {
                 {section === 'complaints' && <ComplaintsSection onToast={onToast} refreshKey={tick} />}
                 {section === 'auctions' && <AuctionsSection onToast={onToast} refreshKey={tick} />}
                 {section === 'messages' && <MessagesSection onToast={onToast} refreshKey={tick} />}
+                {section === 'support' && <SupportSection onToast={onToast} refreshKey={tick} />}
                 {section === 'market' && <MarketSection onToast={onToast} />}
                 {section === 'finance' && <FinanceSection onToast={onToast} refreshKey={tick} />}
                 {section === 'broadcast' && <BroadcastSection onToast={onToast} />}

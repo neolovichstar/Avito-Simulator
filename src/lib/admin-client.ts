@@ -14,6 +14,8 @@ export type AdminKpis = {
   chats24: number
   moneySupply: number
   intrusions24: number
+  gmvTotal: number
+  starsTotal: number
 }
 
 export type SeriesPoint = { day: string; gmv: number; deals: number }
@@ -256,7 +258,33 @@ export type OpsData = {
   repairs: RepairRow[]
 }
 
-export type BadgesData = { complaints: number; liveAuctions: number; opsStuck: number }
+export type BadgesData = { complaints: number; liveAuctions: number; opsStuck: number; supportUnread: number }
+
+export type SupportThread = {
+  userId: string
+  name: string
+  username: string
+  isBot: boolean
+  online: boolean
+  lastText: string
+  lastAt: string
+  lastAuthor: string
+  lastRole: string
+  unread: number
+}
+
+export type SupportThreadMsg = {
+  id: string
+  role: string
+  author: string
+  text: string
+  createdAt: string
+}
+
+export type SupportThreadData = {
+  user: { id: string; name: string; username: string; isBot: boolean; online: boolean }
+  messages: SupportThreadMsg[]
+}
 
 export class AdminApiError extends Error {
   status: number
@@ -359,6 +387,10 @@ export const adminApi = {
   financeAction: (data: { kind: 'tax' | 'loan'; id: string }) =>
     request<{ ok: true }>('/finance', { method: 'POST', body: JSON.stringify(data) }),
   ops: () => request<OpsData>('/ops'),
+  supportThreads: () => request<{ threads: SupportThread[] }>('/support'),
+  supportThread: (userId: string) => request<SupportThreadData>(`/support?userId=${encodeURIComponent(userId)}`),
+  supportReply: (userId: string, text: string) =>
+    request<{ message: SupportThreadMsg }>('/support', { method: 'POST', body: JSON.stringify({ userId, text }) }),
 }
 
 export const EXPORT_TYPES = [

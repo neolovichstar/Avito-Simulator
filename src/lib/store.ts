@@ -10,6 +10,7 @@ export type AppKey =
   | 'repair' | 'auction' | 'career' | 'delivery' | 'leaderboard'
   | 'calc' | 'clock' | 'calendar' | 'notes' | 'weather'
   | 'gallery' | 'music' | 'phone' | 'gosuslugi' | 'numbers' | 'plates'
+  | 'support'
 
 /** Реальный тип сети устройства (Network Information API + navigator.onLine). */
 export type NetKind = 'offline' | 'slow' | '3g' | '4g' | 'wifi'

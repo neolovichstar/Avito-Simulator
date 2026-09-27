@@ -228,6 +228,27 @@ export const api = {
   clearNotifications: () => post<{ ok: boolean }>('/api/notifications', { action: 'clear' }),
   stats: () => req<{ online: number }>('/api/stats'),
   daySummary: () => req<{ deals: number; buys: number; sales: number; net: number }>('/api/day-summary'),
+
+  // ── Поддержка ──
+  supportThread: () => req<{ messages: SupportMsgDTO[]; unreadOnOpen: number }>('/api/support'),
+  supportSend: (text: string) =>
+    post<{ messages: SupportMsgDTO[]; adminActive: boolean }>('/api/support', { text }),
+
+  // ── Магазин Stars (косметика) ──
+  shopGet: () =>
+    req<{
+      items: { sku: string; kind: string; title: string; desc: string; stars: number; wallpaperId?: string }[]
+      cosmetics: { wallpapers: string[]; badge: boolean; tips: number }
+      canPay: boolean
+    }>('/api/shop'),
+  shopInvoice: (sku: string) => post<{ invoiceLink: string }>('/api/shop', { action: 'invoice', sku }),
+  shopVerify: () =>
+    post<{
+      items: { sku: string; kind: string; title: string; desc: string; stars: number; wallpaperId?: string }[]
+      cosmetics: { wallpapers: string[]; badge: boolean; tips: number }
+      canPay: boolean
+      granted: string[]
+    }>('/api/shop', { action: 'verify' }),
   leaderboard: () =>
     req<{
       balance: LeaderRowDTO[]
@@ -254,6 +275,14 @@ export interface LeaderRowDTO {
   value: number
   rank: number
   isMe: boolean
+}
+
+export interface SupportMsgDTO {
+  id: string
+  role: string
+  author: string
+  text: string
+  createdAt: string
 }
 
 // Ссылка на скачивание CSV-истории операций (токен в query — для прямой ссылки)
