@@ -1,10 +1,11 @@
 'use client'
 
-// Экран блокировки «Resale OS» по фирменному макету: светлый минимализм,
-// дата над тонкими огромными часами, карточки уведомлений и два круглых
+// Экран блокировки «Resale OS» по фирменному макету (зона 55-a): светлые
+// «шёлковые» обои, дата над тонкими огромными часами, матовые стеклянные
+// карточки уведомлений с настоящими иконками приложений и два круглых
 // shortcut'а внизу (фонарик — реальный toggle, камера — открывает галерею).
 // Тон интерфейса подстраивается под обои: светлые обои — графитовые тексты
-// и белые карточки, тёмные — как раньше. Разблокировка: свайп вверх, тап,
+// и белое стекло, тёмные — как раньше. Разблокировка: свайп вверх, тап,
 // Enter или пробел. Никаких паролей — это смартфон в игре.
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
@@ -18,6 +19,7 @@ import { setTorch } from '@/lib/torch'
 import { wallpaperById, wallpaperClass } from '@/lib/wallpapers'
 import { useDrag } from '@/lib/use-swipe'
 import { KIND_APP } from './notif-meta'
+import { APP_TILE, AppTileImage } from './app-logos'
 
 // Живые тики каждые 1000 мс без setState в эффекте (useSyncExternalStore).
 function useClock(): Date | null {
@@ -38,6 +40,27 @@ const MAX_PREVIEWS = 3 // до трёх превью на локскрине
 // Пустой subscribe: mounted-гейт против hydration mismatch (player читает
 // localStorage на клиенте — на сервере current всегда null).
 const emptySubscribe = () => () => {}
+
+// Суммы внутри текста уведомления — фирменный зелёный по макету.
+// fmtMoney даёт «12 500 ₽» (пробелы/NBSP между разрядами), плюс «-12 500 ₽».
+const MONEY_SPLIT = /(-?\d[\d \u00A0\u202F]*\u00A0?₽)/g
+function MoneyText({ text, moneyClass }: { text: string; moneyClass: string }) {
+  const parts = text.split(MONEY_SPLIT)
+  if (parts.length === 1) return <>{text}</>
+  return (
+    <>
+      {parts.map((p, i) =>
+        i % 2 === 1 ? (
+          <span key={i} className={moneyClass}>
+            {p}
+          </span>
+        ) : (
+          p
+        ),
+      )}
+    </>
+  )
+}
 
 export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   const dnd = useOS((s) => s.dnd)
@@ -186,40 +209,43 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
       : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)
         ? 'уведомления'
         : 'уведомлений'
-  const DayIcon = KIND_APP.deal.icon
   const dealsLabel =
     day && (day.deals === 1 ? 'сделка' : day.deals < 5 ? 'сделки' : 'сделок')
 
-  // Токены тона
+  // Токены тона (55-a: матовое стекло + графит по макету)
   const T = lightTone
     ? {
-        date: 'text-neutral-800',
-        clock: 'text-neutral-900',
-        sub: 'text-neutral-500',
-        faint: 'text-neutral-400',
-        card: 'bg-white/75 ring-1 ring-black/[0.05] shadow-[0_14px_34px_-20px_rgba(15,23,42,0.45)]',
-        cardText: 'text-neutral-900',
-        cardSub: 'text-neutral-500',
-        cardTime: 'text-neutral-400',
-        shortcut: 'bg-white/65 text-neutral-800 ring-1 ring-black/[0.06] backdrop-blur-xl',
-        shortcutOn: 'bg-neutral-900 text-white',
-        handle: 'bg-neutral-900/60',
-        hint: 'text-neutral-500',
-        dnd: 'text-neutral-500',
+        date: 'text-[rgba(20,20,22,0.72)]',
+        clock: 'text-[#0F0F12]',
+        notifLabel: 'text-[rgba(60,60,67,0.6)]',
+        card: 'bg-white/70 ring-1 ring-black/[0.05] shadow-[0_8px_24px_rgba(15,15,20,0.08)] backdrop-blur-2xl',
+        cardTitle: 'text-[#111111]',
+        cardBody: 'text-[rgba(60,60,67,0.78)]',
+        cardTime: 'text-[rgba(60,60,67,0.6)]',
+        more: 'text-[rgba(60,60,67,0.45)]',
+        money: 'font-semibold text-[#34C759]',
+        moneyNeg: 'font-semibold text-[#FF3B30]',
+        hint: 'text-[rgba(60,60,67,0.5)]',
+        shortcut: 'bg-white/60 text-[#111111] ring-1 ring-black/[0.06] shadow-sm backdrop-blur-xl',
+        shortcutOn: 'bg-neutral-900 text-white shadow-md',
+        handle: 'bg-[#111111]/40',
+        dnd: 'text-[rgba(60,60,67,0.55)]',
       }
     : {
-        date: 'text-white/90',
+        date: 'text-white/85',
         clock: 'text-white',
-        sub: 'text-white/65',
-        faint: 'text-white/45',
-        card: 'bg-white/[0.08] ring-1 ring-white/[0.08] backdrop-blur-md',
-        cardText: 'text-white',
-        cardSub: 'text-white/65',
-        cardTime: 'text-white/40',
-        shortcut: 'bg-white/[0.10] text-white ring-1 ring-white/[0.10] backdrop-blur-xl',
+        notifLabel: 'text-white/55',
+        card: 'bg-white/[0.10] ring-1 ring-white/[0.12] shadow-[0_10px_28px_rgba(0,0,0,0.35)] backdrop-blur-2xl',
+        cardTitle: 'text-white',
+        cardBody: 'text-white/70',
+        cardTime: 'text-white/50',
+        more: 'text-white/45',
+        money: 'font-semibold text-[#30D158]',
+        moneyNeg: 'font-semibold text-[#FF453A]',
+        hint: 'text-white/55',
+        shortcut: 'bg-white/[0.12] text-white ring-1 ring-white/[0.14] shadow-sm backdrop-blur-xl',
         shortcutOn: 'bg-white text-neutral-900 shadow-[0_0_28px_rgba(255,251,214,0.45)]',
         handle: 'bg-white/50',
-        hint: 'text-white/60',
         dnd: 'text-white/55',
       }
 
@@ -237,15 +263,15 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
       {!lightTone && (
         <div aria-hidden="true" className={`absolute inset-0 ${dark && wall.light ? 'bg-[#0B0C0E]/[0.86]' : 'bg-[#050d09]/55'}`} />
       )}
-      {lightTone && <div aria-hidden="true" className="absolute inset-0 bg-white/10" />}
+      {lightTone && <div aria-hidden="true" className="absolute inset-0 bg-white/5" />}
 
       <div className="relative z-10 flex h-full flex-col px-5 pb-4 pt-14">
         {/* ─── Дата + тонкие часы по макету ─── */}
         <div className="shrink-0 text-center" suppressHydrationWarning>
-          <p className={`text-[15px] font-medium capitalize ${T.date}`}>
+          <p className={`text-[16px] font-medium capitalize ${T.date}`}>
             {now ? now.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' }) : '\u00A0'}
           </p>
-          <p className={`os-thin-clock mt-1 text-[92px] ${T.clock}`}>
+          <p className={`os-thin-clock mt-2 text-[96px] ${T.clock}`}>
             {now ? now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '\u00A0'}
           </p>
         </div>
@@ -259,58 +285,63 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
         )}
 
         {/* ─── Уведомления, итоги дня и медиа ─── */}
-        <div data-lock-scroll className="mt-5 min-h-0 flex-1 space-y-2.5 overflow-y-auto [scrollbar-width:none]">
+        <div data-lock-scroll className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto [scrollbar-width:none]">
           {unreadCount > 0 && (
-            <p className={`px-1 text-[11px] font-semibold uppercase tracking-wider ${T.faint}`}>
-              {unreadCount} {notifWord(unreadCount)}
-            </p>
+            <p className={`text-center text-[13px] font-medium ${T.notifLabel}`}>Уведомления</p>
           )}
           {previews.map((n) => {
             const meta = KIND_APP[n.kind] ?? KIND_APP.system
             const NotifIcon = meta.icon
+            const tile = APP_TILE[meta.openApp]
             return (
               <div
                 key={n.id}
-                className={`flex items-center gap-3 rounded-[22px] px-3 py-2.5 ${T.card}`}
+                className={`flex items-start gap-3 rounded-[22px] p-3 ${T.card}`}
               >
+                {/* настоящая иконка приложения (PNG из фирменного пака) на плитке */}
                 <span
                   aria-hidden="true"
-                  className="flex size-9 shrink-0 items-center justify-center rounded-[12px] text-white shadow-sm"
-                  style={{ background: meta.bg }}
+                  className="relative size-[38px] shrink-0 overflow-hidden rounded-[11px] shadow-[0_3px_8px_rgba(15,15,20,0.22)]"
+                  style={{ background: tile.background }}
                 >
-                  <NotifIcon className="size-4" />
+                  <NotifIcon className="absolute inset-0 m-auto size-[18px] text-white" />
+                  <AppTileImage app={meta.openApp} className="absolute inset-0 h-full w-full" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className={`truncate text-[13px] font-bold leading-tight ${T.cardText}`}>{n.title}</p>
-                  <p className={`mt-0.5 truncate text-[12px] leading-tight ${T.cardSub}`}>{n.body}</p>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className={`truncate text-[14px] font-semibold leading-tight ${T.cardTitle}`}>{n.title}</p>
+                    <span className={`shrink-0 text-[12px] tabular-nums ${T.cardTime}`}>{timeAgo(n.createdAt)}</span>
+                  </div>
+                  <p className={`mt-0.5 line-clamp-2 text-[13px] leading-snug ${T.cardBody}`}>
+                    <MoneyText text={n.body} moneyClass={T.money} />
+                  </p>
                 </div>
-                <span className={`shrink-0 text-[11px] tabular-nums ${T.cardTime}`}>{timeAgo(n.createdAt)}</span>
               </div>
             )
           })}
 
           {/* «ещё N» — если уведомлений больше трёх */}
           {moreCount > 0 && (
-            <p className={`pt-0.5 text-center text-[11px] font-medium ${T.faint}`}>
+            <p className={`pt-0.5 text-center text-[12px] font-medium ${T.more}`}>
               Ещё {moreCount} {notifWord(moreCount)}
             </p>
           )}
 
           {/* Итоги дня (если сегодня были сделки) */}
           {day && dealsLabel && (
-            <div className={`flex items-center gap-3 rounded-[22px] px-3 py-2.5 ${T.card}`}>
+            <div className={`flex items-start gap-3 rounded-[22px] p-3 ${T.card}`}>
               <span
                 aria-hidden="true"
-                className="flex size-9 shrink-0 items-center justify-center rounded-[12px] text-white shadow-sm"
-                style={{ background: KIND_APP.deal.bg }}
+                className="relative size-[38px] shrink-0 overflow-hidden rounded-[11px] shadow-[0_3px_8px_rgba(15,15,20,0.22)]"
+                style={{ background: APP_TILE.avito.background }}
               >
-                <DayIcon className="size-4" />
+                <AppTileImage app="avito" className="absolute inset-0 h-full w-full" />
               </span>
               <div className="min-w-0 flex-1">
-                <p className={`truncate text-[13px] font-semibold leading-tight ${T.cardText}`}>Сегодня в Resale</p>
-                <p className={`mt-0.5 truncate text-[12px] leading-tight ${T.cardSub}`}>
+                <p className={`truncate text-[14px] font-semibold leading-tight ${T.cardTitle}`}>Сегодня в Resale</p>
+                <p className={`mt-0.5 truncate text-[13px] leading-snug ${T.cardBody}`}>
                   {day.deals} {dealsLabel} ·{' '}
-                  <span className={day.net >= 0 ? (lightTone ? 'font-semibold text-emerald-600' : 'font-semibold text-emerald-300') : (lightTone ? 'font-semibold text-red-500' : 'font-semibold text-red-300')}>
+                  <span className={day.net >= 0 ? T.money : T.moneyNeg}>
                     {day.net >= 0 ? '+' : ''}
                     {fmtMoney(day.net)}
                   </span>
@@ -325,7 +356,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
 
         {/* ─── Низ: подсказка, круглые shortcut'ы и home-индикатор ─── */}
         <div className="shrink-0 pt-4">
-          <p className={`text-center text-[12px] font-medium ${T.hint}`}>Проведите вверх, чтобы открыть</p>
+          <p className={`text-center text-[13px] font-medium ${T.hint}`}>Проведите вверх, чтобы открыть</p>
           <div className="mt-4 flex items-center justify-between px-2">
             <button
               type="button"
@@ -335,7 +366,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
                 e.stopPropagation()
                 void toggleFlash()
               }}
-              className={`flex size-14 items-center justify-center rounded-full outline-none transition-all duration-200 active:scale-90 focus-visible:ring-2 focus-visible:ring-black/30 ${
+              className={`flex size-[52px] items-center justify-center rounded-full outline-none transition-transform duration-200 active:scale-90 focus-visible:ring-2 focus-visible:ring-black/30 ${
                 flashlight ? T.shortcutOn : T.shortcut
               }`}
             >
@@ -349,7 +380,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
                 e.stopPropagation()
                 openCamera()
               }}
-              className={`flex size-14 items-center justify-center rounded-full outline-none transition-all duration-200 active:scale-90 focus-visible:ring-2 focus-visible:ring-black/30 ${T.shortcut}`}
+              className={`flex size-[52px] items-center justify-center rounded-full outline-none transition-transform duration-200 active:scale-90 focus-visible:ring-2 focus-visible:ring-black/30 ${T.shortcut}`}
             >
               <Camera className="size-6" aria-hidden="true" />
             </button>
@@ -373,12 +404,14 @@ function LockMedia({ light }: { light: boolean }) {
   const next = usePlayer((s) => s.next)
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
   if (!mounted || !current) return null
-  const card = light ? 'bg-white/75 ring-1 ring-black/[0.05]' : 'bg-white/[0.08] ring-1 ring-white/[0.08] backdrop-blur-md'
-  const title = light ? 'text-neutral-900' : 'text-white'
-  const sub = light ? 'text-neutral-500' : 'text-white/60'
+  const card = light
+    ? 'bg-white/70 ring-1 ring-black/[0.05] shadow-[0_8px_24px_rgba(15,15,20,0.08)] backdrop-blur-2xl'
+    : 'bg-white/[0.10] ring-1 ring-white/[0.12] shadow-[0_10px_28px_rgba(0,0,0,0.35)] backdrop-blur-2xl'
+  const title = light ? 'text-[#111111]' : 'text-white'
+  const sub = light ? 'text-[rgba(60,60,67,0.78)]' : 'text-white/65'
   return (
     <div
-      className={`flex items-center gap-3 rounded-[22px] p-2.5 ${card}`}
+      className={`flex items-center gap-3 rounded-[22px] p-3 ${card}`}
       role="group"
       aria-label={`Сейчас играет: ${current.title} — ${current.artist}`}
     >
@@ -389,7 +422,7 @@ function LockMedia({ light }: { light: boolean }) {
         {isPlaying && <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[3px] bg-[#3ED598]" />}
       </span>
       <div className="min-w-0 flex-1">
-        <p className={`truncate text-[13px] font-bold leading-tight ${title}`}>{current.title}</p>
+        <p className={`truncate text-[14px] font-semibold leading-tight ${title}`}>{current.title}</p>
         <p className={`mt-0.5 truncate text-[12px] leading-tight ${sub}`}>{current.artist}</p>
       </div>
       <button
@@ -399,7 +432,7 @@ function LockMedia({ light }: { light: boolean }) {
           e.stopPropagation()
           toggle()
         }}
-        className={`flex size-10 shrink-0 items-center justify-center rounded-full outline-none transition-transform duration-150 active:scale-90 ${
+        className={`flex size-11 shrink-0 items-center justify-center rounded-full outline-none transition-transform duration-150 active:scale-90 ${
           light ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'
         }`}
       >
@@ -412,7 +445,7 @@ function LockMedia({ light }: { light: boolean }) {
           e.stopPropagation()
           next()
         }}
-        className={`mr-0.5 flex size-10 shrink-0 items-center justify-center rounded-full outline-none transition-colors ${
+        className={`mr-0.5 flex size-11 shrink-0 items-center justify-center rounded-full outline-none transition-colors ${
           light ? 'text-neutral-600 active:bg-black/5' : 'text-white/80 active:bg-white/10'
         }`}
       >

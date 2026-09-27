@@ -32,6 +32,22 @@ function shade(hex: string, amount: number): string {
   return `rgb(${ch((num >> 16) & 255)} ${ch((num >> 8) & 255)} ${ch(num & 255)})`
 }
 
+// Тень «в тон базы» для ярких тайлов, нейтральная — для тёмных/светлых.
+// Цвет вытягиваем из готового градиента (первый hex в строке).
+function glowFromBg(bg?: string): string {
+  if (!bg) return 'rgba(0,0,0,0.28)'
+  const m = bg.match(/#([0-9a-fA-F]{6})/)
+  if (!m) return 'rgba(0,0,0,0.28)'
+  const n = Number.parseInt(m[1], 16)
+  const r = (n >> 16) & 255
+  const g = (n >> 8) & 255
+  const b = n & 255
+  const mx = Math.max(r, g, b)
+  const mn = Math.min(r, g, b)
+  if (mx - mn >= 60 && mx > 70) return `rgba(${r}, ${g}, ${b}, 0.36)`
+  return 'rgba(0,0,0,0.28)'
+}
+
 export default function AppIcon({
   icon,
   label,
@@ -47,6 +63,11 @@ export default function AppIcon({
   staticTile = false,
   tileClass,
   tileStyle,
+  tileW,
+  tileRadius,
+  labelW,
+  enter = false,
+  enterDelay = 0,
   onPointerDown,
   onLongPress,
   onClick,
@@ -76,6 +97,16 @@ export default function AppIcon({
   tileClass?: string
   /** Инлайн-стиль плитки (позиция призрака при перетаскивании). */
   tileStyle?: React.CSSProperties
+  /** Фиксированная ширина плитки в px (сетка дома 62px; по умолчанию — вся ячейка). */
+  tileW?: number
+  /** Радиус плитки (по умолчанию 22.5% тайла, у библиотеки — rounded-[15px]). */
+  tileRadius?: string
+  /** Ширина подписи в px (по умолчанию 74). */
+  labelW?: number
+  /** Stagger-вход лончера (после разблокировки): scale 0.96 → 1 + fade. */
+  enter?: boolean
+  /** Задержка входа в мс (через --d). */
+  enterDelay?: number
   /** Прокидывание onPointerDown (драг-движок лончера). */
   onPointerDown?: (e: React.PointerEvent) => void
   onLongPress?: () => void
@@ -85,6 +116,12 @@ export default function AppIcon({
   const tileBackground =
     background ??
     `linear-gradient(145deg, ${shade(base, 45)}, ${shade(base, -40)})`
+  // iOS-глубина: мягкая внешняя тень (+ цветной ореол у ярких тайлов) и
+  // inset-хайлайт по верхней кромке. Через переменную, чтобы классы
+  // os-lift/os-merge/os-ghost могли перекрыть box-shadow целиком.
+  const glow = glowFromBg(background ?? imageBg)
+  const radius = tileRadius ?? 'rounded-[22.5%]'
+  const labelWidth = labelW ?? (small ? 52 : 82)
 
   // Долгий тап: таймер на 480 мс без движения больше 9px
   const lpTimer = useRef(0)
@@ -107,6 +144,11 @@ export default function AppIcon({
     if (Math.hypot(e.clientX - lpStart.current.x, e.clientY - lpStart.current.y) > 9) clearLp()
   }
 
+  const btnStyle: React.CSSProperties = {
+    ...(tileW ? { width: tileW } : undefined),
+    ...(enter ? { ['--d' as string]: `${enterDelay}ms` } : undefined),
+  }
+
   return (
     <button
       type="button"
@@ -123,15 +165,20 @@ export default function AppIcon({
           onLongPress()
         }
       }}
-      className={`flex w-full flex-col items-center outline-none focus-visible:ring-2 focus-visible:ring-white/80 ${
-        small ? 'gap-0.5' : 'gap-1'
-      } ${staticTile ? '' : 'transition-transform duration-200 active:scale-95'}`}
+      style={btnStyle}
+      className={`flex ${tileW ? '' : 'w-full'} flex-col items-center outline-none focus-visible:ring-2 focus-visible:ring-white/80 ${
+        small ? 'gap-0.5' : 'gap-[6px]'
+      } ${enter ? 'os-enter' : ''} ${staticTile ? '' : 'transition-transform duration-200 active:scale-95'}`}
     >
       <span
-        className={`relative ${small ? 'w-[52px]' : 'w-full'} block ${small ? 'rounded-[0.95rem]' : 'rounded-[1.15rem]'} aspect-square overflow-hidden shadow-[0_8px_18px_-6px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.35),inset_0_-8px_12px_-10px_rgba(0,0,0,0.35)] transition-[transform,box-shadow] duration-200 ease-out ${
+        className={`relative ${small ? 'w-[52px]' : 'w-full'} block ${radius} aspect-square overflow-hidden shadow-[0_8px_16px_-6px_var(--tile-glow,rgba(0,0,0,0.28)),inset_0_1px_0_rgba(255,255,255,0.35),inset_0_-10px_14px_-12px_rgba(0,0,0,0.3)] transition-[transform,box-shadow] duration-200 ease-out ${
           image ? 'ring-1 ring-white/15' : ''
         } ${tileClass ?? ''}`}
-        style={tileStyle ? { ...(image ? undefined : { backgroundImage: tileBackground }), ...tileStyle } : image ? undefined : { backgroundImage: tileBackground }}
+        style={{
+          ['--tile-glow' as string]: glow,
+          ...(image ? undefined : { backgroundImage: tileBackground }),
+          ...tileStyle,
+        }}
       >
         {image ? (
           <TileImage src={image} bg={imageBg ?? background} loading={loading} />
@@ -140,14 +187,14 @@ export default function AppIcon({
             {/* Блик сверху — стеклянный отблеск, как у настоящих иконок ОС */}
             <span
               aria-hidden="true"
-              className={`pointer-events-none absolute inset-x-0 top-0 h-[46%] ${small ? 'rounded-t-[0.95rem]' : 'rounded-t-[1.15rem]'} bg-gradient-to-b from-white/25 via-white/5 to-transparent`}
+              className={`pointer-events-none absolute inset-x-0 top-0 h-1/2 rounded-t-[inherit] bg-gradient-to-b from-white/25 to-transparent`}
             />
             <span className="absolute inset-0 flex items-center justify-center">{icon}</span>
           </>
         )}
         {badge !== undefined && badge > 0 && (
           <span
-            className={`absolute -right-1 -top-1 flex ${small ? 'h-4 min-w-4 text-[9px]' : 'h-[18px] min-w-[18px] text-[10px]'} items-center justify-center rounded-full bg-[#E5484D] px-1 font-semibold leading-none text-white shadow-md`}
+            className={`absolute -right-1 -top-1 flex ${small ? 'h-4 min-w-4 text-[9px]' : 'h-[18px] min-w-[18px] text-[10px]'} items-center justify-center rounded-full bg-[#FF453A] px-1 font-semibold leading-none text-white shadow-md`}
           >
             {badge > 99 ? '99+' : badge}
           </span>
@@ -155,8 +202,11 @@ export default function AppIcon({
       </span>
       {!hideLabel && (
         <span
-          className={`${small ? 'w-[52px] text-[9px]' : 'w-[74px] text-[10px]'} truncate text-center ${
-            tone === 'light' ? 'text-neutral-700' : 'text-white/90 [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]'
+          style={{ width: labelWidth }}
+          className={`truncate text-center ${small ? 'text-[9px]' : 'text-[11px] font-medium'} ${
+            tone === 'light'
+              ? 'text-[#1a1a1a] [text-shadow:0_1px_2px_rgba(255,255,255,0.65)]'
+              : 'text-white/95 [text-shadow:0_1px_2px_rgba(0,0,0,0.55)]'
           }`}
         >
           {label}

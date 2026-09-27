@@ -1127,3 +1127,53 @@
 @media (prefers-reduced-motion: reduce) {
   .os-folder-panel, .os-absorb { animation-duration: 0.01s; }
 }
+
+/* ============================================================
+   55-a: локскрин, статус-бар и обои Resale OS (frontend-styling-expert).
+   Блок добавлен в конец файла: свои правила только здесь, чужие не правлены.
+   ============================================================ */
+
+/* 55-a: обои «Шёлк» — 4 статичные складки-волны с мягкими тенями между
+   слоями, блики по гребням и лёгкая виньетка к краям. Тона макета:
+   #F7F8FA → #E8EAEE → #D9DCE2. Перебивает ранний .wp-snow (выше по файлу)
+   за счёт порядка каскада; флаг light не меняется, анимаций нет. */
+.wp-snow {
+  background-color: #f7f8fa;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 390 844' preserveAspectRatio='xMidYMid slice'%3E%3Cdefs%3E%3ClinearGradient id='sky' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23FCFDFE'/%3E%3Cstop offset='0.6' stop-color='%23F7F8FA'/%3E%3Cstop offset='1' stop-color='%23F2F4F7'/%3E%3C/linearGradient%3E%3ClinearGradient id='fA' gradientUnits='userSpaceOnUse' x1='0' y1='160' x2='30' y2='380'%3E%3Cstop offset='0' stop-color='%2369758B' stop-opacity='0.2'/%3E%3Cstop offset='0.05' stop-color='%2369758B' stop-opacity='0.06'/%3E%3Cstop offset='0.22' stop-color='%23F8F9FB'/%3E%3Cstop offset='0.62' stop-color='%23EDEFF3'/%3E%3Cstop offset='1' stop-color='%23E1E4EA'/%3E%3C/linearGradient%3E%3ClinearGradient id='fB' gradientUnits='userSpaceOnUse' x1='0' y1='355' x2='34' y2='575'%3E%3Cstop offset='0' stop-color='%2369758B' stop-opacity='0.21'/%3E%3Cstop offset='0.06' stop-color='%2369758B' stop-opacity='0.06'/%3E%3Cstop offset='0.24' stop-color='%23F6F7FA'/%3E%3Cstop offset='0.66' stop-color='%23EAECEF'/%3E%3Cstop offset='1' stop-color='%23DDE0E6'/%3E%3C/linearGradient%3E%3ClinearGradient id='fC' gradientUnits='userSpaceOnUse' x1='0' y1='548' x2='-30' y2='770'%3E%3Cstop offset='0' stop-color='%2369758B' stop-opacity='0.2'/%3E%3Cstop offset='0.05' stop-color='%2369758B' stop-opacity='0.06'/%3E%3Cstop offset='0.24' stop-color='%23F7F8FA'/%3E%3Cstop offset='0.68' stop-color='%23E9EBF0'/%3E%3Cstop offset='1' stop-color='%23DCDFE5'/%3E%3C/linearGradient%3E%3ClinearGradient id='fD' gradientUnits='userSpaceOnUse' x1='0' y1='745' x2='24' y2='852'%3E%3Cstop offset='0' stop-color='%2369758B' stop-opacity='0.22'/%3E%3Cstop offset='0.07' stop-color='%2369758B' stop-opacity='0.07'/%3E%3Cstop offset='0.34' stop-color='%23F0F2F5'/%3E%3Cstop offset='0.75' stop-color='%23E4E7EC'/%3E%3Cstop offset='1' stop-color='%23D9DCE2'/%3E%3C/linearGradient%3E%3ClinearGradient id='sheen' x1='0' y1='0' x2='0.85' y2='1'%3E%3Cstop offset='0' stop-color='%23FFFFFF' stop-opacity='0.55'/%3E%3Cstop offset='0.4' stop-color='%23FFFFFF' stop-opacity='0'/%3E%3C/linearGradient%3E%3CradialGradient id='vig' cx='0.5' cy='0.4' r='0.9'%3E%3Cstop offset='0.62' stop-color='%232A3140' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%232A3140' stop-opacity='0.09'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect width='390' height='844' fill='url(%23sky)'/%3E%3Cpath d='M-20 178 C 80 70 180 210 260 148 C 320 100 372 118 410 92 L 410 864 L -20 864 Z' fill='url(%23fA)'/%3E%3Cpath d='M-20 372 C 70 292 170 420 250 366 C 315 322 365 344 410 316 L 410 864 L -20 864 Z' fill='url(%23fB)'/%3E%3Cpath d='M-20 566 C 75 490 170 616 255 558 C 320 514 368 534 410 506 L 410 864 L -20 864 Z' fill='url(%23fC)'/%3E%3Cpath d='M-20 762 C 80 692 175 812 260 756 C 325 714 368 732 410 704 L 410 864 L -20 864 Z' fill='url(%23fD)'/%3E%3Cg fill='none' stroke='%23FFFFFF' stroke-linecap='round'%3E%3Cpath d='M-20 178 C 80 70 180 210 260 148 C 320 100 372 118 410 92' stroke-width='2' opacity='0.55' transform='translate(0 6)'/%3E%3Cpath d='M-20 372 C 70 292 170 420 250 366 C 315 322 365 344 410 316' stroke-width='1.8' opacity='0.45' transform='translate(0 6)'/%3E%3Cpath d='M-20 566 C 75 490 170 616 255 558 C 320 514 368 534 410 506' stroke-width='1.8' opacity='0.5' transform='translate(0 6)'/%3E%3C/g%3E%3Crect width='390' height='844' fill='url(%23sheen)'/%3E%3Crect width='390' height='844' fill='url(%23vig)'/%3E%3C/svg%3E");
+  background-size: cover;
+  background-position: center;
+}
+
+/* 55-a: пластика часов локскрина по макету — трекинг -0.02em
+   (ранний .os-thin-clock оставлен как есть, здесь уточнение). */
+.os-thin-clock {
+  letter-spacing: -0.02em;
+}
+
+/* ============================================================
+   55-b: дом-экран, иконки, библиотека, ЦУ, папки
+   (frontend-styling-expert; токены карточки-стекла и stagger-вход)
+   ============================================================ */
+
+/* Stagger-вход лончера после разблокировки: scale 0.96 → 1 + fade.
+   Задержка через --d (шаг ~30-40 мс). fill-mode: backwards — после
+   конца анимация отпускает transform/opacity: active:scale, подъём
+   иконки (os-lift) и драг работают без конфликтов. Только transform/opacity. */
+@keyframes os-enter {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+.os-enter {
+  animation: os-enter 0.46s cubic-bezier(0.32, 1, 0.67, 1) backwards;
+  animation-delay: var(--d, 0ms);
+}
+
+/* Цветной ореол ярких тайлов: переменная --tile-glow читается классом
+   тени в AppIcon (shadow-...var(--tile-glow)...). Значение ставится
+   инлайном из base-цвета плитки; здесь только подстраховка для тайлов
+   без инлайна и для os-ghost (класс перекрывает тень целиком). */
+.os-ghost-tile { --tile-glow: rgba(0, 0, 0, 0.4); }
+
+@media (prefers-reduced-motion: reduce) {
+  .os-enter { animation: none; }
+}

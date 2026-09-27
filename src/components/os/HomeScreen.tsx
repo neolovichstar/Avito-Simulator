@@ -19,7 +19,8 @@
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
-  ArrowDown, ArrowUp, Check, ChevronRight, Navigation, Pencil, Plus, Search, X,
+  ArrowDown, ArrowUp, Check, ChevronRight, Cloud, CloudLightning, CloudRain, CloudSun,
+  Navigation2, Pencil, Plus, Search, Snowflake, Sun, X,
 } from 'lucide-react'
 import { useOS, type AppKey, type WidgetKey } from '@/lib/store'
 import { wallpaperById, wallpaperClass } from '@/lib/wallpapers'
@@ -55,6 +56,16 @@ const MERGE_MS = 380 // сколько держать иконку над дру
 const genFolderId = () => `f_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
 const itemApps = (it: HomeItem): AppKey[] => (it.t === 'app' ? [it.app] : it.apps)
 const itemKey = (it: HomeItem): string => (it.t === 'app' ? it.app : it.id)
+
+// Вход лончера (stagger виджетов/иконок) проигрывается один раз за сессию —
+// после разблокировки; возвраты из приложений анимацию не повторяют.
+let homeEntrancePlayed = false
+
+// Токены 55-b: карточка-стекло и тексты.
+const GLASS_CARD = 'shadow-[0_10px_30px_-12px_rgba(10,10,15,0.14)]'
+const TXT_PRIMARY = 'text-[#111114]'
+const TXT_SECOND = 'text-[rgba(60,60,67,0.62)]'
+const TXT_TERTIARY = 'text-[rgba(60,60,67,0.35)]'
 const buzz = (ms: number | number[]) => {
   if (typeof navigator !== 'undefined' && navigator.vibrate) {
     try { navigator.vibrate(ms) } catch { /* ignore */ }
@@ -132,37 +143,50 @@ function useClock(): Date | null {
 const SETTLE_EASE = 'transform 0.34s cubic-bezier(0.22, 1, 0.36, 1)'
 
 // ─── Виджет «Погода» (карточка как в макете) ────────────────────────────────
-function CondGlyph({ cond, className }: { cond: Condition; className: string }) {
-  if (cond === 'Солнечно') return <span className={className}>☀️</span>
-  if (cond === 'Облачно') return <span className={className}>🌤️</span>
-  if (cond === 'Пасмурно') return <span className={className}>☁️</span>
-  if (cond === 'Дождь') return <span className={className}>🌧️</span>
-  if (cond === 'Снег') return <span className={className}>❄️</span>
-  if (cond === 'Гроза') return <span className={className}>⛈️</span>
-  return <span className={className}>🌈</span>
+// ─── Крупная цветная иконка погоды (lucide, жёлтое солнце — без эмодзи) ────
+function WeatherGlyph({ cond, className }: { cond: Condition; className: string }) {
+  if (cond === 'Солнечно') {
+    return <Sun className={`${className} shrink-0 text-[#FFC300]`} fill="rgba(255,229,102,0.85)" strokeWidth={1.8} aria-hidden="true" />
+  }
+  if (cond === 'Облачно' || cond === 'После дождя') {
+    return (
+      <span className={`relative block shrink-0 ${className}`} aria-hidden="true">
+        <Sun className="absolute left-0 top-0 size-[62%] text-[#FFC300]" fill="rgba(255,229,102,0.85)" strokeWidth={1.8} aria-hidden="true" />
+        <Cloud className="absolute bottom-0 right-0 size-[74%] text-white" fill="rgba(255,255,255,0.92)" strokeWidth={1.6} aria-hidden="true" />
+      </span>
+    )
+  }
+  if (cond === 'Пасмурно') return <Cloud className={`${className} shrink-0 text-white`} fill="rgba(255,255,255,0.92)" strokeWidth={1.6} aria-hidden="true" />
+  if (cond === 'Дождь') return <CloudRain className={`${className} shrink-0 text-[#6FA8DC]`} strokeWidth={1.8} aria-hidden="true" />
+  if (cond === 'Снег') return <Snowflake className={`${className} shrink-0 text-[#8FC5EE]`} strokeWidth={1.8} aria-hidden="true" />
+  if (cond === 'Гроза') return <CloudLightning className={`${className} shrink-0 text-[#5E5CE6]`} strokeWidth={1.8} aria-hidden="true" />
+  return <CloudSun className={`${className} shrink-0 text-[#FFC300]`} strokeWidth={1.8} aria-hidden="true" />
 }
 
-function WeatherWidget({ dark, onOpenApp }: { dark: boolean; onOpenApp: (a: AppKey) => void }) {
+function WeatherWidget({ dark, onOpenApp, enterDelay }: { dark: boolean; onOpenApp: (a: AppKey) => void; enterDelay?: number }) {
   const w = useMemo(() => weatherNow(0), [])
   return (
     <button
       type="button"
       aria-label={`Погода: ${w.city}, ${fmtDeg(w.temp)}, ${w.cond}`}
       onClick={() => onOpenApp('weather')}
-      className={`flex flex-1 flex-col justify-between rounded-[24px] p-3.5 text-left outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-black/20 ${
-        dark ? 'bg-white/[0.10] ring-1 ring-white/[0.08]' : 'bg-white/85 ring-1 ring-black/[0.04] shadow-[0_10px_30px_-18px_rgba(15,23,42,0.35)]'
-      }`}
+      style={enterDelay !== undefined ? ({ ['--d' as string]: `${enterDelay}ms` } as React.CSSProperties) : undefined}
+      className={`flex flex-1 flex-col justify-between rounded-[26px] p-4 text-left outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-black/20 ${
+        dark
+          ? 'bg-white/[0.10] ring-1 ring-white/[0.08] backdrop-blur-md'
+          : `bg-white/85 ring-1 ring-black/[0.04] backdrop-blur-xl ${GLASS_CARD}`
+      } ${enterDelay !== undefined ? 'os-enter' : ''}`}
     >
-      <span className="flex items-center gap-1.5">
-        <CondGlyph cond={w.cond} className="text-[20px] leading-none" />
-        <span className={`text-[13px] font-semibold ${dark ? 'text-white' : 'text-neutral-800'}`}>{w.city}</span>
-        <Navigation className={`size-3 ${dark ? 'text-white/50' : 'text-neutral-400'}`} aria-hidden="true" />
+      <span className="flex items-center gap-2">
+        <WeatherGlyph cond={w.cond} className="size-8" />
+        <span className={`truncate text-[15px] font-semibold ${dark ? 'text-white' : TXT_PRIMARY}`}>{w.city}</span>
+        <Navigation2 className="size-2.5 shrink-0 text-[#0A84FF]" fill="currentColor" strokeWidth={2.4} aria-hidden="true" />
       </span>
-      <p className={`mt-1 text-[30px] font-semibold leading-none tracking-tight ${dark ? 'text-white' : 'text-neutral-900'}`}>
+      <p className={`mt-2 text-[36px] font-semibold leading-none tracking-tight ${dark ? 'text-white' : TXT_PRIMARY}`}>
         {fmtDeg(w.temp)}
       </p>
-      <p className={`mt-1.5 text-[11px] leading-tight ${dark ? 'text-white/60' : 'text-neutral-500'}`}>{w.cond}</p>
-      <p className={`mt-0.5 flex items-center gap-2 text-[11px] font-medium tabular-nums ${dark ? 'text-white/60' : 'text-neutral-500'}`}>
+      <p className={`mt-1.5 text-[13px] leading-tight ${dark ? 'text-white/60' : TXT_SECOND}`}>{w.cond}</p>
+      <p className={`mt-0.5 flex items-center gap-2 text-[13px] font-medium tabular-nums ${dark ? 'text-white/60' : TXT_SECOND}`}>
         <span className="flex items-center gap-0.5">
           <ArrowUp className="size-3" aria-hidden="true" />
           {fmtDeg(w.tMax)}
@@ -207,77 +231,85 @@ function useDayData() {
 }
 
 function TodayWidget({
-  dark, widgets, online, day, onOpenApp,
+  dark, widgets, online, day, onOpenApp, enterDelay,
 }: {
   dark: boolean
   widgets: WidgetKey[]
   online: number
   day: { quest: { progress: number; target: number } | null; delivery: { status: string } | null; myPlace: number | null }
   onOpenApp: (a: AppKey) => void
+  enterDelay?: number
 }) {
   const now = useClock()
   const dateStr = now
-    ? now.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'long' })
+    ? now.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' })
     : '\u00A0'
 
-  const rows: { key: string; dot: string; text: string; run: () => void }[] = []
+  const rows: { key: string; dot: string; label: string; value: string; run: () => void }[] = []
   if (widgets.includes('clock') && now) {
     rows.push({
       key: 'clock',
-      dot: 'bg-neutral-400',
-      text: `Часы · ${now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`,
+      dot: 'bg-[#0A84FF]',
+      label: 'Часы',
+      value: now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
       run: () => onOpenApp('clock'),
     })
   }
   if (widgets.includes('online')) {
     rows.push({
       key: 'online',
-      dot: 'bg-emerald-500',
-      text: `Сейчас в игре: ${online}`,
+      dot: 'bg-[#34C759]',
+      label: 'Сейчас в игре',
+      value: String(online),
       run: () => onOpenApp('leaderboard'),
     })
   }
   if (widgets.includes('quest')) {
     rows.push({
       key: 'quest',
-      dot: 'bg-sky-500',
-      text: day.quest ? `Задание · ${day.quest.progress} из ${day.quest.target}` : 'Задания · всё чисто',
+      dot: 'bg-[#FF9F0A]',
+      label: 'Задание',
+      value: day.quest ? `${day.quest.progress} из ${day.quest.target}` : 'всё чисто',
       run: () => onOpenApp('career'),
     })
   }
   if (widgets.includes('delivery')) {
     rows.push({
       key: 'delivery',
-      dot: 'bg-rose-500',
-      text: day.delivery ? `Посылка · ${day.delivery.status}` : 'Посылок нет',
+      dot: 'bg-[#FF453A]',
+      label: 'Посылка',
+      value: day.delivery ? day.delivery.status : 'нет',
       run: () => onOpenApp('delivery'),
     })
   }
 
   return (
     <div
-      className={`flex w-[46%] shrink-0 flex-col rounded-[24px] p-3.5 ${
-        dark ? 'bg-white/[0.10] ring-1 ring-white/[0.08]' : 'bg-white/85 ring-1 ring-black/[0.04] shadow-[0_10px_30px_-18px_rgba(15,23,42,0.35)]'
-      }`}
+      style={enterDelay !== undefined ? ({ ['--d' as string]: `${enterDelay}ms` } as React.CSSProperties) : undefined}
+      className={`flex w-[46%] shrink-0 flex-col rounded-[26px] p-4 ${
+        dark
+          ? 'bg-white/[0.10] ring-1 ring-white/[0.08] backdrop-blur-md'
+          : `bg-white/85 ring-1 ring-black/[0.04] backdrop-blur-xl ${GLASS_CARD}`
+      } ${enterDelay !== undefined ? 'os-enter' : ''}`}
     >
       <div className="flex items-center justify-between gap-1">
-        <p className={`truncate text-[13px] font-bold capitalize ${dark ? 'text-white' : 'text-neutral-900'}`} suppressHydrationWarning>
+        <p className={`truncate text-[15px] font-semibold capitalize ${dark ? 'text-white' : TXT_PRIMARY}`} suppressHydrationWarning>
           {dateStr}
         </p>
         <button
           type="button"
           aria-label="Открыть задания"
           onClick={() => onOpenApp('career')}
-          className={`flex size-6 shrink-0 items-center justify-center rounded-full outline-none transition-transform duration-150 active:scale-90 ${
-            dark ? 'bg-white/10 text-white/80' : 'bg-neutral-100 text-neutral-500'
+          className={`flex size-[26px] shrink-0 items-center justify-center rounded-full outline-none transition-transform duration-150 active:scale-90 ${
+            dark ? 'bg-white/10 text-white/80' : 'bg-black/[0.06] text-[rgba(60,60,67,0.62)]'
           }`}
         >
           <Plus className="size-3.5" aria-hidden="true" />
         </button>
       </div>
-      <div className="mt-2 flex min-h-0 flex-1 flex-col justify-between gap-1.5">
+      <div className="mt-2 flex min-h-0 flex-1 flex-col justify-between gap-y-2">
         {rows.length === 0 && (
-          <p className={`text-[11px] leading-tight ${dark ? 'text-white/45' : 'text-neutral-400'}`}>
+          <p className={`text-[12px] leading-tight ${dark ? 'text-white/45' : TXT_TERTIARY}`}>
             Добавьте строки в Настройках
           </p>
         )}
@@ -286,11 +318,14 @@ function TodayWidget({
             key={r.key}
             type="button"
             onClick={r.run}
-            className="flex min-h-[18px] items-start gap-1.5 text-left outline-none"
+            className="flex min-h-[18px] items-center gap-1.5 text-left outline-none"
           >
-            <span aria-hidden="true" className={`mt-[4px] size-[7px] shrink-0 rounded-full ${r.dot}`} />
-            <span className={`text-[11px] font-medium leading-tight ${dark ? 'text-white/80' : 'text-neutral-600'}`}>
-              {r.text}
+            <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${r.dot}`} />
+            <span className={`min-w-0 flex-1 truncate text-[13px] font-medium leading-tight ${dark ? 'text-white/85' : TXT_PRIMARY}`}>
+              {r.label}
+            </span>
+            <span className={`shrink-0 text-[13px] leading-tight tabular-nums ${dark ? 'text-white/55' : TXT_SECOND}`}>
+              {r.value}
             </span>
           </button>
         ))}
@@ -299,18 +334,20 @@ function TodayWidget({
   )
 }
 
-// ─── Стеклянная плитка папки (мини-иконки внутри) ───────────────────────────
+// ─── Стеклянная плитка папки (мини-иконки внутри, та же глубина, что у иконок) ───
 function FolderGlass({ apps, dark, className, style }: { apps: AppKey[]; dark: boolean; className?: string; style?: React.CSSProperties }) {
   const minis = apps.slice(0, 9)
   const cols = minis.length > 4 ? 3 : 2
   return (
     <span
       style={style}
-      className={`relative block aspect-square w-full overflow-hidden rounded-[1.15rem] ring-1 backdrop-blur-md ${
-        dark ? 'bg-white/[0.13] ring-white/[0.14]' : 'bg-white/50 ring-white/80 shadow-[0_10px_26px_-14px_rgba(15,23,42,0.5)]'
+      className={`relative block aspect-square w-full overflow-hidden rounded-[22.5%] ring-1 backdrop-blur-xl ${
+        dark
+          ? 'bg-white/[0.13] ring-white/[0.14] shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]'
+          : 'bg-white/55 ring-black/[0.05] shadow-[0_8px_16px_-6px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.45)]'
       } ${className ?? ''}`}
     >
-      <span aria-hidden="true" className="absolute inset-0 grid place-items-center px-[9%]">
+      <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center px-[9%]">
         <span className="grid w-full" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: '8%' }}>
           {minis.map((a) => (
             <img
@@ -320,23 +357,31 @@ function FolderGlass({ apps, dark, className, style }: { apps: AppKey[]; dark: b
               draggable={false}
               loading="lazy"
               decoding="async"
-              className="aspect-square w-full select-none rounded-[26%] object-cover shadow-[0_2px_5px_rgba(0,0,0,0.28)]"
+              className="aspect-square w-full select-none rounded-[26%] object-cover shadow-[0_2px_5px_rgba(0,0,0,0.24)]"
             />
           ))}
         </span>
       </span>
+      {/* глянец поверх миниатюр — как у иконок */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-1/2 rounded-t-[inherit] bg-gradient-to-b from-white/25 to-transparent"
+      />
     </span>
   )
 }
 
 function FolderTile({
-  item, dark, tone, tileClass, badge, onPointerDown, onClick,
+  item, dark, tone, tileClass, badge, tileW, enter, enterDelay, onPointerDown, onClick,
 }: {
   item: FolderItem
   dark: boolean
   tone: 'dark' | 'light'
   tileClass?: string
   badge?: number
+  tileW?: number
+  enter?: boolean
+  enterDelay?: number
   onPointerDown?: (e: React.PointerEvent) => void
   onClick: (e: React.MouseEvent) => void
 }) {
@@ -347,17 +392,28 @@ function FolderTile({
       onClick={onClick}
       onPointerDown={onPointerDown}
       onContextMenu={(e) => e.preventDefault()}
-      className="flex w-full flex-col items-center gap-1 outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+      style={{
+        ...(tileW ? { width: tileW } : undefined),
+        ...(enter ? ({ ['--d' as string]: `${enterDelay ?? 0}ms` } as React.CSSProperties) : undefined),
+      }}
+      className={`flex ${tileW ? '' : 'w-full'} flex-col items-center gap-[6px] outline-none focus-visible:ring-2 focus-visible:ring-white/80 ${enter ? 'os-enter' : ''}`}
     >
       <span className={`relative block w-full transition-[transform,box-shadow] duration-200 ease-out ${tileClass ?? ''}`}>
         <FolderGlass apps={item.apps} dark={dark} />
         {badge !== undefined && badge > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#E5484D] px-1 text-[10px] font-semibold leading-none text-white shadow-md">
+          <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#FF453A] px-1 text-[10px] font-semibold leading-none text-white shadow-md">
             {badge > 99 ? '99+' : badge}
           </span>
         )}
       </span>
-      <span className={`w-[74px] truncate text-center text-[10px] ${tone === 'light' ? 'text-neutral-700' : 'text-white/90 [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]'}`}>
+      <span
+        style={{ width: 74 }}
+        className={`truncate text-center text-[11px] font-medium ${
+          tone === 'light'
+            ? 'text-[#1a1a1a] [text-shadow:0_1px_2px_rgba(255,255,255,0.65)]'
+            : 'text-white/95 [text-shadow:0_1px_2px_rgba(0,0,0,0.55)]'
+        }`}
+      >
         {item.name}
       </span>
     </button>
@@ -401,12 +457,12 @@ function FolderView({
       />
       <div
         ref={panelRef}
-        className={`absolute left-1/2 top-[13%] w-[88%] max-w-[330px] rounded-[38px] p-4 ring-1 backdrop-blur-2xl ${
+        className={`absolute left-1/2 top-[13%] w-[88%] max-w-[330px] rounded-[36px] p-4 ring-1 backdrop-blur-3xl ${
           closing ? 'os-folder-panel-imploding' : 'os-folder-panel'
         } ${
           dark
-            ? 'bg-[#1C1C1E]/70 ring-white/[0.14] shadow-[0_44px_90px_-26px_rgba(0,0,0,0.8)]'
-            : 'bg-white/60 ring-white/80 shadow-[0_44px_90px_-28px_rgba(15,23,42,0.55)]'
+            ? 'bg-[#1C1C1E]/75 ring-white/[0.14] shadow-2xl'
+            : 'bg-white/75 ring-black/[0.05] shadow-2xl'
         }`}
       >
         <input
@@ -416,7 +472,7 @@ function FolderView({
           onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
           maxLength={24}
           aria-label="Название папки"
-          className={`w-full rounded-lg bg-transparent px-1 py-0.5 text-center text-[15px] font-bold outline-none transition-colors focus:bg-black/5 ${dark ? 'text-white' : 'text-neutral-900'}`}
+          className={`w-full rounded-lg bg-transparent px-1 py-0.5 text-center text-[20px] font-semibold outline-none transition-colors focus:bg-black/5 ${dark ? 'text-white' : TXT_PRIMARY}`}
         />
         <div className="mt-3 grid grid-cols-3 gap-x-2 gap-y-4">
           {item.apps.map((app, i) => (
@@ -441,7 +497,7 @@ function FolderView({
             </div>
           ))}
         </div>
-        <p className={`mt-3 text-center text-[10.5px] ${dark ? 'text-white/45' : 'text-neutral-500'}`}>
+        <p className={`mt-3 text-center text-[12px] ${dark ? 'text-white/45' : TXT_SECOND}`}>
           {item.apps.length} из {FOLDER_MAX} · зажмите иконку и тяните, чтобы вынести
         </p>
       </div>
@@ -558,6 +614,7 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
   const widgets = useOS((s) => s.widgets)
   const pushToast = useOS((s) => s.pushToast)
   const theme = useOS((s) => s.theme)
+  const locked = useOS((s) => s.locked)
   const dark = theme === 'dark'
   const wall = wallpaperById(wallpaper)
   // Тон текстов: светлые обои + светлая тема → графитовые подписи; иначе белые
@@ -584,6 +641,24 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
 
   const day = useDayData()
   const rootRef = useRef<HTMLDivElement>(null)
+
+  // Stagger-вход лончера после разблокировки: scale 0.96 → 1 + fade.
+  // Только transform/opacity; после ~1.2 с классы снимаются и не мешают драгу.
+  const [entrance, setEntrance] = useState(false)
+  const entranceClearTimer = useRef(0)
+  useEffect(() => {
+    if (locked || homeEntrancePlayed) return
+    homeEntrancePlayed = true
+    // setState из колбэка таймера (не синхронно в теле эффекта)
+    const t = window.setTimeout(() => {
+      setEntrance(true)
+      entranceClearTimer.current = window.setTimeout(() => setEntrance(false), 1200)
+    }, 0)
+    return () => {
+      window.clearTimeout(t)
+      window.clearTimeout(entranceClearTimer.current)
+    }
+  }, [locked])
 
   // persist раскладки
   useEffect(() => {
@@ -1216,11 +1291,16 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
   const page1Items = layout.grid.slice(PAGE0_SLOTS)
   const jiggleMode = edit || !!drag || !!armed
 
-  const renderSlot = (item: HomeItem, zone: 'grid' | 'dock', index: number, small: boolean) => {
+  const renderSlot = (item: HomeItem, zone: 'grid' | 'dock', index: number, small: boolean, enterDelay?: number) => {
     const isDragging = !!drag && drag.zone === zone && drag.index === index && itemKey(drag.item) === itemKey(item)
     const isArmed = !!armed && armed.zone === zone && armed.index === index && itemKey(armed.item) === itemKey(item)
     const isMerge = zone === 'grid' && mergeAt === index && drag?.zone !== 'folder' && !isDragging
     const jiggleCls = isArmed ? 'os-lift' : jiggleMode ? `os-jiggle ${index % 2 ? 'os-jiggle-late' : ''}` : isMerge ? `os-merge ${dark ? 'os-merge-dark' : ''}` : ''
+    const enterProps = {
+      tileW: small ? undefined : 62,
+      enter: enterDelay !== undefined,
+      enterDelay: enterDelay ?? 0,
+    }
     return (
       <div
         key={`${zone}:${index}:${itemKey(item)}`}
@@ -1237,6 +1317,7 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
             badge={item.apps.reduce((n, a) => n + (a === 'avito' ? unreadChats : 0), 0)}
             onPointerDown={iconPointerDown(item, zone, index)}
             onClick={slotClick(item)}
+            {...enterProps}
           />
         ) : (
           <AppIcon
@@ -1252,6 +1333,7 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
             tileClass={jiggleCls}
             onPointerDown={iconPointerDown(item, zone, index)}
             onClick={slotClick(item)}
+            {...enterProps}
           />
         )}
       </div>
@@ -1278,16 +1360,20 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
 
   const libIcon = (app: AppKey) => (
     <div key={app} className="relative flex flex-col items-center">
-      <AppIcon
-        icon={APP_TILE[app].icon}
-        label={APP_TILE[app].label}
-        image={APP_TILE[app].image || undefined}
-        imageBg={APP_TILE[app].background}
-        tone={tone}
-        staticTile
-        onLongPress={() => openMenuAt({ kind: 'app', app, ctx: 'lib' }, window.innerWidth / 2, window.innerHeight / 2 - 40)}
-        onClick={() => onOpenApp(app)}
-      />
+      <div className="flex w-[54px] flex-col items-center">
+        <AppIcon
+          icon={APP_TILE[app].icon}
+          label={APP_TILE[app].label}
+          image={APP_TILE[app].image || undefined}
+          imageBg={APP_TILE[app].background}
+          tone={tone}
+          staticTile
+          tileRadius="rounded-[15px]"
+          labelW={68}
+          onLongPress={() => openMenuAt({ kind: 'app', app, ctx: 'lib' }, window.innerWidth / 2, window.innerHeight / 2 - 40)}
+          onClick={() => onOpenApp(app)}
+        />
+      </div>
     </div>
   )
 
@@ -1333,19 +1419,19 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
         <div ref={trackRef} className="flex h-full w-[300%]" style={trackStyle}>
           {/* Панель 1: виджеты + сетка */}
           <section className="flex h-full w-1/3 flex-col" aria-label="Главный экран" aria-hidden={page !== 0}>
-            <div className="flex items-stretch gap-2 px-3">
-              <WeatherWidget dark={dark} onOpenApp={openAppFromHome} />
-              <TodayWidget dark={dark} widgets={widgets} online={online} day={day} onOpenApp={openAppFromHome} />
+            <div className="flex items-stretch gap-2.5 px-4">
+              <WeatherWidget dark={dark} onOpenApp={openAppFromHome} enterDelay={entrance ? 0 : undefined} />
+              <TodayWidget dark={dark} widgets={widgets} online={online} day={day} onOpenApp={openAppFromHome} enterDelay={entrance ? 32 : undefined} />
             </div>
-            <div className="mt-5 grid grid-cols-4 gap-x-2 gap-y-4 px-4">
-              {page0Items.map((item, i) => renderSlot(item, 'grid', i, false))}
+            <div className="mt-5 grid grid-cols-4 gap-x-2 gap-y-[18px] px-4">
+              {page0Items.map((item, i) => renderSlot(item, 'grid', i, false, entrance ? 80 + i * 30 : undefined))}
             </div>
             <div className="flex-1" />
           </section>
 
           {/* Панель 2: продолжение сетки */}
           <section className="flex h-full w-1/3 flex-col" aria-label="Вторая страница" aria-hidden={page !== 1}>
-            <div className="mt-2 grid grid-cols-4 content-start gap-x-2 gap-y-4 px-4">
+            <div className="mt-2 grid grid-cols-4 content-start gap-x-2 gap-y-[18px] px-4">
               {page1Items.map((item, i) => renderSlot(item, 'grid', PAGE0_SLOTS + i, false))}
             </div>
             <div className="flex-1" />
@@ -1355,29 +1441,29 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
           <section className="flex h-full w-1/3 flex-col" aria-label="Библиотека приложений" aria-hidden={page !== 2}>
             <div className="px-4">
               <div
-                className={`flex h-11 items-center gap-2.5 rounded-[18px] px-3.5 outline-none ring-1 transition-colors ${
-                  dark ? 'bg-white/[0.10] ring-white/[0.08]' : 'bg-white/85 ring-black/[0.04] shadow-[0_8px_24px_-16px_rgba(15,23,42,0.4)]'
+                className={`flex h-11 items-center gap-2.5 rounded-full px-4 outline-none ring-1 transition-colors ${
+                  dark ? 'bg-white/[0.10] ring-white/[0.08]' : 'bg-white/75 ring-black/[0.04] backdrop-blur-xl'
                 }`}
               >
-                <Search className={`size-4 shrink-0 ${dark ? 'text-white/60' : 'text-neutral-400'}`} aria-hidden="true" />
+                <Search className={`size-4 shrink-0 ${dark ? 'text-white/60' : TXT_TERTIARY}`} aria-hidden="true" />
                 <input
                   value={libQuery}
                   onChange={(e) => setLibQuery(e.target.value)}
                   placeholder="Поиск приложений"
                   aria-label="Поиск приложений"
-                  className={`min-w-0 flex-1 bg-transparent text-[13px] font-medium outline-none placeholder:text-neutral-400 ${dark ? 'text-white' : 'text-neutral-800'}`}
+                  className={`min-w-0 flex-1 bg-transparent text-[13px] font-medium outline-none placeholder:text-[rgba(60,60,67,0.35)] ${dark ? 'text-white' : 'text-neutral-800'}`}
                   onPointerDown={(e) => e.stopPropagation()}
                 />
                 {libQuery ? (
                   <button type="button" aria-label="Очистить" onClick={() => setLibQuery('')} className="shrink-0 outline-none">
-                    <X className={`size-4 ${dark ? 'text-white/50' : 'text-neutral-400'}`} aria-hidden="true" />
+                    <X className={`size-4 ${dark ? 'text-white/50' : TXT_TERTIARY}`} aria-hidden="true" />
                   </button>
                 ) : (
                   <MicGlyph dark={dark} />
                 )}
               </div>
               {/* чипы категорий */}
-              <div className="mt-3 flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
+              <div className="mt-2 flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
                 {LIB_CHIPS.map((c) => {
                   const on = libChip === c.key
                   return (
@@ -1386,15 +1472,19 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
                       type="button"
                       aria-pressed={on}
                       onClick={() => setLibChip(c.key)}
-                      className={`h-8 shrink-0 rounded-full px-3.5 text-[12px] font-semibold outline-none transition-all duration-150 active:scale-95 ${
-                        on
-                          ? 'bg-neutral-900 text-white shadow-sm'
-                          : dark
-                            ? 'bg-white/[0.10] text-white/70'
-                            : 'bg-white/80 text-neutral-600 ring-1 ring-black/[0.04]'
-                      }`}
+                      className="flex h-11 shrink-0 items-center outline-none transition-transform duration-150 active:scale-95"
                     >
-                      {c.label}
+                      <span
+                        className={`flex h-9 items-center rounded-full px-4 text-[13px] font-semibold transition-colors duration-150 ${
+                          on
+                            ? 'bg-black text-white'
+                            : dark
+                              ? 'bg-white/[0.10] text-white/70'
+                              : 'bg-white/75 text-[rgba(60,60,67,0.62)] ring-1 ring-black/[0.04] backdrop-blur-xl'
+                        }`}
+                      >
+                        {c.label}
+                      </span>
                     </button>
                   )
                 })}
@@ -1403,9 +1493,9 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
 
             <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-2 [scrollbar-width:none]">
               {foundApps ? (
-                <div className={`rounded-[24px] p-3 ring-1 backdrop-blur-sm ${dark ? 'bg-white/[0.08] ring-white/[0.06]' : 'bg-white/70 ring-black/[0.04]'}`}>
+                <div className={`rounded-[24px] p-3 ring-1 backdrop-blur-xl ${dark ? 'bg-white/[0.08] ring-white/[0.06]' : `bg-white/80 ring-black/[0.04] ${GLASS_CARD}`}`}>
                   {foundApps.length === 0 ? (
-                    <p className="py-6 text-center text-[13px] font-medium text-neutral-400">Ничего не найдено</p>
+                    <p className={`py-6 text-center text-[13px] font-medium ${dark ? 'text-white/40' : TXT_TERTIARY}`}>Ничего не найдено</p>
                   ) : (
                     <div className="grid grid-cols-4 gap-x-2 gap-y-4">
                       {foundApps.map((a, i) => libIcon(a))}
@@ -1414,10 +1504,10 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
                 </div>
               ) : (
                 visibleSections.map((s) => (
-                  <div key={s.key} className={`rounded-[24px] p-3 ring-1 backdrop-blur-sm ${dark ? 'bg-white/[0.08] ring-white/[0.06]' : 'bg-white/70 ring-black/[0.04]'}`}>
+                  <div key={s.key} className={`rounded-[24px] p-3 ring-1 backdrop-blur-xl ${dark ? 'bg-white/[0.08] ring-white/[0.06]' : `bg-white/80 ring-black/[0.04] ${GLASS_CARD}`}`}>
                     <div className="flex items-center justify-between px-1 pb-1.5">
-                      <p className={`text-[14px] font-bold ${dark ? 'text-white' : 'text-neutral-900'}`}>{s.title}</p>
-                      <ChevronRight className={`size-4 ${dark ? 'text-white/40' : 'text-neutral-300'}`} aria-hidden="true" />
+                      <p className={`text-[16px] font-semibold ${dark ? 'text-white' : TXT_PRIMARY}`}>{s.title}</p>
+                      <ChevronRight className={`size-4 ${dark ? 'text-white/40' : TXT_TERTIARY}`} aria-hidden="true" />
                     </div>
                     <div className="grid grid-cols-4 gap-x-2 gap-y-4">
                       {s.apps.map((a) => libIcon(a))}
@@ -1426,7 +1516,7 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
                 ))
               )}
               {foundApps && foundApps.length === 0 && (
-                <p className={`pb-2 text-center text-[11px] ${dark ? 'text-white/40' : 'text-neutral-400'}`}>
+                <p className={`pb-2 text-center text-[11px] ${dark ? 'text-white/40' : TXT_TERTIARY}`}>
                   Свайп вверх вернёт на главный экран
                 </p>
               )}
@@ -1438,12 +1528,16 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
       {/* Мини-плеер над точками страниц */}
       <MiniPlayer onOpenApp={openAppFromHome} />
 
-      {/* Точки страниц */}
-      <div className="z-10 mb-2 flex items-center justify-center gap-1.5" aria-hidden="true">
+      {/* Точки страниц: активная — пилюля 18px через scaleX (анимация только transform) */}
+      <div
+        style={entrance ? ({ ['--d' as string]: '560ms' } as React.CSSProperties) : undefined}
+        className={`z-10 mb-2 flex items-center justify-center gap-1.5 ${entrance ? 'os-enter' : ''}`}
+        aria-hidden="true"
+      >
         {Array.from({ length: PAGES }).map((_, i) => (
           <span
             key={i}
-            className={`h-1.5 rounded-full transition-all duration-300 ${i === page ? 'w-5' : 'size-1.5'} ${
+            className={`size-[7px] rounded-full transition-transform duration-300 ${i === page ? 'scale-x-[2.55]' : ''} ${
               lightTone ? (i === page ? 'bg-neutral-700' : 'bg-neutral-400/60') : i === page ? 'bg-white' : 'bg-white/40'
             }`}
           />
@@ -1453,11 +1547,13 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
       {/* ─── Док: матовая стеклянная панель ─── */}
       <div className="z-10 mx-3 mb-2">
         <div
-          className={`grid grid-cols-4 gap-1 rounded-[26px] px-1.5 py-2 ${
-            dark ? 'bg-white/[0.10] ring-1 ring-white/[0.08]' : 'bg-white/55 ring-1 ring-white/70 shadow-[0_14px_34px_-18px_rgba(15,23,42,0.45)] backdrop-blur-xl'
+          className={`grid grid-cols-4 gap-1 rounded-[28px] p-[10px] ${
+            dark
+              ? 'bg-white/[0.10] ring-1 ring-white/[0.08] backdrop-blur-2xl'
+              : 'bg-white/55 ring-1 ring-black/[0.05] shadow-[0_12px_32px_rgba(10,10,15,0.10)] backdrop-blur-2xl'
           }`}
         >
-          {layout.dock.map((app, i) => renderSlot({ t: 'app', app }, 'dock', i, true))}
+          {layout.dock.map((app, i) => renderSlot({ t: 'app', app }, 'dock', i, true, entrance ? 610 + i * 30 : undefined))}
         </div>
       </div>
 

@@ -14,13 +14,14 @@ export interface WallpaperDef {
 }
 
 export const WALLPAPERS: WallpaperDef[] = [
-  // Обои Resale OS по фирменному макету: светлый минимализм, шёлковые волны.
+  // Обои Resale OS по фирменному макету: светлый «шёлк» — плавные складки
+  // #F7F8FA → #E8EAEE → #D9DCE2 (отрисовка в .wp-snow, блок 55-a globals.css).
   {
     id: 'snow',
-    name: 'Волны',
+    name: 'Шёлк',
     image: null,
     css:
-      'linear-gradient(168deg, #F5F6F8 0%, #ECEEF1 42%, #E2E4E9 74%, #D8DBE1 100%)',
+      'linear-gradient(172deg, #FBFCFD 0%, #F4F5F8 34%, #E9EBF0 62%, #D9DCE2 100%)',
     light: true,
   },
   {

@@ -9,9 +9,9 @@
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
-  BatteryFull, BatteryCharging, ChevronRight, Moon, MoonStar, Pause, Play,
-  SkipBack, SkipForward, Sun, Timer, Wifi, WifiOff, Flashlight, RotateCw,
-  Bluetooth, Volume2,
+  BatteryFull, BatteryCharging, ChevronRight, Cloud, CloudLightning, CloudRain, CloudSun,
+  Moon, MoonStar, Pause, Play, SkipBack, SkipForward, Snowflake, Sun, Timer, Wifi, WifiOff,
+  Flashlight, RotateCw, Bluetooth, Volume2,
 } from 'lucide-react'
 import { useOS, type AppKey } from '@/lib/store'
 import { usePrefs } from '@/lib/prefs'
@@ -24,6 +24,12 @@ import { api } from '@/lib/api'
 import { fmtDeg, weatherNow, type Condition } from '@/lib/weather'
 import { NotificationList } from './NotificationCenter'
 import type { CareerData, DeliveryDTO } from '@/lib/types'
+
+// Токены 55-b (карточка-стекло / тексты) — как в HomeScreen.
+const GLASS_CARD = 'shadow-[0_10px_30px_-12px_rgba(10,10,15,0.14)]'
+const TXT_PRIMARY = 'text-[#111114]'
+const TXT_SECOND = 'text-[rgba(60,60,67,0.62)]'
+const TXT_TERTIARY = 'text-[rgba(60,60,67,0.35)]'
 
 function useClock(): Date | null {
   const ts = useSyncExternalStore(
@@ -54,8 +60,8 @@ function Circle({
       onClick={onClick}
       className={`flex size-[52px] items-center justify-center rounded-full outline-none transition-all duration-200 active:scale-90 focus-visible:ring-2 ${
         active
-          ? 'bg-neutral-900 text-white shadow-[0_10px_22px_-10px_rgba(0,0,0,0.6)]'
-          : 'bg-white text-neutral-800 ring-1 ring-black/[0.04] shadow-[0_8px_20px_-14px_rgba(15,23,42,0.35)]'
+          ? 'bg-[#0A84FF] text-white shadow-[0_6px_14px_rgba(10,132,255,0.35)]'
+          : 'bg-white/85 text-[#111114] ring-1 ring-black/[0.04] shadow-[0_8px_20px_-14px_rgba(15,23,42,0.35)]'
       }`}
     >
       {children}
@@ -105,19 +111,20 @@ function VSlider({
       aria-valuemax={100}
       aria-valuenow={pct}
       {...onPointerDown}
-      className={`relative flex h-[118px] w-[52px] touch-none flex-col justify-end overflow-hidden rounded-[24px] outline-none transition-transform duration-150 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-black/30 ${
-        dark ? 'bg-white/[0.10] ring-1 ring-white/[0.08]' : 'bg-white ring-1 ring-black/[0.04] shadow-[0_10px_24px_-16px_rgba(15,23,42,0.4)]'
+      className={`relative flex h-[120px] w-[52px] touch-none flex-col justify-end overflow-hidden rounded-full outline-none transition-transform duration-150 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-black/30 ${
+        dark ? 'bg-white/[0.12]' : 'bg-black/[0.08]'
       }`}
     >
+      {/* заливка сверху тёмным, как в макете */}
       <span
         aria-hidden="true"
-        className="absolute inset-x-0 bottom-0 bg-neutral-900 transition-[height] duration-75 ease-linear"
-        style={{ height: `${pct}%` }}
+        className="absolute inset-x-0 top-0 bg-[#1C1C1E] transition-[height] duration-75 ease-linear"
+        style={{ height: `${pct}%`, background: dark ? 'rgba(245,245,247,0.92)' : '#1C1C1E' }}
       />
       <span
         aria-hidden="true"
         className="relative z-10 flex items-center justify-center pb-3"
-        style={{ color: value > 0.28 ? '#ffffff' : dark ? 'rgba(255,255,255,0.85)' : '#17181A' }}
+        style={{ color: value > 0.7 ? (dark ? '#111114' : '#ffffff') : dark ? 'rgba(255,255,255,0.85)' : '#111114' }}
       >
         {icon}
       </span>
@@ -127,13 +134,22 @@ function VSlider({
 
 // ─── Погода «сейчас» (данные с виджетом дома) ────────────────────────────────
 function CondGlyph({ cond, className }: { cond: Condition; className: string }) {
-  if (cond === 'Солнечно') return <span className={className}>☀️</span>
-  if (cond === 'Облачно') return <span className={className}>🌤️</span>
-  if (cond === 'Пасмурно') return <span className={className}>☁️</span>
-  if (cond === 'Дождь') return <span className={className}>🌧️</span>
-  if (cond === 'Снег') return <span className={className}>❄️</span>
-  if (cond === 'Гроза') return <span className={className}>⛈️</span>
-  return <span className={className}>🌈</span>
+  if (cond === 'Солнечно') {
+    return <Sun className={`${className} shrink-0 text-[#FFC300]`} fill="rgba(255,229,102,0.85)" strokeWidth={1.8} aria-hidden="true" />
+  }
+  if (cond === 'Облачно' || cond === 'После дождя') {
+    return (
+      <span className={`relative block shrink-0 ${className}`} aria-hidden="true">
+        <Sun className="absolute left-0 top-0 size-[62%] text-[#FFC300]" fill="rgba(255,229,102,0.85)" strokeWidth={1.8} aria-hidden="true" />
+        <Cloud className="absolute bottom-0 right-0 size-[74%] text-white" fill="rgba(255,255,255,0.92)" strokeWidth={1.6} aria-hidden="true" />
+      </span>
+    )
+  }
+  if (cond === 'Пасмурно') return <Cloud className={`${className} shrink-0 text-white`} fill="rgba(255,255,255,0.92)" strokeWidth={1.6} aria-hidden="true" />
+  if (cond === 'Дождь') return <CloudRain className={`${className} shrink-0 text-[#6FA8DC]`} strokeWidth={1.8} aria-hidden="true" />
+  if (cond === 'Снег') return <Snowflake className={`${className} shrink-0 text-[#8FC5EE]`} strokeWidth={1.8} aria-hidden="true" />
+  if (cond === 'Гроза') return <CloudLightning className={`${className} shrink-0 text-[#5E5CE6]`} strokeWidth={1.8} aria-hidden="true" />
+  return <CloudSun className={`${className} shrink-0 text-[#FFC300]`} strokeWidth={1.8} aria-hidden="true" />
 }
 
 // ─── Задачи дня (реальные: квест, посылка, топ) ──────────────────────────────
@@ -171,28 +187,28 @@ function TasksCard({ dark, onOpenApp }: { dark: boolean; onOpenApp: (a: AppKey) 
   if (t.place) rows.push({ key: 'p', text: `Топ площадки: ${t.place} место`, done: false })
 
   return (
-    <div className={`flex flex-1 flex-col rounded-[24px] p-3.5 ${dark ? 'bg-white/[0.10] ring-1 ring-white/[0.08]' : 'bg-white ring-1 ring-black/[0.04] shadow-[0_10px_26px_-18px_rgba(15,23,42,0.4)]'}`}>
-      <div className="flex items-center justify-between">
-        <p className={`text-[13px] font-bold ${dark ? 'text-white' : 'text-neutral-900'}`}>Задачи</p>
+    <div className={`flex min-w-0 flex-1 flex-col rounded-[24px] p-3.5 ${dark ? 'bg-white/[0.10] ring-1 ring-white/[0.08]' : `bg-white/85 ring-1 ring-black/[0.04] ${GLASS_CARD}`}`}>
+      <div className="flex min-w-0 items-center justify-between">
+        <p className={`shrink-0 text-[14px] font-semibold ${dark ? 'text-white' : TXT_PRIMARY}`}>Задачи</p>
         <button
           type="button"
           onClick={() => onOpenApp('career')}
-          className={`flex items-center gap-0.5 text-[11px] font-medium outline-none ${dark ? 'text-white/55' : 'text-neutral-400'}`}
+          className="flex min-h-[44px] min-w-0 items-center gap-0.5 py-1 text-[13px] font-medium text-[#0A84FF] outline-none"
         >
           Смотреть все
-          <ChevronRight className="size-3" aria-hidden="true" />
+          <ChevronRight className="size-3.5" aria-hidden="true" />
         </button>
       </div>
-      <div className="mt-2 flex flex-1 flex-col justify-between gap-1.5">
+      <div className="mt-1 flex flex-1 flex-col justify-between gap-1.5">
         {rows.length === 0 && (
-          <p className={`text-[11px] leading-tight ${dark ? 'text-white/45' : 'text-neutral-400'}`}>На сегодня всё свободно</p>
+          <p className={`text-[12px] leading-tight ${dark ? 'text-white/45' : TXT_TERTIARY}`}>На сегодня всё свободно</p>
         )}
         {rows.map((r) => (
           <div key={r.key} className="flex items-center gap-2">
             <span
               aria-hidden="true"
-              className={`flex size-4 shrink-0 items-center justify-center rounded-full ${
-                r.done ? 'bg-sky-500 text-white' : dark ? 'bg-white/10' : 'bg-neutral-200'
+              className={`flex size-[17px] shrink-0 items-center justify-center rounded-full ${
+                r.done ? 'bg-[#0A84FF] text-white shadow-[0_4px_10px_rgba(10,132,255,0.35)]' : dark ? 'bg-white/15' : 'bg-black/[0.08]'
               }`}
             >
               {r.done && (
@@ -201,7 +217,7 @@ function TasksCard({ dark, onOpenApp }: { dark: boolean; onOpenApp: (a: AppKey) 
                 </svg>
               )}
             </span>
-            <span className={`truncate text-[11.5px] font-medium leading-tight ${dark ? 'text-white/80' : 'text-neutral-600'}`}>{r.text}</span>
+            <span className={`truncate text-[12.5px] font-medium leading-tight ${dark ? 'text-white/85' : TXT_PRIMARY}`}>{r.text}</span>
           </div>
         ))}
       </div>
@@ -218,43 +234,43 @@ function MediaCard({ dark, onOpenApp }: { dark: boolean; onOpenApp: (a: AppKey) 
   const prev = usePlayer((s) => s.prev)
 
   return (
-    <div className={`flex min-w-0 flex-1 flex-col rounded-[24px] p-3 ${dark ? 'bg-white/[0.10] ring-1 ring-white/[0.08]' : 'bg-white ring-1 ring-black/[0.04] shadow-[0_10px_26px_-18px_rgba(15,23,42,0.4)]'}`}>
+    <div className={`flex min-w-0 flex-1 flex-col rounded-[24px] p-3.5 ${dark ? 'bg-white/[0.10] ring-1 ring-white/[0.08]' : `bg-white/85 ring-1 ring-black/[0.04] ${GLASS_CARD}`}`}>
       {current ? (
         <>
           <button
             type="button"
             onClick={() => onOpenApp('music')}
-            className="flex min-w-0 items-center gap-2.5 text-left outline-none"
+            className="flex min-h-[44px] min-w-0 items-center gap-2.5 text-left outline-none"
             aria-label={`Открыть музыку: ${current.title} — ${current.artist}`}
           >
-            <span className="relative size-11 shrink-0 overflow-hidden rounded-[13px] bg-neutral-100">
+            <span className="relative size-11 shrink-0 overflow-hidden rounded-[12px] bg-neutral-100 ring-1 ring-black/[0.04]">
               {current.artworkSmall ? <img loading="lazy" decoding="async" src={current.artworkSmall} alt="" className="h-full w-full object-cover" /> : null}
             </span>
             <span className="min-w-0">
-              <span className={`block truncate text-[13px] font-bold leading-tight ${dark ? 'text-white' : 'text-neutral-900'}`}>{current.title}</span>
-              <span className={`block truncate text-[11.5px] leading-tight ${dark ? 'text-white/55' : 'text-neutral-500'}`}>{current.artist}</span>
+              <span className={`block truncate text-[14px] font-semibold leading-tight ${dark ? 'text-white' : TXT_PRIMARY}`}>{current.title}</span>
+              <span className={`block truncate text-[13px] leading-tight ${dark ? 'text-white/55' : TXT_SECOND}`}>{current.artist}</span>
             </span>
           </button>
           <div className={`mt-2 flex items-center justify-around border-t pt-1.5 ${dark ? 'border-white/[0.06]' : 'border-black/[0.05]'}`}>
-            <button type="button" aria-label="Предыдущий трек" onClick={prev} className={`flex size-9 items-center justify-center rounded-full outline-none transition-transform active:scale-90 ${dark ? 'text-white/85' : 'text-neutral-700'}`}>
-              <SkipBack className="size-4.5" aria-hidden="true" />
+            <button type="button" aria-label="Предыдущий трек" onClick={prev} className={`flex size-10 items-center justify-center rounded-full outline-none transition-transform active:scale-90 ${dark ? 'text-white/90' : 'text-[#111114]'}`}>
+              <SkipBack className="size-5" fill="currentColor" aria-hidden="true" />
             </button>
-            <button type="button" aria-label={isPlaying ? 'Пауза' : 'Продолжить'} onClick={toggle} className={`flex size-10 items-center justify-center rounded-full outline-none transition-transform active:scale-90 ${dark ? 'bg-white text-neutral-900' : 'bg-neutral-900 text-white'}`}>
-              {isPlaying ? <Pause className="size-4.5" aria-hidden="true" /> : <Play className="size-4.5 translate-x-[1px]" aria-hidden="true" />}
+            <button type="button" aria-label={isPlaying ? 'Пауза' : 'Продолжить'} onClick={toggle} className={`flex size-10 items-center justify-center rounded-full outline-none transition-transform active:scale-90 ${dark ? 'text-white' : 'text-[#111114]'}`}>
+              {isPlaying ? <Pause className="size-5" fill="currentColor" aria-hidden="true" /> : <Play className="size-5 translate-x-[1px]" fill="currentColor" aria-hidden="true" />}
             </button>
-            <button type="button" aria-label="Следующий трек" onClick={next} className={`flex size-9 items-center justify-center rounded-full outline-none transition-transform active:scale-90 ${dark ? 'text-white/85' : 'text-neutral-700'}`}>
-              <SkipForward className="size-4.5" aria-hidden="true" />
+            <button type="button" aria-label="Следующий трек" onClick={next} className={`flex size-10 items-center justify-center rounded-full outline-none transition-transform active:scale-90 ${dark ? 'text-white/90' : 'text-[#111114]'}`}>
+              <SkipForward className="size-5" fill="currentColor" aria-hidden="true" />
             </button>
           </div>
         </>
       ) : (
-        <button type="button" onClick={() => onOpenApp('music')} className="flex flex-1 items-center gap-2.5 text-left outline-none">
-          <span className={`flex size-11 shrink-0 items-center justify-center rounded-[13px] ${dark ? 'bg-white/10' : 'bg-neutral-100'}`}>
+        <button type="button" onClick={() => onOpenApp('music')} className="flex min-h-[44px] flex-1 items-center gap-2.5 text-left outline-none">
+          <span className={`flex size-11 shrink-0 items-center justify-center rounded-[12px] ${dark ? 'bg-white/10' : 'bg-black/[0.06]'}`}>
             <MusicNoteGlyph dark={dark} />
           </span>
           <span className="min-w-0">
-            <span className={`block text-[13px] font-bold leading-tight ${dark ? 'text-white' : 'text-neutral-900'}`}>Музыка</span>
-            <span className={`block text-[11.5px] leading-tight ${dark ? 'text-white/55' : 'text-neutral-500'}`}>Ничего не играет</span>
+            <span className={`block text-[14px] font-semibold leading-tight ${dark ? 'text-white' : TXT_PRIMARY}`}>Музыка</span>
+            <span className={`block text-[13px] leading-tight ${dark ? 'text-white/55' : TXT_SECOND}`}>Ничего не играет</span>
           </span>
         </button>
       )}
@@ -368,22 +384,34 @@ export default function Shade({
         }`}
       />
 
-      {/* панель на весь экран */}
+      {/* панель на весь экран; ЦУ живёт плавающей карточкой со скруглением 34px */}
       <section
         aria-label={expanded ? 'Центр управления' : 'Уведомления'}
-        className={`pointer-events-auto absolute inset-0 flex flex-col shadow-2xl backdrop-blur-2xl transition-transform duration-[360ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
-          dark ? 'bg-[#0B0D10]/[0.94] text-white' : 'bg-[#EFF0F3]/[0.88] text-neutral-900'
+        className={`pointer-events-auto absolute inset-0 flex flex-col backdrop-blur-2xl transition-[transform,background-color] duration-[360ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          expanded
+            ? dark
+              ? 'bg-black/30'
+              : 'bg-black/[0.12]'
+            : dark
+              ? 'bg-[#0B0D10]/[0.94] text-white'
+              : 'bg-[#EFF0F3]/[0.88] text-neutral-900'
         } ${open ? 'translate-y-0' : '-translate-y-[102%]'}`}
       >
         {expanded ? (
           /* ─────────── ЦЕНТР УПРАВЛЕНИЯ ─────────── */
-          <div key={animKey} className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-2 pt-3 [scrollbar-width:none]">
+          <div
+            key={animKey}
+            className={`sheet-rise mx-3 mb-3 mt-12 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[34px] shadow-2xl ring-1 backdrop-blur-3xl ${
+              dark ? 'bg-[#1C1C1E]/[0.78] text-white ring-white/[0.08]' : `bg-white/70 ${TXT_PRIMARY} ring-black/[0.06]`
+            }`}
+          >
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-3 pt-2 [scrollbar-width:none]">
             {/* статус-строка */}
             <div className="flex items-center justify-between px-2 pb-3">
-              <span className={`text-[12.5px] font-semibold ${dark ? 'text-white/70' : 'text-neutral-500'}`} suppressHydrationWarning>
+              <span className={`text-[12.5px] font-semibold ${dark ? 'text-white/70' : TXT_SECOND}`} suppressHydrationWarning>
                 {now ? now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '\u00A0'}
               </span>
-              <span className={`flex items-center gap-1.5 text-[12px] font-semibold ${dark ? 'text-white/70' : 'text-neutral-500'}`}>
+              <span className={`flex items-center gap-1.5 text-[12px] font-semibold ${dark ? 'text-white/70' : TXT_SECOND}`}>
                 {wifiOn ? <Wifi className="size-3.5" aria-hidden="true" /> : <WifiOff className="size-3.5" aria-hidden="true" />}
                 Resale OS
               </span>
@@ -432,15 +460,15 @@ export default function Shade({
                 type="button"
                 aria-label="Открыть погоду"
                 onClick={() => { onClose(); onOpenApp('weather') }}
-                className={`flex w-[46%] shrink-0 flex-col rounded-[24px] p-3.5 text-left outline-none transition-transform duration-150 active:scale-[0.98] ${dark ? 'bg-white/[0.10] ring-1 ring-white/[0.08]' : 'bg-white ring-1 ring-black/[0.04] shadow-[0_10px_26px_-18px_rgba(15,23,42,0.4)]'}`}
+                className={`flex w-[46%] shrink-0 flex-col rounded-[24px] p-3.5 text-left outline-none transition-transform duration-150 active:scale-[0.98] ${dark ? 'bg-white/[0.10] ring-1 ring-white/[0.08]' : `bg-white/85 ring-1 ring-black/[0.04] ${GLASS_CARD}`}`}
               >
-                <span className="flex items-center gap-1.5">
-                  <CondGlyph cond={w.cond} className="text-[18px] leading-none" />
-                  <span className={`text-[12.5px] font-semibold ${dark ? 'text-white' : 'text-neutral-800'}`}>{w.city}</span>
+                <span className="flex items-center gap-2">
+                  <CondGlyph cond={w.cond} className="size-6" />
+                  <span className={`text-[13px] font-semibold ${dark ? 'text-white' : TXT_PRIMARY}`}>{w.city}</span>
                 </span>
-                <span className={`mt-1 text-[26px] font-semibold leading-none tracking-tight ${dark ? 'text-white' : 'text-neutral-900'}`}>{fmtDeg(w.temp)}</span>
-                <span className={`mt-1.5 text-[10.5px] leading-tight ${dark ? 'text-white/55' : 'text-neutral-500'}`}>{w.cond}</span>
-                <span className={`mt-0.5 text-[10.5px] font-medium tabular-nums ${dark ? 'text-white/55' : 'text-neutral-500'}`}>
+                <span className={`mt-1.5 text-[26px] font-semibold leading-none tracking-tight ${dark ? 'text-white' : TXT_PRIMARY}`}>{fmtDeg(w.temp)}</span>
+                <span className={`mt-1.5 text-[12px] leading-tight ${dark ? 'text-white/55' : TXT_SECOND}`}>{w.cond}</span>
+                <span className={`mt-0.5 text-[12px] font-medium tabular-nums ${dark ? 'text-white/55' : TXT_SECOND}`}>
                   ↑ {fmtDeg(w.tMax)} ↓ {fmtDeg(w.tMin)}
                 </span>
               </button>
@@ -453,28 +481,29 @@ export default function Shade({
                 type="button"
                 aria-pressed={dnd}
                 onClick={toggleDnd}
-                className={`flex items-center gap-3 rounded-[24px] p-3.5 text-left outline-none transition-all duration-200 active:scale-[0.98] ${dark ? 'bg-white/[0.10] ring-1 ring-white/[0.08]' : 'bg-white ring-1 ring-black/[0.04] shadow-[0_10px_26px_-18px_rgba(15,23,42,0.4)]'}`}
+                className={`flex items-center gap-3 rounded-full py-2.5 pl-3 pr-2.5 text-left outline-none transition-all duration-200 active:scale-[0.98] ${dark ? 'bg-white/[0.10] ring-1 ring-white/[0.08]' : `bg-white/85 ring-1 ring-black/[0.04] ${GLASS_CARD}`}`}
               >
-                <span className={`flex size-10 shrink-0 items-center justify-center rounded-full ${dnd ? 'bg-neutral-900 text-white' : dark ? 'bg-white/10 text-violet-300' : 'bg-violet-50 text-violet-500'}`}>
-                  <Moon className="size-5" aria-hidden="true" />
+                <span className={`flex size-9 shrink-0 items-center justify-center rounded-full text-white ${dnd ? 'shadow-[0_6px_14px_rgba(94,92,230,0.45)]' : ''} ${dnd ? 'bg-[#4543B8]' : 'bg-[#5E5CE6]'}`}>
+                  <Moon className="size-4" aria-hidden="true" />
                 </span>
-                <span className="min-w-0">
-                  <span className={`block text-[12.5px] font-bold ${dark ? 'text-white' : 'text-neutral-900'}`}>Не беспокоить</span>
-                  <span className={`block truncate text-[11px] ${dark ? 'text-white/55' : 'text-neutral-500'}`}>{dnd ? 'Включено' : 'Выключено'}</span>
+                <span className="min-w-0 flex-1">
+                  <span className={`block text-[14px] font-semibold leading-tight ${dark ? 'text-white' : TXT_PRIMARY}`}>Не беспокоить</span>
+                  <span className={`block truncate text-[12px] leading-tight ${dark ? 'text-white/55' : TXT_SECOND}`}>{dnd ? 'Включено' : 'Выключено'}</span>
                 </span>
+                <ChevronRight className={`size-4 shrink-0 ${dark ? 'text-white/40' : TXT_TERTIARY}`} aria-hidden="true" />
               </button>
               <button
                 type="button"
                 onClick={() => { if (!batteryReal) setCharging(!charging) }}
                 aria-label={charging ? 'Отключить зарядку' : 'Подключить зарядку'}
-                className={`flex items-center gap-3 rounded-[24px] p-3.5 text-left outline-none transition-all duration-200 active:scale-[0.98] ${dark ? 'bg-white/[0.10] ring-1 ring-white/[0.08]' : 'bg-white ring-1 ring-black/[0.04] shadow-[0_10px_26px_-18px_rgba(15,23,42,0.4)]'}`}
+                className={`flex items-center gap-3 rounded-full py-2.5 pl-3 pr-2.5 text-left outline-none transition-all duration-200 active:scale-[0.98] ${dark ? 'bg-white/[0.10] ring-1 ring-white/[0.08]' : `bg-white/85 ring-1 ring-black/[0.04] ${GLASS_CARD}`}`}
               >
-                <span className={`flex size-10 shrink-0 items-center justify-center rounded-full ${dark ? 'bg-white/10 text-emerald-300' : 'bg-emerald-50 text-emerald-600'}`}>
-                  {charging ? <BatteryCharging className="size-5" aria-hidden="true" /> : <BatteryFull className="size-5" aria-hidden="true" />}
+                <span className={`flex size-9 shrink-0 items-center justify-center rounded-full ${dark ? 'bg-[#34C759]/20 text-[#5BE08A]' : 'bg-[#34C759]/15 text-[#1F9D48]'}`}>
+                  {charging ? <BatteryCharging className="size-4" aria-hidden="true" /> : <BatteryFull className="size-4" aria-hidden="true" />}
                 </span>
                 <span className="min-w-0">
-                  <span className={`block text-[12.5px] font-bold ${dark ? 'text-white' : 'text-neutral-900'}`}>Заряд</span>
-                  <span className={`block text-[11px] tabular-nums ${dark ? 'text-white/55' : 'text-neutral-500'}`}>{Math.round(battery)}%</span>
+                  <span className={`block text-[14px] font-semibold leading-tight ${dark ? 'text-white' : TXT_PRIMARY}`}>Заряд</span>
+                  <span className={`block text-[12px] leading-tight tabular-nums ${dark ? 'text-white/55' : TXT_SECOND}`}>{Math.round(battery)}%</span>
                 </span>
               </button>
             </div>
@@ -524,15 +553,15 @@ export default function Shade({
                   <span
                     className={`flex size-[52px] items-center justify-center rounded-full transition-all duration-200 active:scale-90 ${
                       b.active
-                        ? 'bg-neutral-900 text-white shadow-[0_10px_22px_-10px_rgba(0,0,0,0.6)]'
+                        ? 'bg-[#0A84FF] text-white shadow-[0_6px_14px_rgba(10,132,255,0.35)]'
                         : dark
-                          ? 'bg-white/[0.10] text-white ring-1 ring-white/[0.08]'
-                          : 'bg-white text-neutral-800 ring-1 ring-black/[0.04] shadow-[0_8px_20px_-14px_rgba(15,23,42,0.35)]'
+                          ? 'bg-white/[0.12] text-white'
+                          : 'bg-white/85 text-[#111114] ring-1 ring-black/[0.04] shadow-[0_8px_20px_-14px_rgba(15,23,42,0.35)]'
                     }`}
                   >
                     {b.icon}
                   </span>
-                  <span className={`text-center text-[10.5px] font-medium leading-tight ${dark ? 'text-white/75' : 'text-neutral-600'}`}>{b.label}</span>
+                  <span className={`text-center text-[11px] font-medium leading-tight ${dark ? 'text-white/75' : 'text-[rgba(60,60,67,0.62)]'}`}>{b.label}</span>
                 </button>
               ))}
             </div>
@@ -543,10 +572,11 @@ export default function Shade({
               aria-label="Закрыть центр управления"
               onClick={onClose}
               {...closeDrag}
-              className={`mx-auto mt-2 flex h-9 w-40 shrink-0 items-center justify-center rounded-full outline-none ${dark ? 'bg-white/15' : 'bg-neutral-900/10'}`}
+              className={`mx-auto mt-2 flex h-9 w-40 shrink-0 items-center justify-center rounded-full outline-none ${dark ? 'bg-white/15' : 'bg-black/[0.08]'}`}
             >
               <span aria-hidden="true" className={`block h-1 w-12 rounded-full ${dark ? 'bg-white/50' : 'bg-neutral-500/60'}`} />
             </button>
+            </div>
           </div>
         ) : (
           /* ─────────── УВЕДОМЛЕНИЯ ─────────── */

@@ -2477,3 +2477,23 @@ Stage Summary:
 - Каталог удвоен (289), рынок 140 + сид 120, аукцион x3; всё на проде
 - Vercel: будущие функции компактнее (без standalone, без лишних node_modules, без мусора в трейсах); Deployment Storage −130MB за счёт untrack
 - КРИТИЧНО ДЛЯ ЮЗЕРА: разово удалить старые деплои в Vercel дашборде (Deployments → Delete) — это освободит основную часть 8.44GB; крону предписана дисциплина: пушить только реальные изменения
+---
+Task ID: 55-a
+Agent: frontend-styling-expert
+Task: Редизайн оболочки ОС по макету (зона 55-a): обои «шёлк», локскрин, статус-бар, мини-плеер и центр уведомлений
+
+Work Log:
+- Макет и QA-скрины изучены через VLM (mock_os.png экран 1 + qa2_lock.png/qa_now_lock.png): фикс — плоские обои, тяжёлые карточки, капс «2 УВЕДОМЛЕНИЯ», статус-бар не iOS
+- wallpapers.ts: карточка 'snow' — name «Шёлк», preview-css linear-gradient(172deg,#FBFCFD→#F4F5F8→#E9EBF0→#D9DCE2); id/light/image не тронуты — isLightWallpaper() работает как раньше
+- globals.css: свой блок в конце файла с маркером /* 55-a */; чужие правила не правлены. (1) .wp-snow — новый статичный SVG (data-URI): база-sky + 4 складки (fold-грейды userSpaceOnUse с тенями-заломами #69758B 17-22% на гребнях, светлые грани #F6F7FA-#F8F9FB, глубина к низу складки #D9DCE2), белые блики-нити по гребням, диагональный sheen, радиальная виньетка к краям; перебивает ранний .wp-snow порядком каскада. CSS-анимации обоев нет. (2) .os-thin-clock — уточнение letter-spacing -0.02em (было -0.03em)
+- LockScreen.tsx: часы 96px weight 200 (os-thin-clock) #0F0F12, дата 16px medium rgba(20,20,22,0.72); капс «N УВЕДОМЛЕНИЙ» заменён на центрированное «Уведомления» 13px rgba(60,60,67,0.6) (скрыто при 0); карточки — матовое стекло bg-white/70 backdrop-blur-2xl ring-black/[0.05] shadow-[0_8px_24px_rgba(15,15,20,0.08)] r22 p3; слева настоящая иконка приложения 38px r11 (APP_TILE + AppTileImage из app-logos.tsx, lucide-иконка как подложка-fallback); заголовок 14px semibold #111, время справа 12px rgba(60,60,67,0.6), тело 13px rgba(60,60,67,0.78) clamp-2; суммы в тексте и итогах дня подсвечены зелёным #34C759 (регексп MoneyText по fmtMoney-формату, тёмная тема — #30D158, минус — #FF3B30); подсказка 13px rgba(60,60,67,0.5); круглые кнопки 52px bg-white/60 backdrop-blur-xl ring-black/[0.06] active:scale-90; LockMedia переведена на ту же стеклянную систему; тёмная тема — свои токены (bg-white/[0.10] ring-white/[0.12] и т.д.). Свайп-ап/тап/клавиатура, LEAVE_ANIMATION_MS, MAX_PREVIEWS, data-lock-scroll — вся логика без изменений
+- StatusBar.tsx: время 15px semibold tracking-[-0.01em]; сигнал — чёткий SVG 4 столбика 16x11 (rx=1, активность по уровню); Wi-Fi — свой SVG (3 дуги + точка); батарея — капсула 24x12 rounded-full (корпус border-current/40 + заливка по уровню + контакт), молния при зарядке; колокольчик — тач-таргет 44px (h-11 w-11); убран переход transition-[width] (только transform/opacity). Props variant/plain/raised и все контракты сохранены
+- MiniPlayer.tsx: карточка bg-white/75 backdrop-blur-2xl r22, тень 0_12px_30px_rgba(15,15,20,0.14), арт 40px, кнопки 44px (тач ≥44), текст 13px semibold/11px
+- NotificationCenter.tsx: NotifCard в единой стеклянной системе (light: bg-white/75 backdrop-blur-2xl + та же тень; expanded bg-white/90; read bg-white/50; dark: белые альфа-слои + blur), панель rounded-b-[26px] + тень 0_24px_60px; exports/props/swipe-удаление не тронуты
+- Визуальная проверка без dev-сервера: SVG отрендерен sharp + HTML-реплика локскрина в headless-браузере, 2 итерации VLM-сравнения с макетом; после раунда правок вердикт: «light, high-key silk with soft creases», карточки — премиум-стекло. Остаточные замечания VLM (truncation, faint hint) — сознательно по спецификации (clamp-2, hint rgba 0.5)
+- Проверки: bunx tsc --noEmit | grep '^src/' → пусто; bun run lint → exit 0; анимации только transform/opacity, transition-классы Tailwind; звуков нет; длинных тире в новых текстах нет; тач-таргеты ≥44px. git status: AppIcon.tsx/app-logos.tsx в модифицированных — это параллельная зона 55-b, мной не трогались
+- Временная реплика (.tmp55a) удалена; dev-сервер и build не запускались, коммитов нет
+
+Stage Summary:
+- Экран 1 макета доведён: обои «Шёлк» (4 статичные складки #F7F8FA→#E8EAEE→#D9DCE2, заломы, блики, виньетка), iOS-локскрин (тонкие часы 96px, стеклянные карточки с настоящими иконками приложений и зелёными суммами, 52px shortcut'ы), аккуратный статус-бар (капсула-батарея, SVG сигнал/wifi, время 15px), MiniPlayer и центр уведомлений — в той же стеклянной системе; тёмная тема сохранена
+- Контракты (props/exports/обработчики) без изменений; файлы 55-b (HomeScreen, AppIcon, app-logos, Shade, AppInfoSheet) и page.tsx не тронуты

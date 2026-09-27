@@ -54,16 +54,17 @@ function NotifCard({
   const meta: NotifApp = KIND_APP[n.kind] ?? KIND_APP.system
   const AppIcon = meta.icon
   const unread = !n.readAt
+  // 55-a: единая стеклянная система (матовое стекло + те же тени, что на замке)
   const T = tone === 'light'
     ? {
         ring: 'focus-visible:ring-black/30',
         card: willDelete
-          ? 'bg-red-100 ring-1 ring-red-300'
+          ? 'bg-red-100/90 ring-1 ring-red-300'
           : expanded
-            ? 'bg-white ring-1 ring-black/[0.08]'
+            ? 'bg-white/90 ring-1 ring-black/[0.08] backdrop-blur-2xl'
             : unread
-              ? 'bg-white ring-1 ring-black/[0.05] shadow-[0_10px_26px_-18px_rgba(15,23,42,0.4)]'
-              : 'bg-white/60 ring-1 ring-black/[0.03]',
+              ? 'bg-white/75 ring-1 ring-black/[0.05] shadow-[0_8px_24px_rgba(15,15,20,0.08)] backdrop-blur-2xl'
+              : 'bg-white/50 ring-1 ring-black/[0.04] backdrop-blur-xl',
         active: 'active:bg-neutral-100',
         app: 'text-neutral-400',
         time: 'text-neutral-400',
@@ -74,12 +75,12 @@ function NotifCard({
     : {
         ring: 'focus-visible:ring-white/60',
         card: willDelete
-          ? 'bg-red-500/30 ring-red-400/50'
+          ? 'bg-red-500/30 ring-1 ring-red-400/50'
           : expanded
-            ? 'bg-white/[0.13] ring-white/[0.09]'
+            ? 'bg-white/[0.14] ring-1 ring-white/[0.12] backdrop-blur-xl'
             : unread
-              ? 'bg-white/[0.09] ring-white/[0.07]'
-              : 'bg-white/[0.04] ring-white/[0.04]',
+              ? 'bg-white/[0.10] ring-1 ring-white/[0.10] backdrop-blur-xl'
+              : 'bg-white/[0.05] ring-1 ring-white/[0.06] backdrop-blur-md',
         active: 'active:bg-white/[0.1]',
         app: 'text-white/50',
         time: 'text-white/45',
@@ -346,7 +347,7 @@ export default function NotificationCenter({
       {/* Панель */}
       <section
         aria-label="Уведомления"
-        className={`pointer-events-auto absolute inset-x-0 top-0 flex max-h-[80%] flex-col rounded-b-[28px] bg-[#0B0F0D]/95 text-white shadow-2xl backdrop-blur-2xl transition-transform duration-300 ease-[cubic-bezier(0.2,0,0,1)] ${
+        className={`pointer-events-auto absolute inset-x-0 top-0 flex max-h-[80%] flex-col rounded-b-[26px] bg-[#0B0F0D]/95 text-white shadow-[0_24px_60px_rgba(0,0,0,0.5)] backdrop-blur-2xl transition-transform duration-300 ease-[cubic-bezier(0.2,0,0,1)] ${
           open ? 'translate-y-0' : '-translate-y-full'
         }`}
       >
