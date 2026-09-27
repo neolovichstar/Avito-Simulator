@@ -2533,3 +2533,20 @@ Stage Summary:
 - Все 4 ключа валидны и хранятся в .env; прод живой, редизайн 55 в проде
 - Шторки ЦУ/уведомлений закрылись по iOS-поведению: тап по пустой зоне, свайп вверх отовсюду свободного, граббер; карточка ЦУ компактная по контенту
 - Русские даты приведены к iOS RU (строчные месяцы); QA всего жестового цикла OS пройдено
+---
+Task ID: 57
+Agent: main (Z.ai Code)
+Task: Фикс падающих деплоев Vercel (cp в несуществующий .next/standalone)
+
+Work Log:
+- Юзер прислал лог Vercel: `cp: cannot create directory '.next/standalone/.next/'` → `bun run build` exit 1. Причина: с Task 54 next.config отключает output:standalone на Vercel, а package.json "build" БЕЗУСЛОВНО делал cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/ → папки нет → cp падает ВСЕГДА на Vercel
+- ВАЖНОЕ ОТКРЫТИЕ: из-за этого ВСЕ деплои после 27a84ce (Task 54) падали — прод сидел на старой сборке ещё с до-слайм эпохи. Вчерашние маркеры wp-snow/os-thin-clock/data-lock-scroll не доказывали Task 55: эти классы существовали и раньше. Вывод «редизайн в проде» из Task 56 был ошибочным — исправлено теперь
+- Фикс: package.json build → `next build && ([ -d .next/standalone ] && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/ || true)` — на Vercel шаг пропускается, локальный standalone-флоу (bun run start) не тронут
+- Валидация: (1) sh-синтаксис guard-ветки → exit 0; (2) полная локальная сборка с чистым .next → ок, .next/standalone/server.js + static + public на месте; (3) dev-сервер перезапущен (health ok)
+- Коммит d16f17a запушен → деплой ВПЕРВЫЕ с Task 54 прошёл. Проверка прода: /api/health {ok:true, db:up} 503ms; HTML содержит data-shade-scroll (Task 56), capitalize-даты исчезли; CSS-чанк содержит #69758b (шёлковые складки обоев Task 55) и sheet-rise; /api/market живой (activeListings 97)
+- Бонус: слайм-конфиг функций (Task 54) наконец-то задеплоился — Functions Storage должен просесть; неудавшиеся деплои место не жгли
+
+Stage Summary:
+- Деплой-пайплайн починен навсегда: standalone-cp только там, где standalone есть
+- Прод = свежайшая сборка: Supabase + слайм + редизайн OS 55 + шторки UX 56 одновременно
+- Проверено по маркерам в HTML и CSS-чанке, health и market API зелёные
