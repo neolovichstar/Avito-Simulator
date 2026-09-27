@@ -7,8 +7,9 @@ import type {
   RepairOrderDTO, RepairQuoteDTO, DeliveryDTO, AuctionData, AuctionLotDTO, CareerData, QuestDTO,
   SavedSearchDTO, SellerProfile, BonusState, PulseItemDTO, MarketPulseDTO, RivalsData, BlockedSellerDTO,
   LoanHistoryItem, WorkshopDataDTO, JobConfigDTO, JobResultDTO, StockDTO, TransitItemDTO,
-  PlateOfferDTO, CarPlateDTO,
+  PlateOfferDTO, CarPlateDTO, PlateMarketItemDTO,
 } from '@/lib/types'
+import type { PhoneMarketItem } from '@/lib/phone-market'
 import type { CatalogItem, CategoryKey } from '@/lib/catalog-types'
 
 const TOKEN_KEY = 'avito_sim_token'
@@ -217,6 +218,10 @@ export const api = {
   }) =>
     post<{ offer: PlateOfferDTO }>('/api/plates/roll', body),
   plates: () => req<{ plates: CarPlateDTO[] }>('/api/plates'),
+  platesMarket: () => req<{ items: PlateMarketItemDTO[]; updatedAt: string }>('/api/plates/market'),
+  phonesMarket: () => req<{ items: PhoneMarketItem[] }>('/api/phones/market'),
+  phonesMarketBuy: (digits: string) =>
+    post<{ phone: { id: string; number: string; balance?: number }; balance: number }>('/api/phones/market', { digits }),
   plateBuy: (o: { first: string; digits: string; letters: string; regionCode: string; regionName: string }) =>
     post<{ plate: CarPlateDTO; balance: number }>('/api/plates', o),
   plateSetMain: (id: string) => patch<{ ok: boolean }>(`/api/plates/${id}`, { isMain: true }),
@@ -233,6 +238,17 @@ export const api = {
   supportThread: () => req<{ messages: SupportMsgDTO[]; unreadOnOpen: number }>('/api/support'),
   supportSend: (text: string) =>
     post<{ messages: SupportMsgDTO[]; adminActive: boolean }>('/api/support', { text }),
+  supportTickets: () => req<{ tickets: SupportTicketDTO[] }>('/api/support/tickets'),
+  supportTicketCreate: (body: { category: string; subject: string; orderNo?: string; body: string }) =>
+    post<{ ticket: SupportTicketDTO; messages: SupportTicketMsgDTO[] }>('/api/support/tickets', body),
+  supportTicketThread: (id: string) =>
+    req<{ ticket: Omit<SupportTicketDTO, 'preview' | 'unread'>; messages: SupportTicketMsgDTO[]; unreadOnOpen: number }>(
+      `/api/support/tickets/${encodeURIComponent(id)}`,
+    ),
+  supportTicketSend: (id: string, text: string) =>
+    post<{ messages: SupportTicketMsgDTO[]; adminActive: boolean }>(`/api/support/tickets/${encodeURIComponent(id)}`, { text }),
+  supportTicketClose: (id: string, action: 'close' | 'reopen') =>
+    patch<{ ok: boolean; status: string }>(`/api/support/tickets/${encodeURIComponent(id)}`, { action }),
 
   // ── Магазин Stars (косметика) ──
   shopGet: () =>
@@ -278,6 +294,26 @@ export interface LeaderRowDTO {
 }
 
 export interface SupportMsgDTO {
+  id: string
+  role: string
+  author: string
+  text: string
+  createdAt: string
+}
+
+export interface SupportTicketDTO {
+  id: string
+  category: string
+  subject: string
+  orderNo: string | null
+  status: string // open | answered | closed
+  preview: string
+  createdAt: string
+  updatedAt: string
+  unread: number
+}
+
+export interface SupportTicketMsgDTO {
   id: string
   role: string
   author: string

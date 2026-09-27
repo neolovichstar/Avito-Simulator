@@ -273,6 +273,29 @@ export type SupportThread = {
   unread: number
 }
 
+export type AdminTicket = {
+  ticketId: string
+  userId: string
+  name: string
+  username: string
+  isBot: boolean
+  online: boolean
+  category: string
+  subject: string
+  status: string
+  lastText: string
+  lastAuthor: string
+  lastRole: string
+  lastAt: string
+  unread: number
+}
+
+export type AdminTicketData = {
+  ticket: { ticketId: string; subject: string; category: string; status: string; orderNo: string | null; createdAt: string }
+  user: { id: string; name: string; username: string; isBot: boolean; online: boolean }
+  messages: SupportThreadMsg[]
+}
+
 export type SupportThreadMsg = {
   id: string
   role: string
@@ -391,6 +414,13 @@ export const adminApi = {
   supportThread: (userId: string) => request<SupportThreadData>(`/support?userId=${encodeURIComponent(userId)}`),
   supportReply: (userId: string, text: string) =>
     request<{ message: SupportThreadMsg }>('/support', { method: 'POST', body: JSON.stringify({ userId, text }) }),
+  adminTickets: () => request<{ tickets: AdminTicket[] }>('/support?tickets=1'),
+  adminTicketThread: (ticketId: string) =>
+    request<AdminTicketData>(`/support?ticketId=${encodeURIComponent(ticketId)}`),
+  adminTicketReply: (ticketId: string, text: string) =>
+    request<{ message: SupportThreadMsg }>('/support', { method: 'POST', body: JSON.stringify({ ticketId, text }) }),
+  adminTicketStatus: (ticketId: string, status: string) =>
+    request<{ ok: boolean; status: string }>('/support', { method: 'PATCH', body: JSON.stringify({ ticketId, status }) }),
 }
 
 export const EXPORT_TYPES = [

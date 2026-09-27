@@ -573,3 +573,18 @@ export interface CarPlateDTO {
   isMain: boolean
   createdAt: string
 }
+
+/** Позиция витрины «Автономеров» (генерируется на сутки). */
+export interface PlateMarketItemDTO {
+  key: string
+  first: string
+  digits: string
+  letters: string
+  regionCode: string
+  regionName: string
+  rarity: PlateRarityDTO
+  beautyScore: number
+  price: number
+  category: 'vip' | 'elite' | 'top' | 'common'
+  trait: string
+}

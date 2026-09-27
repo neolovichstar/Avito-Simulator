@@ -1,22 +1,27 @@
 'use client'
 
-// Приложение «Номера» (Task 30) — крутилка в духе игровых автоматов.
-// Вкладки: Крутить / Брони / Мои / История — каждая помещается на экран,
-// вниз бесконечно не листаем. Сцена: ГТА-плашка с десятью барабанами-окошками;
-// при «Крутить» цифры ПАДАЮТ СВЕРХУ ВНИЗ с motion-блюром, колонки
-// останавливаются влево→вправо, каждое окошко «клацает» (scaleY-поп).
-// На финале плашка вздрагивает, по ней проходит цветная волна тира,
-// за плашкой загорается свечение (Золото/Платина/Бриллиант).
-// Регионы — все субъекты РФ (85 шт.), выбор через шторку с поиском.
-// Результат НИКОГДА не сохраняется сам: «Забрать» (бесплатно / за N ₽)
-// или «Крутить ещё»; невыкупленное ждёт в «Бронях» 48 ч.
-// Светлый M3 ОС: фон #F5F6F8, белые карточки r20, чёрные pill-CTA,
-// жёлтый #FFD53D. Тёмная тема — пары в globals.css (.plate-frame/.reel-*).
+// Приложение «Номера» — маркетплейс красивых номеров по макету + крутилка.
+// Вкладки (нижний таб-бар): Главная (витрина) / Поиск (фильтры) / Розыгрыш
+// (барабаны, центральная кнопка) / Избранное / Профиль (мои, брони, история).
+//
+// Машина: ГТА-плашка с десятью барабанами-окошками; при «Крутить» цифры
+// ПАДАЮТ СВЕРХУ ВНИЗ с motion-блюром, колонки останавливаются влево→вправо,
+// каждое окошко «клацает» (scaleY-поп). На финале плашка вздрагивает, по ней
+// проходит цветная волна тира, за плашкой загорается свечение.
+// Витрина: /api/phones/market — ежедневный каталог (usual/pretty/gold),
+// покупка номера напрямую. Брони 48 ч и крутка сохранены как были.
+// Светлый M3 ОС: фон #F5F6F8, белые карточки r20, зелёный CTA #12894B,
+// золото #E8C46A. Тёмная тема — пары в globals.css (.plate-frame/.reel-*).
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { animate, AnimatePresence, motion, useMotionValue, useTransform, type AnimationPlaybackControls } from 'framer-motion'
-import { BadgeCheck, Check, ChevronDown, Crown, Dices, Loader2, MapPin, Search, Timer, Wallet, X } from 'lucide-react'
+import {
+  BadgeCheck, Bell, Check, ChevronDown, ChevronLeft, ChevronRight, Crown, Dices, Heart, Loader2,
+  MapPin, Phone, Search, ShieldCheck, SlidersHorizontal, Star, Timer, UserRound, Wallet, X,
+} from 'lucide-react'
 import { REGIONS, RESERVE_HOURS, isGoldCode, reserveSecondsLeft } from '@/lib/phone'
+import type { PhoneMarketItem } from '@/lib/phone-market'
+import { api } from '@/lib/api'
 import { fmtMoney } from '@/lib/format'
 import { sound } from '@/lib/sound'
 import { useOS } from '@/lib/store'
@@ -31,6 +36,9 @@ import {
 } from './phone/shared'
 
 const CARD = 'rounded-[20px] bg-white shadow-[0_2px_14px_rgba(23,24,26,0.05)]'
+const GREEN = '#12894B'
+const CAPS = 'text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]'
+const FAV_KEY = 'avito_sim_number_favs_v1'
 
 const randDigit = () => String(Math.floor(Math.random() * 10))
 const randDigits = (n: number) => Array.from({ length: n }, randDigit).join('')
@@ -39,46 +47,51 @@ const randDigits = (n: number) => Array.from({ length: n }, randDigit).join('')
 const SHORT_BY_NAME: Record<string, string> = Object.fromEntries(REGIONS.map((r) => [r.name, r.short]))
 const shortRegion = (name: string) => SHORT_BY_NAME[name] ?? name
 
-/** Коды региона для списка: «495 · 499», «900–999», «812». */
 function codesLabel(codes: string[]): string {
-  return codes.length > 3 ? `${codes[0]}–${codes[codes.length - 1]}` : codes.join(' · ')
+  return codes.slice(0, 3).join(', ') + (codes.length > 3 ? '…' : '')
 }
 
-/** Престиж → 1..5 точек в шторке регионов. */
 function prestigeDots(prestige: number): number {
-  if (prestige >= 1.15) return 5
-  if (prestige >= 1.05) return 4
-  if (prestige >= 0.95) return 3
-  if (prestige >= 0.8) return 2
-  return 1
+  return Math.max(1, Math.min(5, Math.round((prestige - 0.8) * 7)))
 }
 
-/** Метка паттерна для чипа результата (первый совпавший). */
 function patternOf(tail: string): string | null {
-  const d = tail.replace(/\D/g, '')
+  const d = tail
   if (d.length < 4) return null
+  const run = (s: string) => {
+    let best = 1
+    let cur = 1
+    for (let i = 1; i < s.length; i++) {
+      cur = s[i] === s[i - 1] ? cur + 1 : 1
+      best = Math.max(best, cur)
+    }
+    return best
+  }
+  if (new Set(d.split('')).size === 1) return 'Легенда'
+  if (run(d) >= 3) return 'Повтор цифр'
   if (d === [...d].reverse().join('')) return 'Палиндром'
-  if (/(.)\1{2}/.test(d)) return 'Триплет'
-  // стрит: 4+ цифр шагом ±1 в одном направлении
-  let run = 1
-  for (let i = 1; i < d.length; i++) {
-    const step = d.charCodeAt(i) - d.charCodeAt(i - 1)
-    const prev = i >= 2 ? d.charCodeAt(i - 1) - d.charCodeAt(i - 2) : 0
-    if ((step === 1 || step === -1) && (i === 1 || prev === step)) {
-      run++
-      if (run >= 4) return 'Стрит'
-    } else if (step === 1 || step === -1) run = 2
-    else run = 1
-  }
+  if (d.endsWith('000')) return 'Круглый'
   for (let i = 0; i + 4 <= d.length; i++) {
-    if (d[i] === d[i + 3] && d[i + 1] === d[i + 2]) return 'Зеркало'
+    if (d[i] === d[i + 3] && d[i + 1] === d[i + 2]) return 'Зеркальный'
   }
-  if (d.length >= 5 && [...d].every((c, i) => i < 2 || c === d[i - 2])) return 'Чередование'
-  if (/00$/.test(d)) return 'Круглый'
+  for (let i = 0; i + 3 <= d.length; i++) {
+    if (d[i] === d[i + 2] && d[i + 1] !== d[i]) return 'С повтором'
+  }
+  const step = (s: string) => {
+    let best = 1
+    let cur = 1
+    for (let i = 1; i < s.length; i++) {
+      const delta = s.charCodeAt(i) - s.charCodeAt(i - 1)
+      cur = delta === 1 || delta === -1 ? cur + 1 : 1
+      best = Math.max(best, cur)
+    }
+    return best
+  }
+  if (step(d) >= 4) return 'Последовательный'
+  if (new Set(d.split('')).size <= 4) return 'Удачный'
   return null
 }
 
-/** Свечение за плашкой: только редкие тиры. */
 const GLOW: Partial<Record<string, string>> = { gold: '#FFD53D', platinum: '#D8DAE0', diamond: '#9BDFF5' }
 
 /* ───────────────────────────── Хук данных ───────────────────────────────── */
@@ -622,25 +635,754 @@ function RegionSheet({
   )
 }
 
-/* ──────────────────────────────── Экран ─────────────────────────────────── */
+/* ═══════════════════════════ ВИТРИНА (маркет) ═══════════════════════════ */
 
-type Tab = 'roll' | 'reserves' | 'mine' | 'history'
+const CAT_META: Record<PhoneMarketItem['category'], { label: string; from: number; chip: string }> = {
+  usual: { label: 'Обычные', from: 199, chip: 'bg-[#F3F4F6] text-[#6B7280]' },
+  pretty: { label: 'Красивые', from: 1990, chip: 'bg-[#F3F4F6] text-[#6B7280]' },
+  gold: { label: 'Золотой', from: 49990, chip: 'bg-[#FFF4D6] text-[#B45309]' },
+}
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'roll', label: 'Крутить' },
-  { id: 'reserves', label: 'Брони' },
-  { id: 'mine', label: 'Мои' },
-  { id: 'history', label: 'История' },
+/** Строка витрины (список «Рекомендуем»). */
+function MarketRow({
+  item,
+  faved,
+  onOpen,
+  onFav,
+  index,
+}: {
+  item: PhoneMarketItem
+  faved: boolean
+  onOpen: () => void
+  onFav: () => void
+  index: number
+}) {
+  const gold = item.category === 'gold'
+  return (
+    <div
+      className={`${CARD} screen-enter flex items-center gap-3 p-3.5`}
+      style={{ animationDelay: `${Math.min(index, 8) * 35}ms` }}
+    >
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={`Номер ${item.number}, ${fmtMoney(item.price)}`}
+        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+      >
+        <span
+          className="flex size-11 shrink-0 items-center justify-center rounded-[14px]"
+          style={{ background: gold ? '#FFF4D6' : '#F3F4F6', color: gold ? '#C99B2F' : '#9CA3AF' }}
+          aria-hidden
+        >
+          {gold ? <Crown className="size-5" /> : <Phone className="size-5" />}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[15px] font-bold tabular-nums text-[#17181A]">{item.number}</span>
+          <span className="mt-1 flex flex-wrap items-center gap-1.5">
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${CAT_META[item.category].chip}`}>
+              {CAT_META[item.category].label}
+            </span>
+            <span className="rounded-full bg-[#F3F4F6] px-2 py-0.5 text-[10px] font-medium text-[#9CA3AF]">{item.trait}</span>
+          </span>
+        </span>
+        <span className="shrink-0 text-right">
+          <span className="block text-[14.5px] font-extrabold tabular-nums text-[#17181A]">{fmtMoney(item.price)}</span>
+        </span>
+      </button>
+      <button
+        type="button"
+        onClick={onFav}
+        aria-label={faved ? 'Убрать из избранного' : 'В избранное'}
+        aria-pressed={faved}
+        className="press flex size-8 shrink-0 items-center justify-center rounded-full"
+      >
+        <Heart
+          className="size-4.5 transition-colors duration-200"
+          style={{ color: faved ? '#E4573D' : '#C4C8CE', fill: faved ? '#E4573D' : 'transparent' }}
+          aria-hidden
+        />
+      </button>
+    </div>
+  )
+}
+
+/** Витрина: категории + «Рекомендуем». */
+function MarketHome({
+  loading,
+  items,
+  category,
+  favs,
+  onCategory,
+  onSearch,
+  onOpen,
+  onFav,
+}: {
+  loading: boolean
+  items: PhoneMarketItem[]
+  category: PhoneMarketItem['category'] | 'all'
+  favs: string[]
+  onCategory: (c: PhoneMarketItem['category'] | 'all') => void
+  onSearch: () => void
+  onOpen: (i: PhoneMarketItem) => void
+  onFav: (digits: string) => void
+}) {
+  const cats: { key: PhoneMarketItem['category'] | 'all'; label: string; sub: string; cls: string }[] = [
+    { key: 'all', label: 'Все номера', sub: '', cls: 'bg-[#17181A] text-white' },
+    { key: 'usual', label: 'Обычные', sub: 'от 199 ₽', cls: 'bg-white text-[#17181A]' },
+    { key: 'pretty', label: 'Красивые', sub: 'от 1 990 ₽', cls: 'bg-[#FFF4D6] text-[#17181A]' },
+    { key: 'gold', label: 'Золотые', sub: 'от 49 990 ₽', cls: 'bg-white text-[#17181A]' },
+  ]
+  const shown = category === 'all' ? items : items.filter((i) => i.category === category)
+  return (
+    <div className="h-full min-h-0 overflow-y-auto px-4 pb-6 pt-1 [scrollbar-width:thin]">
+      <button type="button" onClick={onSearch} className="press block w-full text-left" aria-label="Поиск номера">
+        <div className="flex h-11 items-center gap-2.5 rounded-full bg-white px-4 shadow-[0_2px_10px_rgba(23,24,26,0.05)]">
+          <Search className="size-4.5 shrink-0 text-[#9CA3AF]" aria-hidden />
+          <span className="flex-1 truncate text-[13.5px] text-[#9CA3AF]">Найти номер, например +7 999 777-77-77</span>
+          <SlidersHorizontal className="size-4.5 shrink-0 text-[#374151]" aria-hidden />
+        </div>
+      </button>
+
+      {/* категории */}
+      <div className="mt-3 grid grid-cols-4 gap-2">
+        {cats.map((c) => {
+          const active = category === c.key
+          return (
+            <button
+              key={c.key}
+              type="button"
+              onClick={() => {
+                sound.tap()
+                onCategory(c.key)
+              }}
+              aria-pressed={active}
+              className={`press flex flex-col items-center gap-1 rounded-[16px] p-2.5 text-center shadow-[0_2px_10px_rgba(23,24,26,0.05)] ${c.cls} ${
+                active ? 'ring-2 ring-[#17181A] ring-offset-1 ring-offset-[#F5F6F8]' : ''
+              }`}
+            >
+              {c.key === 'gold' ? (
+                <Crown className="size-4.5 text-[#C99B2F]" aria-hidden />
+              ) : c.key === 'pretty' ? (
+                <Star className="size-4.5 text-[#C99B2F]" aria-hidden />
+              ) : c.key === 'usual' ? (
+                <Phone className="size-4.5 text-[#6B7280]" aria-hidden />
+              ) : (
+                <span className="text-[15px] font-black" aria-hidden>∞</span>
+              )}
+              <span className="text-[10.5px] font-bold leading-tight">{c.label}</span>
+              {c.sub && <span className="text-[8.5px] leading-none opacity-60">{c.sub}</span>}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* рекомендации */}
+      <div className="mt-4 flex items-baseline justify-between">
+        <p className={CAPS}>Рекомендуем</p>
+        <button type="button" onClick={onSearch} className="press text-[12px] font-semibold text-[#374151]">
+          Смотреть все ›
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="mt-2.5 space-y-2">
+          <div className="h-[76px] animate-pulse rounded-[20px] bg-white" />
+          <div className="h-[76px] animate-pulse rounded-[20px] bg-white" />
+          <div className="h-[76px] animate-pulse rounded-[20px] bg-white" />
+        </div>
+      ) : shown.length === 0 ? (
+        <p className="mt-8 text-center text-[13px] text-[#9CA3AF]">В этой категории пусто — загляните завтра.</p>
+      ) : (
+        <div className="mt-2.5 space-y-2">
+          {shown.slice(0, 12).map((it, i) => (
+            <MarketRow key={it.key} item={it} index={i} faved={favs.includes(it.digits)} onOpen={() => onOpen(it)} onFav={() => onFav(it.digits)} />
+          ))}
+        </div>
+      )}
+
+      {shown.length > 12 && (
+        <button type="button" onClick={onSearch} className="press mt-3 w-full text-center text-[12.5px] font-semibold text-[#12894B]">
+          Показать все {shown.length} ›
+        </button>
+      )}
+    </div>
+  )
+}
+
+/* ─────────────────────────── Фильтры («Поиск») ─────────────────────────── */
+
+type PatKey = 'any' | 'same' | 'mirror' | 'seq' | 'pairs' | 'triples' | 'round' | 'none'
+
+const PATTERN_CARDS: { key: PatKey; label: string; hint: string }[] = [
+  { key: 'any', label: 'Любые', hint: '' },
+  { key: 'same', label: 'Повтор цифр', hint: '777, 888, 000' },
+  { key: 'mirror', label: 'Зеркальные', hint: '123-21-321' },
+  { key: 'seq', label: 'Порядок', hint: '123-45-67' },
+  { key: 'pairs', label: 'Две пары', hint: 'XX-XX-YY' },
+  { key: 'triples', label: 'Три пары', hint: 'XXX-XX-XX' },
+  { key: 'round', label: 'Круглые', hint: '…000' },
+  { key: 'none', label: 'Без рисунка', hint: '' },
 ]
+
+function matchPat(tail: string, p: PatKey): boolean {
+  const run = (s: string) => {
+    let b = 1
+    let c = 1
+    for (let i = 1; i < s.length; i++) {
+      c = s[i] === s[i - 1] ? c + 1 : 1
+      b = Math.max(b, c)
+    }
+    return b
+  }
+  const counts = new Map<string, number>()
+  for (const ch of tail) counts.set(ch, (counts.get(ch) ?? 0) + 1)
+  const triples = [...counts.values()].filter((n) => n >= 3).length
+  const pairs = [...counts.values()].filter((n) => n === 2).length
+
+  switch (p) {
+    case 'any':
+      return true
+    case 'same':
+      return run(tail) >= 3
+    case 'mirror':
+      return tail === [...tail].reverse().join('') || /\d(\d)\1\d/.test(tail)
+    case 'seq': {
+      let best = 1
+      let cur = 1
+      for (let i = 1; i < tail.length; i++) {
+        const d = tail.charCodeAt(i) - tail.charCodeAt(i - 1)
+        cur = d === 1 || d === -1 ? cur + 1 : 1
+        best = Math.max(best, cur)
+      }
+      return best >= 4
+    }
+    case 'pairs':
+      return pairs >= 2
+    case 'triples':
+      return triples >= 2
+    case 'round':
+      return tail.endsWith('000') || tail.endsWith('00')
+    case 'none':
+      return run(tail) < 3 && triples === 0 && !tail.endsWith('00')
+  }
+}
+
+function MarketFilters({
+  items,
+  q,
+  setQ,
+  category,
+  setCategory,
+  pat,
+  setPat,
+  priceLo,
+  priceHi,
+  setPriceLo,
+  setPriceHi,
+  premiumOnly,
+  setPremiumOnly,
+  onApply,
+  onReset,
+}: {
+  items: PhoneMarketItem[]
+  q: string
+  setQ: (v: string) => void
+  category: PhoneMarketItem['category'] | 'all'
+  setCategory: (c: PhoneMarketItem['category'] | 'all') => void
+  pat: PatKey
+  setPat: (p: PatKey) => void
+  priceLo: number
+  priceHi: number
+  setPriceLo: (v: number) => void
+  setPriceHi: (v: number) => void
+  premiumOnly: boolean
+  setPremiumOnly: (v: boolean) => void
+  onApply: () => void
+  onReset: () => void
+}) {
+  const catChips: { key: PhoneMarketItem['category'] | 'all'; label: string }[] = [
+    { key: 'all', label: 'Все' },
+    { key: 'usual', label: 'Обычные' },
+    { key: 'pretty', label: 'Красивые' },
+    { key: 'gold', label: 'Золотые' },
+  ]
+  const filtered = items.filter((i) => {
+    if (category !== 'all' && i.category !== category) return false
+    if (!matchPat(i.digits.slice(4), pat)) return false
+    if (i.price < priceLo || i.price > priceHi) return false
+    if (premiumOnly && i.category !== 'gold') return false
+    const needle = q.replace(/[\s()+-]/g, '')
+    if (needle && !i.digits.includes(needle)) return false
+    return true
+  })
+
+  return (
+    <div className="h-full min-h-0 overflow-y-auto px-4 pb-28 pt-1 [scrollbar-width:thin]">
+      <div className="flex items-center gap-2 pb-3">
+        <button
+          type="button"
+          onClick={onReset}
+          aria-label="Назад"
+          className="press flex size-10 items-center justify-center rounded-full text-[#17181A]"
+        >
+          <ChevronLeft className="size-6" aria-hidden />
+        </button>
+        <h2 className="flex-1 text-center text-[16px] font-bold text-[#17181A]">Поиск номеров</h2>
+        <span className="size-10 shrink-0" aria-hidden />
+      </div>
+
+      {/* строка поиска */}
+      <div className="flex h-11 items-center gap-2.5 rounded-full bg-white px-4 shadow-[0_2px_10px_rgba(23,24,26,0.05)]">
+        <Search className="size-4.5 shrink-0 text-[#9CA3AF]" aria-hidden />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="+7 999 777-7-77"
+          inputMode="tel"
+          aria-label="Поиск по цифрам номера"
+          className="w-full bg-transparent text-[14px] tabular-nums text-[#17181A] outline-none placeholder:text-[#9CA3AF]"
+        />
+        {q && (
+          <button type="button" onClick={() => setQ('')} aria-label="Очистить" className="press flex size-5 items-center justify-center rounded-full bg-[#D7DBE0] text-white">
+            <X className="size-3" aria-hidden />
+          </button>
+        )}
+      </div>
+
+      {/* быстрые чипы */}
+      <div className="mt-2.5 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <span className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-[#17181A] px-3.5 text-[12.5px] font-semibold text-white">
+          <SlidersHorizontal className="size-3.5" aria-hidden />
+          Фильтры
+        </span>
+        {catChips.map((c) => (
+          <button
+            key={c.key}
+            type="button"
+            onClick={() => {
+              sound.tap()
+              setCategory(c.key)
+            }}
+            aria-pressed={category === c.key}
+            className={`h-9 shrink-0 rounded-full px-3.5 text-[12.5px] font-semibold ${category === c.key ? 'bg-[#17181A] text-white' : 'bg-white text-[#374151] shadow-[0_1px_6px_rgba(23,24,26,0.06)]'}`}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+
+      {/* категория */}
+      <p className={`${CAPS} mt-5`}>Категория номера</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {catChips.map((c) => (
+          <button
+            key={c.key}
+            type="button"
+            onClick={() => {
+              sound.tap()
+              setCategory(c.key)
+            }}
+            aria-pressed={category === c.key}
+            className={`h-9 rounded-full px-4 text-[13px] font-semibold ${category === c.key ? 'bg-[#17181A] text-white' : 'bg-white text-[#374151] shadow-[0_1px_6px_rgba(23,24,26,0.06)]'}`}
+          >
+            {c.label}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => {
+            sound.tap()
+            setPat('same')
+          }}
+          className="h-9 rounded-full bg-white px-4 text-[13px] font-semibold text-[#374151] shadow-[0_1px_6px_rgba(23,24,26,0.06)]"
+        >
+          С повторяющимися
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            sound.tap()
+            setPremiumOnly(!premiumOnly)
+          }}
+          className="h-9 rounded-full bg-white px-4 text-[13px] font-semibold text-[#374151] shadow-[0_1px_6px_rgba(23,24,26,0.06)]"
+        >
+          Особые
+        </button>
+      </div>
+
+      {/* рисунок */}
+      <p className={`${CAPS} mt-5`}>Рисунок номера</p>
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        {PATTERN_CARDS.map((p) => (
+          <button
+            key={p.key}
+            type="button"
+            onClick={() => {
+              sound.tap()
+              setPat(p.key)
+            }}
+            aria-pressed={pat === p.key}
+            className={`press rounded-[14px] border p-2.5 text-left ${
+              pat === p.key ? 'border-[#17181A] bg-[#17181A] text-white' : 'border-[#ECEEF1] bg-white text-[#17181A]'
+            }`}
+          >
+            <span className="block text-[11.5px] font-bold leading-tight">{p.label}</span>
+            {p.hint && <span className={`text-[9px] tabular-nums ${pat === p.key ? 'text-white/60' : 'text-[#9CA3AF]'}`}>{p.hint}</span>}
+          </button>
+        ))}
+      </div>
+
+      {/* цена */}
+      <p className={`${CAPS} mt-5`}>Цена</p>
+      <div className="mt-1.5 flex items-baseline justify-between text-[12px] text-[#6B7280]">
+        <span>от {fmtMoney(priceLo)}</span>
+        <span>до {fmtMoney(priceHi)}</span>
+      </div>
+      <div className="relative h-9" role="group" aria-label="Диапазон цены">
+        <span className="absolute left-0 right-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-[#ECEEF1]" aria-hidden />
+        <span
+          className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-[#12894B]"
+          style={{
+            left: `${((priceLo - 0) / 1_000_000) * 100}%`,
+            width: `${Math.max(0, ((priceHi - priceLo) / 1_000_000) * 100)}%`,
+          }}
+          aria-hidden
+        />
+        <input
+          type="range"
+          min={0}
+          max={1_000_000}
+          step={1000}
+          value={priceLo}
+          onChange={(e) => setPriceLo(Math.min(Number(e.target.value), priceHi - 1000))}
+          aria-label="Цена от"
+          className="absolute inset-0 w-full appearance-none bg-transparent [&::-webkit-slider-thumb]:size-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#12894B] [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md"
+        />
+        <input
+          type="range"
+          min={0}
+          max={1_000_000}
+          step={1000}
+          value={priceHi}
+          onChange={(e) => setPriceHi(Math.max(Number(e.target.value), priceLo + 1000))}
+          aria-label="Цена до"
+          className="absolute inset-0 w-full appearance-none bg-transparent [&::-webkit-slider-thumb]:size-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#12894B] [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md"
+        />
+      </div>
+
+      {/* дополнительно */}
+      <p className={`${CAPS} mt-5`}>Дополнительно</p>
+      <div className="mt-2 divide-y divide-[#F0F1F3] overflow-hidden rounded-[16px] bg-white shadow-[0_2px_10px_rgba(23,24,26,0.05)]">
+        <div className="flex items-center gap-3 px-4 py-3">
+          <Crown className="size-4.5 text-[#9CA3AF]" aria-hidden />
+          <span className="flex-1 text-[13.5px] font-medium text-[#17181A]">Только в наличии</span>
+          <span className="flex h-6 w-10 items-center rounded-full bg-[#12894B] px-0.5" aria-hidden title="Всё на витрине свободно">
+            <span className="ml-auto size-5 rounded-full bg-white shadow" />
+          </span>
+        </div>
+        <button type="button" onClick={() => { sound.tap(); setPremiumOnly(!premiumOnly) }} className="press flex w-full items-center gap-3 px-4 py-3 text-left">
+          <Star className="size-4.5 text-[#9CA3AF]" aria-hidden />
+          <span className="flex-1 text-[13.5px] font-medium text-[#17181A]">Только уникальные</span>
+          <span className={`flex h-6 w-10 items-center rounded-full px-0.5 transition-colors ${premiumOnly ? 'bg-[#12894B]' : 'bg-[#D7DBE0]'}`} aria-hidden>
+            <span className={`size-5 rounded-full bg-white shadow transition-transform ${premiumOnly ? 'translate-x-4' : ''}`} />
+          </span>
+        </button>
+      </div>
+
+      <button
+        type="button"
+        onClick={onApply}
+        className="press mt-4 flex h-12 w-full items-center justify-center rounded-[16px] text-[15px] font-semibold text-white"
+        style={{ background: GREEN, boxShadow: '0 8px 20px rgba(18,137,75,0.28)' }}
+      >
+        Показать {filtered.length} номер{filtered.length % 10 === 1 && filtered.length !== 11 ? '' : filtered.length % 10 >= 2 && filtered.length % 10 <= 4 && (filtered.length < 12 || filtered.length > 14) ? 'а' : 'ов'}
+      </button>
+    </div>
+  )
+}
+
+/* ────────────────────────────── Деталь номера ───────────────────────────── */
+
+function MarketDetail({
+  item,
+  faved,
+  busy,
+  onFav,
+  onBuy,
+  onBack,
+  onShare,
+}: {
+  item: PhoneMarketItem
+  faved: boolean
+  busy: boolean
+  onFav: () => void
+  onBuy: () => void
+  onBack: () => void
+  onShare: () => void
+}) {
+  const gold = item.category === 'gold'
+  const catLabel = CAT_META[item.category].label
+  return (
+    <div className="h-full min-h-0 overflow-y-auto pb-28 [scrollbar-width:thin]">
+      <header className="flex items-center justify-between px-2 pt-1">
+        <button type="button" onClick={onBack} aria-label="Назад" className="press flex size-10 items-center justify-center rounded-full text-[#17181A]">
+          <ChevronLeft className="size-6" aria-hidden />
+        </button>
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={onFav}
+            aria-label={faved ? 'Убрать из избранного' : 'В избранное'}
+            aria-pressed={faved}
+            className="press flex size-10 items-center justify-center rounded-full text-[#17181A]"
+          >
+            <Heart className="size-5" style={{ color: faved ? '#E4573D' : undefined, fill: faved ? '#E4573D' : 'transparent' }} aria-hidden />
+          </button>
+          <button type="button" onClick={onShare} aria-label="Поделиться" className="press flex size-10 items-center justify-center rounded-full text-[#17181A]">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden className="size-5">
+              <path d="M12 3v12M12 3l-4 4M12 3l4 4M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      {/* тёмно-золотой баннер */}
+      <div
+        className="mx-4 mt-1 overflow-hidden rounded-[22px] px-5 py-7 text-center"
+        style={{
+          background:
+            'radial-gradient(120% 130% at 50% -20%, #3A3222 0%, #1B1913 55%, #131313 100%)',
+          boxShadow: '0 14px 34px rgba(23,24,26,0.28)',
+        }}
+      >
+        <span
+          className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold"
+          style={{ borderColor: 'rgba(232,196,106,0.55)', color: '#E8C46A' }}
+        >
+          <Crown className="size-3.5" aria-hidden />
+          {catLabel} номер
+        </span>
+        <h1
+          className="mt-3 text-[27px] font-extrabold tracking-tight text-white"
+          style={{ textShadow: gold ? '0 0 24px rgba(232,196,106,0.45)' : '0 2px 12px rgba(0,0,0,0.5)' }}
+        >
+          {item.number}
+        </h1>
+        <p className="mt-1 text-[12px] text-white/55">{item.trait}</p>
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
+          {[
+            { icon: Crown, text: 'Очень редкий' },
+            { icon: Star, text: 'Высокий спрос' },
+            { icon: Heart, text: 'Легко запомнить' },
+          ].map((c) => (
+            <span
+              key={c.text}
+              className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold"
+              style={{ background: 'rgba(232,196,106,0.12)', color: '#E8C46A' }}
+            >
+              <c.icon className="size-3" aria-hidden />
+              {c.text}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* 3 стат-карточки */}
+      <div className="mx-4 mt-3 grid grid-cols-3 gap-2">
+        {[
+          { icon: BarIcon, label: 'Категория', value: catLabel },
+          { icon: Star, label: 'Уникальность', value: item.unique },
+          { icon: UsersIcon, label: 'Популярность', value: item.popularity },
+        ].map((s) => (
+          <div key={s.label} className={`${CARD} flex flex-col items-center gap-1 p-3 text-center`}>
+            <s.icon />
+            <span className="text-[9.5px] text-[#9CA3AF]">{s.label}</span>
+            <span className="text-[11px] font-bold leading-tight text-[#17181A]">{s.value}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* цена + рассрочка */}
+      <div className="mx-4 mt-3 flex items-stretch gap-2">
+        <div className={`${CARD} flex-1 p-4`}>
+          <span className="text-[11px] text-[#9CA3AF]">Цена</span>
+          <p className="text-[20px] font-extrabold tabular-nums leading-tight text-[#17181A]">{fmtMoney(item.price)}</p>
+        </div>
+        <button type="button" onClick={() => sound.tap()} className="press flex w-[132px] flex-col justify-center rounded-[20px] bg-white p-3 text-left shadow-[0_2px_14px_rgba(23,24,26,0.05)]">
+          <span className="flex items-center gap-1.5 text-[11px] text-[#9CA3AF]">
+            <Wallet className="size-3.5" aria-hidden />
+            Возможна рассрочка
+          </span>
+          <span className="mt-0.5 flex items-center gap-0.5 text-[12px] font-bold text-[#17181A]">
+            от {fmtMoney(Math.round(item.price / 12 / 10) * 10)}/мес
+            <ChevronRight className="size-3.5 text-[#9CA3AF]" aria-hidden />
+          </span>
+        </button>
+      </div>
+
+      {/* безопасность */}
+      <div className="mx-4 mt-3 flex items-center justify-center gap-1.5 text-[11.5px] text-[#6B7280]">
+        <ShieldCheck className="size-4 text-[#12894B]" aria-hidden />
+        Безопасная сделка · Оформление договора · Официально
+      </div>
+
+      {/* что входит */}
+      <div className={`${CARD} mx-4 mt-3 p-4`}>
+        <p className="text-[13.5px] font-bold text-[#17181A]">Что входит в покупку</p>
+        <ul className="mt-2 space-y-1.5">
+          {[
+            `Выделенный номер ${item.number}`,
+            'Оформление на ваше имя',
+            'Быстрая активация (от 5 минут)',
+            'Поддержка 24/7',
+          ].map((t) => (
+            <li key={t} className="flex items-start gap-2 text-[12.5px] leading-snug text-[#374151]">
+              <Check className="mt-0.5 size-4 shrink-0 text-[#12894B]" aria-hidden />
+              {t}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* покупка */}
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#F5F6F8] via-[#F5F6F8] to-transparent px-4 pb-4 pt-6">
+        <button
+          type="button"
+          onClick={onBuy}
+          disabled={busy}
+          className="press flex h-12 w-full items-center justify-center rounded-[16px] text-[15px] font-semibold text-white disabled:opacity-60"
+          style={{ background: GREEN, boxShadow: '0 8px 20px rgba(18,137,75,0.28)' }}
+        >
+          {busy ? 'Покупаем…' : 'Купить номер'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function BarIcon() {
+  return (
+    <span className="flex size-6 items-center justify-center" aria-hidden>
+      <svg viewBox="0 0 24 24" className="size-4 text-[#C99B2F]" fill="currentColor">
+        <rect x="4" y="13" width="3.4" height="7" rx="1" />
+        <rect x="10.3" y="8" width="3.4" height="12" rx="1" />
+        <rect x="16.6" y="4" width="3.4" height="16" rx="1" />
+      </svg>
+    </span>
+  )
+}
+function UsersIcon() {
+  return (
+    <span className="flex size-6 items-center justify-center" aria-hidden>
+      <svg viewBox="0 0 24 24" fill="none" className="size-4 text-[#C99B2F]">
+        <circle cx="9" cy="8.5" r="3.2" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M3.5 19c.7-3 3-4.5 5.5-4.5S13.8 16 14.5 19" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        <circle cx="16.5" cy="9.5" r="2.4" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M16.5 14.5c2 0 3.7 1.2 4.3 3.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+    </span>
+  )
+}
+
+/* ═════════════════════════════ КОРЕНЬ ═════════════════════════════ */
+
+type NTab = 'home' | 'search' | 'roll' | 'favs' | 'profile'
 
 export default function NumbersApp() {
   const pushToast = useOS((s) => s.pushToast)
   const n = useNumbers()
 
-  const [tab, setTab] = useState<Tab>('roll')
+  const [tab, setTab] = useState<NTab>('home')
+  const [detail, setDetail] = useState<PhoneMarketItem | null>(null)
 
-  // Регион сохраняется между сессиями: выбрал «Блатные» — 777 стоит на плашке
-  // по умолчанию при каждом заходе, а крутка идёт по выбранному региону.
+  // витрина
+  const [items, setItems] = useState<PhoneMarketItem[]>([])
+  const [mLoading, setMLoading] = useState(true)
+  const [favs, setFavs] = useState<string[]>([])
+  const [buying, setBuying] = useState(false)
+  const [toast, setToast] = useState('')
+
+  // фильтры
+  const [q, setQ] = useState('')
+  const [category, setCategory] = useState<PhoneMarketItem['category'] | 'all'>('all')
+  const [pat, setPat] = useState<PatKey>('any')
+  const [priceLo, setPriceLo] = useState(0)
+  const [priceHi, setPriceHi] = useState(1_000_000)
+  const [premiumOnly, setPremiumOnly] = useState(false)
+
+  useEffect(() => {
+    try {
+      setFavs(JSON.parse(localStorage.getItem(FAV_KEY) ?? '[]') as string[])
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const showToast = useCallback((t: string) => {
+    setToast(t)
+    setTimeout(() => setToast(''), 2400)
+  }, [])
+
+  const loadMarket = useCallback(async () => {
+    try {
+      const r = await api.phonesMarket()
+      setItems(r.items)
+    } catch {
+      /* сеть моргнула */
+    } finally {
+      setMLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    const t = setTimeout(() => void loadMarket(), 0)
+    return () => clearTimeout(t)
+  }, [loadMarket])
+
+  const toggleFav = useCallback((digits: string) => {
+    sound.tap()
+    setFavs((prev) => {
+      const next = prev.includes(digits) ? prev.filter((k) => k !== digits) : [...prev, digits]
+      try {
+        localStorage.setItem(FAV_KEY, JSON.stringify(next))
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
+  }, [])
+
+  const favItems = useMemo(() => items.filter((i) => favs.includes(i.digits)), [items, favs])
+
+  const refreshBalance = useCallback(
+    (b: number) => {
+      useOS.getState().refreshSession({ balance: b })
+    },
+    [],
+  )
+
+  const buyMarket = useCallback(
+    async (item: PhoneMarketItem) => {
+      if (buying) return
+      sound.tap()
+      setBuying(true)
+      try {
+        const r = await api.phonesMarketBuy(item.digits)
+        refreshBalance(r.balance)
+        await n.refresh()
+        setDetail(null)
+        setItems((list) => list.filter((i) => i.digits !== item.digits))
+        pushToast('Номер ваш', item.number)
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : 'Не удалось купить номер')
+      } finally {
+        setBuying(false)
+      }
+    },
+    [buying, pushToast, showToast, refreshBalance, n],
+  )
+
+  // ── состояние барабана (сцена «Розыгрыш») ──
   const [region, setRegion] = useState<string>(() => {
     if (typeof window === 'undefined') return 'msk'
     try {
@@ -697,14 +1439,12 @@ export default function NumbersApp() {
     setResult(null)
     setClaimed(false)
     pendingRef.current = null
-    // Барабаны стартуют сразу по случайной цели; когда придёт ответ —
-    // бесшовно докрутим до реальных цифр (та же лента, без рывков).
     rollStartRef.current = Date.now()
     seqRef.current += 1
     setSpin({ seq: seqRef.current, digits: randDigits(10), final: false, at: rollStartRef.current })
     const res = await n.roll(regionMeta.id)
     if (res.ok) {
-      await n.refresh() // бронь сразу появится во вкладке «Брони»
+      await n.refresh() // бронь сразу появится в «Профиле»
       pendingRef.current = res.phone
       seqRef.current += 1
       setSpin({ seq: seqRef.current, digits: res.phone.digits.slice(1), final: true, at: rollStartRef.current })
@@ -714,7 +1454,6 @@ export default function NumbersApp() {
     }
   }
 
-  /** Премиум без денег: карточка сама уходит, номер ждёт в «Бронях» 48 ч. */
   useEffect(() => {
     if (!result || rolling || claimed || busy) return
     if (result.buyPrice > n.balance) {
@@ -765,7 +1504,6 @@ export default function NumbersApp() {
   const canAfford = result ? result.buyPrice === 0 || n.balance >= result.buyPrice : false
   const rollTooPoor = n.balance < regionMeta.rollPrice
 
-  // Штамп региона: у выпавшего номера — его код, до первой прокрутки — выбор.
   const stampCode = result ? result.regionCode : regionMeta.codes[0]
   const stampName = result ? shortRegion(result.regionName) : regionMeta.short
   const stampLabel = result
@@ -777,382 +1515,452 @@ export default function NumbersApp() {
   const goldPlate = isGoldCode(stampCode)
   const glowColor = result && !rolling ? (GLOW[result.tier] ?? (goldPlate ? '#E3B341' : undefined)) : undefined
 
-  const counts: Partial<Record<Tab, number>> = {
-    reserves: n.reserves.length,
-    mine: n.owned.length,
-    history: n.history.length,
-  }
-
   return (
     <div className="relative flex h-full flex-col bg-[#F5F6F8] text-[#17181A]">
-      {/* Шапка: название + баланс */}
-      <header className="shrink-0 px-5 pb-2 pt-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-[19px] font-bold tracking-tight">Номера</h1>
-          <span className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[12.5px] font-semibold tabular-nums shadow-[0_2px_10px_rgba(23,24,26,0.05)]">
-            <Wallet className="size-3.5 text-[#17181A]/40" aria-hidden="true" />
-            {fmtMoney(n.balance)}
-          </span>
-        </div>
-
-        {/* Вкладки: компактный сегмент-контрол */}
-        <div className="mt-2.5 flex rounded-full bg-[#F1F3F4] p-1" role="tablist" aria-label="Разделы номеров">
-          {TABS.map((t) => {
-            const active = tab === t.id
-            const count = counts[t.id]
-            return (
+      {detail === null && tab !== 'search' && (
+        <header className="shrink-0 px-4 pb-1 pt-1.5">
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-[26px] font-bold leading-tight tracking-[-0.01em]">Номера</h1>
+              <p className="text-[12.5px] text-[#9CA3AF]">Красивые номера для особенных людей</p>
+            </div>
+            <div className="mt-1 flex items-center gap-2">
+              <span aria-hidden className="flex size-10 items-center justify-center rounded-full bg-white text-[#374151] shadow-[0_2px_10px_rgba(23,24,26,0.06)]">
+                <Bell className="size-5" />
+              </span>
               <button
-                key={t.id}
                 type="button"
-                role="tab"
-                aria-selected={active}
                 onClick={() => {
                   sound.tap()
-                  setTab(t.id)
+                  setTab('profile')
                 }}
-                className={
-                  'relative flex h-9 flex-1 items-center justify-center gap-1 rounded-full text-[12.5px] font-semibold transition-colors ' +
-                  (active ? 'bg-white text-[#17181A] shadow-[0_1px_6px_rgba(23,24,26,0.08)]' : 'text-[#17181A]/45')
-                }
+                aria-label="Профиль"
+                className="press flex size-10 items-center justify-center rounded-full bg-[#ECEEF1] text-[#6B7280]"
               >
-                {t.label}
-                {typeof count === 'number' && count > 0 && (
-                  <span
-                    className={
-                      'min-w-[17px] rounded-full px-1 text-center text-[10px] font-bold leading-[17px] tabular-nums ' +
-                      (active ? 'bg-[#17181A] text-white' : 'bg-[#17181A]/[0.1] text-[#17181A]/50')
-                    }
-                  >
-                    {count > 9 ? '9+' : count}
-                  </span>
-                )}
+                <UserRound className="size-5" aria-hidden />
               </button>
-            )
-          })}
-        </div>
-      </header>
-
-      <main className="nice-scroll flex-1 overflow-y-auto px-4 pb-8 pt-1">
-        {/* ─────────── КРУТИТЬ: сцена, влезает на экран без скролла ─────────── */}
-        {tab === 'roll' && (
-          <section className={CARD + ' px-2.5 pb-4 pt-3'}>
-            {/* Регион — тап открывает шторку с поиском */}
-            <button
-              type="button"
-              onClick={() => {
-                sound.tap()
-                setSheetOpen(true)
-              }}
-              disabled={rolling}
-              className="flex h-11 w-full items-center justify-between gap-2 rounded-2xl bg-[#F1F3F4] px-3.5 transition-transform active:scale-[0.99] disabled:opacity-50"
-              aria-label={`Регион ${regionMeta.name}, крутка ${regionMeta.rollPrice} рублей, изменить`}
-            >
-              <span className="flex min-w-0 items-center gap-2">
-                <MapPin className="size-4 shrink-0 text-[#17181A]/45" aria-hidden="true" />
-                <span className="truncate text-[14px] font-semibold">{regionMeta.short}</span>
-                <span className="shrink-0 text-[11.5px] tabular-nums text-[#17181A]/40">{codesLabel(regionMeta.codes)}</span>
-              </span>
-              <span className="flex shrink-0 items-center gap-1.5">
-                <span className="text-[11px] text-[#17181A]/40">крутка</span>
-                <span className="text-[13.5px] font-bold tabular-nums">{fmtMoney(regionMeta.rollPrice)}</span>
-                <ChevronDown className="size-4 text-[#17181A]/35" aria-hidden="true" />
-              </span>
-            </button>
-
-            {/* Плашка со свечением редкого тира */}
-            <div className="relative mt-3">
-              <motion.div
-                aria-hidden="true"
-                className="pointer-events-none absolute -inset-3 rounded-[28px]"
-                initial={false}
-                animate={{ opacity: glowColor ? 1 : 0 }}
-                transition={{ duration: 0.55 }}
-                style={{
-                  background: `radial-gradient(62% 72% at 50% 42%, ${glowColor ?? 'transparent'}40, transparent 72%)`,
-                }}
-              />
-              <motion.div
-                style={{ scale: plateScale }}
-                className={
-                  'plate-frame relative overflow-hidden rounded-[18px] bg-white px-1 py-3' +
-                  (goldPlate ? ' plate-gold' : '')
-                }
-              >
-                <PlateReels spin={spin ?? IDLE_SPIN} stamp={{ code: stampCode, name: stampName, label: stampLabel }} onSettled={handleSettled} />
-                {/* цветная волна тира по плашке на финале */}
-                <AnimatePresence>
-                  {result && !rolling && (
-                    <motion.div
-                      key={result.id}
-                      aria-hidden="true"
-                      className="pointer-events-none absolute inset-0 overflow-hidden rounded-[16px]"
-                    >
-                      <motion.div
-                        className="absolute inset-y-0 w-1/2 -skew-x-12"
-                        initial={{ x: '-170%' }}
-                        animate={{ x: '380%' }}
-                        transition={{ duration: 0.9, delay: 0.05, ease: [0.32, 0, 0.25, 1] }}
-                        style={{ background: `linear-gradient(90deg, transparent, ${tierColor}30, transparent)` }}
-                      />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
             </div>
-            {result && <span className="sr-only">Выпал номер {result.number}</span>}
+          </div>
+        </header>
+      )}
 
-            {/* Подсказка до первой прокрутки */}
-            {!everRolled && !rolling && result === null && (
-              <motion.p
-                animate={{ opacity: [0.45, 0.9, 0.45] }}
-                transition={{ repeat: Infinity, duration: 2.4, ease: 'easeInOut' }}
-                className="mt-3 text-center text-[12.5px] text-[#17181A]/45"
-              >
-                Крутни, чтобы увидеть номер
-              </motion.p>
-            )}
-
-            {/* Результат: тир + паттерн + красота + Забрать / Крутить ещё */}
-            {showActions && result && (
-              <motion.div
-                key={result.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ type: 'spring', stiffness: 320, damping: 26, delay: 0.06 }}
-              >
-                <div className="mt-3.5 flex items-center gap-2">
-                  <motion.span
-                    initial={{ scale: 0.55, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 16, delay: 0.1 }}
-                    className="shrink-0"
-                  >
-                    <TierBadge tier={result.tier} size="lg" variant="light" />
-                  </motion.span>
-                  {pattern && (
-                    <span className="shrink-0 rounded-full bg-[#F1F3F4] px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[0.06em] text-[#17181A]/55">
-                      {pattern}
-                    </span>
-                  )}
-                  <ScoreBar score={result.beautyScore} color={tierColor} />
-                </div>
-                <div className="mt-3.5 flex gap-2">
-                  {canAfford ? (
-                    <button
-                      type="button"
-                      onClick={() => claim(result)}
-                      disabled={busy}
-                      className={
-                        'h-[52px] flex-[1.15] rounded-full text-[14px] font-bold transition-transform active:scale-[0.98] disabled:opacity-50 ' +
-                        (result.buyPrice === 0 ? 'bg-[#FFD53D] text-[#231a02]' : 'bg-[#17181A] text-white')
-                      }
-                    >
-                      {result.buyPrice === 0 ? 'Забрать бесплатно' : `Забрать · ${fmtMoney(result.buyPrice)}`}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled
-                      className="h-[52px] flex-[1.15] rounded-full bg-[#17181A]/[0.06] text-[13.5px] font-semibold text-[#17181A]/40"
-                    >
-                      Не хватает {fmtMoney(result.buyPrice - n.balance)}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={doRoll}
-                    disabled={busy}
-                    aria-label={`Крутить ещё за ${regionMeta.rollPrice} рублей`}
-                    className="h-[52px] flex-1 whitespace-nowrap rounded-full border border-[#17181A]/12 bg-white px-3 text-[13.5px] font-semibold transition-transform active:scale-[0.98] disabled:opacity-50"
-                  >
-                    Ещё · {fmtMoney(regionMeta.rollPrice)}
-                  </button>
-                </div>
-                {!canAfford && (
-                  <p className="mt-2 text-center text-[11.5px] text-[#17181A]/40">
-                    Номер ждёт в «Бронях» 48 часов
-                  </p>
-                )}
-              </motion.div>
-            )}
-
-            {/* Забрано */}
-            {result && claimed && (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-4 flex items-center justify-center gap-1.5 text-[15px] font-semibold"
-              >
-                <BadgeCheck className="size-5" aria-hidden="true" />
-                Номер ваш
-              </motion.div>
-            )}
-
-            {/* CTA прокрутки (пока результат не разыгран) */}
-            {!showActions && (
-              <button
-                type="button"
-                onClick={doRoll}
-                disabled={rolling || busy || rollTooPoor}
-                aria-label={`Прокрутить номер за ${regionMeta.rollPrice} рублей`}
-                className={
-                  'mt-4 flex h-[54px] w-full items-center justify-center gap-2 rounded-full text-[15.5px] font-semibold transition-transform active:scale-[0.98] disabled:active:scale-100 ' +
-                  (rollTooPoor && !rolling
-                    ? 'bg-[#17181A]/[0.06] text-[#17181A]/40'
-                    : result && !rolling
-                      ? 'border border-[#17181A]/12 bg-white text-[#17181A]'
-                      : 'bg-[#17181A] text-white disabled:opacity-80')
-                }
-              >
-                {rolling ? (
-                  <>
-                    <motion.span
-                      animate={{ rotate: 360 }}
-                      transition={{ repeat: Infinity, duration: 0.9, ease: 'linear' }}
-                      className="inline-flex"
-                    >
-                      <Loader2 className="size-5" aria-hidden="true" />
-                    </motion.span>
-                    Крутим…
-                  </>
-                ) : rollTooPoor ? (
-                  `Не хватает ${fmtMoney(regionMeta.rollPrice - n.balance)}`
-                ) : (
-                  <>
-                    <Dices className="size-[18px]" aria-hidden="true" />
-                    {result ? `Крутить ещё · ${fmtMoney(regionMeta.rollPrice)}` : `Крутить · ${fmtMoney(regionMeta.rollPrice)}`}
-                  </>
-                )}
-              </button>
-            )}
-          </section>
-        )}
-
-        {/* ─────────────────────────── БРОНИ ─────────────────────────── */}
-        {tab === 'reserves' && (
-          <section>
-            {n.reserves.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 py-16 text-center">
-                <Timer className="size-7 text-[#17181A]/15" aria-hidden="true" />
-                <p className="text-[14px] font-semibold text-[#17181A]/45">Броней нет</p>
-                <p className="text-[12.5px] text-[#17181A]/35">Не выкупленный номер ждёт тут 48 часов</p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2 pt-1">
-                {n.reserves.map((p) => (
-                  <ReserveCard key={p.id} p={p} busy={busy} balance={n.balance} onClaim={claim} onRelease={doRelease} />
-                ))}
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* ──────────────────────────── МОИ ──────────────────────────── */}
-        {tab === 'mine' && (
-          <section>
-            {/* Основной номер крупной плашкой */}
-            {n.mainNumber ? (
-              <div className={CARD + ' p-4'}>
-                <span className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[#17181A]/35">Основной</span>
-                <h2 className="mt-1 truncate text-[24px] font-bold leading-tight tracking-tight tabular-nums">
-                  {n.mainNumber.number}
-                </h2>
-                <div className="mt-1.5 flex items-center gap-2">
-                  <TierBadge tier={n.mainNumber.tier} variant="light" />
-                  <span className="text-[12px] text-[#17181A]/45">{n.mainNumber.regionName}</span>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-2 py-14 text-center">
-                <Dices className="size-7 text-[#17181A]/15" aria-hidden="true" />
-                <p className="text-[14px] font-semibold text-[#17181A]/45">Номеров пока нет</p>
+      <main className="min-h-0 flex-1 pb-[64px]">
+        <div key={`${tab}-${detail ? 'd' : 'r'}`} className="h-full screen-enter">
+          {detail ? (
+            <MarketDetail
+              item={detail}
+              faved={favs.includes(detail.digits)}
+              busy={buying}
+              onFav={() => toggleFav(detail.digits)}
+              onBuy={() => void buyMarket(detail)}
+              onBack={() => setDetail(null)}
+              onShare={() => showToast('Ссылка на номер скопирована')}
+            />
+          ) : tab === 'home' ? (
+            <MarketHome
+              loading={mLoading}
+              items={items}
+              category={category}
+              favs={favs}
+              onCategory={setCategory}
+              onSearch={() => setTab('search')}
+              onOpen={setDetail}
+              onFav={toggleFav}
+            />
+          ) : tab === 'search' ? (
+            <MarketFilters
+              items={items}
+              q={q}
+              setQ={setQ}
+              category={category}
+              setCategory={setCategory}
+              pat={pat}
+              setPat={setPat}
+              priceLo={priceLo}
+              priceHi={priceHi}
+              setPriceLo={setPriceLo}
+              setPriceHi={setPriceHi}
+              premiumOnly={premiumOnly}
+              setPremiumOnly={setPremiumOnly}
+              onApply={() => setTab('home')}
+              onReset={() => {
+                sound.tap()
+                setQ('')
+                setCategory('all')
+                setPat('any')
+                setPriceLo(0)
+                setPriceHi(1_000_000)
+                setPremiumOnly(false)
+              }}
+            />
+          ) : tab === 'roll' ? (
+            /* ───────── РОЗЫГРЫШ: сцена барабанов ───────── */
+            <div className="h-full min-h-0 overflow-y-auto px-4 pb-4 pt-1 [scrollbar-width:thin]">
+              <p className="mx-auto max-w-[300px] text-center text-[12.5px] leading-relaxed text-[#9CA3AF]">
+                Крутите барабан и получите уникальный номер из премиальной коллекции
+              </p>
+              <section className={CARD + ' mt-3 px-2.5 pb-4 pt-3'}>
                 <button
                   type="button"
                   onClick={() => {
                     sound.tap()
-                    setTab('roll')
+                    setSheetOpen(true)
                   }}
-                  className="mt-1 h-10 rounded-full bg-[#17181A] px-5 text-[13px] font-semibold text-white transition-transform active:scale-[0.98]"
+                  disabled={rolling}
+                  className="flex h-11 w-full items-center justify-between gap-2 rounded-2xl bg-[#F1F3F4] px-3.5 transition-transform active:scale-[0.99] disabled:opacity-50"
+                  aria-label={`Регион ${regionMeta.name}, крутка ${regionMeta.rollPrice} рублей, изменить`}
                 >
-                  Крутить первый
+                  <span className="flex min-w-0 items-center gap-2">
+                    <MapPin className="size-4 shrink-0 text-[#17181A]/45" aria-hidden="true" />
+                    <span className="truncate text-[14px] font-semibold">{regionMeta.short}</span>
+                    <span className="shrink-0 text-[11.5px] tabular-nums text-[#17181A]/40">{codesLabel(regionMeta.codes)}</span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1.5">
+                    <span className="text-[11px] text-[#17181A]/40">крутка</span>
+                    <span className="text-[13.5px] font-bold tabular-nums">{fmtMoney(regionMeta.rollPrice)}</span>
+                    <ChevronDown className="size-4 text-[#17181A]/35" aria-hidden="true" />
+                  </span>
                 </button>
-              </div>
-            )}
 
-            {/* Остальные номера: тап — сделать основным */}
-            {n.owned.length > (n.mainNumber ? 1 : 0) && (
-              <>
-                <SectionTitle count={n.owned.length - (n.mainNumber ? 1 : 0)}>Остальные</SectionTitle>
-                <div className={CARD + ' divide-y divide-[#17181A]/[0.05]'}>
-                  {n.owned
-                    .filter((p) => !p.isMain)
-                    .map((p) => (
-                      <div key={p.id} className="flex items-center gap-2 px-4 py-3">
+                <div className="relative mt-3">
+                  <motion.div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -inset-3 rounded-[28px]"
+                    initial={false}
+                    animate={{ opacity: glowColor ? 1 : 0 }}
+                    transition={{ duration: 0.55 }}
+                    style={{
+                      background: `radial-gradient(62% 72% at 50% 42%, ${glowColor ?? 'transparent'}40, transparent 72%)`,
+                    }}
+                  />
+                  <motion.div
+                    style={{ scale: plateScale }}
+                    className={'plate-frame relative overflow-hidden rounded-[18px] bg-white px-1 py-3' + (goldPlate ? ' plate-gold' : '')}
+                  >
+                    <PlateReels spin={spin ?? IDLE_SPIN} stamp={{ code: stampCode, name: stampName, label: stampLabel }} onSettled={handleSettled} />
+                    <AnimatePresence>
+                      {result && !rolling && (
+                        <motion.div
+                          key={result.id}
+                          aria-hidden="true"
+                          className="pointer-events-none absolute inset-0 overflow-hidden rounded-[16px]"
+                        >
+                          <motion.div
+                            className="absolute inset-y-0 w-1/2 -skew-x-12"
+                            initial={{ x: '-170%' }}
+                            animate={{ x: '380%' }}
+                            transition={{ duration: 0.9, delay: 0.05, ease: [0.32, 0, 0.25, 1] }}
+                            style={{ background: `linear-gradient(90deg, transparent, ${tierColor}30, transparent)` }}
+                          />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                </div>
+                {result && <span className="sr-only">Выпал номер {result.number}</span>}
+
+                {!everRolled && !rolling && result === null && (
+                  <motion.p
+                    animate={{ opacity: [0.45, 0.9, 0.45] }}
+                    transition={{ repeat: Infinity, duration: 2.4, ease: 'easeInOut' }}
+                    className="mt-3 text-center text-[12.5px] text-[#17181A]/45"
+                  >
+                    Крутни, чтобы увидеть номер
+                  </motion.p>
+                )}
+
+                {showActions && result && (
+                  <motion.div
+                    key={result.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ type: 'spring', stiffness: 320, damping: 26, delay: 0.06 }}
+                  >
+                    <div className="mt-3.5 flex items-center gap-2">
+                      <motion.span
+                        initial={{ scale: 0.55, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 16, delay: 0.1 }}
+                        className="shrink-0"
+                      >
+                        <TierBadge tier={result.tier} size="lg" variant="light" />
+                      </motion.span>
+                      {pattern && (
+                        <span className="shrink-0 rounded-full bg-[#F1F3F4] px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[0.06em] text-[#17181A]/55">
+                          {pattern}
+                        </span>
+                      )}
+                      <ScoreBar score={result.beautyScore} color={tierColor} />
+                    </div>
+                    <div className="mt-3.5 flex gap-2">
+                      {canAfford ? (
                         <button
                           type="button"
-                          onClick={() => doSetMain(p)}
+                          onClick={() => claim(result)}
                           disabled={busy}
-                          aria-label={`Сделать ${p.number} основным`}
-                          className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+                          className={
+                            'h-[52px] flex-[1.15] rounded-full text-[14px] font-bold transition-transform active:scale-[0.98] disabled:opacity-50 ' +
+                            (result.buyPrice === 0 ? 'bg-[#FFD53D] text-[#231a02]' : 'bg-[#17181A] text-white')
+                          }
                         >
-                          <span className="min-w-0 flex-1 truncate text-[15.5px] font-semibold tabular-nums">{p.number}</span>
-                          <TierBadge tier={p.tier} variant="light" />
+                          {result.buyPrice === 0 ? 'Забрать бесплатно' : `Забрать · ${fmtMoney(result.buyPrice)}`}
                         </button>
-                        <ReleaseX label={`Отпустить номер ${p.number}`} onRelease={() => doRelease(p)} />
-                      </div>
-                    ))}
-                </div>
-              </>
-            )}
-          </section>
-        )}
+                      ) : (
+                        <button
+                          type="button"
+                          disabled
+                          className="h-[52px] flex-[1.15] rounded-full bg-[#17181A]/[0.06] text-[13.5px] font-semibold text-[#17181A]/40"
+                        >
+                          Не хватает {fmtMoney(result.buyPrice - n.balance)}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={doRoll}
+                        disabled={busy}
+                        aria-label={`Крутить ещё за ${regionMeta.rollPrice} рублей`}
+                        className="h-[52px] flex-1 whitespace-nowrap rounded-full border border-[#17181A]/12 bg-white px-3 text-[13.5px] font-semibold transition-transform active:scale-[0.98] disabled:opacity-50"
+                      >
+                        Ещё · {fmtMoney(regionMeta.rollPrice)}
+                      </button>
+                    </div>
+                    {!canAfford && (
+                      <p className="mt-2 text-center text-[11.5px] text-[#17181A]/40">Номер ждёт в «Бронях» 48 часов</p>
+                    )}
+                  </motion.div>
+                )}
 
-        {/* ────────────────────────── ИСТОРИЯ ────────────────────────── */}
-        {tab === 'history' && (
-          <section>
-            {n.history.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 py-16 text-center">
-                <Dices className="size-7 text-[#17181A]/15" aria-hidden="true" />
-                <p className="text-[14px] font-semibold text-[#17181A]/45">Круток ещё не было</p>
-              </div>
-            ) : (
-              <>
-                <SectionTitle count={n.history.length}>Последние крутки</SectionTitle>
-                <div className={CARD + ' divide-y divide-[#17181A]/[0.05]'}>
-                  {n.history.map((p) => (
-                    <div
-                      key={p.id}
-                      className={'flex items-center gap-3 px-4 py-2.5 ' + (p.status === 'released' ? 'opacity-40' : '')}
-                    >
-                      <span
-                        className="size-2 shrink-0 rounded-full"
-                        style={{ backgroundColor: tierMeta(p.tier).color }}
-                        aria-hidden="true"
-                      />
-                      <span className="min-w-0 flex-1 truncate text-[14px] font-medium tabular-nums">{p.number}</span>
-                      {p.status === 'reserved' && (
-                        <span className="shrink-0 text-[10.5px] font-semibold uppercase tracking-wide text-[#17181A]/40">бронь</span>
-                      )}
-                      {p.status === 'active' && (
-                        <BadgeCheck className="size-4 shrink-0 text-[#17181A]/60" aria-label="Ваш" />
-                      )}
-                      <span className="shrink-0 text-[11px] tabular-nums text-[#17181A]/35">
-                        {new Date(p.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+                {result && claimed && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-4 flex items-center justify-center gap-1.5 text-[15px] font-semibold"
+                  >
+                    <BadgeCheck className="size-5" aria-hidden="true" />
+                    Номер ваш
+                  </motion.div>
+                )}
+
+                {!showActions && (
+                  <button
+                    type="button"
+                    onClick={doRoll}
+                    disabled={rolling || busy || rollTooPoor}
+                    aria-label={`Прокрутить номер за ${regionMeta.rollPrice} рублей`}
+                    className={
+                      'mt-4 flex h-[54px] w-full flex-col items-center justify-center gap-0.5 rounded-full text-white transition-transform active:scale-[0.98] disabled:active:scale-100 ' +
+                      (rollTooPoor && !rolling ? 'bg-[#17181A]/[0.06] text-[#17181A]/40' : '')
+                    }
+                    style={
+                      rollTooPoor && !rolling
+                        ? undefined
+                        : { background: 'linear-gradient(180deg,#E8C46A 0%,#C99B2F 55%,#B8860B 100%)', boxShadow: '0 12px 28px rgba(201,155,47,0.45)' }
+                    }
+                  >
+                    {rolling ? (
+                      <span className="flex items-center gap-2 text-[15.5px] font-semibold">
+                        <motion.span animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.9, ease: 'linear' }} className="inline-flex">
+                          <Loader2 className="size-5" aria-hidden="true" />
+                        </motion.span>
+                        Крутим…
                       </span>
+                    ) : rollTooPoor ? (
+                      <span className="text-[14.5px] font-semibold">Не хватает {fmtMoney(regionMeta.rollPrice - n.balance)}</span>
+                    ) : (
+                      <>
+                        <span className="flex items-center gap-2 text-[15.5px] font-semibold">
+                          <Dices className="size-[18px]" aria-hidden="true" />
+                          Крутить номер
+                        </span>
+                        <span className="text-[10.5px] font-medium text-white/85">{fmtMoney(regionMeta.rollPrice)} за 1 попытку</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </section>
+
+              {/* Возможные категории */}
+              <div className={CARD + ' mt-3 p-4'}>
+                <p className="flex items-center gap-1.5 text-[13.5px] font-bold text-[#17181A]">
+                  Возможные категории
+                  <span className="flex size-4 items-center justify-center rounded-full bg-[#F1F3F4] text-[10px] text-[#9CA3AF]" aria-hidden>
+                    ?
+                  </span>
+                </p>
+                <div className="mt-2.5 grid grid-cols-4 gap-2 text-center">
+                  {[
+                    { icon: <Crown className="size-4.5 text-[#C99B2F]" aria-hidden />, label: 'Красивые', sub: 'от 1 990 ₽' },
+                    { icon: <Wallet className="size-4.5 text-[#C99B2F]" aria-hidden />, label: 'Золотые', sub: 'от 49 990 ₽' },
+                    { icon: <Dices className="size-4.5 text-[#C99B2F]" aria-hidden />, label: 'С повторами', sub: '777, 888, 000' },
+                    { icon: <Heart className="size-4.5 text-[#C99B2F]" aria-hidden />, label: 'Удачные', sub: 'легко запомнить' },
+                  ].map((c) => (
+                    <div key={c.label} className="flex flex-col items-center gap-1">
+                      {c.icon}
+                      <span className="text-[9.5px] font-bold leading-tight text-[#17181A]">{c.label}</span>
+                      <span className="text-[8.5px] leading-none text-[#9CA3AF]">{c.sub}</span>
                     </div>
                   ))}
                 </div>
-              </>
-            )}
-          </section>
-        )}
+              </div>
+            </div>
+          ) : tab === 'favs' ? (
+            /* ───────── ИЗБРАННОЕ ───────── */
+            <div className="h-full min-h-0 overflow-y-auto px-4 pb-6 pt-2 [scrollbar-width:thin]">
+              {favItems.length === 0 ? (
+                <div className="flex flex-col items-center gap-2.5 px-8 pt-16 text-center">
+                  <span className="flex size-16 items-center justify-center rounded-[22px] bg-white text-[#C4C8CE] shadow-[0_2px_14px_rgba(23,24,26,0.05)]">
+                    <Heart className="size-7" aria-hidden />
+                  </span>
+                  <h3 className="text-[15px] font-bold text-[#17181A]">В избранном пусто</h3>
+                  <p className="text-[13px] leading-relaxed text-[#6B7280]">
+                    Жмите на сердце у номера — он появится здесь для быстрой покупки.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {favItems.map((it, i) => (
+                    <MarketRow key={it.key} item={it} index={i} faved onOpen={() => setDetail(it)} onFav={() => toggleFav(it.digits)} />
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* ───────── ПРОФИЛЬ: мои + брони + история ───────── */
+            <div className="h-full min-h-0 overflow-y-auto px-4 pb-6 pt-2 [scrollbar-width:thin]">
+              {/* Основной номер крупной плашкой */}
+              {n.mainNumber ? (
+                <div className={CARD + ' p-4'}>
+                  <span className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[#17181A]/35">Основной</span>
+                  <h2 className="mt-1 truncate text-[24px] font-bold leading-tight tracking-tight tabular-nums">
+                    {n.mainNumber.number}
+                  </h2>
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <TierBadge tier={n.mainNumber.tier} variant="light" />
+                    <span className="text-[12px] text-[#17181A]/45">{n.mainNumber.regionName}</span>
+                  </div>
+                </div>
+              ) : (
+                <div className={CARD + ' flex flex-col items-center gap-2 p-6 text-center'}>
+                  <Dices className="size-7 text-[#17181A]/15" aria-hidden="true" />
+                  <p className="text-[14px] font-semibold text-[#17181A]/45">Номеров пока нет</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sound.tap()
+                      setTab('roll')
+                    }}
+                    className="mt-1 h-10 rounded-full bg-[#17181A] px-5 text-[13px] font-semibold text-white transition-transform active:scale-[0.98]"
+                  >
+                    Крутить первый
+                  </button>
+                </div>
+              )}
 
-        {n.loading && n.numbers.length === 0 && (
-          <div className="py-10 text-center">
-            <Loader2 className="mx-auto size-5 animate-spin text-[#17181A]/25" aria-hidden="true" />
-          </div>
-        )}
+              {/* Брони */}
+              {n.reserves.length > 0 && (
+                <>
+                  <SectionTitle count={n.reserves.length}>Брони · 48 ч</SectionTitle>
+                  <div className="flex flex-col gap-2">
+                    {n.reserves.map((p) => (
+                      <ReserveCard key={p.id} p={p} busy={busy} balance={n.balance} onClaim={claim} onRelease={doRelease} />
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Остальные номера */}
+              {n.owned.length > (n.mainNumber ? 1 : 0) && (
+                <>
+                  <SectionTitle count={n.owned.length - (n.mainNumber ? 1 : 0)}>Остальные</SectionTitle>
+                  <div className={CARD + ' divide-y divide-[#17181A]/[0.05]'}>
+                    {n.owned
+                      .filter((p) => !p.isMain)
+                      .map((p) => (
+                        <div key={p.id} className="flex items-center gap-2 px-4 py-3">
+                          <button
+                            type="button"
+                            onClick={() => doSetMain(p)}
+                            disabled={busy}
+                            aria-label={`Сделать ${p.number} основным`}
+                            className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+                          >
+                            <span className="min-w-0 flex-1 truncate text-[15.5px] font-semibold tabular-nums">{p.number}</span>
+                            <TierBadge tier={p.tier} variant="light" />
+                          </button>
+                          <ReleaseX label={`Отпустить номер ${p.number}`} onRelease={() => doRelease(p)} />
+                        </div>
+                      ))}
+                  </div>
+                </>
+              )}
+
+              {/* История */}
+              {n.history.length > 0 && (
+                <>
+                  <SectionTitle count={n.history.length}>Последние крутки</SectionTitle>
+                  <div className={CARD + ' divide-y divide-[#17181A]/[0.05]'}>
+                    {n.history.map((p) => (
+                      <div key={p.id} className={'flex items-center gap-3 px-4 py-2.5 ' + (p.status === 'released' ? 'opacity-40' : '')}>
+                        <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: tierMeta(p.tier).color }} aria-hidden="true" />
+                        <span className="min-w-0 flex-1 truncate text-[14px] font-medium tabular-nums">{p.number}</span>
+                        {p.status === 'reserved' && (
+                          <span className="shrink-0 text-[10.5px] font-semibold uppercase tracking-wide text-[#17181A]/40">бронь</span>
+                        )}
+                        {p.status === 'active' && <BadgeCheck className="size-4 shrink-0 text-[#17181A]/60" aria-label="Ваш" />}
+                        <span className="shrink-0 text-[11px] tabular-nums text-[#17181A]/35">
+                          {new Date(p.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {n.loading && n.numbers.length === 0 && (
+                <div className="py-10 text-center">
+                  <Loader2 className="mx-auto size-5 animate-spin text-[#17181A]/25" aria-hidden="true" />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </main>
+
+      {/* нижний таб-бар */}
+      {detail === null && (
+        <nav
+          aria-label="Разделы номеров"
+          className="absolute inset-x-0 bottom-0 z-20 flex h-[64px] items-stretch border-t border-black/[0.04] bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
+        >
+          <NTabBtn label="Главная" active={tab === 'home'} icon={<HomeIcon />} onClick={() => { sound.tap(); setTab('home') }} />
+          <NTabBtn label="Поиск" active={tab === 'search'} icon={<Search className="size-[22px]" aria-hidden />} onClick={() => { sound.tap(); setTab('search') }} />
+          <div className="relative flex w-1/5 items-start justify-center">
+            <button
+              type="button"
+              onClick={() => {
+                sound.tap()
+                setTab('roll')
+              }}
+              aria-label="Розыгрыш"
+              className="press -mt-5 flex size-[52px] items-center justify-center rounded-full text-white"
+              style={{ background: GREEN, boxShadow: '0 10px 22px rgba(18,137,75,0.4)' }}
+            >
+              <Dices className="size-6" aria-hidden />
+            </button>
+          </div>
+          <NTabBtn label="Избранное" active={tab === 'favs'} icon={<Heart className="size-[22px]" aria-hidden />} onClick={() => { sound.tap(); setTab('favs') }} />
+          <NTabBtn label="Профиль" active={tab === 'profile'} icon={<UserRound className="size-[22px]" aria-hidden />} onClick={() => { sound.tap(); setTab('profile') }} />
+        </nav>
+      )}
+
+      {/* тосты */}
+      {toast && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-20 z-40 flex justify-center px-6" role="status">
+          <span className="screen-enter rounded-full bg-[#17181A]/92 px-4 py-2.5 text-center text-[12.5px] font-medium text-white shadow-xl">
+            {toast}
+          </span>
+        </div>
+      )}
 
       {/* Шторка выбора региона: монтируется заново при каждом открытии */}
       <AnimatePresence>
@@ -1169,5 +1977,28 @@ export default function NumbersApp() {
         )}
       </AnimatePresence>
     </div>
+  )
+}
+
+function HomeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden className="size-[22px]">
+      <path d="M4 11.2 12 4l8 7.2V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1v-8.8Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function NTabBtn({ label, active, icon, onClick }: { label: string; active: boolean; icon: ReactNode; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={active ? 'page' : undefined}
+      className="press flex w-1/5 flex-col items-center justify-center gap-0.5 pb-1"
+      style={{ color: active ? '#17181A' : '#9CA3AF' }}
+    >
+      {icon}
+      <span className="text-[10px] font-medium">{label}</span>
+    </button>
   )
 }

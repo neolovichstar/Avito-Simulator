@@ -66,6 +66,7 @@ model User {
   repairJobs     RepairJob[]
   installedParts InstalledPart[]
   supportMessages SupportMessage[]
+  supportTickets  SupportTicket[]
   starsPayments   StarsPayment[]
 }
 
@@ -513,13 +514,36 @@ model InstalledPart {
 
 // ───────────────────────── Поддержка (ИИ + админ) ─────────────────────────
 
+// Обращение (тикет): тема, категория, статус. Первое сообщение тикета —
+// body (описание проблемы). Дальше переписка живёт в SupportMessage
+// с ticketId = этому обращению; ticketId=null — общий чат саппорта.
+model SupportTicket {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category  String // order | account | refund | safety | other
+  subject   String
+  orderNo   String?
+  status    String   @default("open") // open | answered | closed
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages SupportMessage[]
+
+  @@index([userId, updatedAt])
+  @@index([status, updatedAt])
+}
+
 // Переписка игрока с поддержкой. Роль support пишут ИИ (author="ai") и админ
 // (author="admin") — для игрока это один саппорт; ИИ молчит, если последним
-// ответил админ (админ взял чат на себя).
+// ответил админ (админ взял чат на себя). Сообщения тикета ссылаются на него
+// через ticketId, общий чат — ticketId=null.
 model SupportMessage {
   id          String   @id @default(cuid())
   userId      String
   user        User     @relation(fields: [userId], references: [id])
+  ticketId    String?
+  ticket      SupportTicket? @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   role        String // user | support
   author      String   @default("ai") // ai | admin | system
   text        String
@@ -528,6 +552,7 @@ model SupportMessage {
   createdAt   DateTime @default(now())
 
   @@index([userId, createdAt])
+  @@index([ticketId, createdAt])
   @@index([readByAdmin, createdAt])
 }
 
