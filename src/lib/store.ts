@@ -171,8 +171,15 @@ export const useOS = create<OSState>((set, get) => ({
   setDnd: (v) => set({ dnd: v }),
   setFlashlight: (v) => set({ flashlight: v }),
   setBrightness: (v) => set({ brightness: Math.max(0.4, Math.min(1, v)) }),
-  setTheme: (t) => set({ theme: t }),
-  toggleTheme: () => set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
+  setTheme: (t) => {
+    set({ theme: t })
+    try { localStorage.setItem('os_theme_v1', t) } catch { /* приватный режим — не беда */ }
+  },
+  toggleTheme: () => set((s) => {
+    const t = s.theme === 'dark' ? 'light' : 'dark'
+    try { localStorage.setItem('os_theme_v1', t) } catch { /* не сохранилось — не беда */ }
+    return { theme: t }
+  }),
   setWallpaper: (id) => set({ wallpaper: id }),
   setDarkChrome: (v) => set({ darkChrome: v }),
   setWidgets: (w) => set({ widgets: w.length ? w.filter((k) => k !== 'wallet') : ['clock', 'online', 'quest', 'delivery'] }),

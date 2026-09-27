@@ -188,7 +188,7 @@ function TasksCard({ dark, onOpenApp }: { dark: boolean; onOpenApp: (a: AppKey) 
 
   return (
     <div className={`flex min-w-0 flex-1 flex-col rounded-[24px] p-3.5 ${dark ? 'bg-white/[0.10] ring-1 ring-white/[0.08]' : `bg-white/85 ring-1 ring-black/[0.04] ${GLASS_CARD}`}`}>
-      <div className="flex min-w-0 items-center justify-between">
+      <div className="flex min-w-0 items-center justify-between gap-2">
         <p className={`shrink-0 text-[14px] font-semibold ${dark ? 'text-white' : TXT_PRIMARY}`}>Задачи</p>
         <button
           type="button"
@@ -431,7 +431,7 @@ export default function Shade({
           <div
             key={animKey}
             className={`sheet-rise mx-3 mb-3 mt-12 flex max-h-[calc(100%-60px)] min-h-0 flex-initial flex-col overflow-hidden rounded-[34px] shadow-2xl ring-1 backdrop-blur-3xl ${
-              dark ? 'bg-[#1C1C1E]/[0.78] text-white ring-white/[0.08]' : `bg-white/70 ${TXT_PRIMARY} ring-black/[0.06]`
+              dark ? 'bg-[#1B1D22]/[0.82] text-white ring-white/[0.10]' : `bg-white/70 ${TXT_PRIMARY} ring-black/[0.06]`
             }`}
           >
             <div data-shade-scroll className="flex min-h-0 flex-initial flex-col overflow-y-auto px-3 pb-1 pt-2 [scrollbar-width:none]">

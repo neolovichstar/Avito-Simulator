@@ -77,10 +77,10 @@ function NotifCard({
         card: willDelete
           ? 'bg-red-500/30 ring-1 ring-red-400/50'
           : expanded
-            ? 'bg-white/[0.14] ring-1 ring-white/[0.12] backdrop-blur-xl'
+            ? 'bg-white/[0.14] ring-1 ring-white/[0.16] backdrop-blur-xl'
             : unread
-              ? 'bg-white/[0.10] ring-1 ring-white/[0.10] backdrop-blur-xl'
-              : 'bg-white/[0.05] ring-1 ring-white/[0.06] backdrop-blur-md',
+              ? 'bg-[#1B1D22]/[0.78] ring-1 ring-white/[0.12] shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur-xl'
+              : 'bg-white/[0.05] ring-1 ring-white/[0.08] backdrop-blur-md',
         active: 'active:bg-white/[0.1]',
         app: 'text-white/50',
         time: 'text-white/45',

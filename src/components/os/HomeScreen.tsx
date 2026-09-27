@@ -173,7 +173,7 @@ function WeatherWidget({ dark, onOpenApp, enterDelay }: { dark: boolean; onOpenA
       style={enterDelay !== undefined ? ({ ['--d' as string]: `${enterDelay}ms` } as React.CSSProperties) : undefined}
       className={`flex flex-1 flex-col justify-between rounded-[26px] p-4 text-left outline-none transition-transform duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-black/20 ${
         dark
-          ? 'bg-white/[0.10] ring-1 ring-white/[0.08] backdrop-blur-md'
+          ? 'bg-[#1B1D22]/[0.78] ring-1 ring-white/[0.10] shadow-[0_12px_32px_rgba(0,0,0,0.45)] backdrop-blur-xl'
           : `bg-white/85 ring-1 ring-black/[0.04] backdrop-blur-xl ${GLASS_CARD}`
       } ${enterDelay !== undefined ? 'os-enter' : ''}`}
     >
@@ -291,7 +291,7 @@ function TodayWidget({
       style={enterDelay !== undefined ? ({ ['--d' as string]: `${enterDelay}ms` } as React.CSSProperties) : undefined}
       className={`flex w-[46%] shrink-0 flex-col rounded-[26px] p-4 ${
         dark
-          ? 'bg-white/[0.10] ring-1 ring-white/[0.08] backdrop-blur-md'
+          ? 'bg-[#1B1D22]/[0.78] ring-1 ring-white/[0.10] shadow-[0_12px_32px_rgba(0,0,0,0.45)] backdrop-blur-xl'
           : `bg-white/85 ring-1 ring-black/[0.04] backdrop-blur-xl ${GLASS_CARD}`
       } ${enterDelay !== undefined ? 'os-enter' : ''}`}
     >
@@ -1389,13 +1389,15 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
   return (
     <div
       ref={rootRef}
-      className={`absolute inset-0 flex flex-col pt-12 select-none ${wallpaperClass(wallpaper)}`}
+      className={`absolute inset-0 flex flex-col pt-12 select-none ${wallpaperClass(wallpaper, dark)}`}
       role="region"
       aria-label="Домашний экран"
     >
-      {/* тёмная тема: глубокий скрим поверх светлых обоев */}
-      {dark && (
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 bg-[#0B0C0E]/[0.88]" />
+      {/* тёмная тема: лёгкий скрим только на ТЁМНЫХ обоях (читаемость белых
+          подписей). Ночному «Шёлку» скрим не нужен — он нарисован тёмным,
+          а плёночный скрим делал экран грязно-серым. */}
+      {dark && !wall.light && (
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 bg-black/25" />
       )}
       {/* скрим читаемости статус-бара */}
       <div
@@ -1410,7 +1412,8 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
         <button
           type="button"
           onClick={() => setEdit(false)}
-          className="os-pop absolute right-3 top-12 z-[67] flex h-9 items-center rounded-full bg-neutral-900/85 px-4 text-[12.5px] font-bold text-white shadow-lg backdrop-blur-sm outline-none transition-transform duration-150 active:scale-95"
+          className="os-pop absolute right-3 top-12 z-[67] flex h-9 items-center rounded-full px-4 text-[12.5px] font-bold shadow-lg backdrop-blur-sm outline-none transition-transform duration-150 active:scale-95"
+          style={{ background: dark ? 'rgba(255,255,255,0.92)' : 'rgba(23,23,23,0.85)', color: dark ? '#18181B' : '#FFFFFF' }}
         >
           <Check className="mr-1 size-3.5" aria-hidden="true" />
           Готово
@@ -1445,7 +1448,7 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
             <div className="px-4">
               <div
                 className={`flex h-11 items-center gap-2.5 rounded-full px-4 outline-none ring-1 transition-colors ${
-                  dark ? 'bg-white/[0.10] ring-white/[0.08]' : 'bg-white/75 ring-black/[0.04] backdrop-blur-xl'
+                  dark ? 'bg-[#1B1D22]/[0.70] ring-white/[0.12] backdrop-blur-xl' : 'bg-white/75 ring-black/[0.04] backdrop-blur-xl'
                 }`}
               >
                 <Search className={`size-4 shrink-0 ${dark ? 'text-white/60' : TXT_TERTIARY}`} aria-hidden="true" />
@@ -1480,9 +1483,9 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
                       <span
                         className={`flex h-9 items-center rounded-full px-4 text-[13px] font-semibold transition-colors duration-150 ${
                           on
-                            ? 'bg-black text-white'
+                            ? dark ? 'bg-white text-neutral-900 shadow-[0_4px_14px_rgba(255,255,255,0.18)]' : 'bg-black text-white'
                             : dark
-                              ? 'bg-white/[0.10] text-white/70'
+                              ? 'bg-white/[0.09] text-white/75 ring-1 ring-white/[0.10]'
                               : 'bg-white/75 text-[rgba(60,60,67,0.62)] ring-1 ring-black/[0.04] backdrop-blur-xl'
                         }`}
                       >
@@ -1496,7 +1499,7 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
 
             <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-2 [scrollbar-width:none]">
               {foundApps ? (
-                <div className={`rounded-[24px] p-3 ring-1 backdrop-blur-xl ${dark ? 'bg-white/[0.08] ring-white/[0.06]' : `bg-white/80 ring-black/[0.04] ${GLASS_CARD}`}`}>
+                <div className={`rounded-[24px] p-3 ring-1 backdrop-blur-xl ${dark ? 'bg-[#1B1D22]/[0.70] ring-white/[0.10] shadow-[0_12px_32px_rgba(0,0,0,0.4)]' : `bg-white/80 ring-black/[0.04] ${GLASS_CARD}`}`}>
                   {foundApps.length === 0 ? (
                     <p className={`py-6 text-center text-[13px] font-medium ${dark ? 'text-white/40' : TXT_TERTIARY}`}>Ничего не найдено</p>
                   ) : (
@@ -1507,7 +1510,7 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
                 </div>
               ) : (
                 visibleSections.map((s) => (
-                  <div key={s.key} className={`rounded-[24px] p-3 ring-1 backdrop-blur-xl ${dark ? 'bg-white/[0.08] ring-white/[0.06]' : `bg-white/80 ring-black/[0.04] ${GLASS_CARD}`}`}>
+                  <div key={s.key} className={`rounded-[24px] p-3 ring-1 backdrop-blur-xl ${dark ? 'bg-[#1B1D22]/[0.70] ring-white/[0.10] shadow-[0_12px_32px_rgba(0,0,0,0.4)]' : `bg-white/80 ring-black/[0.04] ${GLASS_CARD}`}`}>
                     <div className="flex items-center justify-between px-1 pb-1.5">
                       <p className={`text-[16px] font-semibold ${dark ? 'text-white' : TXT_PRIMARY}`}>{s.title}</p>
                       <ChevronRight className={`size-4 ${dark ? 'text-white/40' : TXT_TERTIARY}`} aria-hidden="true" />
@@ -1552,7 +1555,7 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
         <div
           className={`grid grid-cols-4 gap-1 rounded-[28px] p-[10px] ${
             dark
-              ? 'bg-white/[0.10] ring-1 ring-white/[0.08] backdrop-blur-2xl'
+              ? 'bg-[#16181D]/[0.66] ring-1 ring-white/[0.10] shadow-[0_16px_40px_rgba(0,0,0,0.5)] backdrop-blur-2xl'
               : 'bg-white/55 ring-1 ring-black/[0.05] shadow-[0_12px_32px_rgba(10,10,15,0.10)] backdrop-blur-2xl'
           }`}
         >

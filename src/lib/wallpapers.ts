@@ -93,9 +93,12 @@ export function wallpaperById(id: string): WallpaperDef {
   return WALLPAPERS.find((w) => w.id === id) ?? WALLPAPERS[0]
 }
 
-// CSS-класс обоев (wp-* определён в globals.css)
-export function wallpaperClass(id: string): string {
-  return `wp-${wallpaperById(id).id}`
+// CSS-класс обоев (wp-* определён в globals.css).
+// dark=true: у светлых обоев со «светящейся» версией (пока только «Шёлк»)
+// берётся ночная вариация wp-snow-dark вместо грязной тёмной вуали сверху.
+export function wallpaperClass(id: string, dark = false): string {
+  const base = `wp-${wallpaperById(id).id}`
+  return dark && id === 'snow' ? `${base}-dark` : base
 }
 
 // Инлайн-стиль для превью-миниатюр (не для фонов страниц)

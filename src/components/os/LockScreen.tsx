@@ -235,7 +235,8 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
         date: 'text-white/85',
         clock: 'text-white',
         notifLabel: 'text-white/55',
-        card: 'bg-white/[0.10] ring-1 ring-white/[0.12] shadow-[0_10px_28px_rgba(0,0,0,0.35)] backdrop-blur-2xl',
+        // 58: приподнятая тёмная поверхность вместо белой плёнки — глубина iOS dark
+        card: 'bg-[#1B1D22]/[0.72] ring-1 ring-white/[0.12] shadow-[0_12px_32px_rgba(0,0,0,0.5)] backdrop-blur-2xl',
         cardTitle: 'text-white',
         cardBody: 'text-white/70',
         cardTime: 'text-white/50',
@@ -243,25 +244,26 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
         money: 'font-semibold text-[#30D158]',
         moneyNeg: 'font-semibold text-[#FF453A]',
         hint: 'text-white/55',
-        shortcut: 'bg-white/[0.12] text-white ring-1 ring-white/[0.14] shadow-sm backdrop-blur-xl',
+        shortcut: 'bg-white/[0.14] text-white ring-1 ring-white/[0.16] shadow-sm backdrop-blur-xl',
         shortcutOn: 'bg-white text-neutral-900 shadow-[0_0_28px_rgba(255,251,214,0.45)]',
-        handle: 'bg-white/50',
+        handle: 'bg-white/60',
         dnd: 'text-white/55',
       }
 
   return (
     <div
       ref={rootRef}
-      className={`absolute inset-0 z-50 cursor-pointer overflow-hidden select-none ${wallpaperClass(wallpaper)}`}
+      className={`absolute inset-0 z-50 cursor-pointer overflow-hidden select-none ${wallpaperClass(wallpaper, dark)}`}
       role="dialog"
       aria-label="Экран блокировки — проведите вверх или коснитесь, чтобы открыть"
       onClick={onClick}
       onPointerDown={onPointerDown}
       style={{ touchAction: 'pan-y' }}
     >
-      {/* мягкая вуаль поверх обоев для читаемости */}
-      {!lightTone && (
-        <div aria-hidden="true" className={`absolute inset-0 ${dark && wall.light ? 'bg-[#0B0C0E]/[0.86]' : 'bg-[#050d09]/55'}`} />
+      {/* мягкая вуаль поверх обоев для читаемости. Тёмный «Шёлк Ночь» уже
+          нарисован под белый текст — вуаль на нём только глушит глубину. */}
+      {!lightTone && !(dark && wall.light) && (
+        <div aria-hidden="true" className={`absolute inset-0 ${dark ? 'bg-black/25' : 'bg-[#050d09]/45'}`} />
       )}
       {lightTone && <div aria-hidden="true" className="absolute inset-0 bg-white/5" />}
 
@@ -406,7 +408,7 @@ function LockMedia({ light }: { light: boolean }) {
   if (!mounted || !current) return null
   const card = light
     ? 'bg-white/70 ring-1 ring-black/[0.05] shadow-[0_8px_24px_rgba(15,15,20,0.08)] backdrop-blur-2xl'
-    : 'bg-white/[0.10] ring-1 ring-white/[0.12] shadow-[0_10px_28px_rgba(0,0,0,0.35)] backdrop-blur-2xl'
+    : 'bg-[#1B1D22]/[0.72] ring-1 ring-white/[0.12] shadow-[0_12px_32px_rgba(0,0,0,0.5)] backdrop-blur-2xl'
   const title = light ? 'text-[#111111]' : 'text-white'
   const sub = light ? 'text-[rgba(60,60,67,0.78)]' : 'text-white/65'
   return (

@@ -187,12 +187,23 @@ export default function Home() {
     ((currentApp && LIGHT_APPS[currentApp] && theme !== 'dark') || (!currentApp && wallLight))
   )
 
+  // Тема ОС живёт в localStorage: восстанавливаем сразу после монтирования
+  // (первый рендер всегда светлый — совпадает с SSR, мигание минимально).
   useEffect(() => {
+    try {
+      const saved = localStorage.getItem('os_theme_v1')
+      if (saved === 'dark' || saved === 'light') useOS.setState({ theme: saved })
+    } catch { /* приватный режим — остаёмся в светлой */ }
+  }, [])
+
+  useEffect(() => {
+    // Тёмный «Шёлк Ночь» — свой верхний тон (совпадает с небом SVG-обоев)
+    const darkSilk = theme === 'dark' && wallpaper === 'snow'
     const chrome = locked || !session
-      ? (wallLight ? '#F5F6F8' : '#050d09')
+      ? (wallLight ? '#F5F6F8' : darkSilk ? '#20242B' : '#050d09')
       : currentApp
         ? (LIGHT_APPS[currentApp] && theme !== 'dark' && !darkChrome ? '#F7F8FA' : '#050d09')
-        : (wallLight ? '#F5F6F8' : (WALLPAPER_TOP[wallpaper] ?? '#07130d'))
+        : (wallLight ? '#F5F6F8' : darkSilk ? '#20242B' : (WALLPAPER_TOP[wallpaper] ?? '#07130d'))
     applyTelegramChrome(chrome)
   }, [locked, session, currentApp, wallpaper, theme, wallLight, darkChrome, applyTelegramChrome])
 
