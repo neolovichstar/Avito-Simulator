@@ -2393,3 +2393,18 @@ Work Log:
 Stage Summary:
 - Код Task 52 на проде; прод неработоспособен из-за внешней блокировки Prisma Postgres (planLimitReached) — требует действия юзера в дашборде Prisma или смены провайдера БД
 - Локально всё функционирует (sqlite): папки, оболочка, все приложения
+---
+Task ID: 53-db
+Agent: main (Z.ai Code)
+Task: Переезд прода с заблокированного Prisma Postgres на Supabase (юзер дал connection string)
+
+Work Log:
+- Юзер прислал строку: postgresql://postgres.kmpofhpjjcavrscjtkvr:***@aws-1-eu-west-3.pooler.supabase.com:6543/postgres (shared pooler, IPv4)
+- Проверка pg-драйвером: TLS до pooler OK (host/ref/user верные), но auth failed на 5432 и 6543
+- Протестированы варианты пароля (1928olm))) / 1928olm / 1928OLM...) — все FAIL: пароль от БД неверный
+- Факт для продолжения: project ref = kmpofhpjjcavrscjtkvr, регион aws-1-eu-west-3, runtime-URL в db.ts = DATABASE_URL ?? POSTGRESPRISMA_POSTGRES_URL, схема для pg = prisma/schema.postgres.prisma (datasource env DATABASE_URL)
+- План после получения верного пароля: db push (session pooler 5432, ?sslmode=require) → проверка таблиц → env для Vercel: DATABASE_URL=pooled 6543 + pgbouncer=true&connection_limit=1&sslmode=require, POSTGRESPRISMA_POSTGRES_URL/DIRECT_URL=5432 → рестарт деплоя → прод-проверка /api/cities /api/market /api/stats
+
+Stage Summary:
+- Заблокирован на неверном пароле БД Supabase; юзеру отправлена прямая ссылка сброса пароля: https://supabase.com/dashboard/project/kmpofhpjjcavrscjtkvr/settings/database → Reset database password
+- Всё остальное (host, ref, схема, env-план) готово — как только придёт пароль, заливка схемы занимает минуты
