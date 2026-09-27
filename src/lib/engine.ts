@@ -218,6 +218,10 @@ async function dailySpecial() {
 // Кулдаун 5 ч: без него распродажи шли пачками и захламляли ленту уведомлений.
 const GARAGE_COOLDOWN_MS = 5 * 3_600_000
 
+// Ёмкость рынка: сколько активных объявлений ботов держим в ленте (54-a: 50 → 140,
+// каталог расширен до 289 товаров, ленте нужен запас и живой ценовой фон).
+const MARKET_CAP = 140
+
 // Ротация текстов: даже повторные распродажи не выглядят копипастой.
 const GARAGE_NOTIF = [
   { t: '🏷️ Гаражная распродажа', b: (n: number, a: string, c: string) => `${n} товаров за полцены в категориях «${a}» и «${c}». Рынок не будет ждать.` },
@@ -297,7 +301,7 @@ async function botsTick(tick: number) {
   // 1. Выставляют новые объявления
   const active = await db.listing.count({ where: { status: 'active', seller: { isBot: true } } })
   const freeActive = await db.listing.count({ where: { status: 'active', price: 0 } })
-  const want = Math.min(3, Math.max(0, 50 - active))
+  const want = Math.min(3, Math.max(0, MARKET_CAP - active))
   for (let i = 0; i < want; i++) {
     const bot = await randomBot()
     if (!bot) break

@@ -2443,3 +2443,20 @@ Stage Summary:
 - ПРОД ВОССТАНОВЛЕН на Supabase (aws-1-eu-west-3, pooled 6543 + pgbouncer): игра работает, рынок и боты на месте
 - Игровой прогресс старых игроков утерян (старая БД заблокирована Prisma) — старт с чистой базой
 - Local: sqlite, dev 200; .env содержит SUPABASE_DB_URL/SUPABASE_DB_URL_POOLED (в git не идут)
+---
+Task ID: 54-a
+Agent: general-purpose
+Task: Расширение каталога 134→289 товаров, капа рынка 50→140, досид объявлений до 120
+
+Work Log:
+- catalog-data.ts: добавлено 155 новых товаров во все 13 категорий (grep по «key: ''» дал список 134 существующих ключей, дубли исключены). Распределение: phones +13, laptops +12, electronics +17, clothes +11, sneakers +10, furniture +11, appliances +12, hobby +13, sport +12, music +10, auto +14, kids +11, books +9. Вставки перед маркерами секций, секция МУСОР осталась в конце
+- Дорогие товары (basePrice >= 12000): теперь 100 позиций (было ~40) — пул аукциона вырос: MacBook Pro 14 M1 Pro 95k, Air M2 75k, снегоход Буран 150k, мотоцикл ИЖ 55k, прицеп МЗСА 40k, epiphone-les-paul 35k, konditsioner-09 22k, divan-uglovoy 25k и т.д. Дешёвые 500-3000: 64 позиции (мяч 800, chaynik-electro 1200, uchebniki 500, dune-roman 600, ddr4-16 2500, crocs 2200)
+- Тексты desc в стиле народного Авито, без длинных тире и эмодзи (проверено регэкспом по title/desc — все новые чистые; 5 старых «—» в pc-i5/pc-r5/trash-stul не трогал, они вне задачи). jitter новых 0.12..0.35, weight только 0.5-0.8 (редкие) / 1.5-2.5 (ходовые) либо отсутствует
+- engine.ts: константа MARKET_CAP = 140 рядом с GARAGE_COOLDOWN_MS (комментарий 54-a), в botsTick строка `Math.min(3, Math.max(0, 50 - active))` заменена на `Math.min(3, Math.max(0, MARKET_CAP - active))`. Grep «50 - active|MARKET_CAP» по src/ и scripts/ подтверждает: других мест с капой нет
+- scripts/seed.ts секция 4: идемпотентный досид — MARKET_SEED = 120, deficit = MARKET_SEED - existing, цикл ровно на deficit, логика создания объявления (item/cond/mult/price/createdAt) без изменений. Работает и на пустой базе (120), и на проде с 50 активными (досидит 70), и повторно (0)
+- Проверки: bunx tsc --noEmit | grep '^src/' → пусто (ошибки только в examples/ и mini-services/ — pre-existing, вне задачи); bun run lint → exit 0; grep -c "key: '" → 289; grep -oE "key: '[a-z0-9-]+'" | sort | uniq -d → пусто; git status — изменены только catalog-data.ts, engine.ts, seed.ts
+
+Stage Summary:
+- Каталог расширен 134 → 289 товаров (+155) во всех 13 категориях, без дублей ключей; баланс цен 300р-150к, дорогих товаров втрое больше — аукцион и дорогие сделки стали живыми
+- Рынок ботов вырос втрое: капа активных объявлений 50 → 140 (MARKET_CAP в engine.ts), сид досыпает ленту до 120 идемпотентно (MARKET_SEED в seed.ts)
+- tsc по src/ чист, lint 0 ошибок, ключи уникальны; dev/build не запускались, коммитов нет

@@ -82,12 +82,14 @@ async function main() {
     })
   }
 
-  // 4. Стартовые объявления ботов
+  // 4. Стартовые объявления ботов (идемпотентный досид до MARKET_SEED,
+  // 54-a: рынок расширен, каталог 289 товаров, капа ботов в engine.ts 140)
   const bots = await db.user.findMany({ where: { isBot: true } })
   const existing = await db.listing.count()
-  if (existing < 30) {
-    const target = 48 - existing
-    for (let i = 0; i < target; i++) {
+  const MARKET_SEED = 120
+  const deficit = MARKET_SEED - existing
+  if (deficit > 0) {
+    for (let i = 0; i < deficit; i++) {
       const bot = rnd(bots)
       const item = rnd(CATALOG.filter((c) => !c.key.startsWith('trash-')))
       const cond = conditionWeighted()
@@ -106,7 +108,7 @@ async function main() {
         },
       })
     }
-    console.log('Объявлений:', await db.listing.count())
+    console.log('Объявлений досиджено до:', await db.listing.count())
   }
 
   // 5. Халява: пара объявлений «отдам даром»
