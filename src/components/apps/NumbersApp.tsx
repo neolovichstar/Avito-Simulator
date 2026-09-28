@@ -37,7 +37,7 @@ import {
 
 const CARD = 'rounded-[20px] bg-white shadow-[0_2px_14px_rgba(23,24,26,0.05)]'
 const GREEN = '#12894B'
-const CAPS = 'text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]'
+const CAPS = 'text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400'
 const FAV_KEY = 'avito_sim_number_favs_v1'
 
 const randDigit = () => String(Math.floor(Math.random() * 10))
@@ -471,8 +471,8 @@ function ReserveCard({
         <TierBadge tier={p.tier} variant="light" />
       </div>
       <div className="mt-2.5 flex items-center gap-2">
-        <Timer className={'size-3.5 shrink-0 ' + (urgent ? 'text-[#EE3F58]' : 'text-[#17181A]/35')} aria-hidden="true" />
-        <span className={'shrink-0 text-[12px] font-semibold tabular-nums ' + (urgent ? 'text-[#EE3F58]' : 'text-[#17181A]/55')}>
+        <Timer className={'size-3.5 shrink-0 ' + (urgent ? 'text-red-500' : 'text-[#17181A]/35')} aria-hidden="true" />
+        <span className={'shrink-0 text-[12px] font-semibold tabular-nums ' + (urgent ? 'text-red-500' : 'text-[#17181A]/55')}>
           {fmtCountdown(left)}
         </span>
         <div className="h-1 flex-1 overflow-hidden rounded-full bg-[#17181A]/[0.07]">
@@ -605,7 +605,7 @@ function RegionSheet({
               >
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5">
-                    {r.id === 'gold' && <Crown className="size-3.5 shrink-0 text-[#C08A2D]" aria-label="Блатной регион" />}
+                    {r.id === 'gold' && <Crown className="size-3.5 shrink-0 text-[#C97B1D]" aria-label="Блатной регион" />}
                     <span className="truncate text-[14px] font-medium">{r.name}</span>
                   </span>
                   <span className="mt-0.5 flex items-center gap-2">
@@ -638,9 +638,9 @@ function RegionSheet({
 /* ═══════════════════════════ ВИТРИНА (маркет) ═══════════════════════════ */
 
 const CAT_META: Record<PhoneMarketItem['category'], { label: string; from: number; chip: string }> = {
-  usual: { label: 'Обычные', from: 199, chip: 'bg-[#F3F4F6] text-[#6B7280]' },
-  pretty: { label: 'Красивые', from: 1990, chip: 'bg-[#F3F4F6] text-[#6B7280]' },
-  gold: { label: 'Золотой', from: 49990, chip: 'bg-[#FFF4D6] text-[#B45309]' },
+  usual: { label: 'Обычные', from: 199, chip: 'bg-gray-100 text-gray-500' },
+  pretty: { label: 'Красивые', from: 1990, chip: 'bg-gray-100 text-gray-500' },
+  gold: { label: 'Золотой', from: 49990, chip: 'bg-[#FFF4E5] text-amber-700' },
 }
 
 /** Строка витрины (список «Рекомендуем»). */
@@ -682,7 +682,7 @@ function MarketRow({
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${CAT_META[item.category].chip}`}>
               {CAT_META[item.category].label}
             </span>
-            <span className="rounded-full bg-[#F3F4F6] px-2 py-0.5 text-[10px] font-medium text-[#9CA3AF]">{item.trait}</span>
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-400">{item.trait}</span>
           </span>
         </span>
         <span className="shrink-0 text-right">
@@ -729,7 +729,7 @@ function MarketHome({
   const cats: { key: PhoneMarketItem['category'] | 'all'; label: string; sub: string; cls: string }[] = [
     { key: 'all', label: 'Все номера', sub: '', cls: 'bg-[#17181A] text-white' },
     { key: 'usual', label: 'Обычные', sub: 'от 199 ₽', cls: 'bg-white text-[#17181A]' },
-    { key: 'pretty', label: 'Красивые', sub: 'от 1 990 ₽', cls: 'bg-[#FFF4D6] text-[#17181A]' },
+    { key: 'pretty', label: 'Красивые', sub: 'от 1 990 ₽', cls: 'bg-[#FFF4E5] text-[#17181A]' },
     { key: 'gold', label: 'Золотые', sub: 'от 49 990 ₽', cls: 'bg-white text-[#17181A]' },
   ]
   const shown = category === 'all' ? items : items.filter((i) => i.category === category)
@@ -737,9 +737,9 @@ function MarketHome({
     <div className="h-full min-h-0 overflow-y-auto px-4 pb-6 pt-1 [scrollbar-width:thin]">
       <button type="button" onClick={onSearch} className="press block w-full text-left" aria-label="Поиск номера">
         <div className="flex h-11 items-center gap-2.5 rounded-full bg-white px-4 shadow-[0_2px_10px_rgba(23,24,26,0.05)]">
-          <Search className="size-4.5 shrink-0 text-[#9CA3AF]" aria-hidden />
-          <span className="flex-1 truncate text-[13.5px] text-[#9CA3AF]">Найти номер, например +7 999 777-77-77</span>
-          <SlidersHorizontal className="size-4.5 shrink-0 text-[#374151]" aria-hidden />
+          <Search className="size-4.5 shrink-0 text-gray-400" aria-hidden />
+          <span className="flex-1 truncate text-[13.5px] text-gray-400">Найти номер, например +7 999 777-77-77</span>
+          <SlidersHorizontal className="size-4.5 shrink-0 text-gray-700" aria-hidden />
         </div>
       </button>
 
@@ -761,11 +761,11 @@ function MarketHome({
               }`}
             >
               {c.key === 'gold' ? (
-                <Crown className="size-4.5 text-[#C99B2F]" aria-hidden />
+                <Crown className="size-4.5 text-[#D9A514]" aria-hidden />
               ) : c.key === 'pretty' ? (
-                <Star className="size-4.5 text-[#C99B2F]" aria-hidden />
+                <Star className="size-4.5 text-[#D9A514]" aria-hidden />
               ) : c.key === 'usual' ? (
-                <Phone className="size-4.5 text-[#6B7280]" aria-hidden />
+                <Phone className="size-4.5 text-gray-500" aria-hidden />
               ) : (
                 <span className="text-[15px] font-black" aria-hidden>∞</span>
               )}
@@ -779,7 +779,7 @@ function MarketHome({
       {/* рекомендации */}
       <div className="mt-4 flex items-baseline justify-between">
         <p className={CAPS}>Рекомендуем</p>
-        <button type="button" onClick={onSearch} className="press text-[12px] font-semibold text-[#374151]">
+        <button type="button" onClick={onSearch} className="press text-[12px] font-semibold text-gray-700">
           Смотреть все ›
         </button>
       </div>
@@ -791,7 +791,7 @@ function MarketHome({
           <div className="h-[76px] animate-pulse rounded-[20px] bg-white" />
         </div>
       ) : shown.length === 0 ? (
-        <p className="mt-8 text-center text-[13px] text-[#9CA3AF]">В этой категории пусто — загляните завтра.</p>
+        <p className="mt-8 text-center text-[13px] text-gray-400">В этой категории пусто — загляните завтра.</p>
       ) : (
         <div className="mt-2.5 space-y-2">
           {shown.slice(0, 12).map((it, i) => (
@@ -801,7 +801,7 @@ function MarketHome({
       )}
 
       {shown.length > 12 && (
-        <button type="button" onClick={onSearch} className="press mt-3 w-full text-center text-[12.5px] font-semibold text-[#12894B]">
+        <button type="button" onClick={onSearch} className="press mt-3 w-full text-center text-[12.5px] font-semibold text-[#15803D]">
           Показать все {shown.length} ›
         </button>
       )}
@@ -933,17 +933,17 @@ function MarketFilters({
 
       {/* строка поиска */}
       <div className="flex h-11 items-center gap-2.5 rounded-full bg-white px-4 shadow-[0_2px_10px_rgba(23,24,26,0.05)]">
-        <Search className="size-4.5 shrink-0 text-[#9CA3AF]" aria-hidden />
+        <Search className="size-4.5 shrink-0 text-gray-400" aria-hidden />
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="+7 999 777-7-77"
           inputMode="tel"
           aria-label="Поиск по цифрам номера"
-          className="w-full bg-transparent text-[14px] tabular-nums text-[#17181A] outline-none placeholder:text-[#9CA3AF]"
+          className="w-full bg-transparent text-[14px] tabular-nums text-[#17181A] outline-none placeholder:text-gray-400"
         />
         {q && (
-          <button type="button" onClick={() => setQ('')} aria-label="Очистить" className="press flex size-5 items-center justify-center rounded-full bg-[#D7DBE0] text-white">
+          <button type="button" onClick={() => setQ('')} aria-label="Очистить" className="press flex size-5 items-center justify-center rounded-full bg-[#D9DCE1] text-white">
             <X className="size-3" aria-hidden />
           </button>
         )}
@@ -964,7 +964,7 @@ function MarketFilters({
               setCategory(c.key)
             }}
             aria-pressed={category === c.key}
-            className={`h-9 shrink-0 rounded-full px-3.5 text-[12.5px] font-semibold ${category === c.key ? 'bg-[#17181A] text-white' : 'bg-white text-[#374151] shadow-[0_1px_6px_rgba(23,24,26,0.06)]'}`}
+            className={`h-9 shrink-0 rounded-full px-3.5 text-[12.5px] font-semibold ${category === c.key ? 'bg-[#17181A] text-white' : 'bg-white text-gray-700 shadow-[0_1px_6px_rgba(23,24,26,0.06)]'}`}
           >
             {c.label}
           </button>
@@ -983,7 +983,7 @@ function MarketFilters({
               setCategory(c.key)
             }}
             aria-pressed={category === c.key}
-            className={`h-9 rounded-full px-4 text-[13px] font-semibold ${category === c.key ? 'bg-[#17181A] text-white' : 'bg-white text-[#374151] shadow-[0_1px_6px_rgba(23,24,26,0.06)]'}`}
+            className={`h-9 rounded-full px-4 text-[13px] font-semibold ${category === c.key ? 'bg-[#17181A] text-white' : 'bg-white text-gray-700 shadow-[0_1px_6px_rgba(23,24,26,0.06)]'}`}
           >
             {c.label}
           </button>
@@ -994,7 +994,7 @@ function MarketFilters({
             sound.tap()
             setPat('same')
           }}
-          className="h-9 rounded-full bg-white px-4 text-[13px] font-semibold text-[#374151] shadow-[0_1px_6px_rgba(23,24,26,0.06)]"
+          className="h-9 rounded-full bg-white px-4 text-[13px] font-semibold text-gray-700 shadow-[0_1px_6px_rgba(23,24,26,0.06)]"
         >
           С повторяющимися
         </button>
@@ -1004,7 +1004,7 @@ function MarketFilters({
             sound.tap()
             setPremiumOnly(!premiumOnly)
           }}
-          className="h-9 rounded-full bg-white px-4 text-[13px] font-semibold text-[#374151] shadow-[0_1px_6px_rgba(23,24,26,0.06)]"
+          className="h-9 rounded-full bg-white px-4 text-[13px] font-semibold text-gray-700 shadow-[0_1px_6px_rgba(23,24,26,0.06)]"
         >
           Особые
         </button>
@@ -1023,18 +1023,18 @@ function MarketFilters({
             }}
             aria-pressed={pat === p.key}
             className={`press rounded-[14px] border p-2.5 text-left ${
-              pat === p.key ? 'border-[#17181A] bg-[#17181A] text-white' : 'border-[#ECEEF1] bg-white text-[#17181A]'
+              pat === p.key ? 'border-[#17181A] bg-[#17181A] text-white' : 'border-[#EBEDF0] bg-white text-[#17181A]'
             }`}
           >
             <span className="block text-[11.5px] font-bold leading-tight">{p.label}</span>
-            {p.hint && <span className={`text-[9px] tabular-nums ${pat === p.key ? 'text-white/60' : 'text-[#9CA3AF]'}`}>{p.hint}</span>}
+            {p.hint && <span className={`text-[9px] tabular-nums ${pat === p.key ? 'text-white/60' : 'text-gray-400'}`}>{p.hint}</span>}
           </button>
         ))}
       </div>
 
       {/* цена */}
       <p className={`${CAPS} mt-5`}>Цена</p>
-      <div className="mt-1.5 flex items-baseline justify-between text-[12px] text-[#6B7280]">
+      <div className="mt-1.5 flex items-baseline justify-between text-[12px] text-gray-500">
         <span>от {fmtMoney(priceLo)}</span>
         <span>до {fmtMoney(priceHi)}</span>
       </div>
@@ -1056,7 +1056,7 @@ function MarketFilters({
           value={priceLo}
           onChange={(e) => setPriceLo(Math.min(Number(e.target.value), priceHi - 1000))}
           aria-label="Цена от"
-          className="absolute inset-0 w-full appearance-none bg-transparent [&::-webkit-slider-thumb]:size-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#12894B] [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md"
+          className="absolute inset-0 w-full appearance-none bg-transparent [&::-webkit-slider-thumb]:size-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#16A34A] [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md"
         />
         <input
           type="range"
@@ -1066,24 +1066,24 @@ function MarketFilters({
           value={priceHi}
           onChange={(e) => setPriceHi(Math.max(Number(e.target.value), priceLo + 1000))}
           aria-label="Цена до"
-          className="absolute inset-0 w-full appearance-none bg-transparent [&::-webkit-slider-thumb]:size-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#12894B] [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md"
+          className="absolute inset-0 w-full appearance-none bg-transparent [&::-webkit-slider-thumb]:size-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#16A34A] [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md"
         />
       </div>
 
       {/* дополнительно */}
       <p className={`${CAPS} mt-5`}>Дополнительно</p>
-      <div className="mt-2 divide-y divide-[#F0F1F3] overflow-hidden rounded-[16px] bg-white shadow-[0_2px_10px_rgba(23,24,26,0.05)]">
+      <div className="mt-2 divide-y divide-[#EBEDF0] overflow-hidden rounded-[16px] bg-white shadow-[0_2px_10px_rgba(23,24,26,0.05)]">
         <div className="flex items-center gap-3 px-4 py-3">
-          <Crown className="size-4.5 text-[#9CA3AF]" aria-hidden />
+          <Crown className="size-4.5 text-gray-400" aria-hidden />
           <span className="flex-1 text-[13.5px] font-medium text-[#17181A]">Только в наличии</span>
           <span className="flex h-6 w-10 items-center rounded-full bg-[#12894B] px-0.5" aria-hidden title="Всё на витрине свободно">
             <span className="ml-auto size-5 rounded-full bg-white shadow" />
           </span>
         </div>
         <button type="button" onClick={() => { sound.tap(); setPremiumOnly(!premiumOnly) }} className="press flex w-full items-center gap-3 px-4 py-3 text-left">
-          <Star className="size-4.5 text-[#9CA3AF]" aria-hidden />
+          <Star className="size-4.5 text-gray-400" aria-hidden />
           <span className="flex-1 text-[13.5px] font-medium text-[#17181A]">Только уникальные</span>
-          <span className={`flex h-6 w-10 items-center rounded-full px-0.5 transition-colors ${premiumOnly ? 'bg-[#12894B]' : 'bg-[#D7DBE0]'}`} aria-hidden>
+          <span className={`flex h-6 w-10 items-center rounded-full px-0.5 transition-colors ${premiumOnly ? 'bg-[#12894B]' : 'bg-[#D9DCE1]'}`} aria-hidden>
             <span className={`size-5 rounded-full bg-white shadow transition-transform ${premiumOnly ? 'translate-x-4' : ''}`} />
           </span>
         </button>
@@ -1196,7 +1196,7 @@ function MarketDetail({
         ].map((s) => (
           <div key={s.label} className={`${CARD} flex flex-col items-center gap-1 p-3 text-center`}>
             <s.icon />
-            <span className="text-[9.5px] text-[#9CA3AF]">{s.label}</span>
+            <span className="text-[9.5px] text-gray-400">{s.label}</span>
             <span className="text-[11px] font-bold leading-tight text-[#17181A]">{s.value}</span>
           </div>
         ))}
@@ -1205,24 +1205,24 @@ function MarketDetail({
       {/* цена + рассрочка */}
       <div className="mx-4 mt-3 flex items-stretch gap-2">
         <div className={`${CARD} flex-1 p-4`}>
-          <span className="text-[11px] text-[#9CA3AF]">Цена</span>
+          <span className="text-[11px] text-gray-400">Цена</span>
           <p className="text-[20px] font-extrabold tabular-nums leading-tight text-[#17181A]">{fmtMoney(item.price)}</p>
         </div>
         <button type="button" onClick={() => sound.tap()} className="press flex w-[132px] flex-col justify-center rounded-[20px] bg-white p-3 text-left shadow-[0_2px_14px_rgba(23,24,26,0.05)]">
-          <span className="flex items-center gap-1.5 text-[11px] text-[#9CA3AF]">
+          <span className="flex items-center gap-1.5 text-[11px] text-gray-400">
             <Wallet className="size-3.5" aria-hidden />
             Возможна рассрочка
           </span>
           <span className="mt-0.5 flex items-center gap-0.5 text-[12px] font-bold text-[#17181A]">
             от {fmtMoney(Math.round(item.price / 12 / 10) * 10)}/мес
-            <ChevronRight className="size-3.5 text-[#9CA3AF]" aria-hidden />
+            <ChevronRight className="size-3.5 text-gray-400" aria-hidden />
           </span>
         </button>
       </div>
 
       {/* безопасность */}
-      <div className="mx-4 mt-3 flex items-center justify-center gap-1.5 text-[11.5px] text-[#6B7280]">
-        <ShieldCheck className="size-4 text-[#12894B]" aria-hidden />
+      <div className="mx-4 mt-3 flex items-center justify-center gap-1.5 text-[11.5px] text-gray-500">
+        <ShieldCheck className="size-4 text-[#15803D]" aria-hidden />
         Безопасная сделка · Оформление договора · Официально
       </div>
 
@@ -1236,8 +1236,8 @@ function MarketDetail({
             'Быстрая активация (от 5 минут)',
             'Поддержка 24/7',
           ].map((t) => (
-            <li key={t} className="flex items-start gap-2 text-[12.5px] leading-snug text-[#374151]">
-              <Check className="mt-0.5 size-4 shrink-0 text-[#12894B]" aria-hidden />
+            <li key={t} className="flex items-start gap-2 text-[12.5px] leading-snug text-gray-700">
+              <Check className="mt-0.5 size-4 shrink-0 text-[#15803D]" aria-hidden />
               {t}
             </li>
           ))}
@@ -1263,7 +1263,7 @@ function MarketDetail({
 function BarIcon() {
   return (
     <span className="flex size-6 items-center justify-center" aria-hidden>
-      <svg viewBox="0 0 24 24" className="size-4 text-[#C99B2F]" fill="currentColor">
+      <svg viewBox="0 0 24 24" className="size-4 text-[#D9A514]" fill="currentColor">
         <rect x="4" y="13" width="3.4" height="7" rx="1" />
         <rect x="10.3" y="8" width="3.4" height="12" rx="1" />
         <rect x="16.6" y="4" width="3.4" height="16" rx="1" />
@@ -1274,7 +1274,7 @@ function BarIcon() {
 function UsersIcon() {
   return (
     <span className="flex size-6 items-center justify-center" aria-hidden>
-      <svg viewBox="0 0 24 24" fill="none" className="size-4 text-[#C99B2F]">
+      <svg viewBox="0 0 24 24" fill="none" className="size-4 text-[#D9A514]">
         <circle cx="9" cy="8.5" r="3.2" stroke="currentColor" strokeWidth="1.8" />
         <path d="M3.5 19c.7-3 3-4.5 5.5-4.5S13.8 16 14.5 19" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
         <circle cx="16.5" cy="9.5" r="2.4" stroke="currentColor" strokeWidth="1.6" />
@@ -1522,10 +1522,10 @@ export default function NumbersApp() {
           <div className="flex items-start justify-between">
             <div>
               <h1 className="text-[26px] font-bold leading-tight tracking-[-0.01em]">Номера</h1>
-              <p className="text-[12.5px] text-[#9CA3AF]">Красивые номера для особенных людей</p>
+              <p className="text-[12.5px] text-gray-400">Красивые номера для особенных людей</p>
             </div>
             <div className="mt-1 flex items-center gap-2">
-              <span aria-hidden className="flex size-10 items-center justify-center rounded-full bg-white text-[#374151] shadow-[0_2px_10px_rgba(23,24,26,0.06)]">
+              <span aria-hidden className="flex size-10 items-center justify-center rounded-full bg-white text-gray-700 shadow-[0_2px_10px_rgba(23,24,26,0.06)]">
                 <Bell className="size-5" />
               </span>
               <button
@@ -1535,7 +1535,7 @@ export default function NumbersApp() {
                   setTab('profile')
                 }}
                 aria-label="Профиль"
-                className="press flex size-10 items-center justify-center rounded-full bg-[#ECEEF1] text-[#6B7280]"
+                className="press flex size-10 items-center justify-center rounded-full bg-[#ECEEF1] text-gray-500"
               >
                 <UserRound className="size-5" aria-hidden />
               </button>
@@ -1596,7 +1596,7 @@ export default function NumbersApp() {
           ) : tab === 'roll' ? (
             /* ───────── РОЗЫГРЫШ: сцена барабанов ───────── */
             <div className="h-full min-h-0 overflow-y-auto px-4 pb-4 pt-1 [scrollbar-width:thin]">
-              <p className="mx-auto max-w-[300px] text-center text-[12.5px] leading-relaxed text-[#9CA3AF]">
+              <p className="mx-auto max-w-[300px] text-center text-[12.5px] leading-relaxed text-gray-400">
                 Крутите барабан и получите уникальный номер из премиальной коллекции
               </p>
               <section className={CARD + ' mt-3 px-2.5 pb-4 pt-3'}>
@@ -1783,21 +1783,21 @@ export default function NumbersApp() {
               <div className={CARD + ' mt-3 p-4'}>
                 <p className="flex items-center gap-1.5 text-[13.5px] font-bold text-[#17181A]">
                   Возможные категории
-                  <span className="flex size-4 items-center justify-center rounded-full bg-[#F1F3F4] text-[10px] text-[#9CA3AF]" aria-hidden>
+                  <span className="flex size-4 items-center justify-center rounded-full bg-[#F1F3F4] text-[10px] text-gray-400" aria-hidden>
                     ?
                   </span>
                 </p>
                 <div className="mt-2.5 grid grid-cols-4 gap-2 text-center">
                   {[
-                    { icon: <Crown className="size-4.5 text-[#C99B2F]" aria-hidden />, label: 'Красивые', sub: 'от 1 990 ₽' },
-                    { icon: <Wallet className="size-4.5 text-[#C99B2F]" aria-hidden />, label: 'Золотые', sub: 'от 49 990 ₽' },
-                    { icon: <Dices className="size-4.5 text-[#C99B2F]" aria-hidden />, label: 'С повторами', sub: '777, 888, 000' },
-                    { icon: <Heart className="size-4.5 text-[#C99B2F]" aria-hidden />, label: 'Удачные', sub: 'легко запомнить' },
+                    { icon: <Crown className="size-4.5 text-[#D9A514]" aria-hidden />, label: 'Красивые', sub: 'от 1 990 ₽' },
+                    { icon: <Wallet className="size-4.5 text-[#D9A514]" aria-hidden />, label: 'Золотые', sub: 'от 49 990 ₽' },
+                    { icon: <Dices className="size-4.5 text-[#D9A514]" aria-hidden />, label: 'С повторами', sub: '777, 888, 000' },
+                    { icon: <Heart className="size-4.5 text-[#D9A514]" aria-hidden />, label: 'Удачные', sub: 'легко запомнить' },
                   ].map((c) => (
                     <div key={c.label} className="flex flex-col items-center gap-1">
                       {c.icon}
                       <span className="text-[9.5px] font-bold leading-tight text-[#17181A]">{c.label}</span>
-                      <span className="text-[8.5px] leading-none text-[#9CA3AF]">{c.sub}</span>
+                      <span className="text-[8.5px] leading-none text-gray-400">{c.sub}</span>
                     </div>
                   ))}
                 </div>
@@ -1808,11 +1808,11 @@ export default function NumbersApp() {
             <div className="h-full min-h-0 overflow-y-auto px-4 pb-6 pt-2 [scrollbar-width:thin]">
               {favItems.length === 0 ? (
                 <div className="flex flex-col items-center gap-2.5 px-8 pt-16 text-center">
-                  <span className="flex size-16 items-center justify-center rounded-[22px] bg-white text-[#C4C8CE] shadow-[0_2px_14px_rgba(23,24,26,0.05)]">
+                  <span className="flex size-16 items-center justify-center rounded-[22px] bg-white text-[#C4C8CF] shadow-[0_2px_14px_rgba(23,24,26,0.05)]">
                     <Heart className="size-7" aria-hidden />
                   </span>
                   <h3 className="text-[15px] font-bold text-[#17181A]">В избранном пусто</h3>
-                  <p className="text-[13px] leading-relaxed text-[#6B7280]">
+                  <p className="text-[13px] leading-relaxed text-gray-500">
                     Жмите на сердце у номера — он появится здесь для быстрой покупки.
                   </p>
                 </div>

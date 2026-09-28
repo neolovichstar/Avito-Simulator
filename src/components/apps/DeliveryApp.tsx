@@ -231,19 +231,19 @@ function ParcelCard({ d, nowMs, onOpen }: { d: DeliveryDTO; nowMs: number; onOpe
           decoding="async"
           src={d.image}
           alt=""
-          className="size-14 shrink-0 rounded-[14px] bg-[#F1F2F4] object-cover"
+          className="size-14 shrink-0 rounded-[14px] bg-[#F0F1F5] object-cover"
         />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[14px] font-semibold text-[#141414]">{d.title}</div>
+          <div className="truncate text-[14px] font-semibold text-[#17181A]">{d.title}</div>
           <div className="mt-0.5 flex items-center gap-1.5">
-            <span className="truncate font-mono text-[11px] text-[#9CA3AF]">{trackOf(d.id)} · {d.courier}</span>
+            <span className="truncate font-mono text-[11px] text-gray-400">{trackOf(d.id)} · {d.courier}</span>
             {d.kind === 'sale' && (
-              <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-[#F1F2F4] px-1.5 py-0.5 text-[9.5px] font-bold text-[#6B7280]">
+              <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-[#F0F1F5] px-1.5 py-0.5 text-[9.5px] font-bold text-gray-500">
                 <Banknote className="size-2.5" aria-hidden /> Продажа
               </span>
             )}
             {isWorse(d) && (
-              <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-[#FDECEA] px-1.5 py-0.5 text-[9.5px] font-bold text-[#B3382E]">
+              <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-[#FDEBEB] px-1.5 py-0.5 text-[9.5px] font-bold text-[#B3382E]">
                 <AlertTriangle className="size-2.5" aria-hidden /> Дефекты
               </span>
             )}
@@ -257,10 +257,10 @@ function ParcelCard({ d, nowMs, onOpen }: { d: DeliveryDTO; nowMs: number; onOpe
               <span className="size-2 shrink-0 animate-pulse rounded-full" style={{ backgroundColor: t.text }} aria-hidden />
             )}
             <span className="shrink-0 text-[12px] font-semibold" style={{ color: t.text }}>{meta.label}</span>
-            <span className="truncate text-[12px] text-[#9CA3AF]">{captionOf(d, nowMs)}</span>
+            <span className="truncate text-[12px] text-gray-400">{captionOf(d, nowMs)}</span>
           </div>
         </div>
-        <ChevronRight className="size-4 shrink-0 text-[#C6CAD1]" aria-hidden />
+        <ChevronRight className="size-4 shrink-0 text-[#C4C8CF]" aria-hidden />
       </div>
     </button>
   )
@@ -379,18 +379,18 @@ function VerticalTimeline({ d, nowMs, city }: { d: DeliveryDTO; nowMs: number; c
             />
             <div className="min-w-0 flex-1 pt-0.5">
               <div
-                className={'text-[13.5px] font-semibold leading-tight ' + (row.done || active ? 'text-[#141414]' : 'text-[#9CA3AF]')}
+                className={'text-[13.5px] font-semibold leading-tight ' + (row.done || active ? 'text-[#17181A]' : 'text-gray-400')}
               >
                 {row.stage.label}
               </div>
-              {row.date && <div className="mt-0.5 text-[12px] leading-snug text-black/45">{row.date}</div>}
-              <div className="text-[12px] leading-snug text-black/35">{row.city}</div>
+              {row.date && <div className="mt-0.5 text-[12px] leading-snug text-[#17181A]/45">{row.date}</div>}
+              <div className="text-[12px] leading-snug text-[#17181A]/35">{row.city}</div>
             </div>
           </li>
         )
       })}
       {returned && (
-        <li className="mt-1 flex gap-2 rounded-xl bg-[#FDECEA] p-3">
+        <li className="mt-1 flex gap-2 rounded-xl bg-[#FDEBEB] p-3">
           <AlertTriangle className="size-4 shrink-0 text-[#B3382E]" aria-hidden />
           <p className="text-[11.5px] leading-relaxed text-[#B3382E]">
             Посылку не забрали за 24 ч, курьер вернул её продавцу. Возврат {fmtMoney(Math.round(d.price * 0.95))}, комиссия 5%.
@@ -475,15 +475,15 @@ function ParcelScreen({ d, onBack, onTrack, nowMs }: { d: DeliveryDTO; onBack: (
           type="button"
           onClick={onBack}
           aria-label="Назад к посылкам"
-          className="flex size-10 items-center justify-center rounded-full bg-white text-[#141414] ring-1 ring-black/[0.05] transition active:scale-95"
+          className="flex size-10 items-center justify-center rounded-full bg-white text-[#17181A] ring-1 ring-black/[0.05] transition active:scale-95"
         >
           <ChevronLeft className="size-5" aria-hidden />
         </button>
         <div className="min-w-0">
-          <div className="truncate text-[16px] font-bold leading-tight text-[#141414]">
+          <div className="truncate text-[16px] font-bold leading-tight text-[#17181A]">
             {d.kind === 'sale' ? 'Продажа · доставка' : 'Посылка'}
           </div>
-          <div className="font-mono text-[11px] text-[#9CA3AF]">{trackOf(d.id)}</div>
+          <div className="font-mono text-[11px] text-gray-400">{trackOf(d.id)}</div>
         </div>
       </div>
 
@@ -496,14 +496,14 @@ function ParcelScreen({ d, onBack, onTrack, nowMs }: { d: DeliveryDTO; onBack: (
               decoding="async"
               src={d.image}
               alt=""
-              className="size-[72px] shrink-0 rounded-2xl bg-[#F1F2F4] object-cover"
+              className="size-[72px] shrink-0 rounded-2xl bg-[#F0F1F5] object-cover"
             />
             <div className="min-w-0 flex-1">
-              <div className="line-clamp-2 text-[15px] font-semibold leading-snug text-[#141414]">{d.title}</div>
-              <div className="mt-1 text-[17px] font-bold tabular-nums text-[#141414]">
+              <div className="line-clamp-2 text-[15px] font-semibold leading-snug text-[#17181A]">{d.title}</div>
+              <div className="mt-1 text-[17px] font-bold tabular-nums text-[#17181A]">
                 {d.kind === 'sale' ? '+' : ''}{fmtMoney(d.price)}
               </div>
-              <div className="mt-1 text-[11px] text-[#9CA3AF]">
+              <div className="mt-1 text-[11px] text-gray-400">
                 {d.kind === 'sale' ? 'Продажа' : 'Покупка'} · {timeAgo(d.createdAt)}
               </div>
             </div>
@@ -512,9 +512,9 @@ function ParcelScreen({ d, onBack, onTrack, nowMs }: { d: DeliveryDTO; onBack: (
             type="button"
             onClick={copyTrack}
             aria-label="Скопировать трек-номер"
-            className="mt-3 flex h-11 w-full items-center justify-between rounded-xl bg-[#F1F2F4] px-3 text-left transition active:scale-[0.98]"
+            className="mt-3 flex h-11 w-full items-center justify-between rounded-xl bg-[#F0F1F5] px-3 text-left transition active:scale-[0.98]"
           >
-            <span className="font-mono text-[12px] font-semibold text-[#141414]">{trackOf(d.id)}</span>
+            <span className="font-mono text-[12px] font-semibold text-[#17181A]">{trackOf(d.id)}</span>
             <span className="flex items-center gap-1 text-[11px] font-medium" style={{ color: GREEN }}>
               <Copy className="size-3" aria-hidden />
               {copied ? 'Скопировано' : 'Копировать'}
@@ -539,9 +539,9 @@ function ParcelScreen({ d, onBack, onTrack, nowMs }: { d: DeliveryDTO; onBack: (
           <button
             type="button"
             onClick={() => void share()}
-            className={`${CARD} flex h-12 flex-1 items-center justify-center gap-2 text-[15px] font-semibold text-[#141414] transition-transform active:scale-[0.98]`}
+            className={`${CARD} flex h-12 flex-1 items-center justify-center gap-2 text-[15px] font-semibold text-[#17181A] transition-transform active:scale-[0.98]`}
           >
-            <Share2 className="size-4.5 text-[#6B7280]" aria-hidden />
+            <Share2 className="size-4.5 text-gray-500" aria-hidden />
             {shared ? 'Готово' : 'Поделиться'}
           </button>
         </div>
@@ -555,14 +555,14 @@ function ParcelScreen({ d, onBack, onTrack, nowMs }: { d: DeliveryDTO; onBack: (
         {/* характеристики заказа с иконками */}
         <div className={`${CARD} p-4`}>
           <h3 className={CAPS}>Детали заказа</h3>
-          <div className="mt-2 divide-y divide-black/[0.05]">
+          <div className="mt-2 divide-y divide-[#EBEDF0]">
             {details.map((row) => (
               <div key={row.label} className="flex items-center gap-3 py-2.5">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#F1F2F4] text-[#6B7280]" aria-hidden>
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#F0F1F5] text-gray-500" aria-hidden>
                   <row.icon className="size-4" />
                 </span>
-                <span className="min-w-0 flex-1 truncate text-[13px] text-[#6B7280]">{row.label}</span>
-                <span className="max-w-[55%] text-right text-[13px] font-medium leading-snug text-[#141414]">{row.value}</span>
+                <span className="min-w-0 flex-1 truncate text-[13px] text-gray-500">{row.label}</span>
+                <span className="max-w-[55%] text-right text-[13px] font-medium leading-snug text-[#17181A]">{row.value}</span>
               </div>
             ))}
           </div>
@@ -581,7 +581,7 @@ function ParcelScreen({ d, onBack, onTrack, nowMs }: { d: DeliveryDTO; onBack: (
               <PackageCheck className="size-5" aria-hidden />
               {busy ? 'Оформляем…' : 'Забрать посылку'}
             </button>
-            <p className="text-center text-[10px] text-[#9CA3AF]">
+            <p className="text-center text-[10px] text-gray-400">
               Не забрали за 24 ч: курьер вернёт товар, возврат денег минус 5%
             </p>
           </div>
@@ -589,7 +589,7 @@ function ParcelScreen({ d, onBack, onTrack, nowMs }: { d: DeliveryDTO; onBack: (
         {err && <p className="text-center text-[12px] font-medium text-[#B3382E]">{err}</p>}
 
         {d.status === 'in_transit' && d.kind === 'purchase' && (
-          <div className="flex gap-2 rounded-[20px] bg-[#FBF3E2] p-3.5 ring-1 ring-[#F0E4C4]">
+          <div className="flex gap-2 rounded-[20px] bg-[#F8F1E3] p-3.5 ring-1 ring-[#F0E4C4]">
             <AlertTriangle className="size-4 shrink-0 text-[#9A6B10]" aria-hidden />
             <p className="text-[11px] leading-relaxed text-[#8A6116]">
               Осмотр при получении невозможен. Курьерская доставка: риск скрытых дефектов.
@@ -603,7 +603,7 @@ function ParcelScreen({ d, onBack, onTrack, nowMs }: { d: DeliveryDTO; onBack: (
             <div
               className={
                 'mt-3 flex items-center justify-between gap-2 rounded-xl p-3 ' +
-                (worse || d.status === 'returned' ? 'bg-[#FDECEA]' : 'bg-[#E6F3EB]')
+                (worse || d.status === 'returned' ? 'bg-[#FDEBEB]' : 'bg-[#E6F6EC]')
               }
             >
               <div className="flex items-center gap-2.5">
@@ -616,7 +616,7 @@ function ParcelScreen({ d, onBack, onTrack, nowMs }: { d: DeliveryDTO; onBack: (
                       <div className="text-[13px] font-semibold text-[#B3382E]">
                         {d.status === 'returned' ? 'Возвращено продавцу' : 'Есть дефекты'}
                       </div>
-                      <div className="text-[10px] text-[#9CA3AF]">
+                      <div className="text-[10px] text-gray-400">
                         {d.status === 'returned' ? 'Комиссия 5% удержана' : 'Продавец приукрасил состояние'}
                       </div>
                     </div>
@@ -628,23 +628,23 @@ function ParcelScreen({ d, onBack, onTrack, nowMs }: { d: DeliveryDTO; onBack: (
                     </span>
                     <div>
                       <div className="text-[13px] font-semibold" style={{ color: GREEN }}>Как в описании</div>
-                      <div className="text-[10px] text-[#9CA3AF]">Проверка пройдена</div>
+                      <div className="text-[10px] text-gray-400">Проверка пройдена</div>
                     </div>
                   </>
                 )}
               </div>
-              <span className="shrink-0 text-[10px] text-[#9CA3AF]">{d.deliveredAt ? timeAgo(d.deliveredAt) : null}</span>
+              <span className="shrink-0 text-[10px] text-gray-400">{d.deliveredAt ? timeAgo(d.deliveredAt) : null}</span>
             </div>
             {!worse && d.status === 'delivered' && d.realCondition && (
-              <div className="mt-2 px-1 text-[11px] text-[#9CA3AF]">
+              <div className="mt-2 px-1 text-[11px] text-gray-400">
                 Фактическое состояние:{' '}
-                <span className="font-medium text-[#141414]">{CONDITION_LABEL[d.realCondition] ?? d.realCondition}</span>
+                <span className="font-medium text-[#17181A]">{CONDITION_LABEL[d.realCondition] ?? d.realCondition}</span>
               </div>
             )}
           </div>
         )}
 
-        <div className="pb-2 pt-1 text-center text-[10px] text-[#9CA3AF]">Resale Доставка · осмотр при получении · это игра</div>
+        <div className="pb-2 pt-1 text-center text-[10px] text-gray-400">Resale Доставка · осмотр при получении · это игра</div>
       </div>
     </div>
   )
@@ -661,10 +661,10 @@ function CourierScreen({ d, nowMs, showBack, onBack }: { d: DeliveryDTO; nowMs: 
       : d.status === 'arrived' ? 'Ждёт в пункте выдачи'
         : d.kind === 'sale' ? 'Скоро заберёт ваш товар' : 'Продавец собирает посылку'
   const mapBtn =
-    'flex size-11 items-center justify-center rounded-full bg-white text-[#141414] shadow-[0_4px_16px_rgba(0,0,0,0.12)] ring-1 ring-black/[0.05] transition active:scale-95'
+    'flex size-11 items-center justify-center rounded-full bg-white text-[#17181A] shadow-[0_4px_16px_rgba(0,0,0,0.12)] ring-1 ring-black/[0.05] transition active:scale-95'
 
   return (
-    <div className="flex h-full flex-col bg-[#F6F7F9]">
+    <div className="flex h-full flex-col bg-[#F5F6F8]">
       {/* карта на весь остаток экрана */}
       <div className="relative min-h-0 flex-1">
         <GameMap etaMin={etaMin} className="absolute inset-0" />
@@ -700,7 +700,7 @@ function CourierScreen({ d, nowMs, showBack, onBack }: { d: DeliveryDTO; nowMs: 
 
       {/* нижняя карточка курьера */}
       <div className="shrink-0 rounded-t-[24px] bg-white px-4 pb-4 pt-2 shadow-[0_-6px_24px_rgba(0,0,0,0.06)]">
-        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-black/10" aria-hidden />
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-neutral-200" aria-hidden />
         <div className="flex items-center gap-3">
           <span
             className="flex size-12 shrink-0 items-center justify-center rounded-full text-[13px] font-bold text-white"
@@ -710,18 +710,18 @@ function CourierScreen({ d, nowMs, showBack, onBack }: { d: DeliveryDTO; nowMs: 
             {initialsOf(d.courier)}
           </span>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[15px] font-bold text-[#141414]">{d.courier}</div>
-            <div className="mt-0.5 flex items-center gap-1 text-[12px] text-[#6B7280]">
+            <div className="truncate text-[15px] font-bold text-[#17181A]">{d.courier}</div>
+            <div className="mt-0.5 flex items-center gap-1 text-[12px] text-gray-500">
               <Star className="size-3" style={{ color: AMBER }} fill={AMBER} aria-hidden />
               4.9 · Курьер Resale
             </div>
-            <div className="mt-0.5 truncate text-[11px] text-[#9CA3AF]">{courierSub}</div>
+            <div className="mt-0.5 truncate text-[11px] text-gray-400">{courierSub}</div>
           </div>
           <button
             type="button"
             aria-label="Позвонить курьеру"
             onClick={() => pushToast('Курьер', `Соединяем с ${d.courier}…`)}
-            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[#F1F2F4] text-[#141414] transition active:scale-95"
+            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[#F0F1F5] text-[#17181A] transition active:scale-95"
           >
             <Phone className="size-[18px]" aria-hidden />
           </button>
@@ -729,18 +729,18 @@ function CourierScreen({ d, nowMs, showBack, onBack }: { d: DeliveryDTO; nowMs: 
             type="button"
             aria-label="Написать курьеру"
             onClick={() => pushToast('Курьер', 'Чат с курьером скоро появится')}
-            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[#F1F2F4] text-[#141414] transition active:scale-95"
+            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[#F0F1F5] text-[#17181A] transition active:scale-95"
           >
             <MessageCircle className="size-[18px]" aria-hidden />
           </button>
         </div>
         <div className="mt-3 flex items-center gap-3 border-t border-black/[0.06] pt-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#F1F2F4] text-[#6B7280]" aria-hidden>
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#F0F1F5] text-gray-500" aria-hidden>
             <Truck className="size-[18px]" />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[13.5px] font-semibold text-[#141414]">{CARS[hashOf(d.courier) % CARS.length]}</div>
-            <div className="mt-0.5 font-mono text-[12px] text-[#6B7280]">{plateOf(d.courier)}</div>
+            <div className="truncate text-[13.5px] font-semibold text-[#17181A]">{CARS[hashOf(d.courier) % CARS.length]}</div>
+            <div className="mt-0.5 font-mono text-[12px] text-gray-500">{plateOf(d.courier)}</div>
           </div>
           <span
             className="shrink-0 rounded-lg px-2 py-1 text-[11px] font-semibold"
@@ -757,12 +757,12 @@ function CourierScreen({ d, nowMs, showBack, onBack }: { d: DeliveryDTO; nowMs: 
 // ---------- карта без активных доставок ----------
 function MapEmptyScreen({ onGo }: { onGo: () => void }) {
   return (
-    <div className="flex h-full flex-col bg-[#F6F7F9]">
+    <div className="flex h-full flex-col bg-[#F5F6F8]">
       <div className="relative min-h-0 flex-1">
         <GameMap className="absolute inset-0" />
       </div>
       <div className="shrink-0 rounded-t-[24px] bg-white px-6 pb-6 pt-2 text-center shadow-[0_-6px_24px_rgba(0,0,0,0.06)]">
-        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-black/10" aria-hidden />
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-neutral-200" aria-hidden />
         <img
           src="/img/empty/delivery.webp"
           alt=""
@@ -771,8 +771,8 @@ function MapEmptyScreen({ onGo }: { onGo: () => void }) {
           decoding="async"
           className="mx-auto h-20"
         />
-        <div className="mt-2 text-[15px] font-bold text-[#141414]">Машины на маршруте нет</div>
-        <p className="mx-auto mt-1 max-w-[250px] text-[12.5px] leading-relaxed text-[#9CA3AF]">
+        <div className="mt-2 text-[15px] font-bold text-[#17181A]">Машины на маршруте нет</div>
+        <p className="mx-auto mt-1 max-w-[250px] text-[12.5px] leading-relaxed text-gray-400">
           Карта оживёт, когда посылка выйдет в путь. Загляните в список доставок.
         </p>
         <button
@@ -803,8 +803,8 @@ function HistoryScreen({ items, nowMs, onOpen }: { items: DeliveryDTO[]; nowMs: 
           decoding="async"
           className="h-24"
         />
-        <div className="mt-3 text-[15px] font-semibold text-[#141414]">История пуста</div>
-        <div className="mt-1 max-w-64 text-[13px] leading-relaxed text-[#9CA3AF]">
+        <div className="mt-3 text-[15px] font-semibold text-[#17181A]">История пуста</div>
+        <div className="mt-1 max-w-64 text-[13px] leading-relaxed text-gray-400">
           Завершённые доставки и возвраты появятся здесь
         </div>
       </div>
@@ -828,7 +828,7 @@ function HistoryScreen({ items, nowMs, onOpen }: { items: DeliveryDTO[]; nowMs: 
           ))}
         </>
       )}
-      <div className="pb-2 pt-1 text-center text-[10px] text-[#9CA3AF]">Resale Доставка · это игра</div>
+      <div className="pb-2 pt-1 text-center text-[10px] text-gray-400">Resale Доставка · это игра</div>
     </div>
   )
 }
@@ -855,7 +855,7 @@ function ProfileScreen({ items }: { items: DeliveryDTO[] }) {
             <img
               src={session.photoUrl}
               alt=""
-              className="size-16 shrink-0 rounded-full bg-[#F1F2F4] object-cover"
+              className="size-16 shrink-0 rounded-full bg-[#F0F1F5] object-cover"
             />
           ) : (
             <span
@@ -867,18 +867,18 @@ function ProfileScreen({ items }: { items: DeliveryDTO[] }) {
             </span>
           )}
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[17px] font-bold text-[#141414]">{session?.displayName ?? 'Игрок'}</div>
-            <div className="truncate text-[12.5px] text-[#6B7280]">{session?.username ? `@${session.username}` : 'игрок Resale'}</div>
+            <div className="truncate text-[17px] font-bold text-[#17181A]">{session?.displayName ?? 'Игрок'}</div>
+            <div className="truncate text-[12.5px] text-gray-500">{session?.username ? `@${session.username}` : 'игрок Resale'}</div>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#E6F3EB] px-2 py-0.5 text-[10.5px] font-semibold text-[#12894B]">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#E6F6EC] px-2 py-0.5 text-[10.5px] font-semibold text-[#15803D]">
                 <MapPin className="size-2.5" aria-hidden />
                 {session?.city ?? 'Москва'}
               </span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#FBF3E2] px-2 py-0.5 text-[10.5px] font-semibold text-[#9A6B10]">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#F8F1E3] px-2 py-0.5 text-[10.5px] font-semibold text-[#9A6B10]">
                 <Star className="size-2.5" aria-hidden />
                 {rating}
               </span>
-              <span className="inline-flex items-center rounded-full bg-[#F1F2F4] px-2 py-0.5 text-[10.5px] font-semibold text-[#6B7280]">
+              <span className="inline-flex items-center rounded-full bg-[#F0F1F5] px-2 py-0.5 text-[10.5px] font-semibold text-gray-500">
                 Уровень {session?.level ?? 1}
               </span>
             </div>
@@ -890,25 +890,25 @@ function ProfileScreen({ items }: { items: DeliveryDTO[] }) {
       <div className={`${CARD} p-4`}>
         <div className="grid grid-cols-2 gap-2.5">
           {stats.map((s) => (
-            <div key={s.label} className="rounded-2xl bg-[#F6F7F9] p-3">
-              <div className="text-[20px] font-bold tabular-nums text-[#141414]">{s.n}</div>
-              <div className="mt-0.5 text-[11px] text-[#6B7280]">{s.label}</div>
+            <div key={s.label} className="rounded-2xl bg-[#F5F6F8] p-3">
+              <div className="text-[20px] font-bold tabular-nums text-[#17181A]">{s.n}</div>
+              <div className="mt-0.5 text-[11px] text-gray-500">{s.label}</div>
             </div>
           ))}
         </div>
-        <div className="mt-3 divide-y divide-black/[0.05]">
+        <div className="mt-3 divide-y divide-[#EBEDF0]">
           <div className="flex items-center gap-3 py-2.5">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#F1F2F4] text-[#6B7280]" aria-hidden>
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#F0F1F5] text-gray-500" aria-hidden>
               <Banknote className="size-4" />
             </span>
-            <span className="min-w-0 flex-1 truncate text-[13px] text-[#6B7280]">Потрачено на доставки</span>
-            <span className="text-[13px] font-semibold tabular-nums text-[#141414]">{fmtMoney(spent)}</span>
+            <span className="min-w-0 flex-1 truncate text-[13px] text-gray-500">Потрачено на доставки</span>
+            <span className="text-[13px] font-semibold tabular-nums text-[#17181A]">{fmtMoney(spent)}</span>
           </div>
           <div className="flex items-center gap-3 py-2.5">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#F1F2F4] text-[#6B7280]" aria-hidden>
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#F0F1F5] text-gray-500" aria-hidden>
               <PackageCheck className="size-4" />
             </span>
-            <span className="min-w-0 flex-1 truncate text-[13px] text-[#6B7280]">Выручка с продаж</span>
+            <span className="min-w-0 flex-1 truncate text-[13px] text-gray-500">Выручка с продаж</span>
             <span className="text-[13px] font-semibold tabular-nums" style={{ color: GREEN }}>{fmtMoney(earned)}</span>
           </div>
         </div>
@@ -916,26 +916,26 @@ function ProfileScreen({ items }: { items: DeliveryDTO[] }) {
 
       <h2 className={`${CAPS} px-1`}>О сервисе</h2>
       <div className={`${CARD} p-4`}>
-        <div className="divide-y divide-black/[0.05]">
+        <div className="divide-y divide-[#EBEDF0]">
           {[
             { icon: Truck, title: 'Курьеры Resale', sub: 'От продавца до пункта выдачи за пару часов' },
             { icon: ShieldCheck, title: 'Осмотр при получении', sub: 'Проверяйте вещь, когда забираете посылку' },
             { icon: RotateCcw, title: 'Возврат 24 часа', sub: 'Не забрали за 24 ч, вернём деньги (комиссия 5%)' },
           ].map((row) => (
             <div key={row.title} className="flex items-center gap-3 py-2.5">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#F1F2F4] text-[#6B7280]" aria-hidden>
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#F0F1F5] text-gray-500" aria-hidden>
                 <row.icon className="size-4" />
               </span>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] font-semibold text-[#141414]">{row.title}</div>
-                <div className="truncate text-[11.5px] text-[#9CA3AF]">{row.sub}</div>
+                <div className="truncate text-[13px] font-semibold text-[#17181A]">{row.title}</div>
+                <div className="truncate text-[11.5px] text-gray-400">{row.sub}</div>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="pb-2 pt-1 text-center text-[10px] text-[#9CA3AF]">Resale Доставка · версия 1.0 · это игра</div>
+      <div className="pb-2 pt-1 text-center text-[10px] text-gray-400">Resale Доставка · версия 1.0 · это игра</div>
     </div>
   )
 }
@@ -1054,7 +1054,7 @@ export default function DeliveryApp() {
   }
 
   return (
-    <div className="flex h-full flex-col bg-[#F6F7F9] text-[#141414]">
+    <div className="flex h-full flex-col bg-[#F5F6F8] text-[#17181A]">
       {/* ---------- оверлеи: посылка / курьер ---------- */}
       {view === 'parcel' && selected ? (
         <ParcelScreen
@@ -1078,8 +1078,8 @@ export default function DeliveryApp() {
               <div className="shrink-0 px-4 pb-2 pt-4">
                 <div className="flex items-center gap-2">
                   <div className="min-w-0 flex-1">
-                    <h1 className="text-[26px] font-bold leading-tight tracking-[-0.02em] text-[#141414]">Доставки</h1>
-                    <p className="mt-0.5 text-[13px] text-[#6B7280]">
+                    <h1 className="text-[26px] font-bold leading-tight tracking-[-0.02em] text-[#17181A]">Доставки</h1>
+                    <p className="mt-0.5 text-[13px] text-gray-500">
                       {active.length > 0 ? `${active.length} едут · обновляем сами` : 'Посылки и выплаты с продаж'}
                     </p>
                   </div>
@@ -1090,7 +1090,7 @@ export default function DeliveryApp() {
                     aria-pressed={searchOpen}
                     className={
                       'flex size-10 shrink-0 items-center justify-center rounded-full transition active:scale-95 ' +
-                      (searchOpen ? 'text-white' : 'bg-white text-[#141414] ring-1 ring-black/[0.05]')
+                      (searchOpen ? 'text-white' : 'bg-white text-[#17181A] ring-1 ring-black/[0.05]')
                     }
                     style={searchOpen ? { backgroundColor: GREEN } : undefined}
                   >
@@ -1100,7 +1100,7 @@ export default function DeliveryApp() {
                     type="button"
                     onClick={() => pushToast('Доставки', 'Посылка появится здесь после покупки или продажи')}
                     aria-label="Как работает доставка"
-                    className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-[#141414] ring-1 ring-black/[0.05] transition active:scale-95"
+                    className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-[#17181A] ring-1 ring-black/[0.05] transition active:scale-95"
                   >
                     <Plus className="size-[18px]" aria-hidden />
                   </button>
@@ -1108,20 +1108,20 @@ export default function DeliveryApp() {
 
                 {searchOpen && (
                   <div className="mt-3 flex items-center gap-2 rounded-xl bg-white px-3.5 ring-1 ring-black/[0.05]">
-                    <Search className="size-4 shrink-0 text-[#9CA3AF]" aria-hidden />
+                    <Search className="size-4 shrink-0 text-gray-400" aria-hidden />
                     <input
                       value={q}
                       onChange={(e) => setQ(e.target.value)}
                       placeholder="Название или трек-номер"
                       aria-label="Поиск по посылкам"
-                      className="h-11 w-full bg-transparent text-[14px] text-[#141414] outline-none placeholder:text-[#9CA3AF]"
+                      className="h-11 w-full bg-transparent text-[14px] text-[#17181A] outline-none placeholder:text-gray-400"
                     />
                     {q && (
                       <button
                         type="button"
                         onClick={() => setQ('')}
                         aria-label="Очистить поиск"
-                        className="flex size-8 shrink-0 items-center justify-center rounded-full text-[#9CA3AF] active:bg-black/5"
+                        className="flex size-8 shrink-0 items-center justify-center rounded-full text-gray-400 active:bg-neutral-200/60"
                       >
                         <X className="size-4" aria-hidden />
                       </button>
@@ -1143,7 +1143,7 @@ export default function DeliveryApp() {
                         onClick={() => setFilter(f.key)}
                         className={
                           'flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] transition active:scale-[0.97] ' +
-                          (on ? 'font-semibold text-white' : 'bg-white font-medium text-[#141414] ring-1 ring-black/[0.05]')
+                          (on ? 'font-semibold text-white' : 'bg-white font-medium text-[#17181A] ring-1 ring-black/[0.05]')
                         }
                         style={on ? { backgroundColor: GREEN } : undefined}
                       >
@@ -1152,7 +1152,7 @@ export default function DeliveryApp() {
                           <span
                             className={
                               'inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums ' +
-                              (on ? 'bg-white/25 text-white' : 'bg-black/5 text-[#6B7280]')
+                              (on ? 'bg-white/25 text-white' : 'bg-neutral-200/60 text-gray-500')
                             }
                           >
                             {count}
@@ -1174,7 +1174,7 @@ export default function DeliveryApp() {
                     <div className="h-[86px] animate-pulse rounded-[20px] bg-white" />
                   </div>
                 ) : error && !data ? (
-                  <div className="flex flex-col items-center gap-1 rounded-[20px] bg-[#FDECEA] p-6 text-center">
+                  <div className="flex flex-col items-center gap-1 rounded-[20px] bg-[#FDEBEB] p-6 text-center">
                     <img
                       src="/img/empty/deal-fail.webp"
                       alt=""
@@ -1203,8 +1203,8 @@ export default function DeliveryApp() {
                       decoding="async"
                       className="h-24"
                     />
-                    <div className="mt-3 text-[15px] font-semibold text-[#141414]">Доставок пока нет</div>
-                    <div className="mt-1 max-w-64 text-[13px] leading-relaxed text-[#9CA3AF]">
+                    <div className="mt-3 text-[15px] font-semibold text-[#17181A]">Доставок пока нет</div>
+                    <div className="mt-1 max-w-64 text-[13px] leading-relaxed text-gray-400">
                       Каждая покупка едет посылкой: собираем, в пути, забирайте в пункте выдачи.
                     </div>
                   </div>
@@ -1218,10 +1218,10 @@ export default function DeliveryApp() {
                       decoding="async"
                       className="h-24"
                     />
-                    <div className="mt-3 text-[15px] font-semibold text-[#141414]">
+                    <div className="mt-3 text-[15px] font-semibold text-[#17181A]">
                       {needle ? 'Ничего не нашлось' : 'Здесь пока пусто'}
                     </div>
-                    <div className="mt-1 text-[13px] text-[#9CA3AF]">
+                    <div className="mt-1 text-[13px] text-gray-400">
                       {needle ? 'Попробуйте другое название или трек' : 'Смените фильтр, чтобы увидеть другие посылки'}
                     </div>
                   </div>
@@ -1231,7 +1231,7 @@ export default function DeliveryApp() {
                   ))
                 )}
                 {sorted.length > 0 && filtered.length > 0 && (
-                  <div className="pb-2 pt-1 text-center text-[10px] text-[#9CA3AF]">
+                  <div className="pb-2 pt-1 text-center text-[10px] text-gray-400">
                     Resale Доставка · осмотр при получении · это игра
                   </div>
                 )}
@@ -1250,8 +1250,8 @@ export default function DeliveryApp() {
           {tab === 'history' && (
             <>
               <div className="shrink-0 px-4 pb-2 pt-4">
-                <h1 className="text-[26px] font-bold leading-tight tracking-[-0.02em] text-[#141414]">История</h1>
-                <p className="mt-0.5 text-[13px] text-[#6B7280]">
+                <h1 className="text-[26px] font-bold leading-tight tracking-[-0.02em] text-[#17181A]">История</h1>
+                <p className="mt-0.5 text-[13px] text-gray-500">
                   {deliveredAll.length + returnedAll.length > 0
                     ? `${deliveredAll.length} доставлено · ${returnedAll.length} возвратов`
                     : 'Доставленное и возвраты'}
@@ -1264,8 +1264,8 @@ export default function DeliveryApp() {
           {tab === 'profile' && (
             <>
               <div className="shrink-0 px-4 pb-2 pt-4">
-                <h1 className="text-[26px] font-bold leading-tight tracking-[-0.02em] text-[#141414]">Профиль</h1>
-                <p className="mt-0.5 text-[13px] text-[#6B7280]">Resale Доставка</p>
+                <h1 className="text-[26px] font-bold leading-tight tracking-[-0.02em] text-[#17181A]">Профиль</h1>
+                <p className="mt-0.5 text-[13px] text-gray-500">Resale Доставка</p>
               </div>
               <ProfileScreen items={sorted} />
             </>

@@ -38,10 +38,12 @@ export async function POST(req: Request) {
   const pay = Math.min(user.taxDebt, user.balance)
   if (pay <= 0) return Response.json({ error: 'Недостаточно средств на счету' }, { status: 400 })
 
-  await db.user.update({
-    where: { id: user.id },
+  // 59-a: атомарная оплата: параллельные траты баланса не уводят счёт в минус
+  const dec = await db.user.updateMany({
+    where: { id: user.id, balance: { gte: pay }, taxDebt: { gte: pay } },
     data: { balance: { decrement: pay }, taxDebt: { decrement: pay }, taxPenaltyAt: new Date() },
   })
+  if (dec.count === 0) return Response.json({ error: 'Недостаточно средств на счету' }, { status: 400 })
   // пометить счета оплаченными
   const unpaid = await db.taxBill.findMany({ where: { userId: user.id, status: 'unpaid' }, orderBy: { createdAt: 'asc' } })
   let left = pay

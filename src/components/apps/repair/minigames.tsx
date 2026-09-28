@@ -31,7 +31,7 @@ function TimerBar({ endAt, total }: { endAt: number; total: number }) {
   }, [endAt, total])
   return (
     <div className="flex items-center gap-2">
-      <div className="h-1.5 w-24 overflow-hidden rounded-full bg-black/10">
+      <div className="h-1.5 w-24 overflow-hidden rounded-full bg-neutral-200">
         <div className="h-full rounded-full bg-[#17181A] transition-[width] duration-200" style={{ width: `${frac * 100}%` }} />
       </div>
       <span className="w-8 text-[11px] font-semibold tabular-nums text-[#9AA0A8]">{Math.ceil(frac * total)}с</span>

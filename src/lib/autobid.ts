@@ -3,6 +3,7 @@ import { auctionStep } from '@/lib/economy'
 import { notifyUser } from '@/lib/deals'
 import { fmtMoney } from '@/lib/format'
 import { emitTo } from '@/lib/realtime-emit'
+import { placeAuctionBid } from '@/lib/auction-core'
 
 // Автоставка (прокси-ставки как на eBay).
 // Вызывается после ЛЮБОЙ смены лидера лота, когда лидером стал бот:
@@ -33,33 +34,42 @@ export async function fireAutoBids(lotId: string): Promise<boolean> {
 
   for (const ab of abs) {
     if (nextBid > ab.maxAmount) continue // максимум игрока ниже нужной ставки — ждём
-    const player = await db.user.findUnique({ where: { id: ab.userId } })
+    const player = await db.user.findUnique({
+      where: { id: ab.userId },
+      select: { id: true, displayName: true },
+    })
     if (!player) continue
 
-    if (player.balance < nextBid) {
-      // не хватает денег — автоставка снимается, игрока предупреждаем
-      await db.autoBid.delete({ where: { id: ab.id } })
-      await notifyUser(
-        ab.userId,
-        'market',
-        '🤖 Автоставка отключена',
-        `На лоте «${lot.title}» не хватило баланса, чтобы перебить ${fmtMoney(nextBid)}.`,
-      )
+    // атомарная ставка (59-a): резерв баланса и CAS лота в транзакции: гонка
+    // с параллельной ставкой игрока больше не списывает деньги дважды
+    const res = await placeAuctionBid({
+      lotId, bidderId: player.id, bidderName: player.displayName, amount: nextBid, reserve: true,
+    })
+    if (!res.ok) {
+      if (res.error.startsWith('Недостаточно')) {
+        // не хватает денег — автоставка снимается, игрока предупреждаем
+        await db.autoBid.deleteMany({ where: { id: ab.id } })
+        await notifyUser(
+          ab.userId,
+          'market',
+          '🤖 Автоставка отключена',
+          `На лоте «${lot.title}» не хватило баланса, чтобы перебить ${fmtMoney(nextBid)}.`,
+        )
+      }
+      // «Лот уже завершён»/«перебили» — автоставку оставляем, шанс будет на следующем ходе
       continue
     }
 
-    // анти-снайпинг: как у обычных ставок, финал продлевается до 30с
-    const msLeft = lot.endsAt.getTime() - Date.now()
-    const extended = msLeft < 60_000
-    const endsAt = extended ? new Date(Date.now() + 30_000) : lot.endsAt
-
     // если лидером был другой игрок — возвращаем его резерв
-    if (lot.currentBidderId) {
-      const prev = await db.user.findUnique({ where: { id: lot.currentBidderId } })
-      if (prev && !prev.isBot && prev.id !== ab.userId && lot.currentBid) {
+    if (res.prevBidderId && res.prevBid) {
+      const prev = await db.user.findUnique({
+        where: { id: res.prevBidderId },
+        select: { id: true, isBot: true },
+      })
+      if (prev && !prev.isBot && prev.id !== ab.userId) {
         await db.user.update({
           where: { id: prev.id },
-          data: { balance: { increment: lot.currentBid } },
+          data: { balance: { increment: res.prevBid } },
         })
         await notifyUser(
           prev.id,
@@ -70,27 +80,13 @@ export async function fireAutoBids(lotId: string): Promise<boolean> {
       }
     }
 
-    await db.user.update({ where: { id: ab.userId }, data: { balance: { decrement: nextBid } } })
-    await db.auctionBid.create({
-      data: { lotId, userId: ab.userId, userName: player.displayName, amount: nextBid },
-    })
-    await db.auctionLot.update({
-      where: { id: lotId },
-      data: {
-        currentBid: nextBid,
-        currentBidderId: ab.userId,
-        currentBidderName: player.displayName,
-        bidCount: { increment: 1 },
-        ...(extended ? { endsAt } : {}),
-      },
-    })
     await notifyUser(
       ab.userId,
       'market',
       '🤖 Автоставка сработала',
       `«${lot.title}» — ваша ставка ${fmtMoney(nextBid)} перебила соперника. Потолок ${fmtMoney(ab.maxAmount)} сохранён.`,
     )
-    await emitTo('global', 'auction:update', { lotId, extended, autobid: true })
+    await emitTo('global', 'auction:update', { lotId, extended: res.extended, autobid: true })
     return true
   }
   return false

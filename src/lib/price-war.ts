@@ -19,6 +19,8 @@ function cooldown(key: string, ms: number): boolean {
   const now = Date.now()
   const last = m.get(key) ?? 0
   if (now - last < ms) return false
+  // защита от накопления: ключей listing/chat со временем становится много
+  if (m.size > 500) m.clear()
   m.set(key, now)
   return true
 }
@@ -193,12 +195,14 @@ export async function botComebackOffers(): Promise<void> {
       // покупатель в чёрном списке — продавцу нечего ему предложить
       if (await isBlocked(chat.buyerId, chat.sellerId)) continue
 
-      // последнее слово за игроком, и прошло 4+ минут — «пауза», продавец нервничает
+      // последнее слово за игроком (в БД senderType='user'), и прошло 4+ минут —
+      // «пауза», продавец нервничает (59-a: было сравнение с 'player': такой тип
+      // не существует, ветка никогда не срабатывала и боты не возвращались)
       const last = await db.message.findFirst({
         where: { chatId: chat.id },
         orderBy: { createdAt: 'desc' },
       })
-      if (!last || last.senderType !== 'player') continue
+      if (!last || last.senderType !== 'user') continue
       if (Date.now() - last.createdAt.getTime() < 4 * 60_000) continue
       if (!cooldown(`comeback:${chat.id}`, 12 * 60_000)) continue
 

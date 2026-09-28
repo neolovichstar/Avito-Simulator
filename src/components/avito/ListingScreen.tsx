@@ -195,7 +195,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
 
   if (loading && !data) {
     return (
-      <div className="flex h-full flex-col bg-[#F6F7F9]">
+      <div className="flex h-full flex-col bg-[#F5F6F8]">
         <Skeleton className="aspect-[4/3] w-full rounded-none" />
         <div className="flex-1 space-y-3 p-4">
           <Skeleton className="h-7 w-1/2 rounded-lg" />
@@ -209,9 +209,9 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
   }
   if (error && !data) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#F6F7F9] p-6 text-center">
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#F5F6F8] p-6 text-center">
         <p className="text-sm text-red-600">{error}</p>
-        <button onClick={onBack} className="h-11 rounded-full bg-white px-5 text-sm font-semibold text-[#141414] ring-1 ring-black/[0.08] transition-all active:scale-[0.98]">
+        <button onClick={onBack} className="h-11 rounded-full bg-white px-5 text-sm font-semibold text-[#17181A] ring-1 ring-black/[0.08] transition-all active:scale-[0.98]">
           Вернуться в ленту
         </button>
       </div>
@@ -229,10 +229,10 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
     : ''
 
   return (
-    <div className="relative flex h-full flex-col bg-[#F6F7F9]">
+    <div className="relative flex h-full flex-col bg-[#F5F6F8]">
       {/* фото со свайп-каруселью (нативный scroll-snap, touch-action pan-x — свайпы работают на телефоне) */}
       <div className="flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
-        <div className="relative aspect-[4/3] bg-[#F0F1F3]">
+        <div className="relative aspect-[4/3] bg-[#f0f1f3]">
           <div
             ref={galleryRef}
             onScroll={() => {
@@ -260,12 +260,12 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
           <button
             onClick={onBack}
             aria-label="Назад"
-            className="absolute left-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#141414] shadow-md transition-colors active:bg-black/[0.06]"
+            className="absolute left-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#17181A] shadow-md transition-colors active:bg-neutral-200/60"
           >
             <ChevronLeft size={22} aria-hidden />
           </button>
           <span
-            className="absolute bottom-2.5 right-2.5 rounded-full bg-white/85 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[#141414] backdrop-blur-sm"
+            className="absolute bottom-2.5 right-2.5 rounded-full bg-white/85 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[#17181A] backdrop-blur-sm"
             aria-label={`Фото ${shot + 1} из ${GALLERY_SHOTS.length}`}
           >
             {shot + 1}/{GALLERY_SHOTS.length}
@@ -280,7 +280,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
           )}
           {sold && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/40" aria-hidden>
-              <span className="rounded-2xl bg-white px-5 py-2.5 text-lg font-extrabold text-[#141414] shadow-lg">Продано</span>
+              <span className="rounded-2xl bg-white px-5 py-2.5 text-lg font-extrabold text-[#17181A] shadow-lg">Продано</span>
             </div>
           )}
         </div>
@@ -289,28 +289,28 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
           {/* цена, название, чипы, метрики */}
           <div className="space-y-2 px-4 pb-4 pt-4">
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`text-[18px] font-extrabold tracking-tight leading-none tabular-nums ${data.price === 0 ? 'text-[#16A34A]' : 'text-[#141414]'}`}>
+              <span className={`text-[18px] font-extrabold tracking-tight leading-none tabular-nums ${data.price === 0 ? 'text-[#16A34A]' : 'text-[#17181A]'}`}>
                 {data.price === 0 ? 'Даром' : `${fmtNum(data.price)} ₽`}
               </span>
               {data.price > 0 && data.marginHint > 0 && (
-                <span className="flex items-center gap-1 rounded-full bg-[#14532D]/[0.08] px-2 py-1 text-xs font-bold text-[#14532D]">
+                <span className="flex items-center gap-1 rounded-full bg-[#14532D]/[0.08] px-2 py-1 text-xs font-bold text-[#15803D]">
                   <TrendingDown size={12} aria-hidden /> Дешевле рынка на {data.marginHint}%
                 </span>
               )}
               {!isMine && data.negotiable && (
-                <span className="flex items-center gap-1 rounded-full bg-black/[0.05] px-2 py-1 text-xs font-semibold text-black/55">
+                <span className="flex items-center gap-1 rounded-full bg-neutral-200/60 px-2 py-1 text-xs font-semibold text-[#17181A]/50">
                   <Handshake size={12} aria-hidden /> Торг уместен
                 </span>
               )}
             </div>
-            <h1 className="text-[16px] font-semibold leading-snug text-[#141414]">{data.title}</h1>
+            <h1 className="text-[16px] font-semibold leading-snug text-[#17181A]">{data.title}</h1>
             <div className="flex flex-wrap items-center gap-1.5">
               <ConditionBadge condition={data.condition} />
-              <span className="rounded-full bg-black/[0.05] px-2 py-0.5 text-[11px] font-medium leading-none text-black/55">
+              <span className="rounded-full bg-neutral-200/60 px-2 py-0.5 text-[11px] font-medium leading-none text-[#17181A]/50">
                 {CATEGORY_LABEL[data.category] ?? 'Товар'}
               </span>
             </div>
-            <div className="flex flex-wrap items-center gap-1.5 pt-0.5 text-[12px] text-black/45">
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5 text-[12px] text-[#17181A]/45">
               <span className="flex items-center gap-1"><MapPin size={12} aria-hidden /> {data.city}</span>
               <span aria-hidden>·</span>
               <span className="flex items-center gap-1"><Eye size={12} aria-hidden /> {data.views}</span>
@@ -322,12 +322,12 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
           {/* описание */}
           <Card className="mx-4 p-4">
             <Overline className="mb-1.5">Описание</Overline>
-            <p className={`text-[14px] leading-relaxed text-[#3F4650] ${!showDesc && longDesc ? 'line-clamp-4' : ''}`}>{data.description}</p>
+            <p className={`text-[14px] leading-relaxed text-[#3c4043] ${!showDesc && longDesc ? 'line-clamp-4' : ''}`}>{data.description}</p>
             {longDesc && (
               <button
                 onClick={() => setShowDesc((s) => !s)}
                 aria-expanded={showDesc}
-                className="mt-1.5 text-[14px] font-semibold text-[#14532D] transition-opacity active:opacity-70"
+                className="mt-1.5 text-[14px] font-semibold text-[#15803D] transition-opacity active:opacity-70"
               >
                 {showDesc ? 'Свернуть' : 'Показать полностью'}
               </button>
@@ -338,11 +338,11 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
           {data.specs && data.specs.length > 0 && (
             <Card className="mx-4 mt-3 p-4">
               <Overline className="mb-1">Характеристики</Overline>
-              <div className="divide-y divide-black/[0.05]">
+              <div className="divide-y divide-[#EBEDF0]">
                 {data.specs.map((s) => (
                   <div key={s.label} className="flex items-baseline justify-between gap-3 py-2">
-                    <span className="shrink-0 text-[13px] text-black/45">{s.label}</span>
-                    <span className="min-w-0 text-right text-[13px] font-semibold text-[#141414]">{s.value}</span>
+                    <span className="shrink-0 text-[13px] text-[#17181A]/45">{s.label}</span>
+                    <span className="min-w-0 text-right text-[13px] font-semibold text-[#17181A]">{s.value}</span>
                   </div>
                 ))}
               </div>
@@ -361,19 +361,19 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
                 <UserAvatar name={data.seller.displayName} className="h-11 w-11 rounded-full" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="truncate text-[14px] font-bold text-[#141414]">{data.seller.displayName}</span>
+                    <span className="truncate text-[14px] font-bold text-[#17181A]">{data.seller.displayName}</span>
                     {data.sellerOnline && <span className="size-2 shrink-0 rounded-full bg-[#16A34A]" aria-label="Продавец онлайн" />}
                   </div>
-                  <div className="mt-0.5 flex items-center gap-1 text-[12px] text-black/45">
+                  <div className="mt-0.5 flex items-center gap-1 text-[12px] text-[#17181A]/45">
                     <Star size={11} className="fill-[#16A34A] text-[#16A34A]" aria-hidden />
                     {data.sellerRating > 0 ? Math.min(5, data.sellerRating).toFixed(1) : 'новый'}
                     <span>({data.seller.ratingCount})</span>
                   </div>
                 </div>
-                {onOpenSeller && <ChevronRight size={16} className="shrink-0 text-black/25" aria-hidden />}
+                {onOpenSeller && <ChevronRight size={16} className="shrink-0 text-[#17181A]/25" aria-hidden />}
               </div>
               {joined && (
-                <div className="mt-3 flex items-center gap-1 border-t border-black/[0.05] pt-3 text-[12px] text-black/45">
+                <div className="mt-3 flex items-center gap-1 border-t border-black/[0.05] pt-3 text-[12px] text-[#17181A]/45">
                   <BadgeCheck size={12} className="text-[#16A34A]" aria-hidden />
                   На Resale с {joined}
                 </div>
@@ -389,15 +389,15 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
                 {sellerReviews.map((r) => (
                   <Card key={r.id} className="p-3.5">
                     <div className="flex items-center gap-1.5">
-                      <span className="truncate text-xs font-semibold text-[#141414]">{r.from}</span>
+                      <span className="truncate text-xs font-semibold text-[#17181A]">{r.from}</span>
                       <span className="flex gap-0.5" aria-label={`Оценка ${r.rating} из 5`}>
                         {Array.from({ length: 5 }).map((_, i) => (
-                          <Star key={i} size={10} className={i < r.rating ? 'fill-[#16A34A] text-[#16A34A]' : 'text-black/[0.12]'} aria-hidden />
+                          <Star key={i} size={10} className={i < r.rating ? 'fill-[#16A34A] text-[#16A34A]' : 'text-[#17181A]/25'} aria-hidden />
                         ))}
                       </span>
                       <span className="ml-auto shrink-0 text-[10px] text-black/40">{timeAgo(r.createdAt)}</span>
                     </div>
-                    <p className="mt-1 line-clamp-2 text-xs text-black/55">{r.text}</p>
+                    <p className="mt-1 line-clamp-2 text-xs text-[#17181A]/50">{r.text}</p>
                     <p className="mt-0.5 truncate text-[10px] text-black/40">{r.listing}</p>
                   </Card>
                 ))}
@@ -423,12 +423,12 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
           {sold && data.purchasedByMe && (
             <div className="px-4 pt-4">
               <div className="space-y-2.5 rounded-[20px] bg-amber-500/[0.1] p-4">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-[#141414]">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-[#17181A]">
                   <PenLine size={14} className="text-amber-700" aria-hidden />
                   Оцените сделку
                 </div>
                 {data.reviewedByMe || revSent ? (
-                  <p className="flex items-center gap-1.5 text-xs text-black/55">
+                  <p className="flex items-center gap-1.5 text-xs text-[#17181A]/50">
                     <BadgeCheck size={14} className="text-[#16A34A]" aria-hidden />
                     Отзыв отправлен. Продавец увидит вашу оценку
                   </p>
@@ -455,7 +455,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
                       placeholder="Расскажите, как прошла сделка (необязательно)"
                       rows={2}
                       maxLength={300}
-                      className="w-full resize-none rounded-[14px] bg-white p-3 text-sm text-[#141414] outline-none ring-1 ring-black/[0.06] placeholder:text-black/35 focus:ring-black/[0.14]"
+                      className="w-full resize-none rounded-[14px] bg-white p-3 text-sm text-[#17181A] outline-none ring-1 ring-black/[0.06] placeholder:text-[#17181A]/35 focus:ring-black/[0.14]"
                     />
                     <div className="flex items-center gap-2">
                       <button
@@ -490,14 +490,14 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
           {!isMine && !sold && (
             <div className="px-4 pt-4">
               {complaintSent ? (
-                <p className="flex items-center gap-1.5 text-xs text-black/45">
+                <p className="flex items-center gap-1.5 text-xs text-[#17181A]/45">
                   <ShieldCheck size={13} className="text-[#16A34A]" aria-hidden />
                   Жалоба отправлена. Модератор проверит объявление
                 </p>
               ) : (
                 <button
                   onClick={openComplaint}
-                  className="flex h-11 items-center gap-1.5 rounded-2xl px-3 text-xs font-medium text-black/45 transition-colors active:bg-black/[0.05]"
+                  className="flex h-11 items-center gap-1.5 rounded-2xl px-3 text-xs font-medium text-[#17181A]/45 transition-colors active:bg-neutral-200/60"
                 >
                   <Flag size={13} aria-hidden /> Пожаловаться на объявление
                 </button>
@@ -508,7 +508,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
           {isMine && (
             <div className="px-4 pt-4">
               <Card className="space-y-2.5 p-4">
-                <div className="flex items-center gap-1.5 text-xs text-black/55">
+                <div className="flex items-center gap-1.5 text-xs text-[#17181A]/50">
                   <PackageCheck size={14} className="text-[#16A34A]" aria-hidden />
                   Это ваше объявление
                 </div>
@@ -523,12 +523,12 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
                   <button
                     onClick={remove}
                     disabled={busy}
-                    className="h-11 rounded-full bg-black/[0.05] px-4 text-xs font-semibold text-[#141414] transition-all active:scale-[0.98] disabled:opacity-50"
+                    className="h-11 rounded-full bg-neutral-200/60 px-4 text-xs font-semibold text-[#17181A] transition-all active:scale-[0.98] disabled:opacity-50"
                   >
                     Снять
                   </button>
                 </div>
-                <button onClick={onGoSell} className="flex h-8 items-center text-xs font-semibold text-black/55 transition-opacity active:opacity-70">
+                <button onClick={onGoSell} className="flex h-8 items-center text-xs font-semibold text-[#17181A]/50 transition-opacity active:opacity-70">
                   Продать что-то ещё
                 </button>
               </Card>
@@ -541,7 +541,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
       {!isMine && (
         <div className="shrink-0 border-t border-black/[0.05] bg-white/95 px-3 py-2.5 pb-[max(10px,env(safe-area-inset-bottom))] backdrop-blur-md">
           {sold ? (
-            <div className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-black/[0.05] text-sm font-bold text-black/40">
+            <div className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-neutral-200/60 text-sm font-bold text-black/40">
               <PackageCheck size={17} aria-hidden /> Продано
             </div>
           ) : (
@@ -549,7 +549,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
               <button
                 onClick={chat}
                 disabled={busy}
-                className="flex h-12 items-center justify-center gap-2 rounded-full bg-white px-5 text-[15px] font-bold text-[#141414] ring-1 ring-black/[0.1] transition-all active:scale-[0.98] disabled:opacity-50"
+                className="flex h-12 items-center justify-center gap-2 rounded-full bg-white px-5 text-[15px] font-bold text-[#17181A] ring-1 ring-black/[0.1] transition-all active:scale-[0.98] disabled:opacity-50"
               >
                 <MessageSquare size={17} aria-hidden /> Написать
               </button>
@@ -567,7 +567,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
       )}
       {msg && !buyOpen && <div className="shrink-0 px-4 pb-2 text-xs text-red-600">{msg}</div>}
       {okMsg && !buyOpen && (
-        <div className="flex shrink-0 items-center gap-1 px-4 pb-2 text-xs text-[#14532D]">
+        <div className="flex shrink-0 items-center gap-1 px-4 pb-2 text-xs text-[#15803D]">
           <PackageCheck size={12} aria-hidden /> {okMsg}
         </div>
       )}
@@ -577,9 +577,9 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
         <div className="absolute inset-0 z-40 flex items-end bg-black/50" onClick={() => { if (!busy) setBuyOpen(false) }}>
           <div className="w-full rounded-t-[24px] bg-white animate-in slide-in-from-bottom-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-center pt-3">
-              <span className="h-1 w-10 rounded-full bg-black/[0.08]" aria-hidden />
+              <span className="h-1 w-10 rounded-full bg-neutral-200/70" aria-hidden />
             </div>
-            <h3 className="px-4 pt-2 text-base font-bold text-[#141414]">Как получите товар?</h3>
+            <h3 className="px-4 pt-2 text-base font-bold text-[#17181A]">Как получите товар?</h3>
             <div role="radiogroup" aria-label="Способ получения" className="space-y-2 p-3">
               <button
                 role="radio"
@@ -587,19 +587,19 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
                 onClick={() => setMode('pickup')}
                 disabled={busy}
                 className={`flex w-full items-start gap-3 rounded-[18px] border-2 p-3.5 text-left transition-colors disabled:opacity-50 ${
-                  mode === 'pickup' ? 'border-[#14532D] bg-white' : 'border-black/[0.06] bg-[#F6F7F9]'
+                  mode === 'pickup' ? 'border-[#16A34A] bg-white' : 'border-black/[0.06] bg-[#F5F6F8]'
                 }`}
               >
-                <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${mode === 'pickup' ? 'border-[#14532D]' : 'border-black/20'}`} aria-hidden>
+                <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${mode === 'pickup' ? 'border-[#16A34A]' : 'border-black/20'}`} aria-hidden>
                   {mode === 'pickup' && <span className="h-2.5 w-2.5 rounded-full bg-[#14532D]" />}
                 </span>
-                <HandCoins size={20} className="mt-0.5 shrink-0 text-[#14532D]" aria-hidden />
+                <HandCoins size={20} className="mt-0.5 shrink-0 text-[#15803D]" aria-hidden />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-[#141414]">Самовывоз</span>
-                    <span className="text-sm font-bold tabular-nums text-[#141414]">{data.price === 0 ? 'Даром' : `${fmtNum(data.price)} ₽`}</span>
+                    <span className="text-sm font-semibold text-[#17181A]">Самовывоз</span>
+                    <span className="text-sm font-bold tabular-nums text-[#17181A]">{data.price === 0 ? 'Даром' : `${fmtNum(data.price)} ₽`}</span>
                   </span>
-                  <span className="mt-0.5 block text-xs text-black/45">Осмотр и торг при встрече</span>
+                  <span className="mt-0.5 block text-xs text-[#17181A]/45">Осмотр и торг при встрече</span>
                 </span>
               </button>
               <button
@@ -608,19 +608,19 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
                 onClick={() => setMode('courier')}
                 disabled={busy || data.price === 0}
                 className={`flex w-full items-start gap-3 rounded-[18px] border-2 p-3.5 text-left transition-colors disabled:opacity-50 ${
-                  mode === 'courier' ? 'border-[#14532D] bg-white' : 'border-black/[0.06] bg-[#F6F7F9]'
+                  mode === 'courier' ? 'border-[#16A34A] bg-white' : 'border-black/[0.06] bg-[#F5F6F8]'
                 }`}
               >
-                <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${mode === 'courier' ? 'border-[#14532D]' : 'border-black/20'}`} aria-hidden>
+                <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${mode === 'courier' ? 'border-[#16A34A]' : 'border-black/20'}`} aria-hidden>
                   {mode === 'courier' && <span className="h-2.5 w-2.5 rounded-full bg-[#14532D]" />}
                 </span>
                 <Truck size={20} className="mt-0.5 shrink-0 text-amber-700" aria-hidden />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-[#141414]">Курьер</span>
-                    <span className="text-sm font-bold text-[#141414]">+{fmtMoney(DELIVERY_FEE)}</span>
+                    <span className="text-sm font-semibold text-[#17181A]">Курьер</span>
+                    <span className="text-sm font-bold text-[#17181A]">+{fmtMoney(DELIVERY_FEE)}</span>
                   </span>
-                  <span className="mt-0.5 flex items-center gap-1 text-xs text-black/45">
+                  <span className="mt-0.5 flex items-center gap-1 text-xs text-[#17181A]/45">
                     <AlertTriangle size={11} className="shrink-0 text-amber-700" aria-hidden />
                     Без осмотра и торга
                   </span>
@@ -628,7 +628,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
               </button>
             </div>
             {msg && <div className="px-4 pb-2 text-xs text-red-600">{msg}</div>}
-            {busy && <div className="flex justify-center pb-2"><Loader2 size={18} className="animate-spin text-black/35" aria-hidden /></div>}
+            {busy && <div className="flex justify-center pb-2"><Loader2 size={18} className="animate-spin text-[#17181A]/35" aria-hidden /></div>}
             <div className="border-t border-black/[0.05] p-3 pb-[max(12px,env(safe-area-inset-bottom))]">
               <button
                 onClick={() => buy(mode === 'courier')}
@@ -648,10 +648,10 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
         <div className="absolute inset-0 z-40 flex items-end bg-black/50" onClick={() => { if (!complaintBusy) setComplaintOpen(false) }}>
           <div className="max-h-[86%] w-full overflow-y-auto rounded-t-[24px] bg-white [scrollbar-width:thin] animate-in slide-in-from-bottom-4" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Жалоба на объявление">
             <div className="flex justify-center pt-3">
-              <span className="h-1 w-10 rounded-full bg-black/[0.08]" aria-hidden />
+              <span className="h-1 w-10 rounded-full bg-neutral-200/70" aria-hidden />
             </div>
-            <h3 className="px-4 pt-2 text-base font-bold text-[#141414]">Причина жалобы</h3>
-            <p className="px-4 pt-1 text-xs text-black/45">Модератор проверит объявление и примет решение</p>
+            <h3 className="px-4 pt-2 text-base font-bold text-[#17181A]">Причина жалобы</h3>
+            <p className="px-4 pt-1 text-xs text-[#17181A]/45">Модератор проверит объявление и примет решение</p>
             <div role="radiogroup" aria-label="Причина жалобы" className="space-y-2 p-3">
               {([
                 ['spam', 'Реклама или спам'],
@@ -667,18 +667,18 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
                   onClick={() => setComplaintReason(key)}
                   disabled={complaintBusy}
                   className={`flex w-full items-center gap-3 rounded-[18px] border-2 p-3.5 text-left transition-colors disabled:opacity-50 ${
-                    complaintReason === key ? 'border-[#14532D] bg-white' : 'border-black/[0.06] bg-[#F6F7F9]'
+                    complaintReason === key ? 'border-[#16A34A] bg-white' : 'border-black/[0.06] bg-[#F5F6F8]'
                   }`}
                 >
-                  <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${complaintReason === key ? 'border-[#14532D]' : 'border-black/20'}`} aria-hidden>
+                  <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${complaintReason === key ? 'border-[#16A34A]' : 'border-black/20'}`} aria-hidden>
                     {complaintReason === key && <span className="h-2.5 w-2.5 rounded-full bg-[#14532D]" />}
                   </span>
-                  <span className="text-sm font-medium text-[#141414]">{label}</span>
+                  <span className="text-sm font-medium text-[#17181A]">{label}</span>
                 </button>
               ))}
             </div>
             {complaintSent ? (
-              <div className="flex items-center gap-2 border-t border-black/[0.05] p-3 text-sm font-semibold text-[#14532D]">
+              <div className="flex items-center gap-2 border-t border-black/[0.05] p-3 text-sm font-semibold text-[#15803D]">
                 <ShieldCheck size={16} aria-hidden /> Жалоба отправлена
               </div>
             ) : (
@@ -701,7 +701,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
                   disabled={blockBusy}
                   className={`flex h-12 w-full items-center justify-center gap-2 rounded-full text-sm font-semibold transition-all active:scale-[0.98] disabled:opacity-40 ${
                     sellerBlocked
-                      ? 'bg-black/[0.05] text-[#141414]'
+                      ? 'bg-neutral-200/60 text-[#17181A]'
                       : 'bg-red-500/[0.09] text-red-600'
                   }`}
                 >
@@ -756,18 +756,18 @@ function PriceHistoryCard({ points }: { points: PricePointDTO[] }) {
   return (
     <Card className="p-4">
       <div className="mb-1 flex items-center gap-1.5">
-        <LineChart size={14} className="text-[#14532D]" aria-hidden />
+        <LineChart size={14} className="text-[#15803D]" aria-hidden />
         <Overline>Динамика цен</Overline>
         <span
           className={`ml-auto rounded-full px-2 py-0.5 text-[11px] font-bold ${
-            up ? 'bg-red-500/[0.09] text-red-600' : 'bg-[#14532D]/[0.08] text-[#14532D]'
+            up ? 'bg-red-500/[0.09] text-red-600' : 'bg-[#14532D]/[0.08] text-[#15803D]'
           }`}
         >
           {up ? '+' : ''}
           {delta}% {period}
         </span>
       </div>
-      <p className="mb-2 text-[11px] text-black/45">
+      <p className="mb-2 text-[11px] text-[#17181A]/45">
         По {ps.length} объявлениям на рынке · min {fmtNum(min)} ₽ / max {fmtNum(max)} ₽
       </p>
       <svg viewBox={`0 0 ${w} ${h}`} className="h-[72px] w-full" role="img" aria-label={`График цен от ${fmtNum(min)} до ${fmtNum(max)} рублей`}>
@@ -797,7 +797,7 @@ function SimilarStrip({ items, currentPrice, onOpen }: {
     <div>
       <div className="mb-2 flex items-center gap-1.5 pr-4">
         <Overline>Похожие объявления</Overline>
-        <span className="text-[11px] text-black/35">{items.length} шт.</span>
+        <span className="text-[11px] text-[#17181A]/35">{items.length} шт.</span>
       </div>
       <div className="flex gap-2.5 overflow-x-auto pb-1 pr-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" style={{ touchAction: 'pan-x' }}>
         {items.map((s) => {
@@ -810,7 +810,7 @@ function SimilarStrip({ items, currentPrice, onOpen }: {
               onClick={() => onOpen(s.id)}
               className="w-[150px] shrink-0 overflow-hidden rounded-[16px] bg-white text-left ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-transform active:scale-[0.98]"
             >
-              <div className="relative aspect-[4/3] bg-[#F0F1F3]">
+              <div className="relative aspect-[4/3] bg-[#f0f1f3]">
                 <img src={s.image} alt="" className="h-full w-full object-cover" loading="lazy" />
                 {s.boosted && (
                   <span className="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-md bg-black/60 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
@@ -818,21 +818,21 @@ function SimilarStrip({ items, currentPrice, onOpen }: {
                   </span>
                 )}
                 {s.mine && (
-                  <span className="absolute right-1.5 top-1.5 rounded-md bg-white px-1.5 py-0.5 text-[9px] font-bold text-[#141414] shadow-sm">
+                  <span className="absolute right-1.5 top-1.5 rounded-md bg-white px-1.5 py-0.5 text-[9px] font-bold text-[#17181A] shadow-sm">
                     Ваше
                   </span>
                 )}
               </div>
               <div className="space-y-1 p-2">
-                <p className="text-[14px] font-extrabold leading-none tabular-nums text-[#141414]">
+                <p className="text-[14px] font-extrabold leading-none tabular-nums text-[#17181A]">
                   {s.price === 0 ? 'Даром' : `${fmtNum(s.price)} ₽`}
                 </p>
                 {!equal && currentPrice > 0 && s.price > 0 && (
-                  <p className={`text-[10px] font-semibold ${cheaper ? 'text-[#14532D]' : 'text-black/40'}`}>
+                  <p className={`text-[10px] font-semibold ${cheaper ? 'text-[#15803D]' : 'text-black/40'}`}>
                     {cheaper ? 'дешевле' : 'дороже'} на {Math.abs(diff)}%
                   </p>
                 )}
-                <p className="truncate text-[10px] text-black/55">{s.sellerName}</p>
+                <p className="truncate text-[10px] text-[#17181A]/50">{s.sellerName}</p>
                 <p className="flex items-center gap-0.5 text-[10px] text-black/40">
                   <MapPin size={9} aria-hidden /> {s.city}
                 </p>

@@ -86,7 +86,7 @@ export function HeartBtn({
       className={
         'flex shrink-0 items-center justify-center rounded-full transition active:scale-90 ' +
         (plain ? 'size-10 ' : 'size-9 ') +
-        (active ? '' : plain ? 'text-[#141414]' : 'text-[#9CA3AF]')
+        (active ? '' : plain ? 'text-[#17181A]' : 'text-gray-400')
       }
     >
       <Heart
@@ -163,7 +163,7 @@ export function LotRow({
       aria-label={`Открыть лот ${lot.title}`}
       className="flex cursor-pointer gap-3 rounded-[20px] bg-white p-3 ring-1 ring-black/[0.05] transition active:scale-[0.98]"
     >
-      <div className="relative size-24 shrink-0 overflow-hidden rounded-[14px] bg-black/[0.03]">
+      <div className="relative size-24 shrink-0 overflow-hidden rounded-[14px] bg-neutral-200/40">
         <img loading="lazy" decoding="async" src={lot.image} alt={lot.title} className="size-full object-cover"/>
         {!ended && ending && (
           <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur">
@@ -179,18 +179,18 @@ export function LotRow({
       </div>
 
       <div className="min-w-0 flex-1 py-0.5">
-        <div className="truncate text-[15px] font-bold text-[#141414]">{lot.title}</div>
-        <div className="mt-0.5 truncate text-[13px] text-[#9CA3AF]">{lotDesc(lot)}</div>
+        <div className="truncate text-[15px] font-bold text-[#17181A]">{lot.title}</div>
+        <div className="mt-0.5 truncate text-[13px] text-gray-400">{lotDesc(lot)}</div>
         <div className="mt-2 flex items-baseline gap-2">
-          <span className="text-[16px] font-extrabold tabular-nums text-[#141414]">
+          <span className="text-[16px] font-extrabold tabular-nums text-[#17181A]">
             {fmtMoney(lot.currentBid ?? lot.startPrice)}
           </span>
-          <span className="text-[12px] text-[#9CA3AF]">
+          <span className="text-[12px] text-gray-400">
             {lot.bidCount} {plural(lot.bidCount, 'ставка', 'ставки', 'ставок')}
           </span>
         </div>
         {lot.myBid > 0 && (
-          <div className="mt-0.5 truncate text-[11px] font-medium text-[#C77B28]">
+          <div className="mt-0.5 truncate text-[11px] font-medium text-[#C97B1D]">
             Ваша ставка {fmtMoney(lot.myBid)}
             {!ended && lot.myAutoBid > 0 ? ` · авто до ${fmtMoney(lot.myAutoBid)}` : ''}
           </div>
@@ -220,7 +220,7 @@ export function LotRow({
           <span
             className={
               'ml-auto text-[13px] font-semibold tabular-nums ' +
-              (ended ? 'text-black/30' : ending ? 'text-[#D14343]' : 'text-black/45')
+              (ended ? 'text-[#17181A]/30' : ending ? 'text-[#D14343]' : 'text-[#17181A]/45')
             }
           >
             {ended ? 'Завершён' : fmtClock(remainMs)}
@@ -252,7 +252,7 @@ export function CountdownCard({ remainMs, ended }: { remainMs: number; ended: bo
     <div className="rounded-[20px] p-4" style={{ backgroundColor: PLATE }}>
       <Cap className="text-center">До окончания</Cap>
       {ended ? (
-        <div className="mt-2 text-center text-[18px] font-bold text-[#9CA3AF]">Аукцион завершён</div>
+        <div className="mt-2 text-center text-[18px] font-bold text-gray-400">Аукцион завершён</div>
       ) : (
         <div className="mt-2 flex items-start justify-center gap-1.5">
           {cells.map(([v, label], i) => (
@@ -289,7 +289,7 @@ export function Segmented<T extends string>({
   ariaLabel: string
 }) {
   return (
-    <div className="flex rounded-full bg-black/[0.05] p-1" role="tablist" aria-label={ariaLabel}>
+    <div className="flex rounded-full bg-neutral-200/60 p-1" role="tablist" aria-label={ariaLabel}>
       {options.map((o) => (
         <button
           key={o.key}
@@ -299,7 +299,7 @@ export function Segmented<T extends string>({
           onClick={() => onChange(o.key)}
           className={
             'h-10 flex-1 rounded-full text-[13px] font-semibold transition active:scale-[0.98] ' +
-            (value === o.key ? 'text-white' : 'text-[#6B7280]')
+            (value === o.key ? 'text-white' : 'text-gray-500')
           }
           style={value === o.key ? { backgroundColor: AMBER } : undefined}
         >
@@ -366,7 +366,7 @@ export function ListSkeleton({ rows = 4 }: { rows?: number }) {
   return (
     <div className="flex flex-col gap-2.5">
       {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="h-[120px] animate-pulse rounded-[20px] bg-black/[0.04]" />
+        <div key={i} className="h-[120px] animate-pulse rounded-[20px] bg-neutral-200/50" />
       ))}
     </div>
   )
@@ -376,11 +376,11 @@ export function ListSkeleton({ rows = 4 }: { rows?: number }) {
 export function EmptyCard({ icon: Icon, title, text }: { icon: LucideIcon; title: string; text: string }) {
   return (
     <div className="flex flex-col items-center rounded-[20px] bg-white px-6 py-10 text-center ring-1 ring-black/[0.05]">
-      <div className="flex size-14 items-center justify-center rounded-full bg-black/[0.04]">
-        <Icon className="size-6 text-[#9CA3AF]" aria-hidden />
+      <div className="flex size-14 items-center justify-center rounded-full bg-neutral-200/50">
+        <Icon className="size-6 text-gray-400" aria-hidden />
       </div>
-      <div className="mt-3 text-[15px] font-bold text-[#141414]">{title}</div>
-      <div className="mt-1 max-w-64 text-[13px] leading-relaxed text-[#9CA3AF]">{text}</div>
+      <div className="mt-3 text-[15px] font-bold text-[#17181A]">{title}</div>
+      <div className="mt-1 max-w-64 text-[13px] leading-relaxed text-gray-400">{text}</div>
     </div>
   )
 }
@@ -394,7 +394,7 @@ export function StepChip({ value, active, onClick }: { value: number; active: bo
       aria-label={`Прибавить ${fmtNum(value)}`}
       className={
         'h-11 flex-1 rounded-full text-[14px] font-semibold transition active:scale-[0.97] ' +
-        (active ? 'text-white' : 'bg-white text-[#141414] ring-1 ring-black/[0.08]')
+        (active ? 'text-white' : 'bg-white text-[#17181A] ring-1 ring-black/[0.08]')
       }
       style={active ? { backgroundColor: AMBER } : undefined}
     >

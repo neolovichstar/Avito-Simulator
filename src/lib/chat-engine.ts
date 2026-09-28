@@ -653,7 +653,13 @@ export async function payInvoice(chatId: string, invoiceId: string, player: User
   const listing = await db.listing.findUnique({ where: { id: chat.listingId } })
   if (!listing || listing.status !== 'active') return { ok: false as const, error: 'Товар уже продан' }
 
-  await db.message.update({ where: { id: invoice.id }, data: { paid: true } })
+  // 59-a: счёт помечается оплаченным атомарно (paid: null → true): два параллельных
+  // POST по одному счёту больше не проходят дальше оба (второй получает «уже оплачен»)
+  const marked = await db.message.updateMany({
+    where: { id: invoice.id, paid: null },
+    data: { paid: true },
+  })
+  if (marked.count === 0) return { ok: false as const, error: 'Счёт не найден или уже оплачен' }
   // 28-b: счёт в чате = дистанционная сделка → товар едет посылкой («Собираем» → «В пути» → ПВЗ)
   const res = await completeSale({
     listingId: listing.id, buyer: player, price: invoice.amount, via: 'chat', chatId, mode: 'chat',

@@ -3,7 +3,7 @@
 // Приложение «Аукцион», редизайн по макету upload/mockups/02-auction.png.
 // Светлая тёплая система: фон #FAF6EE, белые карточки rounded-[20px] ring-black/[0.05],
 // янтарный акцент #C77B28 (CTA ставки, активные чипы и табы), таймеры заканчивающихся
-// лотов красные #D14343, обычные таймеры text-black/45 tabular-nums.
+// лотов красные #D14343, обычные таймеры text-[#17181A]/45 tabular-nums.
 // Экраны: список лотов (чипы категорий, строки с фото 96x96), карточка лота (галерея,
 // каунтдаун, текущая ставка, история, «О лоте»), шторка «Ваша ставка» (крупная сумма,
 // чипы инкрементов, плашка «Следующая минимальная ставка»), Избранное с сегментами
@@ -51,6 +51,8 @@ type FavSegment = 'lots' | 'bids' | 'won'
 
 export default function AuctionApp() {
   const session = useOS((s) => s.session)
+  // тёмная тема ОС: тёплый кремовый фон заменяется системной тёмной страницей
+  const osTheme = useOS((s) => s.theme)
   const [data, setData] = useState<AuctionData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -398,7 +400,7 @@ export default function AuctionApp() {
   }
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-[#FAF6EE] text-[#141414]">
+    <div className={`relative flex h-full flex-col overflow-hidden ${osTheme === 'dark' ? 'bg-[#121417]' : 'bg-[#FAF6EE]'} text-[#17181A]`}>
       {data && detailLot ? (
         <>
           {/* ================= КАРТОЧКА ЛОТА ================= */}
@@ -408,7 +410,7 @@ export default function AuctionApp() {
               type="button"
               onClick={() => setDetailId(null)}
               aria-label="Назад к лотам"
-              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-[#141414] ring-1 ring-black/[0.05] transition active:scale-95"
+              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-[#17181A] ring-1 ring-black/[0.05] transition active:scale-95"
             >
               <ArrowLeft className="size-5" aria-hidden />
             </button>
@@ -423,7 +425,7 @@ export default function AuctionApp() {
               type="button"
               onClick={() => void shareLot(detailLot)}
               aria-label="Поделиться лотом"
-              className="flex size-10 shrink-0 items-center justify-center rounded-full text-[#141414] transition active:scale-95"
+              className="flex size-10 shrink-0 items-center justify-center rounded-full text-[#17181A] transition active:scale-95"
             >
               <Share className="size-[20px]" aria-hidden />
             </button>
@@ -455,24 +457,24 @@ export default function AuctionApp() {
             <div className="flex flex-col gap-3 px-4">
               {/* название и характеристики */}
               <div>
-                <h1 className="text-[20px] font-bold leading-snug text-[#141414]">{detailLot.title}</h1>
-                <div className="mt-1 text-[14px] text-[#6B7280]">
+                <h1 className="text-[20px] font-bold leading-snug text-[#17181A]">{detailLot.title}</h1>
+                <div className="mt-1 text-[14px] text-gray-500">
                   {CATEGORY_LABEL[detailLot.category] ?? detailLot.category} · Состояние: {CONDITION_LABEL[detailLot.condition] ?? detailLot.condition}
                 </div>
-                <div className="mt-0.5 text-[13px] text-[#9CA3AF]">
+                <div className="mt-0.5 text-[13px] text-gray-400">
                   Рыночная цена {fmtMoney(detailLot.baseValue)} · Старт {fmtMoney(detailLot.startPrice)}
                 </div>
                 <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-2">
-                  <span className="inline-flex items-center gap-1.5 text-[13px] text-[#6B7280]">
-                    <Tag className="size-4 text-black/35" aria-hidden />
+                  <span className="inline-flex items-center gap-1.5 text-[13px] text-gray-500">
+                    <Tag className="size-4 text-[#17181A]/35" aria-hidden />
                     {CATEGORY_LABEL[detailLot.category] ?? detailLot.category}
                   </span>
-                  <span className="inline-flex items-center gap-1.5 text-[13px] text-[#6B7280]">
-                    <ShieldCheck className="size-4 text-black/35" aria-hidden />
+                  <span className="inline-flex items-center gap-1.5 text-[13px] text-gray-500">
+                    <ShieldCheck className="size-4 text-[#17181A]/35" aria-hidden />
                     {CONDITION_LABEL[detailLot.condition] ?? detailLot.condition}
                   </span>
-                  <span className="inline-flex items-center gap-1.5 text-[13px] text-[#6B7280]">
-                    <TrendingUp className="size-4 text-black/35" aria-hidden />
+                  <span className="inline-flex items-center gap-1.5 text-[13px] text-gray-500">
+                    <TrendingUp className="size-4 text-[#17181A]/35" aria-hidden />
                     Рынок {fmtMoney(detailLot.baseValue)}
                   </span>
                 </div>
@@ -507,29 +509,29 @@ export default function AuctionApp() {
                   <div className="min-w-0">
                     <Cap>Текущая ставка</Cap>
                     {detailLot.currentBid != null ? (
-                      <div className="mt-1 text-[26px] font-extrabold tabular-nums leading-none text-[#141414]">
+                      <div className="mt-1 text-[26px] font-extrabold tabular-nums leading-none text-[#17181A]">
                         {fmtMoney(detailLot.currentBid)}
                       </div>
                     ) : (
-                      <div className="mt-1 text-[18px] font-semibold text-[#9CA3AF]">Ставок нет</div>
+                      <div className="mt-1 text-[18px] font-semibold text-gray-400">Ставок нет</div>
                     )}
                     {detailLot.currentBidderName && (
-                      <div className="mt-1 truncate text-[12px] text-[#6B7280]">Лидер: {detailLot.currentBidderName}</div>
+                      <div className="mt-1 truncate text-[12px] text-gray-500">Лидер: {detailLot.currentBidderName}</div>
                     )}
                   </div>
-                  <span className="shrink-0 text-[13px] tabular-nums text-[#9CA3AF]">
+                  <span className="shrink-0 text-[13px] tabular-nums text-gray-400">
                     {detailLot.bidCount} {plural(detailLot.bidCount, 'ставка', 'ставки', 'ставок')}
                   </span>
                 </div>
                 <div className="mt-3 border-t border-black/[0.05] pt-3">
                   <div className="flex items-center justify-between gap-2 text-[13px]">
-                    <span className="text-[#6B7280]">Следующая минимальная ставка</span>
-                    <span className="font-bold tabular-nums text-[#141414]">{fmtMoney(minBid(detailLot))}</span>
+                    <span className="text-gray-500">Следующая минимальная ставка</span>
+                    <span className="whitespace-nowrap font-bold tabular-nums text-[#17181A]">{fmtMoney(minBid(detailLot))}</span>
                   </div>
                   {detailLot.myBid > 0 && (
                     <div className="mt-1.5 flex items-center justify-between gap-2 text-[13px]">
-                      <span className="text-[#6B7280]">Ваша ставка</span>
-                      <span className="font-semibold tabular-nums text-[#C77B28]">{fmtMoney(detailLot.myBid)}</span>
+                      <span className="text-gray-500">Ваша ставка</span>
+                      <span className="whitespace-nowrap font-semibold tabular-nums text-[#C97B1D]">{fmtMoney(detailLot.myBid)}</span>
                     </div>
                   )}
                 </div>
@@ -541,38 +543,38 @@ export default function AuctionApp() {
                   <button
                     type="button"
                     onClick={() => void toggleHist(detailLot.id)}
-                    className="flex w-full items-center justify-between px-4 py-3.5 text-[14px] font-semibold text-[#141414] transition active:scale-[0.99]"
+                    className="flex w-full items-center justify-between px-4 py-3.5 text-[14px] font-semibold text-[#17181A] transition active:scale-[0.99]"
                     aria-expanded={openHist === detailLot.id}
                   >
                     <span className="flex items-center gap-2">
-                      <History className="size-4 text-[#C77B28]" aria-hidden />
+                      <History className="size-4 text-[#C97B1D]" aria-hidden />
                       История ставок ({detailLot.bidCount})
                     </span>
                     {openHist === detailLot.id ? (
-                      <ChevronDown className="size-4 text-[#9CA3AF]" aria-hidden />
+                      <ChevronDown className="size-4 text-gray-400" aria-hidden />
                     ) : (
-                      <ChevronRight className="size-4 text-[#9CA3AF]" aria-hidden />
+                      <ChevronRight className="size-4 text-gray-400" aria-hidden />
                     )}
                   </button>
                   {openHist === detailLot.id && (
                     <div className="max-h-52 overflow-y-auto border-t border-black/[0.05] [scrollbar-width:thin]">
                       {histLoading && !histBids[detailLot.id] ? (
-                        <div className="flex items-center justify-center gap-2 py-4 text-[12px] text-[#9CA3AF]">
+                        <div className="flex items-center justify-center gap-2 py-4 text-[12px] text-gray-400">
                           <Loader2 className="size-3.5 animate-spin" aria-hidden /> Загружаем торги…
                         </div>
                       ) : (histBids[detailLot.id]?.length ?? 0) === 0 ? (
-                        <div className="py-4 text-center text-[12px] text-[#9CA3AF]">Ставок пока не было</div>
+                        <div className="py-4 text-center text-[12px] text-gray-400">Ставок пока не было</div>
                       ) : (
-                        <div className="divide-y divide-black/[0.05]">
+                        <div className="divide-y divide-[#EBEDF0]">
                           {histBids[detailLot.id]!.map((b, i) => (
-                            <div key={b.id} className={'flex items-center gap-2.5 px-4 py-2.5 ' + (i === 0 ? 'bg-[#F6E7D4]/60' : '')}>
+                            <div key={b.id} className={'flex items-center gap-2.5 px-4 py-2.5 ' + (i === 0 ? 'bg-[#F8F1E3]/60' : '')}>
                               <BidAvatar name={b.userName} top={i === 0} />
-                              <span className={'min-w-0 flex-1 truncate text-[13px] ' + (b.isMe ? 'font-semibold text-[#C77B28]' : 'text-[#141414]')}>
+                              <span className={'min-w-0 flex-1 truncate text-[13px] ' + (b.isMe ? 'font-semibold text-[#C97B1D]' : 'text-[#17181A]')}>
                                 {b.userName}
-                                {b.isMe && <span className="ml-1 text-[10px] font-normal text-[#C77B28]/70">(вы)</span>}
+                                {b.isMe && <span className="ml-1 text-[10px] font-normal text-[#C97B1D]/70">(вы)</span>}
                               </span>
-                              <span className="shrink-0 text-[11px] text-[#9CA3AF]">{timeAgo(b.createdAt)}</span>
-                              <span className={'shrink-0 text-[13px] font-bold tabular-nums ' + (i === 0 ? 'text-[#C77B28]' : 'text-[#141414]')}>
+                              <span className="shrink-0 text-[11px] text-gray-400">{timeAgo(b.createdAt)}</span>
+                              <span className={'shrink-0 text-[13px] font-bold tabular-nums ' + (i === 0 ? 'text-[#C97B1D]' : 'text-[#17181A]')}>
                                 {fmtMoney(b.amount)}
                               </span>
                             </div>
@@ -589,14 +591,14 @@ export default function AuctionApp() {
                 <button
                   type="button"
                   onClick={() => setAboutOpen((v) => !v)}
-                  className="flex w-full items-center justify-between px-4 py-3.5 text-[14px] font-semibold text-[#141414] transition active:scale-[0.99]"
+                  className="flex w-full items-center justify-between px-4 py-3.5 text-[14px] font-semibold text-[#17181A] transition active:scale-[0.99]"
                   aria-expanded={aboutOpen}
                 >
                   О лоте
                   {aboutOpen ? (
-                    <ChevronDown className="size-4 text-[#9CA3AF]" aria-hidden />
+                    <ChevronDown className="size-4 text-gray-400" aria-hidden />
                   ) : (
-                    <ChevronRight className="size-4 text-[#9CA3AF]" aria-hidden />
+                    <ChevronRight className="size-4 text-gray-400" aria-hidden />
                   )}
                 </button>
                 {aboutOpen && (
@@ -610,8 +612,8 @@ export default function AuctionApp() {
                       ['Лидер', detailLot.currentBidderName ?? 'Ставок нет', false],
                     ] as const).map(([label, value, num]) => (
                       <div key={label} className="mt-1.5 flex items-center justify-between gap-3 text-[13px] first:mt-0">
-                        <span className="text-[#6B7280]">{label}</span>
-                        <span className={'truncate text-right ' + (num ? 'font-semibold tabular-nums text-[#141414]' : 'font-medium text-[#141414]')}>
+                        <span className="text-gray-500">{label}</span>
+                        <span className={'truncate text-right ' + (num ? 'font-semibold tabular-nums text-[#17181A]' : 'font-medium text-[#17181A]')}>
                           {value}
                         </span>
                       </div>
@@ -636,7 +638,7 @@ export default function AuctionApp() {
             </div>
           ) : (
             <div className="shrink-0 border-t border-black/[0.06] bg-white px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3">
-              <div className="flex h-[54px] w-full items-center justify-center rounded-[14px] bg-black/[0.04] text-[14px] font-semibold text-[#9CA3AF]">
+              <div className="flex h-[54px] w-full items-center justify-center rounded-[14px] bg-neutral-200/50 text-[14px] font-semibold text-gray-400">
                 Аукцион завершён
               </div>
             </div>
@@ -648,11 +650,11 @@ export default function AuctionApp() {
           <div className="shrink-0 px-4 pb-1 pt-3">
             <div className="flex items-center gap-2">
               <div className="min-w-0 flex-1">
-                <h1 className="text-[26px] font-bold leading-tight text-[#141414]">
+                <h1 className="text-[26px] font-bold leading-tight text-[#17181A]">
                   {tab === 'auction' ? 'Аукцион' : tab === 'fav' ? 'Избранное' : tab === 'bids' ? 'Мои ставки' : 'Профиль'}
                 </h1>
                 {tab === 'auction' && (
-                  <div className="mt-0.5 flex items-center gap-1.5 text-[13px] text-[#6B7280]">
+                  <div className="mt-0.5 flex items-center gap-1.5 text-[13px] text-gray-500">
                     {liveBids > 0 && (
                       <span className="relative flex size-1.5" aria-hidden>
                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75" style={{ backgroundColor: AMBER }} />
@@ -663,7 +665,7 @@ export default function AuctionApp() {
                   </div>
                 )}
                 {tab === 'bids' && (
-                  <div className="mt-0.5 text-[13px] text-[#6B7280]">
+                  <div className="mt-0.5 text-[13px] text-gray-500">
                     {bidsCount > 0 ? `${bidsCount} ${plural(bidsCount, 'лот', 'лота', 'лотов')} с вашими ставками` : 'Здесь появятся лоты со ставками'}
                   </div>
                 )}
@@ -677,7 +679,7 @@ export default function AuctionApp() {
                     aria-expanded={showSearch}
                     className={
                       'flex size-10 shrink-0 items-center justify-center rounded-full transition active:scale-95 ' +
-                      (showSearch ? 'text-[#C77B28] ring-1' : 'bg-white text-[#141414] ring-1 ring-black/[0.05]')
+                      (showSearch ? 'text-[#C97B1D] ring-1' : 'bg-white text-[#17181A] ring-1 ring-black/[0.05]')
                     }
                     style={showSearch ? { backgroundColor: PLATE } : undefined}
                   >
@@ -687,7 +689,7 @@ export default function AuctionApp() {
                     type="button"
                     onClick={notifyEnding}
                     aria-label="Финалы в ближайшие 5 минут"
-                    className="relative flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-[#141414] ring-1 ring-black/[0.05] transition active:scale-95"
+                    className="relative flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-[#17181A] ring-1 ring-black/[0.05] transition active:scale-95"
                   >
                     <Bell className="size-[18px]" aria-hidden />
                     {(data?.lots ?? []).some((l) => {
@@ -703,20 +705,20 @@ export default function AuctionApp() {
 
             {tab === 'auction' && showSearch && (
               <div className="relative mt-3">
-                <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[#9CA3AF]" aria-hidden />
+                <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-gray-400" aria-hidden />
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Поиск по лотам"
                   aria-label="Поиск по лотам"
-                  className="h-11 w-full rounded-full bg-white py-2.5 pl-10 pr-9 text-[13px] text-[#141414] ring-1 ring-black/[0.06] outline-none placeholder:text-[#9CA3AF] focus:ring-[#C77B28]"
+                  className="h-11 w-full rounded-full bg-white py-2.5 pl-10 pr-9 text-[13px] text-[#17181A] ring-1 ring-black/[0.06] outline-none placeholder:text-gray-400 focus:ring-[#C77B28]"
                 />
                 {query && (
                   <button
                     type="button"
                     onClick={() => setQuery('')}
                     aria-label="Очистить поиск"
-                    className="absolute right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-[#9CA3AF] transition active:scale-90"
+                    className="absolute right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition active:scale-90"
                   >
                     <X className="size-4" aria-hidden />
                   </button>
@@ -746,7 +748,7 @@ export default function AuctionApp() {
                   onClick={() => setCategory('all')}
                   className={
                     'h-10 shrink-0 rounded-full px-4 text-[13px] transition active:scale-95 ' +
-                    (category === 'all' ? 'font-semibold text-white' : 'bg-white text-[#6B7280] ring-1 ring-black/[0.06]')
+                    (category === 'all' ? 'font-semibold text-white' : 'bg-white text-gray-500 ring-1 ring-black/[0.06]')
                   }
                   style={category === 'all' ? { backgroundColor: AMBER } : undefined}
                 >
@@ -759,7 +761,7 @@ export default function AuctionApp() {
                     onClick={() => setCategory(c)}
                     className={
                       'h-10 shrink-0 rounded-full px-4 text-[13px] transition active:scale-95 ' +
-                      (category === c ? 'font-semibold text-white' : 'bg-white text-[#6B7280] ring-1 ring-black/[0.06]')
+                      (category === c ? 'font-semibold text-white' : 'bg-white text-gray-500 ring-1 ring-black/[0.06]')
                     }
                     style={category === c ? { backgroundColor: AMBER } : undefined}
                   >
@@ -784,14 +786,14 @@ export default function AuctionApp() {
                     <Gavel className="size-6" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-[16px] font-bold text-[#141414]">{session?.displayName ?? 'Игрок'}</div>
-                    <div className="mt-0.5 text-[13px] text-[#6B7280]">
+                    <div className="truncate text-[16px] font-bold text-[#17181A]">{session?.displayName ?? 'Игрок'}</div>
+                    <div className="mt-0.5 text-[13px] text-gray-500">
                       {session?.city ? `${session.city} · ` : ''}Уровень {session?.level ?? 1}
                     </div>
                   </div>
                   <div className="shrink-0 text-right">
                     <Cap>Баланс</Cap>
-                    <div className="mt-0.5 text-[18px] font-extrabold tabular-nums text-[#141414]">
+                    <div className="mt-0.5 text-[18px] font-extrabold tabular-nums text-[#17181A]">
                       {fmtMoney(session?.balance ?? 0)}
                     </div>
                   </div>
@@ -804,14 +806,14 @@ export default function AuctionApp() {
                     ['Победы', data?.wonCount ?? 0],
                   ] as const).map(([label, value]) => (
                     <div key={label} className="rounded-[20px] bg-white p-3 text-center ring-1 ring-black/[0.05]">
-                      <div className="text-[20px] font-extrabold tabular-nums text-[#141414]">{value}</div>
+                      <div className="text-[20px] font-extrabold tabular-nums text-[#17181A]">{value}</div>
                       <div className="mt-0.5 text-[11px] uppercase tracking-[0.12em] text-black/40">{label}</div>
                     </div>
                   ))}
                 </div>
 
                 <div className="rounded-[20px] bg-white p-4 ring-1 ring-black/[0.05]">
-                  <div className="text-[15px] font-bold text-[#141414]">Как проходят торги</div>
+                  <div className="text-[15px] font-bold text-[#17181A]">Как проходят торги</div>
                   <div className="mt-3 flex flex-col gap-3">
                     {([
                       [Gavel, 'Ставка резервирует сумму с баланса. Если её перебьют, деньги вернутся автоматически.'],
@@ -819,8 +821,8 @@ export default function AuctionApp() {
                       [Timer, 'Ставка в последнюю минуту продлевает финал: снайпинг бесполезен.'],
                     ] as const).map(([Icon, text]) => (
                       <div key={text} className="flex items-start gap-2.5">
-                        <Icon className="mt-0.5 size-4 shrink-0 text-[#C77B28]" aria-hidden />
-                        <span className="text-[13px] leading-relaxed text-[#6B7280]">{text}</span>
+                        <Icon className="mt-0.5 size-4 shrink-0 text-[#C97B1D]" aria-hidden />
+                        <span className="text-[13px] leading-relaxed text-gray-500">{text}</span>
                       </div>
                     ))}
                   </div>
@@ -839,26 +841,26 @@ export default function AuctionApp() {
       {/* ---------- ШТОРКА «ВАША СТАВКА» ---------- */}
       {biddingLot && (
         <div className="absolute inset-0 z-30 flex flex-col justify-end">
-          <button type="button" aria-label="Закрыть панель ставки" onClick={closePanel} className="absolute inset-0 bg-black/45" />
+          <button type="button" aria-label="Закрыть панель ставки" onClick={closePanel} className="absolute inset-0 bg-neutral-400" />
           <div className="relative max-h-[90%] overflow-y-auto rounded-t-[28px] bg-white px-5 pb-[calc(20px+env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_40px_-12px_rgba(0,0,0,0.18)] [scrollbar-width:thin]">
             {/* ручка-хваталка */}
-            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-black/15" aria-hidden />
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-neutral-200" aria-hidden />
 
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <div className="text-[22px] font-bold leading-tight text-[#141414]">Ваша ставка</div>
-                <div className="mt-0.5 truncate text-[14px] font-medium text-[#141414]">{biddingLot.title}</div>
+                <div className="text-[22px] font-bold leading-tight text-[#17181A]">Ваша ставка</div>
+                <div className="mt-0.5 truncate text-[14px] font-medium text-[#17181A]">{biddingLot.title}</div>
               </div>
               <button
                 type="button"
                 onClick={closePanel}
                 aria-label="Закрыть"
-                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-black/[0.04] text-[#6B7280] transition active:scale-90"
+                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-neutral-200/50 text-gray-500 transition active:scale-90"
               >
                 <X className="size-4" aria-hidden />
               </button>
             </div>
-            <div className="mt-0.5 text-[13px] text-[#6B7280]">
+            <div className="mt-0.5 text-[13px] text-gray-500">
               Текущая ставка {fmtMoney(biddingLot.currentBid ?? biddingLot.startPrice)}
             </div>
 
@@ -884,7 +886,7 @@ export default function AuctionApp() {
             {/* крупная сумма */}
             <div className="mt-4 flex h-[76px] items-center rounded-2xl bg-white ring-1 ring-black/[0.08]">
               <input
-                className="h-full w-full bg-transparent text-center text-[34px] font-extrabold tabular-nums text-[#141414] outline-none placeholder:text-black/25"
+                className="h-full w-full bg-transparent text-center text-[34px] font-extrabold tabular-nums text-[#17181A] outline-none placeholder:text-[#17181A]/25"
                 inputMode="numeric"
                 value={bidMode === 'auto' ? autoInput : bidInput}
                 placeholder={bidMode === 'auto' ? 'Потолок, ₽' : 'Ставка, ₽'}
@@ -907,29 +909,29 @@ export default function AuctionApp() {
 
             {/* плашка следующей минимальной ставки */}
             <div className="mt-4 flex items-center gap-3 rounded-2xl p-4" style={{ backgroundColor: PLATE }}>
-              <Gavel className="size-6 shrink-0 text-[#C77B28]" aria-hidden />
+              <Gavel className="size-6 shrink-0 text-[#C97B1D]" aria-hidden />
               <div className="min-w-0">
-                <div className="text-[13px] text-[#6B7280]">
+                <div className="text-[13px] text-gray-500">
                   {bidMode === 'manual' ? 'Следующая минимальная ставка' : 'Минимальный потолок автоставки'}
                 </div>
-                <div className="text-[15px] font-bold tabular-nums text-[#141414]">{fmtMoney(minBid(biddingLot))}</div>
+                <div className="whitespace-nowrap text-[15px] font-bold tabular-nums text-[#17181A]">{fmtMoney(minBid(biddingLot))}</div>
               </div>
               <div className="ml-auto shrink-0 text-right">
                 <div className="text-[11px] uppercase tracking-[0.12em] text-black/40">Баланс</div>
-                <div className="text-[13px] font-semibold tabular-nums text-[#141414]">{fmtMoney(session?.balance ?? 0)}</div>
+                <div className="whitespace-nowrap text-[13px] font-semibold tabular-nums text-[#17181A]">{fmtMoney(session?.balance ?? 0)}</div>
               </div>
             </div>
 
             {bidMode === 'auto' && (
-              <p className="mt-3 text-[11px] leading-relaxed text-[#9CA3AF]">
+              <p className="mt-3 text-[11px] leading-relaxed text-gray-400">
                 Автоставка сама перебивает соперников минимально необходимой суммой, пока ставка не превысит ваш потолок. Резервируются только фактические ставки.
               </p>
             )}
             {bidError && <div className="mt-2 text-[12px] text-[#D14343]">{bidError}</div>}
             {bidMode === 'manual' && bidAmount > 0 && (
-              <div className="mt-3 flex items-center justify-between text-[12px] text-[#9CA3AF]">
-                <span>Победитель платит ровно свою ставку, без комиссии</span>
-                <span className="font-semibold tabular-nums text-[#141414]">{fmtMoney(bidAmount)}</span>
+              <div className="mt-3 flex items-center justify-between gap-3 text-[12px] text-gray-400">
+                <span className="min-w-0 flex-1">Победитель платит ровно свою ставку, без комиссии</span>
+                <span className="whitespace-nowrap font-semibold tabular-nums text-[#17181A]">{fmtMoney(bidAmount)}</span>
               </div>
             )}
 
@@ -961,7 +963,7 @@ export default function AuctionApp() {
                 Отменить автоставку
               </button>
             )}
-            <p className="mt-3 text-[11px] leading-relaxed text-[#9CA3AF]">
+            <p className="mt-3 text-[11px] leading-relaxed text-gray-400">
               Нажимая кнопку, вы соглашаетесь с правилами аукциона. Сумма ставки резервируется с баланса и вернётся, если её перебьют.
             </p>
           </div>

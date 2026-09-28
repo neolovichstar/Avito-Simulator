@@ -37,7 +37,7 @@ export function GostPlate({
 
   return (
     <div
-      className={`relative inline-flex items-stretch bg-white ${dim.radius} ${dim.border} ${dim.pad} ${
+      className={`gost-plate relative inline-flex items-stretch bg-white ${dim.radius} ${dim.border} ${dim.pad} ${
         strong ? 'border-black' : 'border-black/85'
       }`}
       style={

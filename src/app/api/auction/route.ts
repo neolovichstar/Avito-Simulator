@@ -1,11 +1,10 @@
 import { db } from '@/lib/db'
 import { getSessionUser, unauthorized } from '@/lib/session'
-import { auctionStep } from '@/lib/economy'
 import { notifyUser, bumpStats, checkAchievements } from '@/lib/deals'
 import { redisLimit } from '@/lib/redis'
-import { CONDITION_LABEL } from '@/lib/catalog-types'
 import { fmtMoney } from '@/lib/format'
 import { emitTo } from '@/lib/realtime-emit'
+import { placeAuctionBid } from '@/lib/auction-core'
 import type { AuctionLotDTO, AuctionData } from '@/lib/types'
 import { itemImage } from '@/lib/item-images'
 
@@ -58,53 +57,48 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as { lotId?: string; amount?: number }
   if (!body.lotId || body.amount === undefined) return Response.json({ error: 'Некорректная ставка' }, { status: 400 })
   const amount = Math.round(Number(body.amount))
-
-  const lot = await db.auctionLot.findUnique({ where: { id: body.lotId } })
-  if (!lot || lot.status !== 'active' || lot.endsAt.getTime() <= Date.now()) {
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 100_000_000) {
+    return Response.json({ error: 'Некорректная ставка' }, { status: 400 })
+  }
+  const current = await db.auctionLot.findUnique({ where: { id: body.lotId } })
+  if (!current || current.status !== 'active' || current.endsAt.getTime() <= Date.now()) {
     return Response.json({ error: 'Лот уже завершён' }, { status: 400 })
   }
-  const step = auctionStep(lot.startPrice)
-  const minBid = (lot.currentBid ?? lot.startPrice) + step
-  if (amount < minBid) return Response.json({ error: `Минимальная ставка: ${fmtMoney(minBid)}` }, { status: 400 })
-  if (user.balance < amount) return Response.json({ error: 'Недостаточно средств. Ставка резервирует деньги' }, { status: 400 })
 
-  // анти-снайпинг: ставка в последнюю минуту продлевает торги
-  const endsAt = lot.endsAt.getTime() - Date.now() < 60_000
-    ? new Date(Date.now() + 30_000)
-    : lot.endsAt
+  // Атомарная ставка: валидация минимальной суммы, резерв денег и CAS лота
+  // внутри одной транзакции (гонка двух ставок / гонка с движком больше не
+  // возвращает резерв предыдущему лидеру дважды и не уводит баланс в минус).
+  const res = await placeAuctionBid({
+    lotId: current.id, bidderId: user.id, bidderName: user.displayName, amount, reserve: true,
+  })
+  if (!res.ok) {
+    return Response.json({ error: res.error }, { status: 400 })
+  }
 
-  // вернуть деньги предыдущему лидеру-игроку
-  if (lot.currentBidderId && lot.currentBid) {
-    const prev = await db.user.findUnique({ where: { id: lot.currentBidderId } })
+  // вернуть деньги предыдущему лидеру-игроку (в т.ч. себе при повышении своей ставки)
+  if (res.prevBidderId && res.prevBid) {
+    const prev = await db.user.findUnique({ where: { id: res.prevBidderId }, select: { id: true, isBot: true } })
     if (prev && !prev.isBot) {
-      await db.user.update({ where: { id: prev.id }, data: { balance: { increment: lot.currentBid } } })
+      await db.user.update({ where: { id: prev.id }, data: { balance: { increment: res.prevBid } } })
       if (prev.id !== user.id) {
-        await notifyUser(prev.id, 'market', 'Вас перебили на аукционе', `Лот «${lot.title}» теперь ${fmtMoney(amount)}. Деньги возвращены на счёт.`)
+        await notifyUser(prev.id, 'market', 'Вас перебили на аукционе', `Лот «${current.title}» теперь ${fmtMoney(amount)}. Деньги возвращены на счёт.`)
       }
     }
   }
-  // зарезервировать ставку игрока
-  await db.user.update({ where: { id: user.id }, data: { balance: { decrement: amount } } })
-  await db.auctionBid.create({
-    data: { lotId: lot.id, userId: user.id, userName: user.displayName, amount },
-  })
-  await db.auctionLot.update({
-    where: { id: lot.id },
-    data: { currentBid: amount, currentBidderId: user.id, currentBidderName: user.displayName, bidCount: { increment: 1 }, endsAt },
-  })
   await bumpStats(user.id, { bids: 1 })
   await checkAchievements(user.id)
-  await emitTo('global', 'auction:update', { lotId: lot.id, extended: endsAt.getTime() !== lot.endsAt.getTime() })
+  await emitTo('global', 'auction:update', { lotId: current.id, extended: res.extended })
 
   const fresh = await db.user.findUnique({ where: { id: user.id } })
   const myAuto = await db.autoBid.findUnique({
-    where: { lotId_userId: { lotId: lot.id, userId: user.id } },
+    where: { lotId_userId: { lotId: current.id, userId: user.id } },
   })
+  const lot = res.lot
   const dto: AuctionLotDTO = {
     id: lot.id, title: lot.title, image: itemImage(lot.itemKey, lot.category), category: lot.category,
     condition: lot.condition, baseValue: lot.baseValue, startPrice: lot.startPrice,
-    currentBid: amount, currentBidderName: user.displayName, bidCount: lot.bidCount + 1,
-    endsAt: endsAt.toISOString(), myBid: amount, myAutoBid: myAuto?.maxAmount ?? 0, isMine: true,
+    currentBid: lot.currentBid, currentBidderName: lot.currentBidderName, bidCount: lot.bidCount,
+    endsAt: lot.endsAt.toISOString(), myBid: amount, myAutoBid: myAuto?.maxAmount ?? 0, isMine: true,
   }
   return Response.json({ ok: true, balance: fresh?.balance ?? user.balance, lot: dto })
 }

@@ -37,6 +37,12 @@ export class TTLCache {
         this.set(key, v, ttlMs)
         return v
       })
+      .catch((e) => {
+        // 59-a: упавший продюсер не оставляет мусорную запись в кеше
+        const e2 = this.store.get(key)
+        if (e2 && e2.promise === promise) this.store.delete(key)
+        throw e
+      })
       .finally(() => {
         const e = this.store.get(key)
         if (e) delete e.promise

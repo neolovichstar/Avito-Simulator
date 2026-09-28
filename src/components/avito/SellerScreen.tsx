@@ -18,7 +18,7 @@ function Stars({ value }: { value: number }) {
         <Star
           key={i}
           size={12}
-          className={i < Math.round(Math.min(5, value)) ? 'fill-[#16A34A] text-[#16A34A]' : 'text-black/[0.12]'}
+          className={i < Math.round(Math.min(5, value)) ? 'fill-[#16A34A] text-[#16A34A]' : 'text-[#17181A]/25'}
           aria-hidden
         />
       ))}
@@ -67,7 +67,7 @@ export default function SellerScreen({ sellerId, onBack, onOpenListing }: {
 
   if (error) {
     return (
-      <div className="h-full overflow-y-auto bg-[#F6F7F9]">
+      <div className="h-full overflow-y-auto bg-[#F5F6F8]">
         <Header onBack={onBack} title="Продавец" />
         <div className="space-y-3 p-4 pt-8 text-center">
           <p className="text-sm text-red-600">{error}</p>
@@ -81,7 +81,7 @@ export default function SellerScreen({ sellerId, onBack, onOpenListing }: {
 
   if (!data) {
     return (
-      <div className="h-full overflow-y-auto bg-[#F6F7F9]">
+      <div className="h-full overflow-y-auto bg-[#F5F6F8]">
         <Header onBack={onBack} title="Продавец" />
         <div className="space-y-3 p-4">
           <Card className="flex items-center gap-3 p-4">
@@ -101,7 +101,7 @@ export default function SellerScreen({ sellerId, onBack, onOpenListing }: {
   const { seller, stats } = data
 
   return (
-    <div className="h-full overflow-y-auto bg-[#F6F7F9] [scrollbar-width:thin]">
+    <div className="h-full overflow-y-auto bg-[#F5F6F8] [scrollbar-width:thin]">
       <Header onBack={onBack} title="Продавец" />
 
       <div className="space-y-3 p-4 pb-8">
@@ -111,21 +111,21 @@ export default function SellerScreen({ sellerId, onBack, onOpenListing }: {
             <UserAvatar name={seller.displayName} className="h-16 w-16 rounded-full" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <h2 className="truncate text-[17px] font-bold tracking-tight text-[#141414]">{seller.displayName}</h2>
+                <h2 className="truncate text-[17px] font-bold tracking-tight text-[#17181A]">{seller.displayName}</h2>
                 {seller.online && <span className="size-2 shrink-0 rounded-full bg-[#16A34A]" aria-label="Продавец онлайн" />}
               </div>
               <div className="mt-1 flex items-center gap-1.5">
                 <Stars value={seller.rating} />
-                <span className="text-xs font-semibold text-[#141414]">
+                <span className="text-xs font-semibold text-[#17181A]">
                   {seller.ratingCount > 0 ? seller.rating.toFixed(1) : 'новый'}
                 </span>
                 <span className="text-xs text-black/40">({seller.ratingCount})</span>
               </div>
               <div className="mt-1.5 space-y-0.5">
-                <div className="flex items-center gap-1 text-xs text-black/45">
+                <div className="flex items-center gap-1 text-xs text-[#17181A]/45">
                   <MapPin size={11} aria-hidden /> {seller.city}
                 </div>
-                <div className="flex items-center gap-1 text-xs text-black/45">
+                <div className="flex items-center gap-1 text-xs text-[#17181A]/45">
                   <BadgeCheck size={11} className="shrink-0 text-[#16A34A]" aria-hidden />
                   На Resale с {joined}
                 </div>
@@ -133,22 +133,22 @@ export default function SellerScreen({ sellerId, onBack, onOpenListing }: {
             </div>
           </div>
           {seller.bio && (
-            <p className="mt-3 border-t border-black/[0.05] pt-3 text-xs leading-relaxed text-black/55">{seller.bio}</p>
+            <p className="mt-3 border-t border-black/[0.05] pt-3 text-xs leading-relaxed text-[#17181A]/50">{seller.bio}</p>
           )}
         </Card>
 
         {/* статистика */}
-        <Card className="grid grid-cols-3 divide-x divide-black/[0.05] p-4 text-center">
+        <Card className="grid grid-cols-3 divide-x divide-[#EBEDF0] p-4 text-center">
           <div>
-            <div className="text-lg font-extrabold tabular-nums text-[#141414]">{stats.activeCount}</div>
+            <div className="text-lg font-extrabold tabular-nums text-[#17181A]">{stats.activeCount}</div>
             <div className="mt-0.5 text-[11px] text-black/40">объявлений</div>
           </div>
           <div>
-            <div className="text-lg font-extrabold tabular-nums text-[#141414]">{stats.salesCount}</div>
+            <div className="text-lg font-extrabold tabular-nums text-[#17181A]">{stats.salesCount}</div>
             <div className="mt-0.5 text-[11px] text-black/40">сделок</div>
           </div>
           <div>
-            <div className="text-lg font-extrabold tabular-nums text-[#141414]">{seller.ratingCount > 0 ? seller.rating.toFixed(1) : '—'}</div>
+            <div className="text-lg font-extrabold tabular-nums text-[#17181A]">{seller.ratingCount > 0 ? seller.rating.toFixed(1) : '—'}</div>
             <div className="mt-0.5 text-[11px] text-black/40">рейтинг</div>
           </div>
         </Card>
@@ -169,29 +169,29 @@ export default function SellerScreen({ sellerId, onBack, onOpenListing }: {
               />
             </Card>
           ) : (
-            <Card className="divide-y divide-black/[0.05] overflow-hidden">
+            <Card className="divide-y divide-[#EBEDF0] overflow-hidden">
               {listings.map((l) => (
                 <button
                   key={l.id}
                   onClick={() => onOpenListing(l.id)}
-                  className="flex w-full items-center gap-3 p-3 text-left transition-colors active:bg-[#F6F7F9]"
+                  className="flex w-full items-center gap-3 p-3 text-left transition-colors active:bg-[#F5F6F8]"
                 >
                   <img
                     src={l.image}
                     alt={l.title}
-                    className="h-20 w-20 shrink-0 rounded-[14px] bg-[#F0F1F3] object-cover"
+                    className="h-20 w-20 shrink-0 rounded-[14px] bg-[#f0f1f3] object-cover"
                     loading="lazy"
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[15px] font-extrabold tabular-nums text-[#141414]">{l.price > 0 ? `${fmtNum(l.price)} ₽` : 'Даром'}</span>
+                      <span className="text-[15px] font-extrabold tabular-nums text-[#17181A]">{l.price > 0 ? `${fmtNum(l.price)} ₽` : 'Даром'}</span>
                       {l.boosted && (
-                        <span className="shrink-0 rounded bg-black/[0.05] px-1.5 py-0.5 text-[9px] font-bold text-black/50">
+                        <span className="shrink-0 rounded bg-neutral-200/60 px-1.5 py-0.5 text-[9px] font-bold text-black/50">
                           ПРОДВИНУТО
                         </span>
                       )}
                     </div>
-                    <p className="mt-0.5 truncate text-[13px] text-[#141414]">{l.title}</p>
+                    <p className="mt-0.5 truncate text-[13px] text-[#17181A]">{l.title}</p>
                     <div className="mt-1.5 flex items-center gap-2">
                       <ConditionBadge condition={l.condition} />
                       <span className="flex items-center gap-1 text-[10px] text-black/40">
@@ -200,7 +200,7 @@ export default function SellerScreen({ sellerId, onBack, onOpenListing }: {
                       <span className="text-[10px] text-black/40">{timeAgo(l.createdAt)}</span>
                     </div>
                   </div>
-                  <ChevronRight size={16} className="shrink-0 text-black/20" aria-hidden />
+                  <ChevronRight size={16} className="shrink-0 text-[#17181A]/25" aria-hidden />
                 </button>
               ))}
             </Card>
@@ -209,7 +209,7 @@ export default function SellerScreen({ sellerId, onBack, onOpenListing }: {
             <button
               onClick={() => loadListings(offset)}
               disabled={loadingListings}
-              className="mt-2 flex h-11 w-full items-center justify-center gap-1.5 rounded-full bg-white text-sm font-semibold text-[#141414] ring-1 ring-black/[0.08] transition-all active:scale-[0.98] disabled:opacity-50"
+              className="mt-2 flex h-11 w-full items-center justify-center gap-1.5 rounded-full bg-white text-sm font-semibold text-[#17181A] ring-1 ring-black/[0.08] transition-all active:scale-[0.98] disabled:opacity-50"
             >
               {loadingListings ? 'Загрузка…' : <>Показать ещё <ArrowRight size={14} aria-hidden /></>}
             </button>
@@ -224,11 +224,11 @@ export default function SellerScreen({ sellerId, onBack, onOpenListing }: {
               {data.reviews.map((r) => (
                 <Card key={r.id} className="p-3.5">
                   <div className="flex items-center gap-1.5">
-                    <span className="truncate text-xs font-semibold text-[#141414]">{r.from}</span>
+                    <span className="truncate text-xs font-semibold text-[#17181A]">{r.from}</span>
                     <Stars value={r.rating} />
                     <span className="ml-auto shrink-0 text-[10px] text-black/40">{timeAgo(r.createdAt)}</span>
                   </div>
-                  <p className="mt-1 text-xs leading-relaxed text-black/55">{r.text}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-[#17181A]/50">{r.text}</p>
                   <p className="mt-1 truncate text-[10px] text-black/40">{r.listing}</p>
                 </Card>
               ))}
@@ -246,7 +246,7 @@ function Header({ onBack, title }: { onBack: () => void; title: string }) {
       <button
         onClick={onBack}
         aria-label="Назад"
-        className="-ml-1 -my-1.5 flex h-11 w-11 items-center justify-center rounded-full text-[#141414] transition-colors active:bg-black/[0.06]"
+        className="-ml-1 -my-1.5 flex h-11 w-11 items-center justify-center rounded-full text-[#17181A] transition-colors active:bg-neutral-200/60"
       >
         <ChevronLeft size={24} aria-hidden />
       </button>

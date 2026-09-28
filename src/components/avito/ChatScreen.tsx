@@ -85,7 +85,7 @@ function DeliveryLine({ d }: { d: ChatDeliveryDTO }) {
       type="button"
       onClick={() => openApp('delivery')}
       aria-label={`Открыть Доставки: ${phase.label}`}
-      className="mx-3 mb-2 mt-2 flex w-[calc(100%-24px)] items-center gap-2 rounded-[14px] bg-white p-2.5 text-left ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-colors active:bg-[#F6F7F9]"
+      className="mx-3 mb-2 mt-2 flex w-[calc(100%-24px)] items-center gap-2 rounded-[14px] bg-white p-2.5 text-left ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-colors active:bg-[#F5F6F8]"
     >
       <span
         className="flex size-9 shrink-0 items-center justify-center rounded-full"
@@ -100,7 +100,7 @@ function DeliveryLine({ d }: { d: ChatDeliveryDTO }) {
         </span>
         {running && (
           <span className="mt-1 flex items-center gap-2">
-            <span className="h-1 flex-1 overflow-hidden rounded-full bg-black/[0.06]">
+            <span className="h-1 flex-1 overflow-hidden rounded-full bg-neutral-200/60">
               <span
                 className="block h-full rounded-full transition-[width] duration-700 ease-linear"
                 style={{ width: `${pct}%`, backgroundColor: d.status === 'arrived' ? '#14532D' : '#D97706' }}
@@ -315,20 +315,20 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
 
   if (loading && !chat) {
     return (
-      <div className="flex h-full flex-col bg-[#F6F7F9]">
+      <div className="flex h-full flex-col bg-[#F5F6F8]">
         <div className="shrink-0 border-b border-black/[0.05] bg-white px-2 py-2">
           <div className="flex items-center gap-2.5">
-            <div className="size-10 animate-pulse rounded-full bg-black/[0.06]" />
+            <div className="size-10 animate-pulse rounded-full bg-neutral-200/60" />
             <div className="flex-1 space-y-1.5">
-              <div className="h-3.5 w-28 animate-pulse rounded bg-black/[0.06]" />
-              <div className="h-2.5 w-20 animate-pulse rounded bg-black/[0.06]" />
+              <div className="h-3.5 w-28 animate-pulse rounded bg-neutral-200/60" />
+              <div className="h-2.5 w-20 animate-pulse rounded bg-neutral-200/60" />
             </div>
           </div>
         </div>
         <div className="flex-1 space-y-2 p-3">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className={`flex ${i % 2 ? 'justify-end' : 'justify-start'}`}>
-              <div className="h-10 w-2/5 animate-pulse rounded-[18px] bg-black/[0.06]" />
+              <div className="h-10 w-2/5 animate-pulse rounded-[18px] bg-neutral-200/60" />
             </div>
           ))}
         </div>
@@ -337,9 +337,9 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
   }
   if (error && !chat) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#F6F7F9] p-6 text-center">
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#F5F6F8] p-6 text-center">
         <p className="text-sm text-red-600">{error}</p>
-        <button onClick={onBack} className="h-11 rounded-full bg-white px-5 text-sm font-semibold text-[#141414] ring-1 ring-black/[0.08] transition-all active:scale-[0.98]">
+        <button onClick={onBack} className="h-11 rounded-full bg-white px-5 text-sm font-semibold text-[#17181A] ring-1 ring-black/[0.08] transition-all active:scale-[0.98]">
           Назад
         </button>
       </div>
@@ -380,7 +380,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
 
   return (
     <div
-      className="relative flex h-full flex-col overflow-hidden bg-[#F6F7F9] text-[#141414]"
+      className="relative flex h-full flex-col overflow-hidden bg-[#F5F6F8] text-[#17181A]"
       style={{
         transform: `translateX(${swipeX}px)`,
         transition: swiping ? 'none' : 'transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)',
@@ -408,34 +408,34 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
       {/* шапка: назад, аватар, имя bold, рейтинг */}
       <div className="shrink-0 border-b border-black/[0.05] bg-white/95 backdrop-blur-md">
         <div className="flex items-center gap-1 px-2 py-1.5">
-          <button onClick={onBack} aria-label="Назад" className="flex h-10 w-10 items-center justify-center rounded-full text-[#141414] transition-colors active:bg-black/[0.06]">
+          <button onClick={onBack} aria-label="Назад" className="flex h-10 w-10 items-center justify-center rounded-full text-[#17181A] transition-colors active:bg-neutral-200/60">
             <ChevronLeft size={22} aria-hidden />
           </button>
           <UserAvatar name={chat.counterpart.displayName} className="h-10 w-10 rounded-full" />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
-              <span className="truncate text-[15px] font-bold text-[#141414]">{chat.counterpart.displayName}</span>
+              <span className="truncate text-[15px] font-bold text-[#17181A]">{chat.counterpart.displayName}</span>
               {/* честный индикатор настроения бота (28-a) — считает сервер */}
               {chat.counterpart.isBot && chat.mood && (
                 <span aria-label={`Настроение: ${chat.mood.label}`} title={chat.mood.label}>{chat.mood.emoji}</span>
               )}
               {chat.counterpart.online && <span className="size-2 shrink-0 rounded-full bg-[#16A34A]" aria-label="Онлайн" />}
             </div>
-            <div className="flex items-center gap-1 text-[11px] text-black/45">
+            <div className="flex items-center gap-1 text-[11px] text-[#17181A]/45">
               <Star size={9} className="fill-[#16A34A] text-[#16A34A]" aria-hidden />
               {chat.counterpart.rating > 0 ? `${chat.counterpart.rating.toFixed(1)} (${chat.counterpart.ratingCount})` : 'Новый продавец'}
               {!chat.counterpart.online && chat.counterpart.lastSeenAt && (
-                <span className="text-black/35"> · {fmtLastSeen(chat.counterpart.lastSeenAt)}</span>
+                <span className="text-[#17181A]/35"> · {fmtLastSeen(chat.counterpart.lastSeenAt)}</span>
               )}
             </div>
           </div>
         </div>
         {/* карточка товара */}
-        <div className="mx-3 mb-2 flex items-center gap-2 rounded-[14px] bg-black/[0.04] p-2">
+        <div className="mx-3 mb-2 flex items-center gap-2 rounded-[14px] bg-neutral-200/50 p-2">
           <img loading="lazy" decoding="async" src={chat.listing.image} alt="" className="h-10 w-10 rounded-[10px] bg-white object-cover"/>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-medium text-[#141414]">{chat.listing.title}</p>
-            <p className="text-xs font-bold text-[#141414]">
+            <p className="truncate text-xs font-medium text-[#17181A]">{chat.listing.title}</p>
+            <p className="text-xs font-bold text-[#17181A]">
               {chat.listing.price === 0 ? 'Даром' : fmtMoney(chat.listing.price)}
               <span className="ml-1.5 text-[10px] font-normal text-black/40">{CONDITION_LABEL[chat.listing.condition]}</span>
             </p>
@@ -446,7 +446,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
         </div>
         {/* тонкая строка настроения — только когда состояние заметное (28-a) */}
         {chat.counterpart.isBot && chat.mood && chat.mood.state !== 'neutral' && (
-          <p className="-mt-0.5 px-4 pb-1.5 text-[10px] text-black/45" role="status">
+          <p className="-mt-0.5 px-4 pb-1.5 text-[10px] text-[#17181A]/45" role="status">
             {chat.mood.emoji} {chat.mood.label}
           </p>
         )}
@@ -459,7 +459,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
           if (m.senderType === 'system') {
             return (
               <div key={m.id} className="flex justify-center">
-                <span className="rounded-full bg-black/[0.05] px-3 py-1 text-[11px] text-black/45">
+                <span className="rounded-full bg-neutral-200/60 px-3 py-1 text-[11px] text-[#17181A]/45">
                   {pretty(m.text)}
                 </span>
               </div>
@@ -471,12 +471,12 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
             <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[78%] rounded-[18px] px-3.5 py-2 ${
                 mine
-                  ? 'rounded-br-[6px] bg-[#DCEBE1] text-[#141414]'
-                  : 'rounded-bl-[6px] bg-white text-[#141414] ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)]'
+                  ? 'rounded-br-[6px] bg-[#e4f6ec] text-[#17181A]'
+                  : 'rounded-bl-[6px] bg-white text-[#17181A] ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)]'
               }`}>
                 {m.kind === 'invoice' ? (
                   <div className="min-w-[180px]">
-                    <div className={`flex items-center gap-1.5 text-xs font-semibold ${mine ? 'text-[#141414]/70' : 'text-black/45'}`}>
+                    <div className={`flex items-center gap-1.5 text-xs font-semibold ${mine ? 'text-[#17181A]/70' : 'text-[#17181A]/45'}`}>
                       <Banknote size={14} aria-hidden /> Счёт за товар
                     </div>
                     <div className="mt-1 text-xl font-extrabold tabular-nums">{fmtMoney(m.amount ?? 0)}</div>
@@ -490,7 +490,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
                       </button>
                     )}
                     {m.paid !== null && (
-                      <div className={`mt-1.5 flex items-center gap-1 text-[11px] font-semibold ${mine ? 'text-[#141414]/80' : 'text-[#14532D]'}`}>
+                      <div className={`mt-1.5 flex items-center gap-1 text-[11px] font-semibold ${mine ? 'text-[#17181A]/80' : 'text-[#15803D]'}`}>
                         <CheckCheck size={12} aria-hidden /> Оплачен
                       </div>
                     )}
@@ -498,7 +498,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
                 ) : (
                   <p className="text-sm leading-snug whitespace-pre-wrap break-words">{pretty(m.text)}</p>
                 )}
-                <div className={`mt-1 text-right text-[9px] ${mine ? 'text-[#141414]/50' : 'text-black/35'}`}>
+                <div className={`mt-1 text-right text-[9px] ${mine ? 'text-[#17181A]/50' : 'text-[#17181A]/35'}`}>
                   {fmtTime(m.createdAt)}
                 </div>
               </div>
@@ -528,7 +528,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
             <button
               key={q.label}
               onClick={() => { setDraft(q.text); sound.tap() }}
-              className="h-9 shrink-0 whitespace-nowrap rounded-full bg-white px-3.5 text-[13px] font-medium text-[#141414] ring-1 ring-black/[0.08] transition-all active:scale-[0.97]"
+              className="h-9 shrink-0 whitespace-nowrap rounded-full bg-white px-3.5 text-[13px] font-medium text-[#17181A] ring-1 ring-black/[0.08] transition-all active:scale-[0.97]"
             >
               {q.label}
             </button>
@@ -538,7 +538,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
 
       {/* ввод: звонок + счёт + белая пилюля + зелёная круглая кнопка отправки.
           Звонок: бот-продавцу (26-d, ИИ-разговор) или живому игроку (27-e, P2P). */}
-      <div className="flex shrink-0 items-center gap-2 border-t border-black/[0.05] bg-[#F6F7F9] p-2.5">
+      <div className="flex shrink-0 items-center gap-2 border-t border-black/[0.05] bg-[#F5F6F8] p-2.5">
         {(chat.counterpart.isBot
           ? chat.role === 'buyer' && chat.listing.status !== 'sold'
           : true) && (
@@ -550,7 +550,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
                 : `Позвонить ${chat.counterpart.displayName}`
             }
             title={chat.counterpart.isBot ? 'Позвонить продавцу' : 'Позвонить'}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-[#14532D] ring-1 ring-black/[0.08] transition-transform active:scale-95"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-[#15803D] ring-1 ring-black/[0.08] transition-transform active:scale-95"
           >
             <Phone size={19} aria-hidden />
           </button>
@@ -568,7 +568,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
           placeholder="Сообщение..."
           aria-label="Сообщение"
-          className="h-11 flex-1 rounded-full border border-black/[0.08] bg-white px-4 text-sm text-[#141414] outline-none placeholder:text-black/35 focus:border-black/[0.16]"
+          className="h-11 flex-1 rounded-full border border-black/[0.08] bg-white px-4 text-sm text-[#17181A] outline-none placeholder:text-[#17181A]/35 focus:border-black/[0.16]"
         />
         <button
           onClick={send}
@@ -585,12 +585,12 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
         <div className="absolute inset-0 z-40 flex items-end bg-black/50" onClick={() => setInvoiceOpen(false)}>
           <div className="w-full space-y-3 rounded-t-[24px] bg-white p-4 pb-[max(16px,env(safe-area-inset-bottom))] animate-in slide-in-from-bottom-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-[#141414]">Выставить счёт</h3>
-              <button onClick={() => setInvoiceOpen(false)} aria-label="Закрыть" className="flex h-9 w-9 items-center justify-center rounded-full bg-black/[0.05] text-black/50 transition-colors active:bg-black/[0.09]">
+              <h3 className="text-base font-bold text-[#17181A]">Выставить счёт</h3>
+              <button onClick={() => setInvoiceOpen(false)} aria-label="Закрыть" className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-200/60 text-black/50 transition-colors active:bg-neutral-200/80">
                 <X size={16} aria-hidden />
               </button>
             </div>
-            <p className="text-xs leading-relaxed text-black/45">
+            <p className="text-xs leading-relaxed text-[#17181A]/45">
               {chat.role === 'buyer'
                 ? 'Предложите свою цену. Продавец решит, соглашаться ли. Если счёт принят, сделка закроется автоматически.'
                 : 'Покупатель увидит счёт и сможет оплатить прямо в чате.'}
@@ -601,7 +601,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
               onChange={(e) => setInvoiceAmount(e.target.value.replace(/[^\d]/g, ''))}
               placeholder="Сумма, ₽"
               aria-label="Сумма счёта"
-              className="h-12 w-full rounded-[14px] bg-black/[0.04] px-4 text-lg font-bold text-[#141414] outline-none placeholder:text-black/30 focus:ring-1 focus:ring-black/[0.12]"
+              className="h-12 w-full rounded-[14px] bg-neutral-200/50 px-4 text-lg font-bold text-[#17181A] outline-none placeholder:text-[#17181A]/30 focus:ring-1 focus:ring-black/[0.12]"
             />
             <button
               onClick={sendInvoice}

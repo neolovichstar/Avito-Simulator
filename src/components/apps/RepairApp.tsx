@@ -893,7 +893,7 @@ export default function RepairApp() {
         </div>
 
         {/* вкладки */}
-        <div className="mt-3 flex rounded-full bg-[#EBEDF1] p-1" role="tablist" aria-label="Разделы мастерской">
+        <div className="mt-3 flex rounded-full bg-[#EBEDF0] p-1" role="tablist" aria-label="Разделы мастерской">
           {tabs.map((t) => {
             const active = tab === t.key
             return (
@@ -912,7 +912,7 @@ export default function RepairApp() {
                 {typeof t.badge === 'number' && t.badge > 0 && (
                   <span className={
                     'rounded-full px-1.5 text-[10px] font-bold tabular-nums ' +
-                    (active ? 'bg-[#FFD53D] text-[#231A02]' : 'bg-[#DDDFE4] text-[#5F6368]')
+                    (active ? 'bg-[#FFD53D] text-[#231A02]' : 'bg-[#E1E4E9] text-[#5F6368]')
                   }>{t.badge}</span>
                 )}
               </button>

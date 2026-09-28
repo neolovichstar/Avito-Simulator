@@ -123,6 +123,9 @@ export async function POST(req: Request) {
         orderBy: { createdAt: 'asc' },
       })
       const tgId = me.telegramId ? Number(me.telegramId) : NaN
+      // 59-a: накапливаем косметику между итерациями: раньше каждая выдача
+      // перезаписывала cosmetics от устаревшего снимка и теряла предыдущую
+      let cosmeticsRaw = me.cosmetics
       for (const p of pendings) {
         const tx = txs.find(
           (t) =>
@@ -140,9 +143,10 @@ export async function POST(req: Request) {
         } catch {
           continue // chargeId уже занят другой оплатой
         }
+        cosmeticsRaw = grantCosmetics(cosmeticsRaw, p.sku)
         await db.user.update({
           where: { id: me.id },
-          data: { cosmetics: grantCosmetics(me.cosmetics, p.sku) },
+          data: { cosmetics: cosmeticsRaw },
         })
         granted.push(p.sku)
       }

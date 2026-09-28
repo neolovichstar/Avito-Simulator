@@ -27,6 +27,13 @@ export async function GET(req: Request) {
   chats.forEach((c) => { userIds.add(c.buyerId); userIds.add(c.sellerId) })
   const users = await db.user.findMany({ where: { id: { in: [...userIds] } } })
   const userMap = new Map(users.map((u) => [u.id, u]))
+  // 59-a: один агрегат вместо запроса в цикле (N+1 на каждый чат)
+  const unreadAgg = await db.message.groupBy({
+    by: ['chatId'],
+    where: { chatId: { in: chats.map((c) => c.id) }, readAt: null, NOT: { senderId: user.id } },
+    _count: { _all: true },
+  })
+  const unreadMap = new Map(unreadAgg.map((g) => [g.chatId, g._count._all]))
 
   const out: ChatListItem[] = []
   for (const c of chats) {
@@ -34,12 +41,6 @@ export async function GET(req: Request) {
     const counterpart = userMap.get(counterpartId)
     if (!counterpart) continue
     const last = c.messages[0]
-    const unread = await db.message.count({
-      where: {
-        chatId: c.id, readAt: null,
-        NOT: { senderId: user.id },
-      },
-    })
     out.push({
       id: c.id,
       listingId: c.listingId,
@@ -55,7 +56,7 @@ export async function GET(req: Request) {
         id: counterpart.id, displayName: counterpart.displayName,
         isBot: counterpart.isBot, online: isOnline(counterpart),
       },
-      unread,
+      unread: unreadMap.get(c.id) ?? 0,
       role: c.buyerId === user.id ? 'buyer' : 'seller',
     })
   }

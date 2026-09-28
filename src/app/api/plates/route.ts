@@ -3,6 +3,7 @@ import { getSessionUser, unauthorized } from '@/lib/session'
 import { rateLimit } from '@/lib/ratelimit'
 import { subjectByName } from '@/lib/rf-regions'
 import { plateRarity, platePrice, plateBeautyScore, plateKey, isValidPlateParts, type PlateRarity } from '@/lib/plate'
+import type { CarPlate } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
 
@@ -65,32 +66,52 @@ export async function POST(req: Request) {
 
   const mineCount = await db.carPlate.count({ where: { userId: user.id } })
 
-  const plate = await db.$transaction(async (tx) => {
-    await tx.user.update({ where: { id: user.id }, data: { balance: { decrement: price } } })
-    await tx.transaction.create({
-      data: {
-        userId: user.id,
-        type: 'plate',
-        amount: -price,
-        note: `Автономер ${first} ${digits} ${letters} | ${regionCode}`,
-      },
+  // 59-a: транзакция с атомарным списанием (balance >= price) и честной обработкой
+  // гонки двух покупателей одного знака (P2002 → 409, а не 500)
+  let plate: CarPlate
+  try {
+    plate = await db.$transaction(async (tx) => {
+      const dec = await tx.user.updateMany({
+        where: { id: user.id, balance: { gte: price } },
+        data: { balance: { decrement: price } },
+      })
+      if (dec.count === 0) throw new PlateBuyError('Недостаточно средств')
+      await tx.transaction.create({
+        data: {
+          userId: user.id,
+          type: 'plate',
+          amount: -price,
+          note: `Автономер ${first} ${digits} ${letters} | ${regionCode}`,
+        },
+      })
+      return tx.carPlate.create({
+        data: {
+          userId: user.id,
+          plate: key,
+          first,
+          letters,
+          digits,
+          regionCode,
+          regionName: subject.name,
+          rarity,
+          beautyScore,
+          price,
+          isMain: mineCount === 0,
+        },
+      })
     })
-    return tx.carPlate.create({
-      data: {
-        userId: user.id,
-        plate: key,
-        first,
-        letters,
-        digits,
-        regionCode,
-        regionName: subject.name,
-        rarity,
-        beautyScore,
-        price,
-        isMain: mineCount === 0,
-      },
-    })
-  })
+  } catch (err) {
+    if (err instanceof PlateBuyError) {
+      return Response.json({ error: err.message, need: price }, { status: 402 })
+    }
+    if (typeof err === 'object' && err !== null && 'code' in err && (err as { code?: string }).code === 'P2002') {
+      return Response.json({ error: 'Этот номер уже занят' }, { status: 409 })
+    }
+    throw err
+  }
 
-  return Response.json({ plate, balance: user.balance - price })
+  const fresh = await db.user.findUnique({ where: { id: user.id }, select: { balance: true } })
+  return Response.json({ plate, balance: fresh?.balance ?? user.balance - price })
 }
+
+class PlateBuyError extends Error {}

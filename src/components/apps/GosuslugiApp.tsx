@@ -106,7 +106,7 @@ function ErrorScreen({ message, onRetry }: { message: string; onRetry: () => voi
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center">
       <span className="flex size-14 items-center justify-center rounded-full bg-[#EE3F58]/10">
-        <AlertTriangle className="size-6 text-[#EE3F58]" strokeWidth={2} />
+        <AlertTriangle className="size-6 text-red-500" strokeWidth={2} />
       </span>
       <div className="text-[15px] font-semibold text-[#17181A]">Портал недоступен</div>
       <p className="text-[13px] leading-relaxed text-[#9AA0A8]">{message}</p>
@@ -148,7 +148,7 @@ function HomeScreen({
         <button
           type="button"
           onClick={() => onGo({ k: 'profile' })}
-          className="flex min-w-0 flex-1 items-center gap-3 rounded-[20px] p-1.5 text-left transition active:bg-black/[0.04]"
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-[20px] p-1.5 text-left transition active:bg-neutral-200/50"
           aria-label="Личный кабинет"
         >
           <GosAvatar name={data.user.displayName} photoUrl={data.user.photoUrl} className="size-11" />
@@ -191,10 +191,10 @@ function HomeScreen({
               <button
                 type="button"
                 onClick={() => onGo({ k: 'fines' })}
-                className={CARD + ' flex w-full items-center gap-3.5 p-4 text-left transition active:bg-black/[0.03]'}
+                className={CARD + ' flex w-full items-center gap-3.5 p-4 text-left transition active:bg-neutral-200/40'}
               >
                 <span className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[#EE3F58]/10">
-                  <ReceiptText className="size-[21px] text-[#EE3F58]" strokeWidth={2} />
+                  <ReceiptText className="size-[21px] text-red-500" strokeWidth={2} />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[15px] font-bold text-[#17181A]">Штрафы ГИБДД</span>
@@ -225,7 +225,7 @@ function HomeScreen({
         {/* Услуги: название + одна строка описания */}
         <section className="mt-6">
           <SectionTitle title="Услуги" />
-          <div className="mx-5 divide-y divide-[#F0F1F5] overflow-hidden rounded-[20px] bg-white shadow-[0_2px_10px_rgba(15,35,95,0.05)]">
+          <div className="mx-5 divide-y divide-[#EBEDF0] overflow-hidden rounded-[20px] bg-white shadow-[0_2px_10px_rgba(15,35,95,0.05)]">
             {data.services.map((s) => (
               <ServiceRow
                 key={s.id}
@@ -267,9 +267,9 @@ function FinesView({
           <div className="flex items-end justify-between">
             <div>
               <div className="text-[12px] text-[#9AA0A8]">К оплате</div>
-              <div className="mt-0.5 text-[26px] font-extrabold leading-none text-[#EE3F58]">{fmtMoney(total)}</div>
+              <div className="mt-0.5 text-[26px] font-extrabold leading-none text-red-500">{fmtMoney(total)}</div>
             </div>
-            <span className="rounded-full bg-[#EE3F58]/10 px-2.5 py-1 text-[11px] font-bold text-[#EE3F58]">
+            <span className="rounded-full bg-[#EE3F58]/10 px-2.5 py-1 text-[11px] font-bold text-red-500">
               {unpaid.length === 1 ? '1 счёт' : `${unpaid.length} счёта`}
             </span>
           </div>
@@ -294,14 +294,14 @@ function FinesView({
       )}
 
       {unpaid.length > 0 && (
-        <div className="mt-4 divide-y divide-[#F0F1F5] overflow-hidden rounded-[22px] bg-white shadow-[0_2px_10px_rgba(15,35,95,0.05)]">
+        <div className="mt-4 divide-y divide-[#EBEDF0] overflow-hidden rounded-[22px] bg-white shadow-[0_2px_10px_rgba(15,35,95,0.05)]">
           {unpaid.map((f) => {
             const due = fineAmountDue(f)
             const half = due < f.amount
             return (
               <div key={f.id} className="flex items-center gap-3 p-4">
                 <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[#EE3F58]/10">
-                  <Car className="size-[19px] text-[#EE3F58]" strokeWidth={2} />
+                  <Car className="size-[19px] text-red-500" strokeWidth={2} />
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[14px] font-semibold text-[#17181A]">{f.title}</div>
@@ -334,7 +334,7 @@ function FinesView({
       {paid.length > 0 && (
         <div className="mt-4">
           <div className="mb-2 px-1 text-[12px] font-semibold uppercase tracking-wide text-[#9AA0A8]">Оплаченные</div>
-          <div className="divide-y divide-[#F0F1F5] overflow-hidden rounded-[22px] bg-white shadow-[0_2px_10px_rgba(15,35,95,0.05)]">
+          <div className="divide-y divide-[#EBEDF0] overflow-hidden rounded-[22px] bg-white shadow-[0_2px_10px_rgba(15,35,95,0.05)]">
             {paid.map((f) => (
               <div key={f.id} className="flex items-center gap-3 p-4">
                 <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[#0AC760]/10">
@@ -443,7 +443,7 @@ function SearchView({
         {query && docs.length > 0 && (
           <div className="mt-3">
             <div className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-[#9AA0A8]">Документы</div>
-            <div className="divide-y divide-[#F0F1F5] overflow-hidden rounded-[20px] bg-white shadow-[0_2px_10px_rgba(15,35,95,0.05)]">
+            <div className="divide-y divide-[#EBEDF0] overflow-hidden rounded-[20px] bg-white shadow-[0_2px_10px_rgba(15,35,95,0.05)]">
               {docs.map((d) => {
                 const Icon = DOC_ICONS[d.icon]
                 return (
@@ -451,7 +451,7 @@ function SearchView({
                     key={d.id}
                     type="button"
                     onClick={() => onOpenDoc(d.id)}
-                    className="flex min-h-[52px] w-full items-center gap-3 px-4 py-2 text-left transition active:bg-black/[0.04]"
+                    className="flex min-h-[52px] w-full items-center gap-3 px-4 py-2 text-left transition active:bg-neutral-200/50"
                   >
                     <span
                       className="flex size-9 shrink-0 items-center justify-center rounded-xl text-white"
@@ -474,7 +474,7 @@ function SearchView({
         {query && services.length > 0 && (
           <div className="mt-4">
             <div className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-[#9AA0A8]">Услуги</div>
-            <div className="divide-y divide-[#F0F1F5] overflow-hidden rounded-[20px] bg-white shadow-[0_2px_10px_rgba(15,35,95,0.05)]">
+            <div className="divide-y divide-[#EBEDF0] overflow-hidden rounded-[20px] bg-white shadow-[0_2px_10px_rgba(15,35,95,0.05)]">
               {services.map((s) => (
                 <ServiceRow key={s.id} service={s} onClick={() => onOpenService(s.id)} />
               ))}
@@ -529,7 +529,7 @@ function ProfileView({
 
       <div className="mt-3">
         <SectionTitle title="Персональные данные" />
-        <div className={CARD + ' divide-y divide-[#F0F1F5]'}>
+        <div className={CARD + ' divide-y divide-[#EBEDF0]'}>
           <DataRow label="СНИЛС" value={snils?.number ?? '—'} />
           <DataRow label="ИНН" value={inn?.number ?? '—'} />
           {birth && <DataRow label="Дата рождения" value={birth} />}
@@ -540,7 +540,7 @@ function ProfileView({
 
       <div className="mt-4">
         <SectionTitle title="Мои документы" />
-        <div className={CARD + ' divide-y divide-[#F0F1F5]'}>
+        <div className={CARD + ' divide-y divide-[#EBEDF0]'}>
           {data.docs.map((d) => {
             const Icon = DOC_ICONS[d.icon]
             return (
@@ -548,7 +548,7 @@ function ProfileView({
                 key={d.id}
                 type="button"
                 onClick={() => onOpenDoc(d.id)}
-                className="flex min-h-[52px] w-full items-center gap-3 px-4 py-2 text-left transition active:bg-black/[0.04]"
+                className="flex min-h-[52px] w-full items-center gap-3 px-4 py-2 text-left transition active:bg-neutral-200/50"
               >
                 <span
                   className="flex size-9 shrink-0 items-center justify-center rounded-xl text-white"
@@ -569,7 +569,7 @@ function ProfileView({
 
       <div className="mt-4">
         <SectionTitle title="Платежи" />
-        <div className={CARD + ' divide-y divide-[#F0F1F5]'}>
+        <div className={CARD + ' divide-y divide-[#EBEDF0]'}>
           <DataRow label="Баланс счёта" value={fmtMoney(data.user.balance)} />
           <DataRow label="Оплачено через портал" value={fmtMoney(data.paidTotal)} />
         </div>
@@ -791,7 +791,7 @@ export default function GosuslugiApp() {
                   type="button"
                   onClick={() => setDocOpen(null)}
                   aria-label="Закрыть"
-                  className="absolute right-2 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full transition active:bg-black/[0.06]"
+                  className="absolute right-2 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full transition active:bg-neutral-200/60"
                 >
                   <X className="size-5 text-[#17181A]" strokeWidth={2.2} />
                 </button>

@@ -110,25 +110,25 @@ export default function ChatsScreen({ onOpenChat }: { onOpenChat: (id: string) =
   }, [items, q])
 
   return (
-    <div className="h-full overflow-y-auto bg-[#F6F7F9] [scrollbar-width:thin]">
+    <div className="h-full overflow-y-auto bg-[#F5F6F8] [scrollbar-width:thin]">
       {/* шапка: заголовок + поиск */}
-      <div className="sticky top-0 z-10 bg-[#F6F7F9] px-4 pb-2.5 pt-3">
+      <div className="sticky top-0 z-10 bg-[#F5F6F8] px-4 pb-2.5 pt-3">
         <Overline>Resale</Overline>
         <ScreenTitle className="mb-3">Чаты</ScreenTitle>
         <div className="flex h-11 items-center gap-2 rounded-full bg-white px-4 ring-1 ring-black/[0.08]">
-          <Search size={17} className="shrink-0 text-black/35" aria-hidden />
+          <Search size={17} className="shrink-0 text-[#17181A]/35" aria-hidden />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Поиск по чатам"
             aria-label="Поиск по чатам"
-            className="w-full bg-transparent text-[15px] text-[#141414] outline-none placeholder:text-black/35"
+            className="w-full bg-transparent text-[15px] text-[#17181A] outline-none placeholder:text-[#17181A]/35"
           />
           {q && (
             <button
               onClick={() => setQ('')}
               aria-label="Очистить поиск"
-              className="flex size-7 shrink-0 items-center justify-center rounded-full text-black/35 transition-colors active:bg-black/[0.06]"
+              className="flex size-7 shrink-0 items-center justify-center rounded-full text-[#17181A]/35 transition-colors active:bg-neutral-200/60"
             >
               <X size={14} aria-hidden />
             </button>
@@ -156,9 +156,9 @@ export default function ChatsScreen({ onOpenChat }: { onOpenChat: (id: string) =
           note="Напишите продавцу с карточки товара. Или боты сами напишут вам, когда увидят ваши объявления"
         />
       ) : filtered.length === 0 ? (
-        <p className="px-8 pt-10 text-center text-[13px] text-black/45">Никого не нашлось по запросу «{q.trim()}»</p>
+        <p className="px-8 pt-10 text-center text-[13px] text-[#17181A]/45">Никого не нашлось по запросу «{q.trim()}»</p>
       ) : (
-        <Card className="mx-4 divide-y divide-black/[0.05] overflow-hidden">
+        <Card className="mx-4 divide-y divide-[#EBEDF0] overflow-hidden">
           {filtered.map((c) => {
             const isTyping = Boolean(typing[c.id])
             const draft = drafts[c.id]
@@ -166,7 +166,7 @@ export default function ChatsScreen({ onOpenChat }: { onOpenChat: (id: string) =
               <button
                 key={c.id}
                 onClick={() => onOpenChat(c.id)}
-                className="flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors active:bg-[#F6F7F9]"
+                className="flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors active:bg-[#F5F6F8]"
               >
                 {/* круглый аватар 48 + зелёная точка онлайн */}
                 <span className="relative shrink-0">
@@ -184,7 +184,7 @@ export default function ChatsScreen({ onOpenChat }: { onOpenChat: (id: string) =
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="truncate text-[15px] font-bold text-[#141414]">{c.counterpart.displayName}</span>
+                    <span className="truncate text-[15px] font-bold text-[#17181A]">{c.counterpart.displayName}</span>
                     {c.role === 'seller' && (
                       <span className="shrink-0 rounded bg-amber-500/[0.12] px-1 py-0.5 text-[9px] font-bold text-amber-700">ПРОДАЖА</span>
                     )}
@@ -195,17 +195,17 @@ export default function ChatsScreen({ onOpenChat }: { onOpenChat: (id: string) =
                   {isTyping ? (
                     <p className="mt-0.5 truncate text-[14px] font-medium text-[#16A34A]">печатает…</p>
                   ) : draft ? (
-                    <p className="mt-0.5 truncate text-[14px] text-black/55">
+                    <p className="mt-0.5 truncate text-[14px] text-[#17181A]/50">
                       <span className="font-semibold">Черновик:</span> {draft.slice(0, 60)}
                     </p>
                   ) : (
-                    <p className="mt-0.5 truncate text-[14px] text-black/45">
+                    <p className="mt-0.5 truncate text-[14px] text-[#17181A]/45">
                       {c.lastMessage
                         ? `${c.lastMessage.mine ? 'Вы: ' : ''}${c.lastMessage.kind === 'invoice' ? `Счёт на ${c.lastMessage.text.replace(/[^\d\s₽]/g, '')}` : c.lastMessage.text}`
                         : `Товар: ${c.listingTitle}`}
                     </p>
                   )}
-                  <p className="mt-0.5 truncate text-[12px] text-black/35">{c.listingTitle}</p>
+                  <p className="mt-0.5 truncate text-[12px] text-[#17181A]/35">{c.listingTitle}</p>
                 </div>
                 {c.unread > 0 && (
                   <span className={cn(

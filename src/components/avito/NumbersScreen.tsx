@@ -37,12 +37,12 @@ export default function NumbersScreen() {
   const [side, setSide] = useState<'phones' | 'cars'>('phones')
 
   return (
-    <div className="flex h-full flex-col bg-[#F6F7F9] text-[#141414]">
+    <div className="flex h-full flex-col bg-[#F5F6F8] text-[#17181A]">
       {/* заголовок + сегменты */}
       <div className="shrink-0 px-4 pb-3 pt-4">
         <Overline>Resale</Overline>
         <ScreenTitle className="mb-3">Номера</ScreenTitle>
-        <div className="grid grid-cols-2 gap-1 rounded-full bg-black/[0.05] p-1" role="tablist" aria-label="Тип номеров">
+        <div className="grid grid-cols-2 gap-1 rounded-full bg-neutral-200/60 p-1" role="tablist" aria-label="Тип номеров">
           {(
             [
               { key: 'phones', label: 'Телефоны', icon: Phone },
@@ -57,7 +57,7 @@ export default function NumbersScreen() {
               className={cn(
                 'flex h-10 items-center justify-center gap-1.5 rounded-full text-[13.5px] font-bold transition-all active:scale-[0.98]',
                 side === t.key
-                  ? 'bg-white text-[#141414] shadow-[0_1px_6px_rgba(0,0,0,0.1)]'
+                  ? 'bg-white text-[#17181A] shadow-[0_1px_6px_rgba(0,0,0,0.1)]'
                   : 'text-black/40',
               )}
             >
@@ -134,7 +134,7 @@ function PhonesPane() {
         </div>
         <button
           onClick={() => openApp('numbers')}
-          className="shrink-0 rounded-full bg-white px-4 py-2.5 text-[13px] font-bold text-[#14532D] transition-all active:scale-95"
+          className="shrink-0 rounded-full bg-white px-4 py-2.5 text-[13px] font-bold text-[#15803D] transition-all active:scale-95"
         >
           Крутить
         </button>
@@ -158,9 +158,9 @@ function PhonesPane() {
           {rows.map((p) => (
             <Card key={p.id} className="flex items-center gap-3 p-3.5">
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[16px] font-bold tabular-nums text-[#141414]">{p.number}</span>
+                <span className="block truncate text-[16px] font-bold tabular-nums text-[#17181A]">{p.number}</span>
                 <span className="mt-1 flex flex-wrap items-center gap-1.5">
-                  <span className="rounded-full bg-black/[0.05] px-2 py-0.5 text-[10.5px] font-bold leading-none text-black/55">
+                  <span className="rounded-full bg-neutral-200/60 px-2 py-0.5 text-[10.5px] font-bold leading-none text-[#17181A]/50">
                     {TIER_LABEL[p.tier] ?? p.tier}
                   </span>
                   <span className="text-[11px] text-black/40">
@@ -178,7 +178,7 @@ function PhonesPane() {
                     onClick={() => setMain(p.id)}
                     disabled={busy}
                     aria-label="Сделать основным"
-                    className="flex size-9 shrink-0 items-center justify-center rounded-full text-black/30 transition-colors hover:bg-amber-50 hover:text-amber-600 active:bg-amber-500/[0.12]"
+                    className="flex size-9 shrink-0 items-center justify-center rounded-full text-[#17181A]/30 transition-colors hover:bg-amber-50 hover:text-amber-600 active:bg-amber-500/[0.12]"
                   >
                     <Star size={16} aria-hidden />
                   </button>
@@ -186,7 +186,7 @@ function PhonesPane() {
                     onClick={() => release(p.id)}
                     disabled={busy}
                     aria-label="Отпустить номер"
-                    className="flex size-9 shrink-0 items-center justify-center rounded-full text-black/30 transition-colors hover:bg-red-50 hover:text-red-500 active:bg-red-500/[0.12]"
+                    className="flex size-9 shrink-0 items-center justify-center rounded-full text-[#17181A]/30 transition-colors hover:bg-red-50 hover:text-red-500 active:bg-red-500/[0.12]"
                   >
                     <Trash2 size={16} aria-hidden />
                   </button>

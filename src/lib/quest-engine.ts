@@ -24,6 +24,21 @@ export async function ensureDailyQuests(userId: string) {
     const have = await db.quest.count({ where: { userId, day: today } })
     if (have > 0) return
   }
+  // 59-a: атомарный «захват» дня: движок и GET /api/career могут позвать
+  // ensureDailyQuests одновременно; без гардра оба создавали полный набор квестов
+  // (дубли), и каждый дубль можно было «получить награду» отдельно
+  const claim = await db.user.updateMany({
+    where: { id: userId, OR: [{ questDay: null }, { questDay: { not: today } }] },
+    data: { questDay: today },
+  })
+  if (claim.count === 0) {
+    // questDay уже сегодняшний: обычный выход. Но если квестов нет (сбой после
+    // захвата дня) — пересоздаём, как раньше, иначе игрок останется без квестов
+    const fresh = await db.user.findUnique({ where: { id: userId }, select: { questDay: true } })
+    if (!fresh || fresh.questDay !== today) return
+    const have = await db.quest.count({ where: { userId, day: today } })
+    if (have > 0) return
+  }
   const pool = [...QUEST_POOL]
   const chosen: QuestDef[] = []
   const usedKinds = new Set<string>()
@@ -56,7 +71,7 @@ export async function ensureDailyQuests(userId: string) {
       },
     })
   }
-  await db.user.update({ where: { id: userId }, data: { questDay: today } })
+  // questDay уже выставлен «захватом» выше — здесь остаётся только уведомление
   await notifyUser(
     userId, 'system', '🎯 Новые задания',
     mega

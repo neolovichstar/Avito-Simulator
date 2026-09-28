@@ -97,7 +97,7 @@ export function SubHeader({
         type="button"
         onClick={onBack}
         aria-label="Назад"
-        className="flex size-10 shrink-0 items-center justify-center rounded-full transition active:bg-black/[0.06]"
+        className="flex size-10 shrink-0 items-center justify-center rounded-full transition active:bg-neutral-200/60"
       >
         <ChevronLeft className="size-6 text-[#17181A]" strokeWidth={2.2} />
       </button>
@@ -190,7 +190,7 @@ export function ServiceRow({
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-[60px] w-full items-center gap-3 px-4 py-2.5 text-left transition active:bg-black/[0.04]"
+      className="flex min-h-[60px] w-full items-center gap-3 px-4 py-2.5 text-left transition active:bg-neutral-200/50"
     >
       <span
         className="flex size-10 shrink-0 items-center justify-center rounded-[14px]"

@@ -457,7 +457,7 @@ export default function TaxesApp() {
                       {data.bills.length === 0 ? (
                         <EmptyOperations hint="Продавайте товары — налоговые начисления появятся здесь" />
                       ) : (
-                        <div className="divide-y divide-[#F0F1F5]">
+                        <div className="divide-y divide-[#EBEDF0]">
                           {data.bills.slice(0, 4).map((b) => (
                             <BillRow key={b.id} bill={b} />
                           ))}
@@ -512,7 +512,7 @@ export default function TaxesApp() {
                           {g.title}
                         </div>
                         <div className={`${CARD} px-4 py-1`}>
-                          <div className="divide-y divide-[#F0F1F5]">
+                          <div className="divide-y divide-[#EBEDF0]">
                             {g.bills.map((b) => (
                               <BillRow key={b.id} bill={b} />
                             ))}
@@ -543,7 +543,7 @@ export default function TaxesApp() {
                         <div className="relative mt-1.5 max-w-[80%] text-xs font-bold leading-snug">Лимит задолженности, после которого блокируются продажи</div>
                         <div className="relative mt-1 text-[10px] text-[#9AA0A8]">Следите за сроками оплаты</div>
                       </div>
-                      <div className="relative h-[120px] w-[86%] shrink-0 snap-center overflow-hidden rounded-[20px] bg-[#D8E9FA] p-4 text-[#1A1A1A]">
+                      <div className="relative h-[120px] w-[86%] shrink-0 snap-center overflow-hidden rounded-[20px] bg-blue-100 p-4 text-[#1A1A1A]">
                         <Sprout className="absolute -right-3 -top-3 size-24 text-[#174F7C]/10" strokeWidth={1.4} aria-hidden="true" />
                         <div className="relative text-[26px] font-bold leading-none text-[#174F7C]">{data.rate}%</div>
                         <div className="relative mt-1.5 max-w-[80%] text-xs font-bold leading-snug">с продаж другим игрокам — налог считается автоматически</div>
@@ -633,7 +633,7 @@ export default function TaxesApp() {
                         <ShieldCheck className="size-3.5" aria-hidden="true" /> Самозанятый игрок
                       </span>
                     </div>
-                    <div className="mt-3 divide-y divide-[#F0F1F5] border-t border-[#F0F1F5]">
+                    <div className="mt-3 divide-y divide-[#EBEDF0] border-t border-[#F0F1F5]">
                       {[
                         { label: 'ИНН', value: <span className="font-semibold tabular-nums">{inn}</span> },
                         { label: 'Город', value: session?.city || '—' },

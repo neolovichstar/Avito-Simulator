@@ -20,7 +20,7 @@ import type { LoanHistoryItem, TransactionDTO } from '@/lib/types'
 // ---- Дизайн-токены светлых вкладок ----
 export const GREEN = '#0E7A3D'
 export const CARD_CLS =
-  'rounded-[20px] bg-[#FFFFFF] ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)]'
+  'rounded-[20px] bg-white ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)]'
 export const CAPS = 'text-[11px] font-semibold uppercase tracking-[0.12em] text-black/40'
 
 // ---- Дизайн-токены тёмного главного экрана (скриншот старого дизайна) ----
@@ -152,8 +152,8 @@ export function Toggle({ checked, onCheckedChange, label, tone = 'light' }: {
   tone?: 'light' | 'dark'
 }) {
   const on = tone === 'dark' ? 'bg-[#22C55E]' : 'bg-[#0E7A3D]'
-  const off = tone === 'dark' ? 'bg-white/20' : 'bg-black/[0.14]'
-  const ring = tone === 'dark' ? 'focus-visible:ring-[#22C55E]/50' : 'focus-visible:ring-[#0E7A3D]/50'
+  const off = tone === 'dark' ? 'bg-white/20' : 'bg-neutral-200/80'
+  const ring = tone === 'dark' ? 'focus-visible:ring-[#21A038]/50' : 'focus-visible:ring-[#21A038]/50'
   return (
     <button
       type="button"
@@ -165,7 +165,7 @@ export function Toggle({ checked, onCheckedChange, label, tone = 'light' }: {
     >
       <span
         aria-hidden="true"
-        className={`absolute left-0 top-0.5 size-5 rounded-full bg-[#FFFFFF] shadow transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-90 ${checked ? 'translate-x-[22px]' : 'translate-x-0.5'}`}
+        className={`absolute left-0 top-0.5 size-5 rounded-full bg-white shadow transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] active:scale-90 ${checked ? 'translate-x-[22px]' : 'translate-x-0.5'}`}
       />
     </button>
   )
@@ -179,7 +179,7 @@ export function Segment<T extends string>({ value, onChange, options, ariaLabel 
   ariaLabel: string
 }) {
   return (
-    <div role="tablist" aria-label={ariaLabel} className="flex rounded-full bg-black/[0.05] p-1">
+    <div role="tablist" aria-label={ariaLabel} className="flex rounded-full bg-neutral-200/60 p-1">
       {options.map((o) => {
         const active = o.key === value
         return (
@@ -192,7 +192,7 @@ export function Segment<T extends string>({ value, onChange, options, ariaLabel 
             className={`h-9 flex-1 rounded-full text-[13px] transition active:scale-[0.98] ${
               active
                 ? 'bg-[#0E7A3D] font-semibold text-white shadow-[0_1px_3px_rgba(14,122,61,0.35)]'
-                : 'font-medium text-[#6B7280]'
+                : 'font-medium text-gray-500'
             }`}
           >
             {o.label}
@@ -217,7 +217,7 @@ export function Chip({ active, onClick, children }: {
       className={`flex h-9 items-center rounded-full px-4 text-[13px] transition active:scale-[0.98] ${
         active
           ? 'bg-[#0E7A3D] font-semibold text-white shadow-[0_1px_3px_rgba(14,122,61,0.35)]'
-          : `${CARD_CLS} font-medium text-[#141414]`
+          : `${CARD_CLS} font-medium text-[#17181A]`
       }`}
     >
       {children}
@@ -233,7 +233,7 @@ export function PageDots({ count, active, tone = 'light' }: {
   tone?: 'light' | 'dark'
 }) {
   const activeCls = tone === 'dark' ? 'w-5 bg-[#22C55E]' : 'w-5 bg-[#141414]'
-  const idleCls = tone === 'dark' ? 'w-1.5 bg-white/20' : 'w-1.5 bg-black/15'
+  const idleCls = tone === 'dark' ? 'w-1.5 bg-white/20' : 'w-1.5 bg-neutral-200'
   return (
     <div className="flex justify-center gap-1.5" aria-hidden="true">
       {Array.from({ length: count }, (_, i) => (
@@ -423,23 +423,23 @@ export function TxRow({ m }: { m: MergedTx }) {
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <span className="min-w-0 truncate text-[15px] font-semibold text-[#141414]">
+          <span className="min-w-0 truncate text-[15px] font-semibold text-[#17181A]">
             {TX_TYPE_LABEL[t.type] ?? t.type}
           </span>
           {count > 1 && (
-            <span className="shrink-0 rounded-full bg-[#0E7A3D]/10 px-2 text-[11px] font-bold leading-5 text-[#0E7A3D]">
+            <span className="shrink-0 rounded-full bg-[#0E7A3D]/10 px-2 text-[11px] font-bold leading-5 text-[#0E7A2B]">
               ×{count}
             </span>
           )}
         </div>
-        <div className="truncate text-[12px] text-[#9CA3AF]">{t.counterpartyName ?? t.note ?? 'Операция'}</div>
+        <div className="truncate text-[12px] text-gray-400">{t.counterpartyName ?? t.note ?? 'Операция'}</div>
       </div>
       <div className="shrink-0 text-right">
-        <div className={`text-[15px] font-bold tabular-nums ${positive ? 'text-[#0E7A3D]' : 'text-[#141414]'}`}>
+        <div className={`text-[15px] font-bold tabular-nums ${positive ? 'text-[#0E7A2B]' : 'text-[#17181A]'}`}>
           {positive ? '+' : ''}
           {fmtMoney(total)}
         </div>
-        <div className="text-[11px] tabular-nums text-[#9CA3AF]" suppressHydrationWarning>
+        <div className="text-[11px] tabular-nums text-gray-400" suppressHydrationWarning>
           {count > 1 ? `${fmtTime(t.createdAt)} · ×${count} ${fmtMoney(t.amount)}` : fmtTime(t.createdAt)}
         </div>
       </div>
@@ -498,7 +498,7 @@ export function SheetTile({ icon: Icon, label, color, onClick }: {
     <button
       type="button"
       onClick={onClick}
-      className="flex flex-col items-start gap-2.5 rounded-2xl bg-[#F6F7F9] p-3.5 text-left transition active:scale-[0.98]"
+      className="flex flex-col items-start gap-2.5 rounded-2xl bg-[#F5F6F8] p-3.5 text-left transition active:scale-[0.98]"
     >
       <span
         className="flex size-10 items-center justify-center rounded-xl"
@@ -507,7 +507,7 @@ export function SheetTile({ icon: Icon, label, color, onClick }: {
       >
         <Icon className="size-5" strokeWidth={2.1} />
       </span>
-      <span className="text-[13px] font-semibold leading-tight text-[#141414]">{label}</span>
+      <span className="text-[13px] font-semibold leading-tight text-[#17181A]">{label}</span>
     </button>
   )
 }
@@ -530,8 +530,8 @@ export function ServiceTile({ icon: Icon, color, label, sub, onClick, aria }: {
       >
         <Icon className="size-5" strokeWidth={2.1} />
       </span>
-      <span className="mt-2.5 block text-[13.5px] font-bold text-[#141414]">{label}</span>
-      <span className="block text-[11px] text-[#9CA3AF]">{sub}</span>
+      <span className="mt-2.5 block text-[13.5px] font-bold text-[#17181A]">{label}</span>
+      <span className="block text-[11px] text-gray-400">{sub}</span>
     </button>
   )
 }
@@ -542,17 +542,17 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
     <div className="absolute inset-0 z-40 flex flex-col justify-end" role="dialog" aria-modal="true" aria-label={title}>
       <button type="button" aria-label="Закрыть" onClick={onClose} className="absolute inset-0 bg-black/40" />
       <div
-        className="relative max-h-[82%] overflow-y-auto rounded-t-[24px] bg-[#FFFFFF] px-5 pb-7 pt-3 shadow-[0_-12px_40px_rgba(0,0,0,0.18)] [scrollbar-width:thin]"
+        className="relative max-h-[82%] overflow-y-auto rounded-t-[24px] bg-white px-5 pb-7 pt-3 shadow-[0_-12px_40px_rgba(0,0,0,0.18)] [scrollbar-width:thin]"
         style={{ animation: 'sheet-up 0.3s cubic-bezier(0.22, 1, 0.36, 1)' }}
       >
-        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-black/10" aria-hidden="true" />
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-neutral-200" aria-hidden="true" />
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-[17px] font-bold tracking-tight text-[#141414]">{title}</h2>
+          <h2 className="text-[17px] font-bold tracking-tight text-[#17181A]">{title}</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Закрыть"
-            className="flex size-8 items-center justify-center rounded-full bg-[#F6F7F9] text-[#9CA3AF] transition active:scale-95"
+            className="flex size-8 items-center justify-center rounded-full bg-[#F5F6F8] text-gray-400 transition active:scale-95"
           >
             <X className="size-4" aria-hidden="true" />
           </button>
@@ -564,10 +564,10 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
 }
 
 // Строка «ключ: значение» в договорах и анкетах
-export function InfoRow({ k, v, vCls = 'text-[#141414]' }: { k: string; v: string; vCls?: string }) {
+export function InfoRow({ k, v, vCls = 'text-[#17181A]' }: { k: string; v: string; vCls?: string }) {
   return (
     <div className="flex items-center justify-between gap-3 py-2.5">
-      <span className="shrink-0 text-[13px] text-[#9CA3AF]">{k}</span>
+      <span className="shrink-0 text-[13px] text-gray-400">{k}</span>
       <span className={`min-w-0 truncate text-right text-[13px] font-semibold tabular-nums ${vCls}`}>{v}</span>
     </div>
   )
@@ -601,8 +601,8 @@ export function Donut({ segs, total, centerLabel }: {
         ))}
       </svg>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-[20px] font-bold tabular-nums text-[#141414]">{total}</span>
-        <span className="mt-0.5 text-[12px] text-[#9CA3AF]">{centerLabel}</span>
+        <span className="text-[20px] font-bold tabular-nums text-[#17181A]">{total}</span>
+        <span className="mt-0.5 text-[12px] text-gray-400">{centerLabel}</span>
       </div>
     </div>
   )
@@ -627,14 +627,14 @@ export function CategoryRow({ icon: Icon, color, label, count, total, pct }: {
         <Icon className="size-[18px] text-white" strokeWidth={2.1} />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[15px] font-semibold text-[#141414]">{label}</div>
-        <div className="text-[12px] text-[#9CA3AF]">
+        <div className="truncate text-[15px] font-semibold text-[#17181A]">{label}</div>
+        <div className="text-[12px] text-gray-400">
           {count} {plural(count, 'операция', 'операции', 'операций')}
         </div>
       </div>
       <div className="shrink-0 text-right">
-        <div className="text-[15px] font-bold tabular-nums text-[#141414]">{fmtMoney(total)}</div>
-        <div className="text-[12px] tabular-nums text-[#9CA3AF]">{pct}%</div>
+        <div className="text-[15px] font-bold tabular-nums text-[#17181A]">{fmtMoney(total)}</div>
+        <div className="text-[12px] tabular-nums text-gray-400">{pct}%</div>
       </div>
     </div>
   )
@@ -654,8 +654,8 @@ export function Numpad({ onKey }: { onKey: (k: 'digit' | 'back', v?: string) => 
             disabled={isComma}
             aria-label={isComma ? 'Запятая недоступна: сумма в рублях' : `Цифра ${k}`}
             onClick={() => { if (!isComma) onKey('digit', k) }}
-            className={`flex h-12 items-center justify-center rounded-2xl bg-[#FFFFFF] text-[22px] font-semibold ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition active:scale-[0.98] ${
-              isComma ? 'text-[#C4C7CD]' : 'text-[#141414]'
+            className={`flex h-12 items-center justify-center rounded-2xl bg-white text-[22px] font-semibold ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition active:scale-[0.98] ${
+              isComma ? 'text-[#C4C7CD]' : 'text-[#17181A]'
             }`}
           >
             {k}
@@ -666,9 +666,9 @@ export function Numpad({ onKey }: { onKey: (k: 'digit' | 'back', v?: string) => 
         type="button"
         aria-label="Удалить цифру"
         onClick={() => onKey('back')}
-        className="flex h-12 items-center justify-center rounded-2xl bg-[#FFFFFF] text-[#141414] ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition active:scale-[0.98]"
+        className="flex h-12 items-center justify-center rounded-2xl bg-white text-[#17181A] ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition active:scale-[0.98]"
       >
-        <Delete className="size-5 text-[#6B7280]" aria-hidden="true" />
+        <Delete className="size-5 text-gray-500" aria-hidden="true" />
       </button>
     </div>
   )
@@ -693,8 +693,8 @@ export function ScoreGauge({ score }: { score: number }) {
         <circle cx="70" cy="74" r="5" fill="#141414" />
       </svg>
       <div className="-mt-8 text-center">
-        <div className="text-[26px] font-extrabold leading-none tabular-nums text-[#141414]">{score}</div>
-        <div className="mt-1 text-[10.5px] tabular-nums text-[#9CA3AF]">
+        <div className="text-[26px] font-extrabold leading-none tabular-nums text-[#17181A]">{score}</div>
+        <div className="mt-1 text-[10.5px] tabular-nums text-gray-400">
           <span className="mr-3">300</span>
           <span>850</span>
         </div>
@@ -706,7 +706,7 @@ export function ScoreGauge({ score }: { score: number }) {
 // Пилюля статуса договора в кредитной истории
 export function LoanStatusChip({ status }: { status: string }) {
   if (status === 'repaid') {
-    return <span className="shrink-0 rounded-full bg-[#E7F5EA] px-2.5 py-1 text-[11px] font-semibold text-[#0A5C2E]">Погашен</span>
+    return <span className="shrink-0 rounded-full bg-[#E7F5EA] px-2.5 py-1 text-[11px] font-semibold text-[#0E7A2B]">Погашен</span>
   }
   if (status === 'overdue') {
     return <span className="shrink-0 rounded-full bg-[#FDEEEE] px-2.5 py-1 text-[11px] font-semibold text-[#E5584B]">Просрочен</span>
@@ -722,15 +722,15 @@ export function CreditHistorySection({ items }: { items: LoanHistoryItem[] | nul
       <div className={`${CARD_CLS} px-4 py-1`}>
         {items === null ? (
           <div className="space-y-2 py-3">
-            <div className="h-9 animate-pulse rounded-xl bg-black/[0.05]" />
-            <div className="h-9 animate-pulse rounded-xl bg-black/[0.05]" />
+            <div className="h-9 animate-pulse rounded-xl bg-neutral-200/60" />
+            <div className="h-9 animate-pulse rounded-xl bg-neutral-200/60" />
           </div>
         ) : items.length === 0 ? (
-          <div className="py-3 text-[12.5px] text-[#9CA3AF]">
+          <div className="py-3 text-[12.5px] text-gray-400">
             Кредитная история пуста. Первый закрытый вовремя кредит повысит рейтинг и лимит.
           </div>
         ) : (
-          <div className="divide-y divide-[#F0F1F5]">
+          <div className="divide-y divide-[#EBEDF0]">
             {items.map((l) => {
               const c = l.status === 'repaid' ? GREEN : l.status === 'overdue' ? '#E5584B' : '#F8A13A'
               return (
@@ -743,8 +743,8 @@ export function CreditHistorySection({ items }: { items: LoanHistoryItem[] | nul
                     <FileText className="size-4" strokeWidth={2.1} />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13.5px] font-semibold text-[#141414]">Кредит · {fmtMoney(l.principal)}</div>
-                    <div className="text-[11px] tabular-nums text-[#9CA3AF]" suppressHydrationWarning>
+                    <div className="truncate text-[13.5px] font-semibold text-[#17181A]">Кредит · {fmtMoney(l.principal)}</div>
+                    <div className="text-[11px] tabular-nums text-gray-400" suppressHydrationWarning>
                       от {fmtDayMonth(new Date(l.takenAt))} · {l.rate}% · {l.status === 'repaid' ? `закрыт ${l.repaidAt ? fmtDayMonth(new Date(l.repaidAt)) : ''}` : l.status === 'overdue' ? 'просрочен' : 'активен'}
                     </div>
                   </div>

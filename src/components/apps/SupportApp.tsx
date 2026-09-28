@@ -23,7 +23,7 @@ import { useOS } from '@/lib/store'
 
 // ── палитра макета ──
 const GREEN = '#12894B'
-const CAPS = 'text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]'
+const CAPS = 'text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400'
 const CARD = 'rounded-[20px] bg-white shadow-[0_2px_14px_rgba(23,24,26,0.05)]'
 
 type Screen = 'list' | 'chat' | 'new' | 'help' | 'profile' | 'general'
@@ -31,9 +31,9 @@ type Screen = 'list' | 'chat' | 'new' | 'help' | 'profile' | 'general'
 type TicketStatus = 'open' | 'answered' | 'closed'
 
 function statusMeta(s: string): { label: string; cls: string } {
-  if (s === 'closed') return { label: 'Решено', cls: 'bg-[#DCFCE7] text-[#15803D]' }
-  if (s === 'answered') return { label: 'В работе', cls: 'bg-[#FEF3C7] text-[#B45309]' }
-  return { label: 'Ожидает ответа', cls: 'bg-[#F3F4F6] text-[#6B7280]' }
+  if (s === 'closed') return { label: 'Решено', cls: 'bg-[#e4f6ec] text-[#15803D]' }
+  if (s === 'answered') return { label: 'В работе', cls: 'bg-amber-100 text-amber-700' }
+  return { label: 'Ожидает ответа', cls: 'bg-gray-100 text-gray-500' }
 }
 
 const CATEGORIES = [
@@ -98,7 +98,7 @@ function TicketCard({ t, onOpen, index }: { t: SupportTicketDTO; onOpen: () => v
     >
       <div className={`${CARD} p-4`}>
         <div className="flex items-start gap-3">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[#F3F4F6] text-[#374151]">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-gray-100 text-gray-700">
             <Icon className="size-5" aria-hidden />
           </span>
           <div className="min-w-0 flex-1">
@@ -106,12 +106,12 @@ function TicketCard({ t, onOpen, index }: { t: SupportTicketDTO; onOpen: () => v
               <h3 className="min-w-0 flex-1 truncate text-[15px] font-bold text-[#17181A]">{cat.label}</h3>
               <StatusBadge status={t.status} />
             </div>
-            <p className="mt-0.5 text-[12.5px] text-[#9CA3AF]">
+            <p className="mt-0.5 text-[12.5px] text-gray-400">
               {shortNo(t.id)} · {fmtWhen(t.createdAt)}
             </p>
-            <p className="mt-1 line-clamp-2 text-[13px] leading-snug text-[#6B7280]">{t.preview}</p>
+            <p className="mt-1 line-clamp-2 text-[13px] leading-snug text-gray-500">{t.preview}</p>
           </div>
-          <ChevronRight className="mt-1 size-4 shrink-0 text-[#C4C8CE]" aria-hidden />
+          <ChevronRight className="mt-1 size-4 shrink-0 text-[#C4C8CF]" aria-hidden />
         </div>
       </div>
     </button>
@@ -167,7 +167,7 @@ function ListScreen({
                 setSeg(s.key)
               }}
               className={`press h-9 flex-1 rounded-full text-[13px] font-semibold transition-colors ${
-                seg === s.key ? 'bg-white text-[#17181A] shadow-[0_1px_6px_rgba(23,24,26,0.10)]' : 'text-[#6B7280]'
+                seg === s.key ? 'bg-white text-[#17181A] shadow-[0_1px_6px_rgba(23,24,26,0.10)]' : 'text-gray-500'
               }`}
             >
               {s.label}
@@ -185,13 +185,13 @@ function ListScreen({
           </>
         ) : list.length === 0 ? (
           <div className="flex flex-col items-center gap-2.5 px-8 pt-14 text-center">
-            <span className="flex size-16 items-center justify-center rounded-[22px] bg-white text-[#9CA3AF] shadow-[0_2px_14px_rgba(23,24,26,0.05)]">
+            <span className="flex size-16 items-center justify-center rounded-[22px] bg-white text-gray-400 shadow-[0_2px_14px_rgba(23,24,26,0.05)]">
               <Package className="size-7" aria-hidden />
             </span>
             <h3 className="text-[15px] font-bold text-[#17181A]">
               {seg === 'active' ? 'Обращений пока нет' : 'Архив пуст'}
             </h3>
-            <p className="text-[13px] leading-relaxed text-[#6B7280]">
+            <p className="text-[13px] leading-relaxed text-gray-500">
               {seg === 'active'
                 ? 'Создайте обращение — оператор поддержки ответит в течение пары минут.'
                 : 'Решённые обращения будут появляться здесь.'}
@@ -322,7 +322,7 @@ function ChatScreen({
         </button>
         <div className="min-w-0 flex-1 text-center">
           <h1 className="truncate text-[16px] font-bold text-[#17181A]">Обращение {no}</h1>
-          <p className="truncate text-[11.5px] text-[#9CA3AF]">{cat.label}</p>
+          <p className="truncate text-[11.5px] text-gray-400">{cat.label}</p>
         </div>
         <button
           type="button"
@@ -341,7 +341,7 @@ function ChatScreen({
             <button
               type="button"
               onClick={() => void closeTicket()}
-              className="press w-full px-4 py-2.5 text-left text-[14px] text-[#17181A] hover:bg-[#F6F7F9]"
+              className="press w-full px-4 py-2.5 text-left text-[14px] text-[#17181A] hover:bg-[#F5F6F8]"
             >
               {status === 'closed' ? 'Открыть заново' : 'Пометить решённым'}
             </button>
@@ -361,7 +361,7 @@ function ChatScreen({
       <div ref={listRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-2 [scrollbar-width:thin]">
         {!loaded ? (
           <div className="flex h-full items-center justify-center">
-            <div className="size-7 animate-spin rounded-full border-2 border-[#E5E7EB] border-t-[#12894B]" />
+            <div className="size-7 animate-spin rounded-full border-2 border-gray-200 border-t-[#12894B]" />
           </div>
         ) : (
           messages.map((m) => {
@@ -369,9 +369,9 @@ function ChatScreen({
             return (
               <div key={m.id} className={`screen-enter flex w-full ${mine ? 'justify-end' : 'justify-start'}`}>
                 {mine ? (
-                  <div className="max-w-[84%] rounded-[18px] rounded-br-md bg-[#F3F4F6] px-3.5 py-2.5">
+                  <div className="max-w-[84%] rounded-[18px] rounded-br-md bg-gray-100 px-3.5 py-2.5">
                     <p className="whitespace-pre-wrap break-words text-[13.5px] leading-relaxed text-[#17181A]">{m.text}</p>
-                    <span className="mt-1 flex items-center justify-end gap-1 text-[10px] text-[#9CA3AF]">
+                    <span className="mt-1 flex items-center justify-end gap-1 text-[10px] text-gray-400">
                       {timeOf(m.createdAt)}
                       <CheckCheck className="size-3.5" aria-hidden />
                     </span>
@@ -382,9 +382,9 @@ function ChatScreen({
                       <OperatorAvatar size={26} />
                       <div className="leading-tight">
                         <p className="text-[12.5px] font-bold text-[#17181A]">Алина</p>
-                        <p className="text-[10px] text-[#9CA3AF]">Оператор поддержки{m.author === 'admin' ? ' · старший смены' : ''}</p>
+                        <p className="text-[10px] text-gray-400">Оператор поддержки{m.author === 'admin' ? ' · старший смены' : ''}</p>
                       </div>
-                      <time className="ml-auto pl-2 text-[10px] text-[#9CA3AF]">{timeOf(m.createdAt)}</time>
+                      <time className="ml-auto pl-2 text-[10px] text-gray-400">{timeOf(m.createdAt)}</time>
                     </div>
                     <div className="rounded-[18px] rounded-tl-md bg-white px-3.5 py-2.5 shadow-[0_2px_14px_rgba(23,24,26,0.05)]">
                       <p className="whitespace-pre-wrap break-words text-[13.5px] leading-relaxed text-[#17181A]">{m.text}</p>
@@ -398,9 +398,9 @@ function ChatScreen({
         {sending && (
           <div className="flex justify-start">
             <div className="flex items-center gap-1.5 rounded-[18px] rounded-tl-md bg-white px-4 py-3 shadow-[0_2px_14px_rgba(23,24,26,0.05)]" aria-label="Оператор печатает">
-              <span className="size-1.5 animate-bounce rounded-full bg-[#9CA3AF] [animation-delay:0ms]" />
-              <span className="size-1.5 animate-bounce rounded-full bg-[#9CA3AF] [animation-delay:150ms]" />
-              <span className="size-1.5 animate-bounce rounded-full bg-[#9CA3AF] [animation-delay:300ms]" />
+              <span className="size-1.5 animate-bounce rounded-full bg-gray-400 [animation-delay:0ms]" />
+              <span className="size-1.5 animate-bounce rounded-full bg-gray-400 [animation-delay:150ms]" />
+              <span className="size-1.5 animate-bounce rounded-full bg-gray-400 [animation-delay:300ms]" />
             </div>
           </div>
         )}
@@ -417,7 +417,7 @@ function ChatScreen({
               if (q === 'Решено') void closeTicket()
               else void send(q)
             }}
-            className="press shrink-0 rounded-full bg-[#ECEEF1] px-3.5 py-2 text-[12.5px] font-medium text-[#374151] transition-transform active:scale-95 disabled:opacity-40"
+            className="press shrink-0 rounded-full bg-[#ECEEF1] px-3.5 py-2 text-[12.5px] font-medium text-gray-700 transition-transform active:scale-95 disabled:opacity-40"
           >
             {q}
           </button>
@@ -431,7 +431,7 @@ function ChatScreen({
             type="button"
             onClick={() => sound.tap()}
             aria-label="Прикрепить файл (скоро)"
-            className="press flex size-[42px] shrink-0 items-center justify-center rounded-full bg-[#ECEEF1] text-[#6B7280]"
+            className="press flex size-[42px] shrink-0 items-center justify-center rounded-full bg-[#ECEEF1] text-gray-500"
           >
             <Paperclip className="size-5" aria-hidden />
           </button>
@@ -448,7 +448,7 @@ function ChatScreen({
             aria-label="Сообщение оператору"
             placeholder="Написать сообщение…"
             disabled={status === 'closed'}
-            className="max-h-28 min-h-[42px] flex-1 resize-none rounded-[21px] bg-[#ECEEF1] px-4 py-2.5 text-[14px] leading-snug text-[#17181A] outline-none placeholder:text-[#9CA3AF] focus:bg-[#E7EAEE] disabled:opacity-60"
+            className="max-h-28 min-h-[42px] flex-1 resize-none rounded-[21px] bg-[#ECEEF1] px-4 py-2.5 text-[14px] leading-snug text-[#17181A] outline-none placeholder:text-gray-400 focus:bg-[#E6E8ED] disabled:opacity-60"
           />
           <button
             type="button"
@@ -523,46 +523,46 @@ function NewScreen({ onBack, onCreated }: { onBack: () => void; onCreated: (id: 
         {/* категория */}
         <button type="button" onClick={() => { sound.tap(); setCatOpen(true) }} className="press block w-full text-left">
           <div className={`${CARD} flex items-center gap-3 p-4`}>
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[#F3F4F6] text-[#374151]">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-gray-100 text-gray-700">
               <cat.icon className="size-5" aria-hidden />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[12px] text-[#9CA3AF]">Категория обращения</span>
+              <span className="block text-[12px] text-gray-400">Категория обращения</span>
               <span className="block truncate text-[14.5px] font-semibold text-[#17181A]">{cat.label}</span>
             </span>
-            <ChevronRight className="size-4 shrink-0 text-[#C4C8CE]" aria-hidden />
+            <ChevronRight className="size-4 shrink-0 text-[#C4C8CF]" aria-hidden />
           </div>
         </button>
 
         {/* номер заказа */}
         <div className={`${CARD} flex items-center gap-3 p-4`}>
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[#F3F4F6] text-[#374151]">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-gray-100 text-gray-700">
             <Package className="size-5" aria-hidden />
           </span>
           <label className="min-w-0 flex-1">
-            <span className="block text-[12px] text-[#9CA3AF]">Номер заказа (если есть)</span>
+            <span className="block text-[12px] text-gray-400">Номер заказа (если есть)</span>
             <input
               value={orderNo}
               onChange={(e) => setOrderNo(e.target.value)}
               placeholder="Например, №45821"
-              className="w-full bg-transparent text-[14.5px] font-semibold text-[#17181A] outline-none placeholder:font-normal placeholder:text-[#C4C8CE]"
+              className="w-full bg-transparent text-[14.5px] font-semibold text-[#17181A] outline-none placeholder:font-normal placeholder:text-[#C4C8CF]"
             />
           </label>
         </div>
 
         {/* тема */}
         <div className={`${CARD} flex items-center gap-3 p-4`}>
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[#F3F4F6] text-[#374151]">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-gray-100 text-gray-700">
             <MessageSquare className="size-5" aria-hidden />
           </span>
           <label className="min-w-0 flex-1">
-            <span className="block text-[12px] text-[#9CA3AF]">Тема обращения</span>
+            <span className="block text-[12px] text-gray-400">Тема обращения</span>
             <input
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               placeholder="Кратко опишите суть проблемы"
               maxLength={120}
-              className="w-full bg-transparent text-[14.5px] font-semibold text-[#17181A] outline-none placeholder:font-normal placeholder:text-[#C4C8CE]"
+              className="w-full bg-transparent text-[14.5px] font-semibold text-[#17181A] outline-none placeholder:font-normal placeholder:text-[#C4C8CF]"
             />
           </label>
         </div>
@@ -570,33 +570,33 @@ function NewScreen({ onBack, onCreated }: { onBack: () => void; onCreated: (id: 
         {/* описание */}
         <div className={`${CARD} p-4`}>
           <div className="flex items-center gap-3">
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[#F3F4F6] text-[#374151]">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-gray-100 text-gray-700">
               <MessageSquare className="size-5" aria-hidden />
             </span>
-            <span className="flex-1 text-[12px] text-[#9CA3AF]">Подробное описание</span>
-            <span className="text-[11px] tabular-nums text-[#C4C8CE]">{body.length}/1000</span>
+            <span className="flex-1 text-[12px] text-gray-400">Подробное описание</span>
+            <span className="text-[11px] tabular-nums text-[#C4C8CF]">{body.length}/1000</span>
           </div>
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value.slice(0, 1000))}
             rows={4}
             placeholder="Расскажите, что произошло. Чем больше деталей — тем быстрее мы сможем помочь."
-            className="mt-2 w-full resize-none rounded-[12px] bg-[#F6F7F9] p-3 text-[13.5px] leading-relaxed text-[#17181A] outline-none placeholder:text-[#C4C8CE]"
+            className="mt-2 w-full resize-none rounded-[12px] bg-[#F5F6F8] p-3 text-[13.5px] leading-relaxed text-[#17181A] outline-none placeholder:text-[#C4C8CF]"
           />
         </div>
 
         {/* скриншоты */}
         <div className={`${CARD} p-4`}>
           <div className="flex items-center gap-3">
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[#F3F4F6] text-[#374151]">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-gray-100 text-gray-700">
               <ImageIcon className="size-5" aria-hidden />
             </span>
-            <span className="flex-1 text-[12px] text-[#9CA3AF]">Скриншоты (по желанию)</span>
+            <span className="flex-1 text-[12px] text-gray-400">Скриншоты (по желанию)</span>
           </div>
           <button
             type="button"
             onClick={() => sound.tap()}
-            className="press mt-3 flex h-20 w-full flex-col items-center justify-center gap-1 rounded-[14px] border-2 border-dashed border-[#E1E4E8] text-[#9CA3AF]"
+            className="press mt-3 flex h-20 w-full flex-col items-center justify-center gap-1 rounded-[14px] border-2 border-dashed border-[#EBEDF0] text-gray-400"
           >
             <Plus className="size-5" aria-hidden />
             <span className="text-[12px]">Добавить фото</span>
@@ -623,7 +623,7 @@ function NewScreen({ onBack, onCreated }: { onBack: () => void; onCreated: (id: 
         <div className="absolute inset-0 z-30 flex flex-col justify-end" role="dialog" aria-modal="true" aria-label="Выбор категории">
           <button type="button" aria-label="Закрыть" className="absolute inset-0 bg-black/25 os-fade" onClick={() => setCatOpen(false)} />
           <div className="relative rounded-t-[24px] bg-white pb-[calc(14px+env(safe-area-inset-bottom))] os-sheet-rise">
-            <div className="mx-auto mt-2.5 h-1 w-9 rounded-full bg-[#E1E4E8]" aria-hidden />
+            <div className="mx-auto mt-2.5 h-1 w-9 rounded-full bg-[#E1E4E9]" aria-hidden />
             <h2 className="px-5 pb-1 pt-3.5 text-[16px] font-bold text-[#17181A]">Категория обращения</h2>
             <div className="max-h-[380px] overflow-y-auto px-3 pb-2 [scrollbar-width:thin]">
               {CATEGORIES.map((c) => (
@@ -636,14 +636,14 @@ function NewScreen({ onBack, onCreated }: { onBack: () => void; onCreated: (id: 
                     setCatOpen(false)
                   }}
                   className={`press flex w-full items-center gap-3 rounded-[14px] p-3 text-left ${
-                    category === c.key ? 'bg-[#EAF7F0]' : ''
+                    category === c.key ? 'bg-[#E6F6EC]' : ''
                   }`}
                 >
-                  <span className="flex size-10 items-center justify-center rounded-[12px] bg-[#F3F4F6] text-[#374151]">
+                  <span className="flex size-10 items-center justify-center rounded-[12px] bg-gray-100 text-gray-700">
                     <c.icon className="size-5" aria-hidden />
                   </span>
                   <span className="flex-1 text-[14.5px] font-semibold text-[#17181A]">{c.label}</span>
-                  {category === c.key && <CheckCheck className="size-4 text-[#12894B]" aria-hidden />}
+                  {category === c.key && <CheckCheck className="size-4 text-[#15803D]" aria-hidden />}
                 </button>
               ))}
             </div>
@@ -687,16 +687,16 @@ function HelpScreen({ onNew }: { onNew: () => void }) {
       <header className="shrink-0 px-4 pt-1">
         <h1 className="text-[24px] font-bold leading-tight text-[#17181A]">Справочный центр</h1>
         <div className="mt-3 flex h-11 items-center gap-2.5 rounded-full bg-[#ECEEF1] px-4">
-          <Search className="size-4.5 shrink-0 text-[#9CA3AF]" aria-hidden />
+          <Search className="size-4.5 shrink-0 text-gray-400" aria-hidden />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Найти ответ на вопрос…"
             aria-label="Поиск по справке"
-            className="w-full bg-transparent text-[14px] text-[#17181A] outline-none placeholder:text-[#9CA3AF]"
+            className="w-full bg-transparent text-[14px] text-[#17181A] outline-none placeholder:text-gray-400"
           />
           {q && (
-            <button type="button" onClick={() => setQ('')} aria-label="Очистить" className="press flex size-5 items-center justify-center rounded-full bg-[#D7DBE0] text-white">
+            <button type="button" onClick={() => setQ('')} aria-label="Очистить" className="press flex size-5 items-center justify-center rounded-full bg-[#D9DCE1] text-white">
               <X className="size-3" aria-hidden />
             </button>
           )}
@@ -720,11 +720,11 @@ function HelpScreen({ onNew }: { onNew: () => void }) {
                   style={{ animationDelay: `${i * 40}ms` }}
                 >
                   <div className={`${CARD} h-full p-4`}>
-                    <span className="flex size-10 items-center justify-center rounded-[12px] bg-[#F3F4F6] text-[#374151]">
+                    <span className="flex size-10 items-center justify-center rounded-[12px] bg-gray-100 text-gray-700">
                       <t.icon className="size-5" aria-hidden />
                     </span>
                     <h3 className="mt-2.5 text-[13.5px] font-bold leading-tight text-[#17181A]">{t.title}</h3>
-                    <p className="mt-1 text-[11.5px] leading-snug text-[#9CA3AF]">{t.desc}</p>
+                    <p className="mt-1 text-[11.5px] leading-snug text-gray-400">{t.desc}</p>
                   </div>
                 </button>
               ))}
@@ -737,12 +737,12 @@ function HelpScreen({ onNew }: { onNew: () => void }) {
         </div>
         <div className="mt-2.5 overflow-hidden rounded-[20px] bg-white shadow-[0_2px_14px_rgba(23,24,26,0.05)]">
           {faq.length === 0 ? (
-            <p className="px-4 py-5 text-[13.5px] text-[#6B7280]">Ничего не нашлось. Напишите в поддержку ниже.</p>
+            <p className="px-4 py-5 text-[13.5px] text-gray-500">Ничего не нашлось. Напишите в поддержку ниже.</p>
           ) : (
             faq.map((f, i) => {
               const isOpen = open === f.q
               return (
-                <div key={f.q} className={i > 0 ? 'border-t border-[#F0F1F3]' : ''}>
+                <div key={f.q} className={i > 0 ? 'border-t border-[#F0F2F5]' : ''}>
                   <button
                     type="button"
                     aria-expanded={isOpen}
@@ -753,11 +753,11 @@ function HelpScreen({ onNew }: { onNew: () => void }) {
                     className="press flex w-full items-center gap-2 px-4 py-3.5 text-left"
                   >
                     <span className="flex-1 text-[14px] font-semibold text-[#17181A]">{f.q}</span>
-                    <ChevronRight className={`size-4 shrink-0 text-[#C4C8CE] transition-transform duration-300 ${isOpen ? 'rotate-90' : ''}`} aria-hidden />
+                    <ChevronRight className={`size-4 shrink-0 text-[#C4C8CF] transition-transform duration-300 ${isOpen ? 'rotate-90' : ''}`} aria-hidden />
                   </button>
                   <div className={`grid transition-[grid-template-rows] duration-300 ease-out ${isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
                     <div className="overflow-hidden">
-                      <p className="px-4 pb-4 text-[13px] leading-relaxed text-[#6B7280]">{f.a}</p>
+                      <p className="px-4 pb-4 text-[13px] leading-relaxed text-gray-500">{f.a}</p>
                     </div>
                   </div>
                 </div>
@@ -767,15 +767,15 @@ function HelpScreen({ onNew }: { onNew: () => void }) {
         </div>
 
         <button type="button" onClick={() => { sound.tap(); onNew() }} className="press screen-enter mt-4 block w-full text-left">
-          <div className="flex items-center gap-3 rounded-[20px] bg-[#EAF7F0] p-4">
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white text-[#12894B] shadow-[0_2px_10px_rgba(18,137,75,0.18)]">
+          <div className="flex items-center gap-3 rounded-[20px] bg-[#E6F6EC] p-4">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white text-[#15803D] shadow-[0_2px_10px_rgba(18,137,75,0.18)]">
               <Headset className="size-5" aria-hidden />
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-[14px] font-bold text-[#17181A]">Не нашли ответ?</span>
-              <span className="block text-[12.5px] text-[#6B7280]">Напишите в поддержку — мы поможем</span>
+              <span className="block text-[12.5px] text-gray-500">Напишите в поддержку — мы поможем</span>
             </span>
-            <ChevronRight className="size-4 shrink-0 text-[#12894B]" aria-hidden />
+            <ChevronRight className="size-4 shrink-0 text-[#15803D]" aria-hidden />
           </div>
         </button>
       </div>
@@ -796,11 +796,11 @@ function ProfileScreen({ tickets }: { tickets: SupportTicketDTO[] }) {
         </span>
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-[17px] font-bold text-[#17181A]">{session?.displayName ?? 'Игрок'}</h2>
-          <p className="text-[12.5px] text-[#9CA3AF]">
+          <p className="text-[12.5px] text-gray-400">
             {session?.username ? `${session.username} · ` : ''}уровень {session?.level ?? 1}
           </p>
         </div>
-        <span className="rounded-full bg-[#EAF7F0] px-3 py-1.5 text-[13px] font-bold text-[#12894B]">{fmtMoney(session?.balance ?? 0)}</span>
+        <span className="rounded-full bg-[#E6F6EC] px-3 py-1.5 text-[13px] font-bold text-[#15803D]">{fmtMoney(session?.balance ?? 0)}</span>
       </div>
 
       <div className="mt-3 grid grid-cols-3 gap-2.5">
@@ -811,17 +811,17 @@ function ProfileScreen({ tickets }: { tickets: SupportTicketDTO[] }) {
         ].map((s) => (
           <div key={s.label} className={`${CARD} p-3.5 text-center`}>
             <p className="text-[20px] font-bold tabular-nums text-[#17181A]">{s.value}</p>
-            <p className="mt-0.5 text-[11px] text-[#9CA3AF]">{s.label}</p>
+            <p className="mt-0.5 text-[11px] text-gray-400">{s.label}</p>
           </div>
         ))}
       </div>
 
       <div className={`${CARD} mt-3 p-4`}>
         <div className="flex items-center gap-2">
-          <Sparkles className="size-4 text-[#D4A017]" aria-hidden />
+          <Sparkles className="size-4 text-[#D9A514]" aria-hidden />
           <p className="text-[13.5px] font-bold text-[#17181A]">Как получить помощь быстрее</p>
         </div>
-        <ul className="mt-2 space-y-1.5 text-[12.5px] leading-relaxed text-[#6B7280]">
+        <ul className="mt-2 space-y-1.5 text-[12.5px] leading-relaxed text-gray-500">
           <li>• Опишите вопрос деталями: номер заказа, что произошло, когда.</li>
           <li>• Один вопрос — одно обращение: так ответ придёт точнее.</li>
           <li>• Общий чат «Поддержка» внизу — для коротких вопросов.</li>
@@ -903,7 +903,7 @@ function GeneralChatScreen() {
         <OperatorAvatar size={40} />
         <div className="min-w-0 flex-1">
           <h1 className="text-[15px] font-bold leading-tight text-[#17181A]">Поддержка Resale</h1>
-          <p className="truncate text-[11.5px] text-[#9CA3AF]">
+          <p className="truncate text-[11.5px] text-gray-400">
             {sending ? 'оператор печатает…' : adminActive ? 'вас обслуживает старший смены' : 'мы онлайн, отвечаем быстро'}
           </p>
         </div>
@@ -912,13 +912,13 @@ function GeneralChatScreen() {
       <div ref={listRef} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-4 py-2 [scrollbar-width:thin]">
         {!loaded ? (
           <div className="flex h-full items-center justify-center">
-            <div className="size-7 animate-spin rounded-full border-2 border-[#E5E7EB] border-t-[#12894B]" />
+            <div className="size-7 animate-spin rounded-full border-2 border-gray-200 border-t-[#12894B]" />
           </div>
         ) : messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center">
             <OperatorAvatar size={64} />
             <h2 className="text-[16px] font-bold text-[#17181A]">Чем поможем?</h2>
-            <p className="text-[12.5px] leading-relaxed text-[#6B7280]">
+            <p className="text-[12.5px] leading-relaxed text-gray-500">
               Короткий вопрос — сюда. Для проблем с заказами лучше создать обращение.
             </p>
           </div>
@@ -928,9 +928,9 @@ function GeneralChatScreen() {
             return (
               <div key={m.id} className={`flex w-full ${mine ? 'justify-end' : 'justify-start'}`}>
                 {mine ? (
-                  <div className="max-w-[84%] rounded-[18px] rounded-br-md bg-[#F3F4F6] px-3.5 py-2.5">
+                  <div className="max-w-[84%] rounded-[18px] rounded-br-md bg-gray-100 px-3.5 py-2.5">
                     <p className="whitespace-pre-wrap break-words text-[13.5px] leading-relaxed text-[#17181A]">{m.text}</p>
-                    <span className="mt-1 flex items-center justify-end gap-1 text-[10px] text-[#9CA3AF]">
+                    <span className="mt-1 flex items-center justify-end gap-1 text-[10px] text-gray-400">
                       {timeOf(m.createdAt)}
                       <CheckCheck className="size-3.5" aria-hidden />
                     </span>
@@ -941,9 +941,9 @@ function GeneralChatScreen() {
                       <OperatorAvatar size={26} />
                       <p className="text-[12.5px] font-bold text-[#17181A]">Алина</p>
                       {m.author === 'admin' && (
-                        <span className="rounded-full bg-[#FEF3C7] px-2 py-0.5 text-[9.5px] font-semibold text-[#B45309]">старший смены</span>
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[9.5px] font-semibold text-amber-700">старший смены</span>
                       )}
-                      <time className="ml-auto pl-2 text-[10px] text-[#9CA3AF]">{timeOf(m.createdAt)}</time>
+                      <time className="ml-auto pl-2 text-[10px] text-gray-400">{timeOf(m.createdAt)}</time>
                     </div>
                     <div className="rounded-[18px] rounded-tl-md bg-white px-3.5 py-2.5 shadow-[0_2px_14px_rgba(23,24,26,0.05)]">
                       <p className="whitespace-pre-wrap break-words text-[13.5px] leading-relaxed text-[#17181A]">{m.text}</p>
@@ -957,9 +957,9 @@ function GeneralChatScreen() {
         {sending && (
           <div className="flex justify-start">
             <div className="flex items-center gap-1.5 rounded-[18px] rounded-tl-md bg-white px-4 py-3 shadow-[0_2px_14px_rgba(23,24,26,0.05)]" aria-label="Оператор печатает">
-              <span className="size-1.5 animate-bounce rounded-full bg-[#9CA3AF] [animation-delay:0ms]" />
-              <span className="size-1.5 animate-bounce rounded-full bg-[#9CA3AF] [animation-delay:150ms]" />
-              <span className="size-1.5 animate-bounce rounded-full bg-[#9CA3AF] [animation-delay:300ms]" />
+              <span className="size-1.5 animate-bounce rounded-full bg-gray-400 [animation-delay:0ms]" />
+              <span className="size-1.5 animate-bounce rounded-full bg-gray-400 [animation-delay:150ms]" />
+              <span className="size-1.5 animate-bounce rounded-full bg-gray-400 [animation-delay:300ms]" />
             </div>
           </div>
         )}
@@ -979,7 +979,7 @@ function GeneralChatScreen() {
             rows={1}
             aria-label="Сообщение в поддержку"
             placeholder="Опишите вопрос…"
-            className="max-h-28 min-h-[42px] flex-1 resize-none rounded-[21px] bg-[#ECEEF1] px-4 py-2.5 text-[14px] leading-snug text-[#17181A] outline-none placeholder:text-[#9CA3AF] focus:bg-[#E7EAEE]"
+            className="max-h-28 min-h-[42px] flex-1 resize-none rounded-[21px] bg-[#ECEEF1] px-4 py-2.5 text-[14px] leading-snug text-[#17181A] outline-none placeholder:text-gray-400 focus:bg-[#E6E8ED]"
           />
           <button
             type="button"
@@ -1044,13 +1044,13 @@ export default function SupportApp() {
   }, [])
 
   return (
-    <div className="relative flex h-full flex-col bg-[#F6F7F9] text-[#17181A]">
+    <div className="relative flex h-full flex-col bg-[#F5F6F8] text-[#17181A]">
       {(screen === 'list' || screen === 'profile') && (
         <header className="shrink-0 px-4 pb-1 pt-1.5">
           <div className="flex items-start justify-between">
             <div className="min-w-0">
               <h1 className="text-[26px] font-bold leading-tight tracking-[-0.01em] text-[#17181A]">Поддержка</h1>
-              <p className="mt-0.5 text-[12.5px] leading-snug text-[#9CA3AF]">
+              <p className="mt-0.5 text-[12.5px] leading-snug text-gray-400">
                 Мы всегда рядом. Помогаем быстро
                 <br />и по делу.
               </p>
@@ -1064,7 +1064,7 @@ export default function SupportApp() {
                 }}
                 aria-label="Обновления обращений"
                 aria-expanded={bell}
-                className="press relative flex size-10 items-center justify-center rounded-full bg-white text-[#374151] shadow-[0_2px_10px_rgba(23,24,26,0.06)]"
+                className="press relative flex size-10 items-center justify-center rounded-full bg-white text-gray-700 shadow-[0_2px_10px_rgba(23,24,26,0.06)]"
               >
                 <Bell className="size-5" aria-hidden />
                 {unreadTotal > 0 && (
@@ -1073,14 +1073,14 @@ export default function SupportApp() {
                   </span>
                 )}
               </button>
-              <span aria-hidden className="flex size-10 items-center justify-center rounded-full bg-[#ECEEF1] text-[#6B7280]">
+              <span aria-hidden className="flex size-10 items-center justify-center rounded-full bg-[#ECEEF1] text-gray-500">
                 <UserRound className="size-5" />
               </span>
               {bell && (
                 <div className="absolute right-0 top-12 z-30 w-72 overflow-hidden rounded-[18px] bg-white py-1.5 shadow-[0_14px_44px_rgba(23,24,26,0.18)] screen-enter">
-                  <p className="px-4 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">Новые ответы</p>
+                  <p className="px-4 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400">Новые ответы</p>
                   {tickets.filter((t) => t.unread > 0).length === 0 ? (
-                    <p className="px-4 py-3 text-[13px] text-[#6B7280]">Все ответы прочитаны</p>
+                    <p className="px-4 py-3 text-[13px] text-gray-500">Все ответы прочитаны</p>
                   ) : (
                     tickets
                       .filter((t) => t.unread > 0)
@@ -1095,10 +1095,10 @@ export default function SupportApp() {
                             setOpenTicket(t.id)
                             setScreen('chat')
                           }}
-                          className="press w-full px-4 py-2.5 text-left hover:bg-[#F6F7F9]"
+                          className="press w-full px-4 py-2.5 text-left hover:bg-[#F5F6F8]"
                         >
                           <p className="truncate text-[13px] font-semibold text-[#17181A]">{categoryOf(t.category).label}</p>
-                          <p className="truncate text-[11.5px] text-[#9CA3AF]">{t.preview}</p>
+                          <p className="truncate text-[11.5px] text-gray-400">{t.preview}</p>
                         </button>
                       ))
                   )}

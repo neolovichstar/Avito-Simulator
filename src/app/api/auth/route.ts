@@ -70,16 +70,26 @@ export async function POST(req: Request) {
           console.log('[auth] Telegram привязан к дев-аккаунту устройства (прогресс сохранён):', dev.username, '-> tgId', tg.id)
         } else {
           const username = tg.username ? `@${tg.username}` : `tg_${tg.id}`
-          user = await db.user.create({
-            data: {
-              telegramId: String(tg.id),
-              username,
-              displayName,
-              photoUrl: tg.photo_url ?? null,
-              city: 'Москва',
-              bio: 'Новичок в Resale',
-            },
-          })
+          // 59-a: гонка двух первых логинов одного Telegram: ловим P2002 и перечитываем
+          try {
+            user = await db.user.create({
+              data: {
+                telegramId: String(tg.id),
+                username,
+                displayName,
+                photoUrl: tg.photo_url ?? null,
+                city: 'Москва',
+                bio: 'Новичок в Resale',
+              },
+            })
+          } catch (e) {
+            if (typeof e === 'object' && e !== null && 'code' in e && (e as { code?: string }).code === 'P2002') {
+              user = (await db.user.findUnique({ where: { telegramId: String(tg.id) } }))
+                ?? await db.user.findUnique({ where: { username } })
+            } else {
+              throw e
+            }
+          }
         }
       }
     }
@@ -100,9 +110,20 @@ export async function POST(req: Request) {
     const existing = await db.user.findUnique({ where: { username } })
     user = existing
       ? await db.user.update({ where: { id: existing.id }, data: { lastSeenAt: new Date() } })
-      : await db.user.create({
-          data: { username, displayName: devName, city: 'Москва', bio: 'Новичок в Resale' },
-        })
+      : await (async () => {
+          // 59-a: параллельный первый логин с того же deviceId ловим по P2002
+          try {
+            return await db.user.create({
+              data: { username, displayName: devName, city: 'Москва', bio: 'Новичок в Resale' },
+            })
+          } catch (e) {
+            if (typeof e === 'object' && e !== null && 'code' in e && (e as { code?: string }).code === 'P2002') {
+              const dupe = await db.user.findUnique({ where: { username } })
+              if (dupe) return db.user.update({ where: { id: dupe.id }, data: { lastSeenAt: new Date() } })
+            }
+            throw e
+          }
+        })()
   }
 
   if (!user) return Response.json({ error: 'Не удалось создать профиль' }, { status: 500 })

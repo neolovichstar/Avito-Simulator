@@ -19,7 +19,9 @@ export async function GET(
   const listing = await db.listing.findUnique({ where: { id } })
   if (!listing) return Response.json({ error: 'Объявление не найдено' }, { status: 404 })
 
-  const data = await cache.getOrSet(`rivals:${listing.itemKey}`, 20_000, async (): Promise<RivalsData> => {
+  // 59-a: в кеш уходит только общий срез (без isMine): раньше пользовательская
+  // пометка isMine попадала в общий кеш и «чужие» конкуренты показывались как свои
+  const cached = await cache.getOrSet(`rivals:${listing.itemKey}`, 20_000, async () => {
     const rows = await db.listing.findMany({
       where: { itemKey: listing.itemKey, status: 'active', price: { gt: 0 } },
       include: { seller: { select: { displayName: true, isBot: true, city: true } } },
@@ -32,17 +34,31 @@ export async function GET(
       itemKey: listing.itemKey,
       count: rows.length,
       avg,
-      rivals: rows.map((r) => ({
+      rows: rows.map((r) => ({
         id: r.id,
+        sellerId: r.sellerId,
         price: r.price,
         seller: r.seller.displayName,
         city: r.seller.city,
-        isMine: r.sellerId === user.id,
-        isMe: r.id === listing.id,
         condition: r.condition,
         image: itemImage(r.itemKey, r.category),
       })),
     }
   })
+  const data: RivalsData = {
+    itemKey: cached.itemKey,
+    count: cached.count,
+    avg: cached.avg,
+    rivals: cached.rows.map((r) => ({
+      id: r.id,
+      price: r.price,
+      seller: r.seller,
+      city: r.city,
+      condition: r.condition,
+      image: r.image,
+      isMine: r.sellerId === user.id,
+      isMe: r.id === listing.id,
+    })),
+  }
   return Response.json(data)
 }

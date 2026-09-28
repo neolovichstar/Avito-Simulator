@@ -171,13 +171,16 @@ export const useOS = create<OSState>((set, get) => ({
   setDnd: (v) => set({ dnd: v }),
   setFlashlight: (v) => set({ flashlight: v }),
   setBrightness: (v) => set({ brightness: Math.max(0.4, Math.min(1, v)) }),
+  // 59: единый ключ темы (avito_sim_theme). os_theme_v1 больше не пишется:
+  // два источника перетирали друг друга на монте (page.tsx восстанавливал
+  // avito_sim_theme ПОСЛЕ os_theme_v1 и перезаписывал выбор).
   setTheme: (t) => {
     set({ theme: t })
-    try { localStorage.setItem('os_theme_v1', t) } catch { /* приватный режим — не беда */ }
+    try { localStorage.setItem('avito_sim_theme', t) } catch { /* приватный режим — не беда */ }
   },
   toggleTheme: () => set((s) => {
     const t = s.theme === 'dark' ? 'light' : 'dark'
-    try { localStorage.setItem('os_theme_v1', t) } catch { /* не сохранилось — не беда */ }
+    try { localStorage.setItem('avito_sim_theme', t) } catch { /* не сохранилось — не беда */ }
     return { theme: t }
   }),
   setWallpaper: (id) => set({ wallpaper: id }),

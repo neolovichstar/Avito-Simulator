@@ -74,17 +74,24 @@ export async function notifyUser(
 }
 
 export async function addXp(userId: string, xp: number): Promise<number> {
-  const user = await db.user.findUnique({ where: { id: userId } })
-  if (!user) return 0
-  const newXp = user.xp + xp
+  // 59-a: xp растёт атомарным инкрементом: гонка двух параллельных добавлений
+  // больше не теряет часть опыта (раньше читали xp и писали сумму целиком)
+  const updated = await db.user
+    .update({
+      where: { id: userId },
+      data: { xp: { increment: Math.max(0, Math.round(xp)) } },
+      select: { id: true, xp: true, level: true },
+    })
+    .catch(() => null)
+  if (!updated) return 0
   // единая формула уровня (economy.levelFromXp) — та же, что в Карьере и Лидерах,
   // иначе уровень в БД расходился с интерфейсом
-  const level = levelFromXp(newXp)
-  await db.user.update({ where: { id: userId }, data: { xp: newXp, level } })
-  if (level > user.level) {
+  const level = levelFromXp(updated.xp)
+  if (level > updated.level) {
+    await db.user.update({ where: { id: userId }, data: { level } })
     await notifyUser(userId, 'system', '🎖️ Новый уровень', `Вы достигли ${level} уровня. Лимит кредита повышен.`)
   }
-  return newXp
+  return updated.xp
 }
 
 export async function bumpStats(userId: string, patch: Partial<PlayerStats>): Promise<PlayerStats> {
@@ -110,7 +117,14 @@ export async function checkAchievements(userId: string) {
   if (!user || user.isBot) return
   const stats = parseStats(user.stats)
   const inventoryCount = await db.item.count({ where: { ownerId: userId } })
-  const nowHave = new Set<string>(JSON.parse(user.achievements || '[]') as string[])
+  // 59-a: битый achievements (ручная правка/старая миграция) не должен ронять 500-м
+  // все пути, где вызывается checkAchievements (покупка, ставка, квест)
+  let nowHave: Set<string>
+  try {
+    nowHave = new Set<string>(JSON.parse(user.achievements || '[]') as string[])
+  } catch {
+    nowHave = new Set<string>()
+  }
   const should = new Set(achievedIds(stats, user.level, user.balance, inventoryCount))
   const unlocked = ACHIEVEMENTS.filter((a) => should.has(a.id) && !nowHave.has(a.id))
   if (!unlocked.length) return
@@ -161,25 +175,41 @@ export async function completeSale(opts: {
   if (!seller) return { ok: false, error: 'Продавец не найден' }
   if (seller.id === opts.buyer.id) return { ok: false, error: 'Нельзя купить свой товар' }
   const price = Math.max(0, Math.round(opts.price))
-  if (!opts.buyer.isBot && opts.buyer.balance < price) {
-    return { ok: false, error: 'Недостаточно средств на счету' }
-  }
   if (!opts.buyer.isBot && opts.buyer.debt > 30_000) {
     return { ok: false, error: 'Сначала погасите кредит в банке' }
   }
   const mode: DeliveryMode = opts.mode ?? (opts.courier ? 'courier' : 'pickup')
 
-  // двигаем деньги
-  await db.user.update({ where: { id: opts.buyer.id }, data: { balance: { decrement: price } } })
-  // деньги продавца — эскроу: игрок получает их после вручения (см. settleSaleDelivery),
-  // боты-продавцы, как и раньше, сразу
-  if (seller.isBot) {
-    await db.user.update({ where: { id: seller.id }, data: { balance: { increment: price } } })
+  // 59-a: деньги двигаем атомарно. Списание: только при достаточном балансе
+  // (гонка двух покупок с одного счёта больше не уводит баланс в минус),
+  // захват объявления: CAS по status='active' (двое купивших один лот исключены).
+  if (price > 0) {
+    if (opts.buyer.isBot) {
+      await db.user.update({ where: { id: opts.buyer.id }, data: { balance: { decrement: price } } })
+    } else {
+      const dec = await db.user.updateMany({
+        where: { id: opts.buyer.id, balance: { gte: price } },
+        data: { balance: { decrement: price } },
+      })
+      if (dec.count === 0) return { ok: false, error: 'Недостаточно средств на счету' }
+    }
   }
-  await db.listing.update({
-    where: { id: listing.id },
+  const claim = await db.listing.updateMany({
+    where: { id: listing.id, status: 'active' },
     data: { status: 'sold', soldAt: new Date() },
   })
+  if (claim.count === 0) {
+    // кто-то купил первым — откатываем списание
+    if (price > 0) {
+      await db.user.update({ where: { id: opts.buyer.id }, data: { balance: { increment: price } } }).catch(() => {})
+    }
+    return { ok: false, error: 'Товар уже продан или снят с продажи' }
+  }
+  // деньги продавца — эскроу: игрок получает их после вручения (см. settleSaleDelivery),
+  // боты-продавцы, как и раньше, сразу
+  if (seller.isBot && price > 0) {
+    await db.user.update({ where: { id: seller.id }, data: { balance: { increment: price } } })
+  }
 
   // транзакции
   if (!opts.buyer.isBot && price > 0) {
@@ -470,7 +500,12 @@ async function settleSaleDelivery(deliveryId: string): Promise<void> {
 async function returnDelivery(deliveryId: string): Promise<void> {
   const d = await db.delivery.findUnique({ where: { id: deliveryId } })
   if (!d || d.kind !== 'purchase' || d.status !== 'arrived') return
-  await db.delivery.update({ where: { id: d.id }, data: { status: 'returned' } })
+  // 59-a: атомарный захват: гонка с «Забрать» из ПВЗ исключена
+  const claim = await db.delivery.updateMany({
+    where: { id: d.id, kind: 'purchase', status: 'arrived' },
+    data: { status: 'returned' },
+  })
+  if (claim.count === 0) return
   // вещь живого продавца едет обратно к нему (может выставить снова).
   // Дойти сюда она могла только в статусе 'arrived' — полученные посылки не возвращаются.
   const listing = await db.listing.findUnique({ where: { id: d.listingId } })
@@ -500,7 +535,14 @@ export async function pickupDelivery(userId: string, deliveryId: string): Promis
   if (d.kind !== 'purchase') return { ok: false, error: 'Эту посылку забирает получатель' }
   if (d.status !== 'arrived') return { ok: false, error: 'Посылка ещё в пути' }
 
+  // 59-a: атомарный «забор» посылки: двойной клик / гонка с возвратом больше
+  // не создают вторую вещь и вторую пачку квестов
   const now = new Date()
+  const claim = await db.delivery.updateMany({
+    where: { id: d.id, status: 'arrived' },
+    data: { status: 'delivered', deliveredAt: now },
+  })
+  if (claim.count === 0) return { ok: false, error: 'Посылка уже получена' }
   // вещь живого продавца уже существует (владелец — покупатель): раскрываем её в инвентаре
   const listing = await db.listing.findUnique({ where: { id: d.listingId } })
   let itemId: string | undefined
@@ -524,7 +566,7 @@ export async function pickupDelivery(userId: string, deliveryId: string): Promis
     })
     itemId = item.id
   }
-  await db.delivery.update({ where: { id: d.id }, data: { status: 'delivered', deliveredAt: now } })
+  await db.delivery.update({ where: { id: d.id }, data: { deliveredAt: now } }).catch(() => {})
 
   // квест-хуки и счётчики — ПОСЛЕ фактического получения вещи игроком
   const worse = CONDITION_ORDER.indexOf(d.realCondition) < CONDITION_ORDER.indexOf(d.listedCondition)

@@ -15,6 +15,7 @@ import { noteDeal } from '@/lib/bot-memory'
 import { botComebackOffers } from '@/lib/price-war'
 import { isBlocked } from '@/lib/blocked'
 import { fireAutoBids, clearAutoBids } from '@/lib/autobid'
+import { placeAuctionBid } from '@/lib/auction-core'
 import { fmtMoney } from '@/lib/format'
 import { cache } from '@/lib/cache'
 import { DEPOSIT_RATE_PER_HOUR } from '@/lib/economy'
@@ -522,33 +523,25 @@ async function auctionTick(tick: number) {
       const privateLimit = Math.round(est * (0.85 + Math.random() * 0.5))
       const nextBid = (lot.currentBid ?? lot.startPrice) + step
       if (nextBid > privateLimit) continue
-      // перебить
       const prevBidderId = lot.currentBidderId
       const bot = await randomBot()
       if (!bot) continue
       if (bot.id === prevBidderId) continue
-      // анти-снайпинг (как у игрока): ставка в последнюю минуту продлевает торги до 30с
-      const extended = msLeft < 60_000
-      await db.auctionBid.create({
-        data: { lotId: lot.id, userId: bot.id, userName: bot.displayName, amount: nextBid },
+      // 59-a: атомарная ставка бота (CAS по currentBid): параллельная ставка игрока
+      // больше не приводит к двойному возврату резерва и потерянным ставкам
+      const placed = await placeAuctionBid({
+        lotId: lot.id, bidderId: bot.id, bidderName: bot.displayName, amount: nextBid, reserve: false,
       })
-      await db.auctionLot.update({
-        where: { id: lot.id },
-        data: {
-          currentBid: nextBid, currentBidderId: bot.id, currentBidderName: bot.displayName,
-          bidCount: { increment: 1 },
-          ...(extended ? { endsAt: new Date(Date.now() + 30_000) } : {}),
-        },
-      })
+      if (!placed.ok) continue
       // вернуть деньги игроку, которого перебили
-      if (prevBidderId) {
-        const prev = await db.user.findUnique({ where: { id: prevBidderId } })
-        if (prev && !prev.isBot && lot.currentBid) {
-          await db.user.update({ where: { id: prev.id }, data: { balance: { increment: lot.currentBid } } })
+      if (placed.prevBidderId && placed.prevBid) {
+        const prev = await db.user.findUnique({ where: { id: placed.prevBidderId } })
+        if (prev && !prev.isBot) {
+          await db.user.update({ where: { id: prev.id }, data: { balance: { increment: placed.prevBid } } })
           await notifyUser(prev.id, 'market', '🔨 Вас перебили на аукционе', `Лот «${lot.title}» уходит за ${fmtMoney(nextBid)}. Ставка возвращена на счёт.`)
         }
       }
-      await emitTo('global', 'auction:update', { lotId: lot.id, extended })
+      await emitTo('global', 'auction:update', { lotId: lot.id, extended: placed.extended })
       // автоставки игроков могут сразу перебить бота (прокси-торг)
       await fireAutoBids(lot.id)
     }
@@ -560,12 +553,23 @@ async function auctionTick(tick: number) {
   })
   for (const lot of due) {
     if (!lot.currentBidderId || !lot.currentBid) {
-      await db.auctionLot.update({ where: { id: lot.id }, data: { status: 'cancelled', finishedAt: new Date() } })
+      // 59-a: CAS-захват лота: параллельная ставка не должна потерять резерв из-за отмены
+      const claim = await db.auctionLot.updateMany({
+        where: { id: lot.id, status: 'active', currentBidderId: null },
+        data: { status: 'cancelled', finishedAt: new Date() },
+      })
+      if (claim.count === 0) continue // лот обновился — разберёмся на следующем тике
       await clearAutoBids(lot.id)
       continue
     }
     const winner = await db.user.findUnique({ where: { id: lot.currentBidderId } })
     if (!winner) continue
+    // 59-a: атомарное завершение (гонка с новой ставкой / вторым свипом)
+    const claim = await db.auctionLot.updateMany({
+      where: { id: lot.id, status: 'active', currentBid: lot.currentBid, currentBidderId: lot.currentBidderId },
+      data: { status: 'finished', finishedAt: new Date() },
+    })
+    if (claim.count === 0) continue
     if (!winner.isBot) {
       await db.transaction.create({
         data: { userId: winner.id, type: 'purchase', amount: -lot.currentBid, note: `Аукцион: ${lot.title}` },
@@ -577,14 +581,13 @@ async function auctionTick(tick: number) {
     } else {
       await db.user.update({ where: { id: winner.id }, data: { balance: { decrement: lot.currentBid } } })
     }
-    const item = await db.item.create({
+    await db.item.create({
       data: {
         ownerId: winner.id, itemKey: lot.itemKey, title: lot.title, category: lot.category,
         condition: lot.condition, image: lot.image, baseValue: lot.baseValue,
         purchasePrice: lot.currentBid, fromUserId: null,
       },
     })
-    await db.auctionLot.update({ where: { id: lot.id }, data: { status: 'finished', finishedAt: new Date() } })
     await clearAutoBids(lot.id)
     await emitTo('global', 'auction:update', { lotId: lot.id, finished: true })
   }

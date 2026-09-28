@@ -16,7 +16,13 @@ export async function GET(req: Request) {
     where: { userId: user.id, day: new Date().toISOString().slice(0, 10) },
     orderBy: { createdAt: 'asc' },
   })
-  const unlocked = new Set<string>(JSON.parse(user.achievements || '[]') as string[])
+  // 59-a: битый achievements не должен ронять GET /api/career
+  let unlocked: Set<string>
+  try {
+    unlocked = new Set<string>(JSON.parse(user.achievements || '[]') as string[])
+  } catch {
+    unlocked = new Set<string>()
+  }
   const achievements: AchievementDTO[] = ACHIEVEMENTS.map((a) => ({
     id: a.id, title: a.title, desc: a.desc, reward: a.reward, unlocked: unlocked.has(a.id),
     secret: a.secret ?? false,
@@ -51,7 +57,13 @@ export async function POST(req: Request) {
   if (quest.claimed) return Response.json({ error: 'Награда уже получена' }, { status: 400 })
   if (quest.progress < quest.target) return Response.json({ error: 'Задание ещё не выполнено' }, { status: 400 })
 
-  await db.quest.update({ where: { id: quest.id }, data: { claimed: true } })
+  // 59-a: награда забирается атомарно по questId (все строки за день): двойной
+  // клик и дубли-квесты от гонки генерации больше не дают награду дважды
+  const claim = await db.quest.updateMany({
+    where: { userId: user.id, questId: body.questId, day: new Date().toISOString().slice(0, 10), claimed: false },
+    data: { claimed: true },
+  })
+  if (claim.count === 0) return Response.json({ error: 'Награда уже получена' }, { status: 400 })
   await db.user.update({
     where: { id: user.id },
     data: { balance: { increment: quest.reward }, xp: { increment: quest.xpReward } },

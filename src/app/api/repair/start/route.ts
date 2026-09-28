@@ -8,6 +8,7 @@ import {
 } from '@/lib/repair-server'
 import type { JobConfigDTO } from '@/lib/types'
 import { itemImage } from '@/lib/item-images'
+import type { RepairJob } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
 
@@ -83,26 +84,39 @@ export async function POST(req: Request) {
     }
   }
 
-  const job = await db.$transaction(async (tx) => {
-    if (cost > 0) {
-      await tx.user.update({ where: { id: user.id }, data: { balance: { decrement: cost } } })
-      await tx.transaction.create({
-        data: { userId: user.id, type: 'purchase', amount: -cost, note: kind === 'repair' ? `Ремонт: ${item.title}` : `Установка запчасти: ${item.title}` },
+  // 59-a: транзакция с атомарным списанием (balance >= cost) и расходом инструмента
+  // только если прочность ещё есть: гонка двух стартов/трат не уводит в минус
+  let job: RepairJob
+  try {
+    job = await db.$transaction(async (tx) => {
+      if (cost > 0) {
+        const dec = await tx.user.updateMany({
+          where: { id: user.id, balance: { gte: cost } },
+          data: { balance: { decrement: cost } },
+        })
+        if (dec.count === 0) throw new JobStartError(`Работа стоит ${fmtMoney(cost)}. Недостаточно средств`)
+        await tx.transaction.create({
+          data: { userId: user.id, type: 'purchase', amount: -cost, note: kind === 'repair' ? `Ремонт: ${item.title}` : `Установка запчасти: ${item.title}` },
+        })
+      }
+      if (toolKey && hasTool) {
+        const dec = await tx.workshopTool.updateMany({
+          where: { userId: user.id, toolKey, durability: { gt: 0 } },
+          data: { durability: { decrement: 1 } },
+        })
+        if (dec.count === 0) throw new JobStartError('Инструмент сломался — замените или купите новый')
+      }
+      return tx.repairJob.create({
+        data: {
+          userId: user.id, itemId: item.id, kind, game, difficulty, partKey,
+          cost, status: 'in_progress',
+        },
       })
-    }
-    if (toolKey && hasTool) {
-      await tx.workshopTool.update({
-        where: { userId_toolKey: { userId: user.id, toolKey } },
-        data: { durability: { decrement: 1 } },
-      })
-    }
-    return tx.repairJob.create({
-      data: {
-        userId: user.id, itemId: item.id, kind, game, difficulty, partKey,
-        cost, status: 'in_progress',
-      },
     })
-  })
+  } catch (err) {
+    if (err instanceof JobStartError) return Response.json({ error: err.message }, { status: 400 })
+    throw err
+  }
 
   const dto: JobConfigDTO = {
     jobId: job.id,
@@ -127,3 +141,5 @@ export async function POST(req: Request) {
     part: partKey ? partById(partKey) : null,
   })
 }
+
+class JobStartError extends Error {}

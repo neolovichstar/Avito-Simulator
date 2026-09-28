@@ -46,9 +46,17 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return Response.json({ error: 'Вы уже отправляли жалобу на это объявление' }, { status: 409 })
   }
 
-  await db.complaint.create({
-    data: { listingId: id, fromUserId: user.id, reason },
-  })
+  // 59-a: гонка двух одинаковых жалоб ловится уникальным ключом: 409 вместо 500
+  try {
+    await db.complaint.create({
+      data: { listingId: id, fromUserId: user.id, reason },
+    })
+  } catch (err) {
+    if (typeof err === 'object' && err !== null && 'code' in err && (err as { code?: string }).code === 'P2002') {
+      return Response.json({ error: 'Вы уже отправляли жалобу на это объявление' }, { status: 409 })
+    }
+    throw err
+  }
   const count = await db.complaint.count({ where: { listingId: id } })
   await db.listing.update({ where: { id }, data: { complaintCount: count } })
 

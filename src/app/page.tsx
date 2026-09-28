@@ -187,14 +187,9 @@ export default function Home() {
     ((currentApp && LIGHT_APPS[currentApp] && theme !== 'dark') || (!currentApp && wallLight))
   )
 
-  // Тема ОС живёт в localStorage: восстанавливаем сразу после монтирования
-  // (первый рендер всегда светлый — совпадает с SSR, мигание минимально).
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('os_theme_v1')
-      if (saved === 'dark' || saved === 'light') useOS.setState({ theme: saved })
-    } catch { /* приватный режим — остаёмся в светлой */ }
-  }, [])
+  // Тема ОС: единственная точка восстановления — avito_sim_theme (см. эффект
+  // «БАТАРЕЯ/ТЕМА» ниже). Раньше os_theme_v1 восстанавливался здесь и тут же
+  // перетирался вторым источником — выбранный юзером тёмный/светлый сбрасывался.
 
   useEffect(() => {
     // Тёмный «Шёлк Ночь» — свой верхний тон (совпадает с небом SVG-обоев)
@@ -317,6 +312,18 @@ export default function Home() {
     const saved = Number(localStorage.getItem(BATTERY_KEY) ?? '100')
     setBattery(Number.isFinite(saved) ? saved : 100)
     const savedTheme = localStorage.getItem(THEME_KEY)
+      ?? (() => {
+        // 59: миграция со старого ключа os_theme_v1 (Task 58): копируем и дальше
+        // живём на avito_sim_theme
+        try {
+          const legacy = localStorage.getItem('os_theme_v1')
+          if (legacy === 'dark' || legacy === 'light') {
+            localStorage.setItem(THEME_KEY, legacy)
+            return legacy
+          }
+        } catch { /* приватный режим */ }
+        return null
+      })()
     if (savedTheme === 'dark' || savedTheme === 'light') useOS.getState().setTheme(savedTheme)
     const savedDnd = localStorage.getItem(DND_KEY)
     if (savedDnd === '1') useOS.getState().setDnd(true)

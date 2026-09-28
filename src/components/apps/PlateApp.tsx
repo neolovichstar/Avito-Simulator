@@ -33,7 +33,7 @@ import { useOS } from '@/lib/store'
 import { GostPlate } from '@/components/plates/GostPlate'
 
 const GREEN = '#12894B'
-const CAPS = 'text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]'
+const CAPS = 'text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400'
 const CARD = 'rounded-[20px] bg-white shadow-[0_2px_14px_rgba(23,24,26,0.05)]'
 
 type Tab = 'home' | 'search' | 'raffle' | 'favs' | 'profile'
@@ -75,7 +75,7 @@ function CategoryBadge({ category }: { category: PlateMarketItemDTO['category'] 
 function TraitRow({ icon, text }: { icon: 'crown' | 'chart'; text: string }) {
   const gold = icon === 'crown' ? '#C99B2F' : '#94A3B8'
   return (
-    <span className="flex items-center gap-1 text-[10.5px] leading-tight text-[#6B7280]">
+    <span className="flex items-center gap-1 text-[10.5px] leading-tight text-gray-500">
       {icon === 'crown' ? (
         <Crown className="size-3 shrink-0" style={{ color: gold }} aria-hidden />
       ) : (
@@ -134,7 +134,7 @@ function MarketCard({
           {item.letters} {item.regionCode}
         </span>
         <span className="text-[16.5px] font-extrabold text-[#17181A]">{fmtMoney(item.price)}</span>
-        <span className="w-full space-y-0.5 border-t border-[#F0F1F3] pt-2">
+        <span className="w-full space-y-0.5 border-t border-[#F0F2F5] pt-2">
           <TraitRow icon="crown" text={item.trait} />
           <TraitRow icon="chart" text={RARITY_LABEL[item.rarity]} />
         </span>
@@ -441,7 +441,7 @@ export default function PlateApp({ embedded = false }: { embedded?: boolean }) {
 
   // ── рендер ──
   return (
-    <div className="relative flex h-full flex-col bg-[#F6F7F9] text-[#17181A]">
+    <div className="relative flex h-full flex-col bg-[#F5F6F8] text-[#17181A]">
       {!embedded && detail === null && (
         <header className="shrink-0 px-4 pb-1 pt-1.5">
           <div className="flex items-start justify-between">
@@ -450,7 +450,7 @@ export default function PlateApp({ embedded = false }: { embedded?: boolean }) {
               <p className={CAPS}>Премиальные номера для вашего статуса</p>
             </div>
             <div className="mt-1 flex items-center gap-2">
-              <span aria-hidden className="flex size-10 items-center justify-center rounded-full bg-white text-[#374151] shadow-[0_2px_10px_rgba(23,24,26,0.06)]">
+              <span aria-hidden className="flex size-10 items-center justify-center rounded-full bg-white text-gray-700 shadow-[0_2px_10px_rgba(23,24,26,0.06)]">
                 <Bell className="size-5" />
               </span>
               <button
@@ -460,7 +460,7 @@ export default function PlateApp({ embedded = false }: { embedded?: boolean }) {
                   setTab('profile')
                 }}
                 aria-label="Профиль"
-                className="press flex size-10 items-center justify-center rounded-full bg-[#ECEEF1] text-[#6B7280]"
+                className="press flex size-10 items-center justify-center rounded-full bg-[#ECEEF1] text-gray-500"
               >
                 <UserRound className="size-5" aria-hidden />
               </button>
@@ -550,11 +550,11 @@ export default function PlateApp({ embedded = false }: { embedded?: boolean }) {
             <div className="h-full overflow-y-auto px-4 pb-6 pt-2 [scrollbar-width:thin]">
               {favItems.length === 0 ? (
                 <div className="flex flex-col items-center gap-2.5 px-8 pt-16 text-center">
-                  <span className="flex size-16 items-center justify-center rounded-[22px] bg-white text-[#C4C8CE] shadow-[0_2px_14px_rgba(23,24,26,0.05)]">
+                  <span className="flex size-16 items-center justify-center rounded-[22px] bg-white text-[#C4C8CF] shadow-[0_2px_14px_rgba(23,24,26,0.05)]">
                     <Heart className="size-7" aria-hidden />
                   </span>
                   <h3 className="text-[15px] font-bold text-[#17181A]">В избранном пусто</h3>
-                  <p className="text-[13px] leading-relaxed text-[#6B7280]">
+                  <p className="text-[13px] leading-relaxed text-gray-500">
                     Нажимайте на сердце у номера — он появится здесь для быстрого выкупа.
                   </p>
                 </div>
@@ -623,7 +623,7 @@ export default function PlateApp({ embedded = false }: { embedded?: boolean }) {
         <div className="absolute inset-0 z-30 flex flex-col justify-end" role="dialog" aria-modal="true" aria-label="Выбор региона">
           <button type="button" aria-label="Закрыть" className="absolute inset-0 bg-black/25 os-fade" onClick={() => setRegionSheet(false)} />
           <div className="relative rounded-t-[24px] bg-white pb-[calc(14px+env(safe-area-inset-bottom))] os-sheet-rise">
-            <div className="mx-auto mt-2.5 h-1 w-9 rounded-full bg-[#E1E4E8]" aria-hidden />
+            <div className="mx-auto mt-2.5 h-1 w-9 rounded-full bg-[#E1E4E9]" aria-hidden />
             <div className="flex items-center justify-between px-5 pb-2 pt-3.5">
               <h2 className="text-[16px] font-bold text-[#17181A]">Регион</h2>
               <button
@@ -632,19 +632,19 @@ export default function PlateApp({ embedded = false }: { embedded?: boolean }) {
                   setRegionCode(null)
                   setRegionSheet(false)
                 }}
-                className="press text-[13px] font-semibold text-[#12894B]"
+                className="press text-[13px] font-semibold text-[#15803D]"
               >
                 Все регионы
               </button>
             </div>
             <div className="px-5 pb-2">
               <div className="flex h-10 items-center gap-2 rounded-full bg-[#ECEEF1] px-3.5">
-                <Search className="size-4 text-[#9CA3AF]" aria-hidden />
+                <Search className="size-4 text-gray-400" aria-hidden />
                 <input
                   value={regionQuery}
                   onChange={(e) => setRegionQuery(e.target.value)}
                   placeholder="Найти регион…"
-                  className="w-full bg-transparent text-[13.5px] outline-none placeholder:text-[#9CA3AF]"
+                  className="w-full bg-transparent text-[13.5px] outline-none placeholder:text-gray-400"
                 />
               </div>
             </div>
@@ -660,11 +660,11 @@ export default function PlateApp({ embedded = false }: { embedded?: boolean }) {
                       setRegionSheet(false)
                     }}
                     className={`press rounded-[14px] border p-2.5 text-center ${
-                      regionCode === code ? 'border-[#17181A] bg-white shadow-[0_2px_10px_rgba(23,24,26,0.08)]' : 'border-[#ECEEF1] bg-[#F6F7F9]'
+                      regionCode === code ? 'border-[#17181A] bg-white shadow-[0_2px_10px_rgba(23,24,26,0.08)]' : 'border-[#EBEDF0] bg-[#F5F6F8]'
                     }`}
                   >
                     <span className="block text-[15px] font-extrabold tabular-nums text-[#17181A]">{code}</span>
-                    <span className="mt-0.5 block truncate text-[10px] text-[#9CA3AF]">{s.name}</span>
+                    <span className="mt-0.5 block truncate text-[10px] text-gray-400">{s.name}</span>
                   </button>
                 )),
               )}
@@ -733,9 +733,9 @@ function HomeTab({
       {/* поиск */}
       <button type="button" onClick={onSearch} className="press block w-full text-left" aria-label="Поиск номера">
         <div className="flex h-11 items-center gap-2.5 rounded-full bg-white px-4 shadow-[0_2px_10px_rgba(23,24,26,0.05)]">
-          <Search className="size-4.5 shrink-0 text-[#9CA3AF]" aria-hidden />
-          <span className="min-w-0 flex-1 truncate text-[13.5px] text-[#9CA3AF]">Найти номер… Например: А001АА или 777</span>
-          <SlidersHorizontal className="size-4.5 shrink-0 text-[#374151]" aria-hidden />
+          <Search className="size-4.5 shrink-0 text-gray-400" aria-hidden />
+          <span className="min-w-0 flex-1 truncate text-[13.5px] text-gray-400">Найти номер… Например: А001АА или 777</span>
+          <SlidersHorizontal className="size-4.5 shrink-0 text-gray-700" aria-hidden />
         </div>
       </button>
 
@@ -748,7 +748,7 @@ function HomeTab({
             onClick={() => onChip(c.key)}
             aria-pressed={chip === c.key}
             className={`press h-9 shrink-0 rounded-full px-4 text-[13px] font-semibold transition-colors ${
-              chip === c.key ? 'bg-[#17181A] text-white' : 'bg-white text-[#374151] shadow-[0_1px_6px_rgba(23,24,26,0.06)]'
+              chip === c.key ? 'bg-[#17181A] text-white' : 'bg-white text-gray-700 shadow-[0_1px_6px_rgba(23,24,26,0.06)]'
             }`}
           >
             {c.label}
@@ -757,7 +757,7 @@ function HomeTab({
         <button
           type="button"
           onClick={onSearch}
-          className="press h-9 shrink-0 rounded-full bg-white px-4 text-[13px] font-semibold text-[#374151] shadow-[0_1px_6px_rgba(23,24,26,0.06)]"
+          className="press h-9 shrink-0 rounded-full bg-white px-4 text-[13px] font-semibold text-gray-700 shadow-[0_1px_6px_rgba(23,24,26,0.06)]"
         >
           Регион <ChevronDown className="ml-0.5 inline size-3.5" aria-hidden />
         </button>
@@ -766,7 +766,7 @@ function HomeTab({
       {/* витрина */}
       <div className="mt-4 flex items-baseline justify-between">
         <p className={CAPS}>Популярные номера</p>
-        <button type="button" onClick={onSearch} className="press text-[12px] font-semibold text-[#374151]">
+        <button type="button" onClick={onSearch} className="press text-[12px] font-semibold text-gray-700">
           Смотреть все ›
         </button>
       </div>
@@ -780,9 +780,9 @@ function HomeTab({
         </div>
       ) : filtered.length === 0 ? (
         <div className="mt-8 flex flex-col items-center gap-2 text-center">
-          <Search className="size-8 text-[#C4C8CE]" aria-hidden />
+          <Search className="size-8 text-[#C4C8CF]" aria-hidden />
           <p className="text-[14px] font-semibold text-[#17181A]">Ничего не найдено</p>
-          <p className="text-[12.5px] text-[#9CA3AF]">Смягчите фильтры или загляните завтра — рынок обновляется каждый день.</p>
+          <p className="text-[12.5px] text-gray-400">Смягчите фильтры или загляните завтра — рынок обновляется каждый день.</p>
         </div>
       ) : (
         <div className="mt-2.5 grid grid-cols-2 gap-2.5">
@@ -793,7 +793,7 @@ function HomeTab({
       )}
 
       {items.length > 0 && filtered.length > 24 && (
-        <p className="mt-3 text-center text-[11.5px] text-[#9CA3AF]">Показаны топ-24 из {filtered.length}. Точнее — в фильтрах.</p>
+        <p className="mt-3 text-center text-[11.5px] text-gray-400">Показаны топ-24 из {filtered.length}. Точнее — в фильтрах.</p>
       )}
     </div>
   )
@@ -856,7 +856,7 @@ function FilterScreen({
     <div className="h-full min-h-0 overflow-y-auto px-4 pb-28 pt-1 [scrollbar-width:thin]">
       <div className="flex items-center justify-between pb-3">
         <h2 className="text-[20px] font-bold text-[#17181A]">Фильтры</h2>
-        <button type="button" onClick={onReset} className="press text-[13px] font-semibold text-[#6B7280]">
+        <button type="button" onClick={onReset} className="press text-[13px] font-semibold text-gray-500">
           Сбросить
         </button>
       </div>
@@ -864,7 +864,7 @@ function FilterScreen({
       {/* регион */}
       <div className="flex items-baseline justify-between">
         <p className={CAPS}>Регион</p>
-        <button type="button" onClick={openRegionSheet} className="press text-[12px] font-semibold text-[#374151]">
+        <button type="button" onClick={openRegionSheet} className="press text-[12px] font-semibold text-gray-700">
           {regionCode ? `Код ${regionCode}` : 'Все регионы'} ›
         </button>
       </div>
@@ -876,16 +876,16 @@ function FilterScreen({
             onClick={() => setRegionCode(regionCode === r.code ? null : r.code)}
             aria-pressed={regionCode === r.code}
             className={`press rounded-[14px] border p-2.5 text-center ${
-              regionCode === r.code ? 'border-[#17181A] bg-white shadow-[0_2px_10px_rgba(23,24,26,0.08)]' : 'border-[#ECEEF1] bg-white'
+              regionCode === r.code ? 'border-[#17181A] bg-white shadow-[0_2px_10px_rgba(23,24,26,0.08)]' : 'border-[#EBEDF0] bg-white'
             }`}
           >
             <span className="block text-[15px] font-extrabold tabular-nums text-[#17181A]">{r.code}</span>
-            <span className="mt-0.5 block truncate text-[10px] text-[#9CA3AF]">{r.name}</span>
+            <span className="mt-0.5 block truncate text-[10px] text-gray-400">{r.name}</span>
           </button>
         ))}
-        <button type="button" onClick={openRegionSheet} className="press rounded-[14px] border border-[#ECEEF1] bg-white p-2.5 text-center">
+        <button type="button" onClick={openRegionSheet} className="press rounded-[14px] border border-[#EBEDF0] bg-white p-2.5 text-center">
           <span className="block text-[12.5px] font-bold text-[#17181A]">Регионы</span>
-          <span className="mt-0.5 flex items-center justify-center gap-0.5 text-[10px] text-[#9CA3AF]">
+          <span className="mt-0.5 flex items-center justify-center gap-0.5 text-[10px] text-gray-400">
             Выбрать <ChevronRight className="size-3" aria-hidden />
           </span>
         </button>
@@ -898,7 +898,7 @@ function FilterScreen({
           type="button"
           onClick={() => setSeries(null)}
           aria-pressed={series === null}
-          className={`press h-9 rounded-full px-4 text-[13px] font-semibold ${series === null ? 'bg-[#17181A] text-white' : 'bg-white text-[#374151] shadow-[0_1px_6px_rgba(23,24,26,0.06)]'}`}
+          className={`press h-9 rounded-full px-4 text-[13px] font-semibold ${series === null ? 'bg-[#17181A] text-white' : 'bg-white text-gray-700 shadow-[0_1px_6px_rgba(23,24,26,0.06)]'}`}
         >
           Любая
         </button>
@@ -908,7 +908,7 @@ function FilterScreen({
             type="button"
             onClick={() => setSeries(series === l ? null : l)}
             aria-pressed={series === l}
-            className={`press size-9 rounded-full text-[14px] font-bold ${series === l ? 'bg-[#17181A] text-white' : 'bg-white text-[#374151] shadow-[0_1px_6px_rgba(23,24,26,0.06)]'}`}
+            className={`press size-9 rounded-full text-[14px] font-bold ${series === l ? 'bg-[#17181A] text-white' : 'bg-white text-gray-700 shadow-[0_1px_6px_rgba(23,24,26,0.06)]'}`}
           >
             {l}
           </button>
@@ -925,11 +925,11 @@ function FilterScreen({
             onClick={() => setPattern(p.key)}
             aria-pressed={pattern === p.key}
             className={`press rounded-[14px] border p-3 text-left ${
-              pattern === p.key ? 'border-[#17181A] bg-[#17181A] text-white' : 'border-[#ECEEF1] bg-white text-[#17181A]'
+              pattern === p.key ? 'border-[#17181A] bg-[#17181A] text-white' : 'border-[#EBEDF0] bg-white text-[#17181A]'
             }`}
           >
             <span className="block text-[13px] font-bold">{p.label}</span>
-            {p.hint && <span className={`text-[10.5px] tabular-nums ${pattern === p.key ? 'text-white/60' : 'text-[#9CA3AF]'}`}>{p.hint}</span>}
+            {p.hint && <span className={`text-[10.5px] tabular-nums ${pattern === p.key ? 'text-white/60' : 'text-gray-400'}`}>{p.hint}</span>}
           </button>
         ))}
       </div>
@@ -944,19 +944,19 @@ function FilterScreen({
             onClick={() => setCategory(category === c.key ? 'all' : c.key)}
             aria-pressed={category === c.key}
             className={`press flex flex-col items-center gap-1 rounded-[14px] border p-2.5 text-center ${
-              category === c.key ? 'border-[#C99B2F] bg-[#FFF9EC]' : 'border-[#ECEEF1] bg-white'
+              category === c.key ? 'border-[#C99B2F] bg-[#FFF9EC]' : 'border-[#EBEDF0] bg-white'
             }`}
           >
             <c.icon className="size-4.5" style={{ color: category === c.key ? '#C99B2F' : '#9CA3AF' }} aria-hidden />
             <span className="text-[11px] font-bold text-[#17181A]">{c.label}</span>
-            <span className="text-[9px] leading-tight text-[#9CA3AF]">{c.desc}</span>
+            <span className="text-[9px] leading-tight text-gray-400">{c.desc}</span>
           </button>
         ))}
       </div>
 
       {/* цена */}
       <p className={`${CAPS} mt-5`}>Цена</p>
-      <div className="mt-1.5 flex items-baseline justify-between text-[12px] text-[#6B7280]">
+      <div className="mt-1.5 flex items-baseline justify-between text-[12px] text-gray-500">
         <span>От {fmtMoney(priceLo)}</span>
         <span>До {fmtMoney(priceHi)}</span>
       </div>
@@ -964,7 +964,7 @@ function FilterScreen({
 
       {/* результаты */}
       <div className="mt-4 rounded-[16px] bg-white p-3.5 text-center shadow-[0_2px_10px_rgba(23,24,26,0.05)]">
-        <p className="text-[13px] text-[#6B7280]">
+        <p className="text-[13px] text-gray-500">
           Подходит <span className="font-bold text-[#17181A]">{filtered.length}</span> из {items.length} номеров
         </p>
       </div>
@@ -1008,7 +1008,7 @@ function RegionSheetEmbedded({
     <div className="absolute inset-0 z-30 flex flex-col justify-end" role="dialog" aria-modal="true" aria-label="Выбор региона">
       <button type="button" aria-label="Закрыть" className="absolute inset-0 bg-black/25 os-fade" onClick={onClose} />
       <div className="relative rounded-t-[24px] bg-white pb-[calc(14px+env(safe-area-inset-bottom))] os-sheet-rise">
-        <div className="mx-auto mt-2.5 h-1 w-9 rounded-full bg-[#E1E4E8]" aria-hidden />
+        <div className="mx-auto mt-2.5 h-1 w-9 rounded-full bg-[#E1E4E9]" aria-hidden />
         <div className="flex items-center justify-between px-5 pb-2 pt-3.5">
           <h2 className="text-[16px] font-bold text-[#17181A]">Регион</h2>
           <button
@@ -1017,19 +1017,19 @@ function RegionSheetEmbedded({
               onPick(null)
               onClose()
             }}
-            className="press text-[13px] font-semibold text-[#12894B]"
+            className="press text-[13px] font-semibold text-[#15803D]"
           >
             Все регионы
           </button>
         </div>
         <div className="px-5 pb-2">
           <div className="flex h-10 items-center gap-2 rounded-full bg-[#ECEEF1] px-3.5">
-            <Search className="size-4 text-[#9CA3AF]" aria-hidden />
+            <Search className="size-4 text-gray-400" aria-hidden />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Найти регион…"
-              className="w-full bg-transparent text-[13.5px] outline-none placeholder:text-[#9CA3AF]"
+              className="w-full bg-transparent text-[13.5px] outline-none placeholder:text-gray-400"
             />
           </div>
         </div>
@@ -1044,11 +1044,11 @@ function RegionSheetEmbedded({
                   onClose()
                 }}
                 className={`press rounded-[14px] border p-2.5 text-center ${
-                  regionCode === code ? 'border-[#17181A] bg-white shadow-[0_2px_10px_rgba(23,24,26,0.08)]' : 'border-[#ECEEF1] bg-[#F6F7F9]'
+                  regionCode === code ? 'border-[#17181A] bg-white shadow-[0_2px_10px_rgba(23,24,26,0.08)]' : 'border-[#EBEDF0] bg-[#F5F6F8]'
                 }`}
               >
                 <span className="block text-[15px] font-extrabold tabular-nums text-[#17181A]">{code}</span>
-                <span className="mt-0.5 block truncate text-[10px] text-[#9CA3AF]">{s.name}</span>
+                <span className="mt-0.5 block truncate text-[10px] text-gray-400">{s.name}</span>
               </button>
             )),
           )}
@@ -1081,7 +1081,7 @@ function RaffleScreen({
     <div className="flex h-full min-h-0 flex-col overflow-y-auto px-4 pb-6 pt-1 [scrollbar-width:thin]">
       <div className="text-center">
         <h2 className="text-[19px] font-bold text-[#17181A]">Розыгрыш номера</h2>
-        <p className="mx-auto mt-1 max-w-[280px] text-[12.5px] leading-relaxed text-[#9CA3AF]">
+        <p className="mx-auto mt-1 max-w-[280px] text-[12.5px] leading-relaxed text-gray-400">
           Испытайте удачу и получите эксклюзивный номер из премиум-базы
         </p>
       </div>
@@ -1104,7 +1104,7 @@ function RaffleScreen({
           {reel ? (
             <GostPlate first={reel.first} digits={reel.digits} letters={reel.letters} regionCode={reel.regionCode} rarity={reel.rarity} size="lg" />
           ) : (
-            <span className="flex h-[92px] items-center text-[13px] text-[#C4C8CE]">Номер появится здесь</span>
+            <span className="flex h-[92px] items-center text-[13px] text-[#C4C8CF]">Номер появится здесь</span>
           )}
         </div>
         {/* нижний — размытый */}
@@ -1114,10 +1114,10 @@ function RaffleScreen({
           </div>
         )}
         {/* стрелки */}
-        <span className="absolute left-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-[#374151] shadow-md" aria-hidden>
+        <span className="absolute left-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-gray-700 shadow-md" aria-hidden>
           <ChevronLeft className="size-5" />
         </span>
-        <span className="absolute right-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-[#374151] shadow-md" aria-hidden>
+        <span className="absolute right-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-gray-700 shadow-md" aria-hidden>
           <ChevronRight className="size-5" />
         </span>
       </div>
@@ -1125,27 +1125,27 @@ function RaffleScreen({
       {/* точки */}
       <div className="mt-3 flex justify-center gap-1.5" aria-hidden>
         {[0, 1, 2, 3, 4].map((d) => (
-          <span key={d} className={`size-1.5 rounded-full ${d === 2 ? 'w-4 bg-[#C99B2F]' : 'bg-[#E1E4E8]'} transition-all duration-300`} />
+          <span key={d} className={`size-1.5 rounded-full ${d === 2 ? 'w-4 bg-[#C99B2F]' : 'bg-[#E1E4E9]'} transition-all duration-300`} />
         ))}
       </div>
 
       {/* результат оффера */}
       {offer && !spinning && (
         <div className={`${CARD} screen-enter mx-auto mt-3 w-full max-w-[340px] p-4 text-center`}>
-          <p className="text-[12px] text-[#9CA3AF]">Выпал номер</p>
+          <p className="text-[12px] text-gray-400">Выпал номер</p>
           <p className="mt-0.5 text-[17px] font-extrabold text-[#17181A]">
             {offer.first} {offer.digits} {offer.letters} · {offer.regionCode}
           </p>
           <div className="mt-1.5 flex items-center justify-center gap-1.5">
-            <span className="rounded-full bg-[#FEF3C7] px-2.5 py-0.5 text-[11px] font-semibold text-[#B45309]">{RARITY_LABEL[offer.rarity]}</span>
-            <span className="rounded-full bg-[#F3F4F6] px-2.5 py-0.5 text-[11px] font-semibold text-[#6B7280]">Красота {offer.beautyScore}</span>
+            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700">{RARITY_LABEL[offer.rarity]}</span>
+            <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-semibold text-gray-500">Красота {offer.beautyScore}</span>
           </div>
           <p className="mt-2 text-[18px] font-extrabold text-[#17181A]">Выкуп за {fmtMoney(offer.price)}</p>
           <div className="mt-2.5 grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={onAgain}
-              className="press flex h-11 items-center justify-center rounded-[14px] bg-[#F3F4F6] text-[13.5px] font-semibold text-[#374151]"
+              className="press flex h-11 items-center justify-center rounded-[14px] bg-gray-100 text-[13.5px] font-semibold text-gray-700"
             >
               Ещё раз
             </button>
@@ -1171,7 +1171,7 @@ function RaffleScreen({
         ].map((f) => (
           <div key={f.label} className={`${CARD} flex flex-col items-center gap-1.5 p-3 text-center`}>
             <f.icon />
-            <span className="text-[10px] leading-tight text-[#6B7280]">{f.label}</span>
+            <span className="text-[10px] leading-tight text-gray-500">{f.label}</span>
           </div>
         ))}
       </div>
@@ -1192,7 +1192,7 @@ function RaffleScreen({
             </span>
             <span className="text-[10.5px] font-medium text-white/85">Попытка бесплатна · выкуп по редкости</span>
           </button>
-          <p className="mt-2 flex items-center justify-center gap-1 text-center text-[10.5px] text-[#9CA3AF]">
+          <p className="mt-2 flex items-center justify-center gap-1 text-center text-[10.5px] text-gray-400">
             Возможные номера из всех регионов РФ
             <Eye className="size-3" aria-hidden />
           </p>
@@ -1204,7 +1204,7 @@ function RaffleScreen({
 
 function ZapIcon() {
   return (
-    <span className="flex size-7 items-center justify-center rounded-full bg-[#FFF4D6] text-[#C99B2F]" aria-hidden>
+    <span className="flex size-7 items-center justify-center rounded-full bg-[#FFF4E5] text-[#D9A514]" aria-hidden>
       <svg viewBox="0 0 24 24" className="size-4" fill="currentColor">
         <path d="M13 2 4.5 13.5H11L9.8 22 19 9.8h-6.6L13 2Z" />
       </svg>
@@ -1213,14 +1213,14 @@ function ZapIcon() {
 }
 function ShieldIcon() {
   return (
-    <span className="flex size-7 items-center justify-center rounded-full bg-[#EAF7F0] text-[#12894B]" aria-hidden>
+    <span className="flex size-7 items-center justify-center rounded-full bg-[#E6F6EC] text-[#15803D]" aria-hidden>
       <ShieldCheck className="size-4" aria-hidden />
     </span>
   )
 }
 function GemIcon() {
   return (
-    <span className="flex size-7 items-center justify-center rounded-full bg-[#F1ECFE] text-[#7C5CD6]" aria-hidden>
+    <span className="flex size-7 items-center justify-center rounded-full bg-violet-100 text-violet-600" aria-hidden>
       <Gem className="size-4" aria-hidden />
     </span>
   )
@@ -1276,8 +1276,8 @@ function DetailScreen({
       </div>
       <div className="mt-2.5 flex justify-center gap-1.5" aria-hidden>
         <span className="h-1.5 w-4 rounded-full bg-[#17181A]" />
-        <span className="size-1.5 rounded-full bg-[#E1E4E8]" />
-        <span className="size-1.5 rounded-full bg-[#E1E4E8]" />
+        <span className="size-1.5 rounded-full bg-[#E1E4E9]" />
+        <span className="size-1.5 rounded-full bg-[#E1E4E9]" />
       </div>
 
       {/* шапка */}
@@ -1292,22 +1292,22 @@ function DetailScreen({
         </div>
         <p className="mt-0.5 text-[22px] font-extrabold text-[#17181A]">{fmtMoney(item.price)}</p>
         <div className="mt-2 flex flex-wrap gap-2">
-          <span className="flex items-center gap-1 rounded-full bg-[#FFF9EC] px-2.5 py-1 text-[11.5px] font-semibold text-[#B45309]">
+          <span className="flex items-center gap-1 rounded-full bg-[#FFF9EC] px-2.5 py-1 text-[11.5px] font-semibold text-amber-700">
             <Crown className="size-3.5" aria-hidden />
             {item.trait}
           </span>
-          <span className="flex items-center gap-1 rounded-full bg-[#F3F4F6] px-2.5 py-1 text-[11.5px] font-semibold text-[#6B7280]">
+          <span className="flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-[11.5px] font-semibold text-gray-500">
             <BarChart3 className="size-3.5" aria-hidden />
             {RARITY_LABEL[item.rarity]}
           </span>
         </div>
 
         {/* характеристики */}
-        <div className={`${CARD} mt-3.5 divide-y divide-[#F0F1F3] px-4`}>
+        <div className={`${CARD} mt-3.5 divide-y divide-[#EBEDF0] px-4`}>
           {rows.map((r) => (
             <div key={r.label} className="flex items-center gap-3 py-3">
-              <r.icon className="size-4.5 shrink-0 text-[#9CA3AF]" aria-hidden />
-              <span className="w-[92px] shrink-0 text-[12.5px] text-[#9CA3AF]">{r.label}</span>
+              <r.icon className="size-4.5 shrink-0 text-gray-400" aria-hidden />
+              <span className="w-[92px] shrink-0 text-[12.5px] text-gray-400">{r.label}</span>
               <span className="flex min-w-0 flex-1 items-center justify-end gap-1.5 text-right text-[13px] font-semibold text-[#17181A]">
                 <span className="truncate">{r.value}</span>
                 {r.dot && <span className="size-2 shrink-0 rounded-full" style={{ background: r.dot }} aria-hidden />}
@@ -1374,17 +1374,17 @@ function ProfileTab({
         </span>
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-[17px] font-bold text-[#17181A]">{session?.displayName ?? 'Игрок'}</h2>
-          <p className="text-[12.5px] text-[#9CA3AF]">Баланс: {fmtMoney(balance)}</p>
+          <p className="text-[12.5px] text-gray-400">Баланс: {fmtMoney(balance)}</p>
         </div>
-        <span className="rounded-full bg-[#F3F4F6] px-3 py-1.5 text-[12.5px] font-bold text-[#374151]">{mine.length} шт.</span>
+        <span className="rounded-full bg-gray-100 px-3 py-1.5 text-[12.5px] font-bold text-gray-700">{mine.length} шт.</span>
       </div>
 
       <p className={`${CAPS} mt-4`}>Мои номера</p>
       {mine.length === 0 ? (
         <div className="mt-2.5 flex flex-col items-center gap-2 rounded-[20px] bg-white p-6 text-center shadow-[0_2px_14px_rgba(23,24,26,0.05)]">
-          <Dices className="size-7 text-[#C4C8CE]" aria-hidden />
+          <Dices className="size-7 text-[#C4C8CF]" aria-hidden />
           <p className="text-[13.5px] font-semibold text-[#17181A]">Номеров пока нет</p>
-          <p className="text-[12px] text-[#9CA3AF]">Крутите в разделе «Разыграть» или выберите из витрины.</p>
+          <p className="text-[12px] text-gray-400">Крутите в разделе «Разыграть» или выберите из витрины.</p>
         </div>
       ) : (
         <div className="mt-2.5 space-y-2.5">
@@ -1394,23 +1394,23 @@ function ProfileTab({
                 <GostPlate first={p.first} digits={p.digits} letters={p.letters} regionCode={p.regionCode} rarity={p.rarity} size="sm" />
                 <div className="min-w-0 flex-1">
                   {p.isMain ? (
-                    <span className="rounded-full bg-[#EAF7F0] px-2 py-0.5 text-[10px] font-bold text-[#12894B]">Основной</span>
+                    <span className="rounded-full bg-[#E6F6EC] px-2 py-0.5 text-[10px] font-bold text-[#15803D]">Основной</span>
                   ) : (
-                    <span className="text-[12px] text-[#9CA3AF]">{RARITY_LABEL[p.rarity]}</span>
+                    <span className="text-[12px] text-gray-400">{RARITY_LABEL[p.rarity]}</span>
                   )}
-                  <p className="text-[12px] text-[#9CA3AF]">Красота {p.beautyScore}</p>
+                  <p className="text-[12px] text-gray-400">Красота {p.beautyScore}</p>
                 </div>
               </div>
               <div className="mt-2.5 flex gap-2">
                 {!p.isMain && (
-                  <button type="button" onClick={() => onMain(p)} className="press h-9 flex-1 rounded-full bg-[#F3F4F6] text-[12.5px] font-semibold text-[#374151]">
+                  <button type="button" onClick={() => onMain(p)} className="press h-9 flex-1 rounded-full bg-gray-100 text-[12.5px] font-semibold text-gray-700">
                     Сделать основным
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={() => onRelease(p)}
-                  className="press flex h-9 items-center justify-center gap-1.5 rounded-full bg-[#FDEEEE] px-3 text-[12.5px] font-semibold text-[#C43D2E]"
+                  className="press flex h-9 items-center justify-center gap-1.5 rounded-full bg-[#FDEEEE] px-3 text-[12.5px] font-semibold text-[#D14343]"
                   aria-label={`Сдать номер ${p.plate}`}
                 >
                   <Trash2 className="size-3.5" aria-hidden />

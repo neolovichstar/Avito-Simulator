@@ -74,11 +74,11 @@ export default function AvitoApp() {
         onClick={() => goTab('auto')}
         className="flex min-h-[52px] flex-1 items-center gap-2.5 rounded-[16px] bg-white p-2.5 text-left ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all active:scale-[0.98]"
       >
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#14532D]/[0.08] text-[#14532D]" aria-hidden>
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#14532D]/[0.08] text-[#15803D]" aria-hidden>
           <Car size={17} />
         </span>
         <span className="min-w-0">
-          <span className="block text-[13px] font-semibold leading-tight text-[#141414]">Авто</span>
+          <span className="block text-[13px] font-semibold leading-tight text-[#17181A]">Авто</span>
           <span className="block truncate text-[11px] leading-tight text-black/40">Авто и мото</span>
         </span>
       </button>
@@ -86,11 +86,11 @@ export default function AvitoApp() {
         onClick={() => goTab('numbers')}
         className="flex min-h-[52px] flex-1 items-center gap-2.5 rounded-[16px] bg-white p-2.5 text-left ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all active:scale-[0.98]"
       >
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#14532D]/[0.08] text-[#14532D]" aria-hidden>
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#14532D]/[0.08] text-[#15803D]" aria-hidden>
           <Hash size={17} />
         </span>
         <span className="min-w-0">
-          <span className="block text-[13px] font-semibold leading-tight text-[#141414]">Номера</span>
+          <span className="block text-[13px] font-semibold leading-tight text-[#17181A]">Номера</span>
           <span className="block truncate text-[11px] leading-tight text-black/40">Крутка знаков</span>
         </span>
       </button>
@@ -99,7 +99,7 @@ export default function AvitoApp() {
 
   return (
     // Фикс светлого фона в ЛЮБОЙ теме ОС: не полагаемся на CSS-переменные темы
-    <div className="relative flex h-full flex-col bg-[#F6F7F9] text-[#141414]">
+    <div className="relative flex h-full flex-col bg-[#F5F6F8] text-[#17181A]">
       {/* контент */}
       <div className="relative flex-1 overflow-hidden">
         {top?.type === 'listing' && (
@@ -165,7 +165,7 @@ export default function AvitoApp() {
                       <span className="block text-[14px] font-bold leading-tight">Автономера</span>
                       <span className="block text-[11.5px] leading-snug text-white/60">Крутите буквы и цифры. Блатной знак украсит машину</span>
                     </span>
-                    <span className="shrink-0 rounded-full bg-white px-3.5 py-2 text-[12px] font-bold text-[#14532D]">Крутить</span>
+                    <span className="shrink-0 rounded-full bg-white px-3.5 py-2 text-[12px] font-bold text-[#15803D]">Крутить</span>
                   </button>
                 }
               />
@@ -242,13 +242,13 @@ function TabButton({ tab, active, badge, onClick }: {
       onClick={onClick}
       aria-label={tab.label}
       aria-current={active ? 'page' : undefined}
-      className="relative flex h-16 flex-1 flex-col items-center justify-center gap-1 transition-colors active:bg-black/[0.03]"
+      className="relative flex h-16 flex-1 flex-col items-center justify-center gap-1 transition-colors active:bg-neutral-200/40"
     >
       <span className="relative flex items-center justify-center" aria-hidden>
         <Icon
           size={22}
           strokeWidth={active ? 2.3 : 1.9}
-          className={active ? 'text-[#14532D]' : 'text-black/40'}
+          className={active ? 'text-[#15803D]' : 'text-black/40'}
         />
         {badge !== undefined && badge > 0 && (
           <span className="absolute -right-2.5 -top-1.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-[#16A34A] px-1 text-[10px] font-bold text-white ring-2 ring-white">
@@ -256,7 +256,7 @@ function TabButton({ tab, active, badge, onClick }: {
           </span>
         )}
       </span>
-      <span className={`text-[10px] leading-none ${active ? 'font-semibold text-[#14532D]' : 'font-medium text-black/40'}`}>
+      <span className={`text-[10px] leading-none ${active ? 'font-semibold text-[#15803D]' : 'font-medium text-black/40'}`}>
         {tab.label}
       </span>
     </button>
@@ -268,14 +268,14 @@ export function ConditionBadge({ condition }: { condition: string }) {
     new: 'Новое', excellent: 'Отличное', good: 'Хорошее', used: 'Б/у', parts: 'На запчасти',
   }
   const colors: Record<string, string> = {
-    new: 'bg-[#14532D]/[0.08] text-[#14532D]',
-    excellent: 'bg-[#14532D]/[0.08] text-[#14532D]',
-    good: 'bg-black/[0.05] text-black/55',
+    new: 'bg-[#14532D]/[0.08] text-[#15803D]',
+    excellent: 'bg-[#14532D]/[0.08] text-[#15803D]',
+    good: 'bg-neutral-200/60 text-[#17181A]/50',
     used: 'bg-amber-500/[0.12] text-amber-700',
     parts: 'bg-red-500/[0.08] text-red-600',
   }
   return (
-    <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-medium leading-none ${colors[condition] ?? 'bg-black/[0.05] text-black/55'}`}>
+    <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-medium leading-none ${colors[condition] ?? 'bg-neutral-200/60 text-[#17181A]/50'}`}>
       {labels[condition] ?? condition}
     </span>
   )

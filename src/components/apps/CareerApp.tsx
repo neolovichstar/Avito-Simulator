@@ -435,7 +435,7 @@ export default function CareerApp() {
                         'h-1.5 flex-1 rounded-full ' +
                         (i < bonus.streak % 7 || (bonus.streak > 0 && bonus.streak % 7 === 0)
                           ? ''
-                          : 'bg-black/10')
+                          : 'bg-neutral-200')
                       }
                       style={i < bonus.streak % 7 || (bonus.streak > 0 && bonus.streak % 7 === 0) ? { backgroundColor: GREEN } : undefined}
                       aria-hidden

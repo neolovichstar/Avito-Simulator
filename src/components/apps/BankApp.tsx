@@ -484,7 +484,7 @@ export default function BankApp() {
   const darkMain = screen === 'main'
 
   return (
-    <div className={`relative flex h-full flex-col ${darkMain ? 'bg-[#0B1B12] text-[#F2F5F3]' : 'bg-[#F6F7F9] text-[#141414]'}`}>
+    <div className={`relative flex h-full flex-col ${darkMain ? 'bg-[#0B1B12] text-[#F2F5F3]' : 'bg-[#F5F6F8] text-[#17181A]'}`}>
       {screen === 'transfer' && data ? (
         /* ===== ПЕРЕВОД: получатель + сумма с клавиатурой (по макету) ===== */
         <div key="transfer" className="screen-enter flex h-full min-h-0 flex-col">
@@ -493,11 +493,11 @@ export default function BankApp() {
               type="button"
               onClick={() => setScreen(transferReturnRef.current)}
               aria-label="Назад"
-              className="absolute left-4 flex size-10 items-center justify-center rounded-full bg-[#FFFFFF] ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition active:scale-95"
+              className="absolute left-4 flex size-10 items-center justify-center rounded-full bg-white ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition active:scale-95"
             >
-              <ArrowLeft className="size-5 text-[#141414]" aria-hidden="true" />
+              <ArrowLeft className="size-5 text-[#17181A]" aria-hidden="true" />
             </button>
-            <h1 className="text-[17px] font-bold tracking-tight text-[#141414]">Перевод</h1>
+            <h1 className="text-[17px] font-bold tracking-tight text-[#17181A]">Перевод</h1>
           </div>
 
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-2 pt-1 [scrollbar-width:thin]">
@@ -525,10 +525,10 @@ export default function BankApp() {
                 {transferDest === 'deposit' ? <PiggyBank className="size-5" /> : <Landmark className="size-5" />}
               </span>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[15px] font-bold text-[#141414]">
+                <div className="truncate text-[15px] font-bold text-[#17181A]">
                   {transferDest === 'deposit' ? 'Накопительный счёт' : 'Погашение кредита'}
                 </div>
-                <div className="truncate text-[12px] text-[#9CA3AF]">
+                <div className="truncate text-[12px] text-gray-400">
                   {transferDest === 'deposit'
                     ? `Копилка · •••• ${depositLast4} · ${rate}% в час`
                     : data.debt > 0
@@ -536,7 +536,7 @@ export default function BankApp() {
                       : 'Активных кредитов нет'}
                 </div>
               </div>
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-black/[0.04] text-[#9CA3AF]" aria-hidden="true">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-neutral-200/50 text-gray-400" aria-hidden="true">
                 {transferDest === 'deposit' ? <Landmark className="size-4.5" /> : <FileText className="size-4.5" />}
               </span>
             </div>
@@ -545,7 +545,7 @@ export default function BankApp() {
             <div>
               <div className={CAPS}>Сумма перевода</div>
               <div className={`${CARD_CLS} mt-2 flex items-center justify-between p-4`}>
-                <span className={`text-[28px] font-bold tabular-nums ${transferAmount > 0 ? 'text-[#141414]' : 'text-[#C4C7CD]'}`}>
+                <span className={`text-[28px] font-bold tabular-nums ${transferAmount > 0 ? 'text-[#17181A]' : 'text-[#C4C7CD]'}`}>
                   {fmtNum(transferAmount)} ₽
                 </span>
                 {amountStr !== '' && (
@@ -553,7 +553,7 @@ export default function BankApp() {
                     type="button"
                     onClick={() => setAmountStr('')}
                     aria-label="Очистить сумму"
-                    className="flex size-9 shrink-0 items-center justify-center rounded-full bg-black/[0.04] text-[#9CA3AF] transition active:scale-95"
+                    className="flex size-9 shrink-0 items-center justify-center rounded-full bg-neutral-200/50 text-gray-400 transition active:scale-95"
                   >
                     <X className="size-4" aria-hidden="true" />
                   </button>
@@ -580,7 +580,7 @@ export default function BankApp() {
                       className={`h-9 flex-1 rounded-full text-[12.5px] font-semibold transition active:scale-95 disabled:opacity-50 ${
                         transferAmount > 0 && transferAmount === val
                           ? 'bg-[#0E7A3D] text-white'
-                          : 'bg-black/[0.05] text-[#141414]'
+                          : 'bg-neutral-200/60 text-[#17181A]'
                       }`}
                     >
                       {c.label}
@@ -590,13 +590,13 @@ export default function BankApp() {
               </div>
             )}
 
-            <p className="px-1 text-[11.5px] leading-relaxed text-[#9CA3AF]">
+            <p className="px-1 text-[11.5px] leading-relaxed text-gray-400">
               {transferDest === 'deposit'
                 ? `Доступно: ${fmtMoney(data.balance)} · На вкладе: ${fmtMoney(data.deposit)} · Минимум 100 ₽`
                 : `Доступно: ${fmtMoney(data.balance)}${data.debt > 0 ? ` · Остаток долга: ${fmtMoney(data.debt)}` : ''}`}
             </p>
             {transferDest === 'loan' && data.debt <= 0 && (
-              <p className="px-1 text-[11.5px] leading-relaxed text-[#9CA3AF]">
+              <p className="px-1 text-[11.5px] leading-relaxed text-gray-400">
                 Погашать нечего: активных кредитов нет. Оформить кредит можно в кредитном центре.
               </p>
             )}
@@ -609,7 +609,7 @@ export default function BankApp() {
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  className="flex h-12 items-center justify-center rounded-xl bg-[#0E7A3D] text-[15px] font-semibold text-white transition active:scale-[0.98] disabled:bg-black/[0.06] disabled:text-[#9CA3AF]"
+                  className="flex h-12 items-center justify-center rounded-xl bg-[#0E7A3D] text-[15px] font-semibold text-white transition active:scale-[0.98] disabled:bg-neutral-200/60 disabled:text-gray-400"
                   disabled={busy || transferAmount < 100 || transferAmount > data.balance}
                   onClick={() =>
                     applyMutation(
@@ -624,7 +624,7 @@ export default function BankApp() {
                 </button>
                 <button
                   type="button"
-                  className="flex h-12 items-center justify-center rounded-xl bg-[#FFFFFF] text-[15px] font-semibold text-[#141414] ring-1 ring-black/[0.08] transition active:scale-[0.98] disabled:text-[#C4C7CD]"
+                  className="flex h-12 items-center justify-center rounded-xl bg-white text-[15px] font-semibold text-[#17181A] ring-1 ring-black/[0.08] transition active:scale-[0.98] disabled:text-[#C4C7CD]"
                   disabled={busy || transferAmount < 100 || transferAmount > data.deposit}
                   onClick={() =>
                     applyMutation(
@@ -641,7 +641,7 @@ export default function BankApp() {
             ) : (
               <button
                 type="button"
-                className="flex h-12 w-full items-center justify-center rounded-xl bg-[#0E7A3D] text-[15px] font-semibold text-white transition active:scale-[0.98] disabled:bg-black/[0.06] disabled:text-[#9CA3AF]"
+                className="flex h-12 w-full items-center justify-center rounded-xl bg-[#0E7A3D] text-[15px] font-semibold text-white transition active:scale-[0.98] disabled:bg-neutral-200/60 disabled:text-gray-400"
                 disabled={busy || transferAmount <= 0 || data.debt <= 0 || data.balance <= 0}
                 onClick={() =>
                   applyMutation(
@@ -717,7 +717,7 @@ export default function BankApp() {
                           decoding="async"
                           src={session.photoUrl}
                           alt={holderName}
-                          className="size-12 shrink-0 rounded-full object-cover ring-2 ring-[#22C55E]/50"
+                          className="size-12 shrink-0 rounded-full object-cover ring-2 ring-[#21A038]/50"
                         />
                       ) : (
                         <span
@@ -884,8 +884,8 @@ export default function BankApp() {
                 {/* ===== ПЛАТЕЖИ ===== */}
                 {screen === 'payments' && (
                   <div className="p-4 pt-5">
-                    <h1 className="text-[26px] font-bold tracking-tight text-[#141414]">Платежи</h1>
-                    <p className="mt-0.5 text-[13px] text-[#9CA3AF]">Услуги, переводы и быстрый доступ</p>
+                    <h1 className="text-[26px] font-bold tracking-tight text-[#17181A]">Платежи</h1>
+                    <p className="mt-0.5 text-[13px] text-gray-400">Услуги, переводы и быстрый доступ</p>
                     <div className="mt-4 grid grid-cols-2 gap-3">
                       {services.map((s) => (
                         <ServiceTile
@@ -899,7 +899,7 @@ export default function BankApp() {
                         />
                       ))}
                     </div>
-                    <div className={`${CARD_CLS} mt-4 p-4 text-[11px] leading-relaxed text-[#9CA3AF]`}>
+                    <div className={`${CARD_CLS} mt-4 p-4 text-[11px] leading-relaxed text-gray-400`}>
                       Переводы людям проходят из чата сделки: напишите продавцу и оплатите счёт, операция появится в истории банка.
                     </div>
                   </div>
@@ -909,14 +909,14 @@ export default function BankApp() {
                 {screen === 'history' && (
                   <div className="p-4 pt-5">
                     <div className="flex items-center justify-between gap-2">
-                      <h1 className="text-[26px] font-bold tracking-tight text-[#141414]">История</h1>
+                      <h1 className="text-[26px] font-bold tracking-tight text-[#17181A]">История</h1>
                       <div className="flex items-center gap-2">
                         {data.transactions.length > 0 && (
                           <a
                             href={exportCsvUrl()}
                             download
                             aria-label="Скачать историю операций в CSV"
-                            className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-[#0E7A3D]/10 px-3 text-[11px] font-semibold text-[#0E7A3D] outline-none transition-colors hover:bg-[#0E7A3D]/20 focus-visible:ring-2 focus-visible:ring-[#0E7A3D]/40"
+                            className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-[#0E7A3D]/10 px-3 text-[11px] font-semibold text-[#0E7A2B] outline-none transition-colors hover:bg-[#0E7A3D]/20 focus-visible:ring-2 focus-visible:ring-[#21A038]/40"
                           >
                             <FileDown className="size-3.5" aria-hidden="true" />
                             CSV
@@ -930,7 +930,7 @@ export default function BankApp() {
                           }}
                           aria-label="Поиск по операциям"
                           aria-expanded={histSearch}
-                          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#FFFFFF] text-[#6B7280] ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition active:scale-95"
+                          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-gray-500 ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition active:scale-95"
                         >
                           {histSearch ? <X className="size-4.5" aria-hidden="true" /> : <Search className="size-4.5" aria-hidden="true" />}
                         </button>
@@ -943,7 +943,7 @@ export default function BankApp() {
                         onChange={(e) => setHistQ(e.target.value)}
                         placeholder="Найти операцию"
                         aria-label="Поиск по операциям"
-                        className="mt-3 h-11 w-full rounded-full bg-[#FFFFFF] px-4 text-sm text-[#141414] ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)] outline-none transition placeholder:text-[#9CA3AF] focus:ring-[#0E7A3D]/40"
+                        className="mt-3 h-11 w-full rounded-full bg-white px-4 text-sm text-[#17181A] ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)] outline-none transition placeholder:text-gray-400 focus:ring-[#21A038]/40"
                       />
                     )}
 
@@ -955,18 +955,18 @@ export default function BankApp() {
 
                     {data.transactions.length === 0 ? (
                       <div className={`${CARD_CLS} mt-4 p-6 text-center`}>
-                        <p className="text-sm text-[#9CA3AF]">Здесь появятся все ваши покупки, продажи и операции с банком.</p>
+                        <p className="text-sm text-gray-400">Здесь появятся все ваши покупки, продажи и операции с банком.</p>
                       </div>
                     ) : historyGroups.length === 0 ? (
                       <div className={`${CARD_CLS} mt-4 p-6 text-center`}>
-                        <p className="text-sm text-[#9CA3AF]">Ничего не найдено. Измените фильтр или запрос.</p>
+                        <p className="text-sm text-gray-400">Ничего не найдено. Измените фильтр или запрос.</p>
                       </div>
                     ) : (
                       <div className="mt-4 space-y-4">
                         {historyGroups.map((g) => (
                           <div key={g.label}>
                             <div className={`${CAPS} px-1 pb-2`} suppressHydrationWarning>{g.label}</div>
-                            <div className={`${CARD_CLS} divide-y divide-[#F0F1F5] px-4 py-1`}>
+                            <div className={`${CARD_CLS} divide-y divide-[#EBEDF0] px-4 py-1`}>
                               {mergeTxs(g.items).map((m) => (
                                 <TxRow key={m.tx.id} m={m} />
                               ))}
@@ -981,7 +981,7 @@ export default function BankApp() {
                 {/* ===== АНАЛИТИКА ===== */}
                 {screen === 'analytics' && (
                   <div className="p-4 pt-5">
-                    <h1 className="text-[26px] font-bold tracking-tight text-[#141414]">Аналитика</h1>
+                    <h1 className="text-[26px] font-bold tracking-tight text-[#17181A]">Аналитика</h1>
 
                     <div className="mt-3">
                       <Segment<'out' | 'in'>
@@ -997,14 +997,14 @@ export default function BankApp() {
 
                     {monthKeys.length > 0 && (
                       <div className="mt-4 flex items-center justify-between">
-                        <span className="text-[15px] font-bold text-[#141414]" suppressHydrationWarning>{monthLabel}</span>
+                        <span className="text-[15px] font-bold text-[#17181A]" suppressHydrationWarning>{monthLabel}</span>
                         <div className="flex items-center gap-1.5">
                           <button
                             type="button"
                             onClick={() => setMonthIdx(activeIdx + 1)}
                             disabled={activeIdx >= monthKeys.length - 1}
                             aria-label="Предыдущий месяц"
-                            className="flex size-9 items-center justify-center rounded-full bg-[#FFFFFF] text-[#6B7280] ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition active:scale-95 disabled:opacity-40"
+                            className="flex size-9 items-center justify-center rounded-full bg-white text-gray-500 ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition active:scale-95 disabled:opacity-40"
                           >
                             <ChevronLeft className="size-4.5" aria-hidden="true" />
                           </button>
@@ -1013,7 +1013,7 @@ export default function BankApp() {
                             onClick={() => setMonthIdx(Math.max(0, activeIdx - 1))}
                             disabled={activeIdx <= 0}
                             aria-label="Следующий месяц"
-                            className="flex size-9 items-center justify-center rounded-full bg-[#FFFFFF] text-[#6B7280] ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition active:scale-95 disabled:opacity-40"
+                            className="flex size-9 items-center justify-center rounded-full bg-white text-gray-500 ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition active:scale-95 disabled:opacity-40"
                           >
                             <ChevronRight className="size-4.5" aria-hidden="true" />
                           </button>
@@ -1024,10 +1024,10 @@ export default function BankApp() {
                     {catsTotal <= 0 ? (
                       <div className={`${CARD_CLS} mt-4 flex flex-col items-center p-8 text-center`}>
                         <Info className="size-6 text-[#C4C7CD]" aria-hidden="true" />
-                        <p className="mt-2 text-sm font-medium text-[#141414]">
+                        <p className="mt-2 text-sm font-medium text-[#17181A]">
                           {monthKeys.length === 0 ? 'Операций пока нет' : 'В выбранном месяце таких операций нет'}
                         </p>
-                        <p className="mt-1 text-xs text-[#9CA3AF]">
+                        <p className="mt-1 text-xs text-gray-400">
                           {monthKeys.length === 0
                             ? 'Совершите покупки или продажи, и аналитика появится здесь'
                             : 'Выберите другой месяц или переключите режим'}
@@ -1043,7 +1043,7 @@ export default function BankApp() {
                           />
                         </div>
                         <div className={`${CAPS} mt-5 px-1 pb-2`}>Категории</div>
-                        <div className={`${CARD_CLS} divide-y divide-[#F0F1F5] px-4`}>
+                        <div className={`${CARD_CLS} divide-y divide-[#EBEDF0] px-4`}>
                           {cats.map((c) => (
                             <CategoryRow
                               key={c.key}
@@ -1056,7 +1056,7 @@ export default function BankApp() {
                             />
                           ))}
                         </div>
-                        <p className="mt-3 px-1 text-[11px] leading-relaxed text-[#9CA3AF]">
+                        <p className="mt-3 px-1 text-[11px] leading-relaxed text-gray-400">
                           Показаны операции выбранного месяца: {catsOps}{' '}
                           {plural(catsOps, 'операция', 'операции', 'операций')}.
                         </p>
@@ -1077,11 +1077,11 @@ export default function BankApp() {
                           else setScreen(creditReturnRef.current)
                         }}
                         aria-label="Назад"
-                        className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#FFFFFF] text-[#141414] ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition active:scale-95"
+                        className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-[#17181A] ring-1 ring-black/[0.05] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition active:scale-95"
                       >
                         <ArrowLeft className="size-5" aria-hidden="true" />
                       </button>
-                      <h1 className="text-[18px] font-bold tracking-tight text-[#141414]">Кредит</h1>
+                      <h1 className="text-[18px] font-bold tracking-tight text-[#17181A]">Кредит</h1>
                     </div>
 
                     <div className="px-4">
@@ -1090,23 +1090,23 @@ export default function BankApp() {
                         <>
                           <div className={`${loanOverdue ? 'bg-[#FDEEEE]' : CARD_CLS} rounded-[20px] p-5`}>
                             <div className="flex items-center justify-between">
-                              <span className="text-[12px] text-[#9CA3AF]">Остаток долга</span>
+                              <span className="text-[12px] text-gray-400">Остаток долга</span>
                               {activeLoan && (
-                                <span className="rounded-full bg-black/[0.05] px-2.5 py-1 text-[11px] font-semibold text-[#141414]">
+                                <span className="rounded-full bg-neutral-200/60 px-2.5 py-1 text-[11px] font-semibold text-[#17181A]">
                                   {activeLoan.rate}%{activeLoan.principal > 0 ? ` · ${fmtMoney(activeLoan.principal)}` : ''}
                                 </span>
                               )}
                             </div>
-                            <div className={`mt-1 text-[30px] font-extrabold leading-tight tabular-nums ${loanOverdue ? 'text-[#E5584B]' : 'text-[#141414]'}`}>
+                            <div className={`mt-1 text-[30px] font-extrabold leading-tight tabular-nums ${loanOverdue ? 'text-[#E5584B]' : 'text-[#17181A]'}`}>
                               {fmtMoney(data.debt)}
                             </div>
-                            <div className="mt-3 h-2 overflow-hidden rounded-full bg-black/[0.06]" role="progressbar" aria-valuenow={loanPaidPct} aria-valuemin={0} aria-valuemax={100} aria-label="Прогресс погашения">
+                            <div className="mt-3 h-2 overflow-hidden rounded-full bg-neutral-200/60" role="progressbar" aria-valuenow={loanPaidPct} aria-valuemin={0} aria-valuemax={100} aria-label="Прогресс погашения">
                               <div className="h-full rounded-full bg-[#0E7A3D] transition-[width] duration-500" style={{ width: `${loanPaidPct}%` }} />
                             </div>
                             <div className="mt-1.5 flex items-center justify-between text-[11.5px]">
-                              <span className="text-[#9CA3AF]">Погашено {loanPaidPct}%</span>
+                              <span className="text-gray-400">Погашено {loanPaidPct}%</span>
                               {activeLoan && (
-                                <span className={`font-semibold ${loanOverdue ? 'text-[#E5584B]' : 'text-[#0A5C2E]'}`} suppressHydrationWarning>
+                                <span className={`font-semibold ${loanOverdue ? 'text-[#E5584B]' : 'text-[#0E7A2B]'}`} suppressHydrationWarning>
                                   {loanOverdue
                                     ? `Просрочен на ${Math.abs(loanDaysLeft)} ${plural(Math.abs(loanDaysLeft), 'день', 'дня', 'дней')}`
                                     : `Платёж до ${fmtDayMonth(new Date(activeLoan.dueAt))} · осталось ${loanDaysLeft} ${plural(loanDaysLeft, 'день', 'дня', 'дней')}`}
@@ -1126,10 +1126,10 @@ export default function BankApp() {
 
                           {/* платёж */}
                           <div className={`${CARD_CLS} mt-4 p-4`}>
-                            <div className="text-[15px] font-semibold text-[#141414]">Внести платёж</div>
+                            <div className="text-[15px] font-semibold text-[#17181A]">Внести платёж</div>
                             <div className="mt-2 flex items-baseline justify-between">
-                              <div className="text-[24px] font-extrabold tabular-nums text-[#141414]">{fmtMoney(Math.min(repayAmount, data.debt))}</div>
-                              <div className="text-[11px] text-[#9CA3AF]">Доступно: {fmtMoney(data.balance)}</div>
+                              <div className="text-[24px] font-extrabold tabular-nums text-[#17181A]">{fmtMoney(Math.min(repayAmount, data.debt))}</div>
+                              <div className="text-[11px] text-gray-400">Доступно: {fmtMoney(data.balance)}</div>
                             </div>
                             <div className="mt-1 flex gap-2" role="group" aria-label="Быстрый выбор суммы платежа">
                               {[
@@ -1145,7 +1145,7 @@ export default function BankApp() {
                                   className={`h-9 flex-1 rounded-full text-[12.5px] font-semibold transition active:scale-95 ${
                                     Math.min(repayAmount, data.debt) === Math.min(c.v, data.debt)
                                       ? 'bg-[#0E7A3D] text-white'
-                                      : 'bg-black/[0.05] text-[#141414]'
+                                      : 'bg-neutral-200/60 text-[#17181A]'
                                   }`}
                                 >
                                   {c.label}
@@ -1153,7 +1153,7 @@ export default function BankApp() {
                               ))}
                             </div>
                             <Slider
-                              className="mt-4 [&_[data-slot=slider-range]]:bg-[#0E7A3D] [&_[data-slot=slider-thumb]]:border-[#0E7A3D] [&_[data-slot=slider-thumb]]:bg-[#FFFFFF] [&_[data-slot=slider-track]]:bg-[#ECEFEE]"
+                              className="mt-4 [&_[data-slot=slider-range]]:bg-[#0E7A3D] [&_[data-slot=slider-thumb]]:border-[#16A34A] [&_[data-slot=slider-thumb]]:bg-white [&_[data-slot=slider-track]]:bg-[#ECEFEE]"
                               value={[Math.min(Math.max(repayAmount, 0), data.debt)]}
                               min={0}
                               max={Math.max(100, Math.round(data.debt))}
@@ -1161,14 +1161,14 @@ export default function BankApp() {
                               onValueChange={(v) => setRepayAmount(v[0] ?? 0)}
                               aria-label="Сумма платежа"
                             />
-                            <div className="mt-1.5 flex justify-between text-[11px] text-[#9CA3AF]">
+                            <div className="mt-1.5 flex justify-between text-[11px] text-gray-400">
                               <span>После платежа: {fmtMoney(Math.max(0, data.debt - Math.min(repayAmount, data.debt)))}</span>
                               <span>Досрочно, без комиссий</span>
                             </div>
                             {formError && <p className="mt-2 text-[13px] text-[#E5584B]">{formError}</p>}
                             <button
                               type="button"
-                              className="mt-3 flex h-12 w-full items-center justify-center rounded-xl bg-[#0E7A3D] text-[15px] font-semibold text-white transition active:scale-[0.98] disabled:bg-black/[0.06] disabled:text-[#9CA3AF]"
+                              className="mt-3 flex h-12 w-full items-center justify-center rounded-xl bg-[#0E7A3D] text-[15px] font-semibold text-white transition active:scale-[0.98] disabled:bg-neutral-200/60 disabled:text-gray-400"
                               disabled={busy || repayAmount <= 0 || data.balance <= 0}
                               onClick={() => applyMutation(() => api.repayLoan(Math.min(repayAmount, data.debt)))}
                             >
@@ -1178,43 +1178,43 @@ export default function BankApp() {
 
                           {/* график платежей */}
                           <div className={`${CARD_CLS} mt-4 px-4 py-1`}>
-                            <div className="pt-3 text-[15px] font-semibold text-[#141414]">График платежей</div>
+                            <div className="pt-3 text-[15px] font-semibold text-[#17181A]">График платежей</div>
                             <div className="flex items-center gap-3 border-b border-[#F0F1F5] py-3">
-                              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#0E7A3D]/10 text-[#0E7A3D]" aria-hidden="true">
+                              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#0E7A3D]/10 text-[#0E7A2B]" aria-hidden="true">
                                 <CalendarDays className="size-5" strokeWidth={2.1} />
                               </span>
                               <div className="min-w-0 flex-1">
-                                <div className="truncate text-[14px] font-medium text-[#141414]">Платёж по кредиту</div>
+                                <div className="truncate text-[14px] font-medium text-[#17181A]">Платёж по кредиту</div>
                                 {activeLoan && (
-                                  <div className="text-[11.5px] text-[#9CA3AF]" suppressHydrationWarning>
+                                  <div className="text-[11.5px] text-gray-400" suppressHydrationWarning>
                                     до {fmtDayMonth(new Date(activeLoan.dueAt))}
                                   </div>
                                 )}
                               </div>
                               <div className="shrink-0 text-right">
-                                <div className="text-[14px] font-bold tabular-nums text-[#141414]">{fmtMoney(data.debt)}</div>
+                                <div className="text-[14px] font-bold tabular-nums text-[#17181A]">{fmtMoney(data.debt)}</div>
                                 <LoanStatusChip status={loanOverdue ? 'overdue' : 'active'} />
                               </div>
                             </div>
-                            <div className="py-2.5 text-[11px] leading-relaxed text-[#9CA3AF]">
+                            <div className="py-2.5 text-[11px] leading-relaxed text-gray-400">
                               Кредит возвращается одним платежом в конце срока. Частичные досрочные платежи уменьшают остаток.
                             </div>
                           </div>
 
                           {/* выплачено */}
                           <div className={`${CARD_CLS} mt-4 px-4 py-1`}>
-                            <div className="pt-3 text-[15px] font-semibold text-[#141414]">Выплачено</div>
+                            <div className="pt-3 text-[15px] font-semibold text-[#17181A]">Выплачено</div>
                             {repayTxs.length === 0 ? (
-                              <div className="py-3 text-[12.5px] text-[#9CA3AF]">Досрочных платежей ещё не было.</div>
+                              <div className="py-3 text-[12.5px] text-gray-400">Досрочных платежей ещё не было.</div>
                             ) : (
-                              <div className="divide-y divide-[#F0F1F5]">
+                              <div className="divide-y divide-[#EBEDF0]">
                                 {repayTxs.map((t) => (
                                   <div key={t.id} className="flex items-center justify-between gap-3 py-2.5">
                                     <div className="min-w-0">
-                                      <div className="truncate text-[13.5px] font-medium text-[#141414]">Платёж по кредиту</div>
-                                      <div className="text-[11px] text-[#9CA3AF]">{t.createdAt ? fmtDayMonth(new Date(t.createdAt)) : ''}</div>
+                                      <div className="truncate text-[13.5px] font-medium text-[#17181A]">Платёж по кредиту</div>
+                                      <div className="text-[11px] text-gray-400">{t.createdAt ? fmtDayMonth(new Date(t.createdAt)) : ''}</div>
                                     </div>
-                                    <div className="shrink-0 text-[13.5px] font-bold tabular-nums text-[#0E7A3D]">{fmtMoney(-t.amount)}</div>
+                                    <div className="shrink-0 text-[13.5px] font-bold tabular-nums text-[#0E7A2B]">{fmtMoney(-t.amount)}</div>
                                   </div>
                                 ))}
                               </div>
@@ -1224,8 +1224,8 @@ export default function BankApp() {
                           {/* условия кредита */}
                           {activeLoan && (
                             <div className={`${CARD_CLS} mt-4 px-4 py-1`}>
-                              <div className="pt-3 text-[15px] font-semibold text-[#141414]">Условия кредита</div>
-                              <div className="divide-y divide-[#F0F1F5] pb-1">
+                              <div className="pt-3 text-[15px] font-semibold text-[#17181A]">Условия кредита</div>
+                              <div className="divide-y divide-[#EBEDF0] pb-1">
                                 <InfoRow k="Выдано" v={fmtMoney(activeLoan.principal)} />
                                 <InfoRow k="Ставка" v={`${activeLoan.rate}%`} />
                                 <InfoRow k="Всего к возврату" v={fmtMoney(loanInitialOwed)} />
@@ -1243,13 +1243,13 @@ export default function BankApp() {
                             <span className="flex size-16 items-center justify-center rounded-full bg-[#0E7A3D] shadow-[0_10px_28px_rgba(14,122,61,0.35)]" aria-hidden="true">
                               <BadgeCheck className="size-8 text-white" strokeWidth={2.2} />
                             </span>
-                            <h2 className="mt-4 text-[22px] font-extrabold tracking-tight text-[#141414]">Кредит выдан</h2>
-                            <p className="mt-1 text-[13px] text-[#9CA3AF]">
+                            <h2 className="mt-4 text-[22px] font-extrabold tracking-tight text-[#17181A]">Кредит выдан</h2>
+                            <p className="mt-1 text-[13px] text-gray-400">
                               {fmtMoney(issued.amount)} зачислены на дебетовую карту
                             </p>
                           </div>
                           <div className={`${CARD_CLS} mt-5 px-4 py-1`}>
-                            <div className="divide-y divide-[#F0F1F5]">
+                            <div className="divide-y divide-[#EBEDF0]">
                               <InfoRow k="Договор" v={issued.contractNo} />
                               <InfoRow k="Сумма" v={fmtMoney(issued.amount)} />
                               <InfoRow k="Ставка" v={`${issued.rate}% · ${issued.days} ${plural(issued.days, 'день', 'дня', 'дней')}`} />
@@ -1257,7 +1257,7 @@ export default function BankApp() {
                               <InfoRow k="Дата платежа" v={fmtDayMonth(new Date(issued.dueAt))} />
                             </div>
                           </div>
-                          <p className="mt-3 text-center text-[11px] leading-relaxed text-[#9CA3AF]">
+                          <p className="mt-3 text-center text-[11px] leading-relaxed text-gray-400">
                             Вернёте вовремя: рейтинг +40, лимит и ставка станут лучше.
                           </p>
                           <button
@@ -1274,10 +1274,10 @@ export default function BankApp() {
                           <div className="px-1 pt-1" aria-hidden="true">
                             <div className="flex items-center gap-1.5">
                               {[0, 1, 2, 3].map((i) => (
-                                <span key={i} className={`h-1.5 flex-1 rounded-full transition-colors ${i <= cwStep ? 'bg-[#0E7A3D]' : 'bg-black/[0.08]'}`} />
+                                <span key={i} className={`h-1.5 flex-1 rounded-full transition-colors ${i <= cwStep ? 'bg-[#0E7A3D]' : 'bg-neutral-200/70'}`} />
                               ))}
                             </div>
-                            <div className="mt-1.5 text-[11px] text-[#9CA3AF]">
+                            <div className="mt-1.5 text-[11px] text-gray-400">
                               Шаг {cwStep + 1} из 4 · {CREDIT_STEP_LABELS[cwStep]}
                             </div>
                           </div>
@@ -1307,10 +1307,10 @@ export default function BankApp() {
                                 <>
                                   {/* калькулятор */}
                                   <div className={`${CARD_CLS} mt-4 p-4`}>
-                                    <div className="text-[15px] font-semibold text-[#141414]">Сколько нужно?</div>
-                                    <div className="mt-1 text-[28px] font-extrabold leading-tight tabular-nums text-[#141414]">{fmtMoney(loanAmount)}</div>
+                                    <div className="text-[15px] font-semibold text-[#17181A]">Сколько нужно?</div>
+                                    <div className="mt-1 text-[28px] font-extrabold leading-tight tabular-nums text-[#17181A]">{fmtMoney(loanAmount)}</div>
                                     <Slider
-                                      className="mt-3 [&_[data-slot=slider-range]]:bg-[#0E7A3D] [&_[data-slot=slider-thumb]]:border-[#0E7A3D] [&_[data-slot=slider-thumb]]:bg-[#FFFFFF] [&_[data-slot=slider-track]]:bg-[#ECEFEE]"
+                                      className="mt-3 [&_[data-slot=slider-range]]:bg-[#0E7A3D] [&_[data-slot=slider-thumb]]:border-[#16A34A] [&_[data-slot=slider-thumb]]:bg-white [&_[data-slot=slider-track]]:bg-[#ECEFEE]"
                                       value={[Math.min(Math.max(loanAmount, 1000), Math.max(1000, data.loanLimit))]}
                                       min={1000}
                                       max={Math.max(1000, data.loanLimit)}
@@ -1326,7 +1326,7 @@ export default function BankApp() {
                                           aria-pressed={loanAmount === v}
                                           onClick={() => setLoanAmount(Math.min(v, data.loanLimit))}
                                           className={`h-9 flex-1 rounded-full text-[12px] font-semibold tabular-nums transition active:scale-95 ${
-                                            loanAmount === v ? 'bg-[#0E7A3D] text-white' : 'bg-black/[0.05] text-[#141414]'
+                                            loanAmount === v ? 'bg-[#0E7A3D] text-white' : 'bg-neutral-200/60 text-[#17181A]'
                                           }`}
                                         >
                                           {fmtMoney(v)}
@@ -1337,14 +1337,14 @@ export default function BankApp() {
                                         aria-pressed={loanAmount >= data.loanLimit}
                                         onClick={() => setLoanAmount(Math.max(1000, data.loanLimit))}
                                         className={`h-9 flex-1 rounded-full text-[12px] font-semibold transition active:scale-95 ${
-                                          loanAmount >= data.loanLimit ? 'bg-[#0E7A3D] text-white' : 'bg-black/[0.05] text-[#141414]'
+                                          loanAmount >= data.loanLimit ? 'bg-[#0E7A3D] text-white' : 'bg-neutral-200/60 text-[#17181A]'
                                         }`}
                                       >
                                         Максимум
                                       </button>
                                     </div>
 
-                                    <div className="mt-5 text-[15px] font-semibold text-[#141414]">На какой срок?</div>
+                                    <div className="mt-5 text-[15px] font-semibold text-[#17181A]">На какой срок?</div>
                                     <div className="mt-2 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Срок кредита">
                                       {LOAN_TERM_OPTIONS.map((t) => {
                                         const active = loanDays === t.days
@@ -1356,11 +1356,11 @@ export default function BankApp() {
                                             aria-checked={active}
                                             onClick={() => setLoanDays(t.days)}
                                             className={`rounded-2xl border p-2.5 text-center transition active:scale-[0.97] ${
-                                              active ? 'border-[#0E7A3D] bg-[#E7F5EA]' : 'border-black/[0.08] bg-[#FFFFFF]'
+                                              active ? 'border-[#16A34A] bg-[#E7F5EA]' : 'border-black/[0.08] bg-white'
                                             }`}
                                           >
-                                            <span className={`block text-[13.5px] font-bold ${active ? 'text-[#0A5C2E]' : 'text-[#141414]'}`}>{t.label}</span>
-                                            <span className={`block text-[11px] tabular-nums ${active ? 'text-[#0C6B34]' : 'text-[#9CA3AF]'}`}>
+                                            <span className={`block text-[13.5px] font-bold ${active ? 'text-[#0E7A2B]' : 'text-[#17181A]'}`}>{t.label}</span>
+                                            <span className={`block text-[11px] tabular-nums ${active ? 'text-[#0E7A2B]' : 'text-gray-400'}`}>
                                               {rateForDays(t.days)}%
                                             </span>
                                           </button>
@@ -1369,7 +1369,7 @@ export default function BankApp() {
                                     </div>
 
                                     {/* расчёт */}
-                                    <div className="mt-4 divide-y divide-[#F0F1F5] border-t border-[#F0F1F5] pt-1">
+                                    <div className="mt-4 divide-y divide-[#EBEDF0] border-t border-[#F0F1F5] pt-1">
                                       <InfoRow k="Ставка на срок" v={`${curRate}%`} />
                                       <InfoRow k="Проценты" v={fmtMoney(curOwed - loanAmount)} />
                                       <InfoRow k="К возврату" v={fmtMoney(curOwed)} vCls="text-[#E5584B]" />
@@ -1380,14 +1380,14 @@ export default function BankApp() {
                                   {/* кредитный рейтинг */}
                                   <div className={`${CARD_CLS} mt-4 p-4`}>
                                     <div className="flex items-center justify-between">
-                                      <div className="text-[15px] font-semibold text-[#141414]">Кредитный рейтинг</div>
+                                      <div className="text-[15px] font-semibold text-[#17181A]">Кредитный рейтинг</div>
                                       <span className={`text-xs font-semibold ${credit.cls}`}>{credit.label}</span>
                                     </div>
                                     <div className="mt-2">
                                       <ScoreGauge score={score} />
                                     </div>
-                                    <div className="mt-3 rounded-xl bg-[#F6F7F9] p-3 text-[11.5px] leading-relaxed text-[#9CA3AF]">
-                                      Возвращаете вовремя: <span className="font-semibold text-[#0A5C2E]">+40</span> к рейтингу, ставка ниже.
+                                    <div className="mt-3 rounded-xl bg-[#F5F6F8] p-3 text-[11.5px] leading-relaxed text-gray-400">
+                                      Возвращаете вовремя: <span className="font-semibold text-[#0E7A2B]">+40</span> к рейтингу, ставка ниже.
                                       Просрочка: <span className="font-semibold text-[#E5584B]">−80</span>, лимит срезается.
                                     </div>
                                   </div>
@@ -1399,18 +1399,18 @@ export default function BankApp() {
                                   >
                                     Продолжить
                                   </button>
-                                  <p className="mt-2.5 text-center text-[10.5px] leading-relaxed text-[#9CA3AF]">
+                                  <p className="mt-2.5 text-center text-[10.5px] leading-relaxed text-gray-400">
                                     Расчёт предварительный и не является офертой
                                   </p>
                                 </>
                               ) : (
                                 /* кредит недоступен */
                                 <div className={`${CARD_CLS} mt-4 p-6 text-center`}>
-                                  <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-black/[0.05]" aria-hidden="true">
-                                    <Landmark className="size-6 text-[#9CA3AF]" />
+                                  <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-neutral-200/60" aria-hidden="true">
+                                    <Landmark className="size-6 text-gray-400" />
                                   </span>
-                                  <div className="mt-3 text-[15px] font-semibold text-[#141414]">Кредит пока недоступен</div>
-                                  <p className="mt-1 text-[12.5px] leading-relaxed text-[#9CA3AF]">
+                                  <div className="mt-3 text-[15px] font-semibold text-[#17181A]">Кредит пока недоступен</div>
+                                  <p className="mt-1 text-[12.5px] leading-relaxed text-gray-400">
                                     Ваш лимит: {fmtMoney(data.loanLimit)}. Повышайте уровень и возвращайте кредиты вовремя: лимит растёт с уровнем и рейтингом.
                                   </p>
                                 </div>
@@ -1422,8 +1422,8 @@ export default function BankApp() {
                           {cwStep === 1 && (
                             <>
                               <div className={`${CARD_CLS} mt-3 px-4 py-1`}>
-                                <div className="pt-3 text-[15px] font-semibold text-[#141414]">Данные заёмщика</div>
-                                <div className="divide-y divide-[#F0F1F5] pb-1">
+                                <div className="pt-3 text-[15px] font-semibold text-[#17181A]">Данные заёмщика</div>
+                                <div className="divide-y divide-[#EBEDF0] pb-1">
                                   <InfoRow k="ФИО" v={holderName} />
                                   <InfoRow k="Паспорт РФ" v={passportMask} />
                                   <InfoRow k="Телефон" v={phoneMask} />
@@ -1432,7 +1432,7 @@ export default function BankApp() {
                                 </div>
                               </div>
                               <div className={`${CARD_CLS} mt-4 p-4`}>
-                                <div className="text-[15px] font-semibold text-[#141414]">Цель кредита</div>
+                                <div className="text-[15px] font-semibold text-[#17181A]">Цель кредита</div>
                                 <div className="mt-2 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Цель кредита">
                                   {LOAN_PURPOSES.map((p) => {
                                     const active = loanPurpose === p
@@ -1444,7 +1444,7 @@ export default function BankApp() {
                                         aria-checked={active}
                                         onClick={() => setLoanPurpose(p)}
                                         className={`h-11 rounded-full text-[13px] font-semibold transition active:scale-[0.97] ${
-                                          active ? 'bg-[#0E7A3D] text-white' : 'bg-black/[0.05] text-[#141414]'
+                                          active ? 'bg-[#0E7A3D] text-white' : 'bg-neutral-200/60 text-[#17181A]'
                                         }`}
                                       >
                                         {p}
@@ -1453,7 +1453,7 @@ export default function BankApp() {
                                   })}
                                 </div>
                               </div>
-                              <p className="mt-3 px-1 text-[11px] leading-relaxed text-[#9CA3AF]">
+                              <p className="mt-3 px-1 text-[11px] leading-relaxed text-gray-400">
                                 Данные подтверждаются автоматически. Банк может запросить уточнения перед выдачей.
                               </p>
                               <button
@@ -1471,17 +1471,17 @@ export default function BankApp() {
                             <>
                               <div className={`${CARD_CLS} mt-3 p-4`}>
                                 <div className="flex items-center gap-3">
-                                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#0E7A3D]/10 text-[#0E7A3D]" aria-hidden="true">
+                                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#0E7A3D]/10 text-[#0E7A2B]" aria-hidden="true">
                                     <FileText className="size-5" strokeWidth={2.1} />
                                   </span>
                                   <div className="min-w-0">
-                                    <div className="truncate text-[14.5px] font-bold text-[#141414]">Договор кредитования</div>
-                                    <div className="text-[11.5px] tabular-nums text-[#9CA3AF]" suppressHydrationWarning>
+                                    <div className="truncate text-[14.5px] font-bold text-[#17181A]">Договор кредитования</div>
+                                    <div className="text-[11.5px] tabular-nums text-gray-400" suppressHydrationWarning>
                                       № {contractNo} · от {fmtDayMonth(new Date())}
                                     </div>
                                   </div>
                                 </div>
-                                <div className="mt-2 divide-y divide-[#F0F1F5]">
+                                <div className="mt-2 divide-y divide-[#EBEDF0]">
                                   <InfoRow k="Кредитор" v="Столичный Банк" />
                                   <InfoRow k="Заёмщик" v={holderName} />
                                   <InfoRow k="Сумма кредита" v={fmtMoney(loanAmount)} />
@@ -1494,15 +1494,15 @@ export default function BankApp() {
                               </div>
 
                               <div className={`${CARD_CLS} mt-4 p-4`}>
-                                <div className="text-[13px] font-semibold text-[#141414]">Условия договора</div>
-                                <div className="mt-2 space-y-1.5 text-[11.5px] leading-relaxed text-[#6B7280]">
+                                <div className="text-[13px] font-semibold text-[#17181A]">Условия договора</div>
+                                <div className="mt-2 space-y-1.5 text-[11.5px] leading-relaxed text-gray-500">
                                   <p>1. Банк выдаёт кредит {fmtMoney(loanAmount)} на дебетовую карту заёмщика единовременно.</p>
                                   <p>2. Проценты: {curRate}% за весь срок, начисляются единовременно при выдаче. К возврату {fmtMoney(curOwed)}.</p>
                                   <p>3. Допускается частичное досрочное погашение без комиссий и штрафов.</p>
                                   <p>4. Своевременное погашение повышает кредитный рейтинг на 40 пунктов.</p>
                                   <p>5. При просрочке рейтинг снижается на 80 пунктов; при долге свыше {fmtMoney(DEBT_BLOCK_LIMIT)} покупки ограничиваются.</p>
                                 </div>
-                                <label className="mt-3 flex cursor-pointer items-center gap-3 rounded-xl bg-[#F6F7F9] p-3">
+                                <label className="mt-3 flex cursor-pointer items-center gap-3 rounded-xl bg-[#F5F6F8] p-3">
                                   <input
                                     type="checkbox"
                                     checked={agree}
@@ -1513,12 +1513,12 @@ export default function BankApp() {
                                   <span
                                     aria-hidden="true"
                                     className={`flex size-5.5 shrink-0 items-center justify-center rounded-md border-2 transition ${
-                                      agree ? 'border-[#0E7A3D] bg-[#0E7A3D]' : 'border-black/[0.14] bg-[#FFFFFF]'
+                                      agree ? 'border-[#16A34A] bg-[#0E7A3D]' : 'border-black/[0.14] bg-white'
                                     }`}
                                   >
                                     {agree && <Check className="size-3.5 text-white" strokeWidth={3.5} />}
                                   </span>
-                                  <span className="text-[12.5px] font-medium leading-snug text-[#141414]">
+                                  <span className="text-[12.5px] font-medium leading-snug text-[#17181A]">
                                     Ознакомлен(а) и согласен(на) с условиями договора
                                   </span>
                                 </label>
@@ -1527,7 +1527,7 @@ export default function BankApp() {
                               <button
                                 type="button"
                                 disabled={!agree}
-                                className="mt-4 flex h-12 w-full items-center justify-center rounded-xl bg-[#0E7A3D] text-[15px] font-semibold text-white transition active:scale-[0.98] disabled:bg-black/[0.06] disabled:text-[#9CA3AF]"
+                                className="mt-4 flex h-12 w-full items-center justify-center rounded-xl bg-[#0E7A3D] text-[15px] font-semibold text-white transition active:scale-[0.98] disabled:bg-neutral-200/60 disabled:text-gray-400"
                                 onClick={() => {
                                   setSignCode('')
                                   setSignError(null)
@@ -1545,28 +1545,28 @@ export default function BankApp() {
                             <>
                               <div className={`${CARD_CLS} mt-3 p-4`}>
                                 <div className="flex items-center gap-3">
-                                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#0E7A3D]/10 text-[#0E7A3D]" aria-hidden="true">
+                                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#0E7A3D]/10 text-[#0E7A2B]" aria-hidden="true">
                                     <PenLine className="size-5" strokeWidth={2.1} />
                                   </span>
                                   <div>
-                                    <div className="text-[14.5px] font-bold text-[#141414]">Подписание договора</div>
-                                    <div className="text-[11.5px] text-[#9CA3AF]">№ {contractNo}</div>
+                                    <div className="text-[14.5px] font-bold text-[#17181A]">Подписание договора</div>
+                                    <div className="text-[11.5px] text-gray-400">№ {contractNo}</div>
                                   </div>
                                 </div>
-                                <p className="mt-3 text-[12.5px] leading-relaxed text-[#9CA3AF]">
+                                <p className="mt-3 text-[12.5px] leading-relaxed text-gray-400">
                                   Мы отправили код подтверждения в уведомления. Введите его, чтобы подписать договор.
                                 </p>
                                 {/* макет пуш-уведомления (код дублируется системным тостом) */}
-                                <div className="mt-3 rounded-2xl border border-black/[0.06] bg-[#FFFFFF] p-3 shadow-[0_2px_10px_rgba(0,0,0,0.05)]">
+                                <div className="mt-3 rounded-2xl border border-black/[0.06] bg-white p-3 shadow-[0_2px_10px_rgba(0,0,0,0.05)]">
                                   <div className="flex items-center gap-2.5">
                                     <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-[#0E7A3D]" aria-hidden="true">
                                       <Landmark className="size-4.5 text-white" />
                                     </span>
                                     <div className="min-w-0 flex-1">
                                       <div className="flex items-center justify-between gap-2">
-                                        <span className="text-[11px] font-semibold uppercase tracking-wide text-[#9CA3AF]">Банк · сейчас</span>
+                                        <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Банк · сейчас</span>
                                       </div>
-                                      <div className="truncate text-[13px] font-semibold text-[#141414]">
+                                      <div className="truncate text-[13px] font-semibold text-[#17181A]">
                                         Код подписания: {sentCode ?? '····'}
                                       </div>
                                     </div>
@@ -1581,12 +1581,12 @@ export default function BankApp() {
                                   maxLength={4}
                                   placeholder="····"
                                   aria-label="Код подписания из уведомления"
-                                  className="mt-4 h-14 w-full rounded-xl border border-black/[0.08] bg-[#F6F7F9] text-center text-[22px] font-bold tracking-[0.45em] text-[#141414] outline-none transition placeholder:tracking-[0.45em] placeholder:text-[#C4C7CD] focus:border-[#0E7A3D]/60"
+                                  className="mt-4 h-14 w-full rounded-xl border border-black/[0.08] bg-[#F5F6F8] text-center text-[22px] font-bold tracking-[0.45em] text-[#17181A] outline-none transition placeholder:tracking-[0.45em] placeholder:text-[#C4C7CD] focus:border-[#16A34A]/60"
                                 />
                                 <button
                                   type="button"
                                   onClick={sendSignCode}
-                                  className="mx-auto mt-2.5 block text-[12.5px] font-semibold text-[#0E7A3D] transition active:opacity-70"
+                                  className="mx-auto mt-2.5 block text-[12.5px] font-semibold text-[#0E7A2B] transition active:opacity-70"
                                 >
                                   Отправить код повторно
                                 </button>
@@ -1595,7 +1595,7 @@ export default function BankApp() {
                               <button
                                 type="button"
                                 disabled={signing || signCode.length < 4}
-                                className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#0E7A3D] text-[15px] font-semibold text-white transition active:scale-[0.98] disabled:bg-black/[0.06] disabled:text-[#9CA3AF]"
+                                className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#0E7A3D] text-[15px] font-semibold text-white transition active:scale-[0.98] disabled:bg-neutral-200/60 disabled:text-gray-400"
                                 onClick={confirmSign}
                               >
                                 {signing ? (
@@ -1624,15 +1624,15 @@ export default function BankApp() {
           {/* ===== НИЖНИЙ ТАБ-БАР (на тёмном главном — тёмный) ===== */}
           <nav
             className={`relative z-10 shrink-0 border-t ${
-              darkMain ? 'border-white/[0.06] bg-[#0C1911]/95 backdrop-blur-xl' : 'border-black/[0.05] bg-[#FFFFFF]'
+              darkMain ? 'border-white/[0.06] bg-[#0C1911]/95 backdrop-blur-xl' : 'border-black/[0.05] bg-white'
             }`}
             aria-label="Навигация банка"
           >
             <div className="grid grid-cols-4 pb-[max(8px,env(safe-area-inset-bottom))] pt-1.5">
               {tabs.map((t) => {
                 const active = tabActive(t.key)
-                const activeCls = darkMain ? 'text-[#4ADE80]' : 'text-[#0E7A3D]'
-                const idleCls = darkMain ? 'text-white/40' : 'text-[#9CA3AF]'
+                const activeCls = darkMain ? 'text-[#4ADE80]' : 'text-[#0E7A2B]'
+                const idleCls = darkMain ? 'text-white/40' : 'text-gray-400'
                 return (
                   <button
                     key={t.key}
@@ -1642,7 +1642,7 @@ export default function BankApp() {
                     className="flex min-h-[52px] flex-col items-center justify-center gap-1 transition"
                   >
                     <t.icon className={`size-[22px] ${active ? activeCls : idleCls}`} strokeWidth={active ? 2.3 : 2} aria-hidden="true" />
-                    <span className={`text-[10px] ${active ? `font-semibold ${darkMain ? 'text-white' : 'text-[#0E7A3D]'}` : idleCls}`}>{t.label}</span>
+                    <span className={`text-[10px] ${active ? `font-semibold ${darkMain ? 'text-white' : 'text-[#0E7A2B]'}` : idleCls}`}>{t.label}</span>
                   </button>
                 )
               })}
@@ -1680,7 +1680,7 @@ export default function BankApp() {
               onClick={() => { setSheet(null); openTransfer('deposit') }}
             />
           </div>
-          <p className="mt-4 text-[11px] leading-relaxed text-[#9CA3AF]">
+          <p className="mt-4 text-[11px] leading-relaxed text-gray-400">
             Наведите камеру на QR-код продавца, или выберите операцию выше. Переводы людям доступны из чата сделки.
           </p>
         </Sheet>

@@ -6,6 +6,7 @@ import { getSessionUser, unauthorized } from '@/lib/session'
 import { rateLimit } from '@/lib/ratelimit'
 import { buildPhoneMarket, daySeed } from '@/lib/phone-market'
 import { serializePhone } from '@/lib/phone-server'
+import type { PhoneNumber } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,9 +48,15 @@ export async function POST(req: Request) {
 
   const mineCount = await db.phoneNumber.count({ where: { userId: me.id, status: 'active' } })
 
+  // 59-a: атомарное списание (balance >= price) + честные 402/409 вместо 500 при гонке
+  let phone: PhoneNumber
   try {
-    const phone = await db.$transaction(async (tx) => {
-      await tx.user.update({ where: { id: me.id }, data: { balance: { decrement: item.price } } })
+    phone = await db.$transaction(async (tx) => {
+      const dec = await tx.user.updateMany({
+        where: { id: me.id, balance: { gte: item.price } },
+        data: { balance: { decrement: item.price } },
+      })
+      if (dec.count === 0) throw new PhoneBuyError('Недостаточно средств')
       await tx.transaction.create({
         data: {
           userId: me.id,
@@ -73,9 +80,15 @@ export async function POST(req: Request) {
         },
       })
     })
-
-    return Response.json({ phone: serializePhone(phone), balance: me.balance - item.price })
-  } catch {
+  } catch (err) {
+    if (err instanceof PhoneBuyError) {
+      return Response.json({ error: err.message, need: item.price }, { status: 402 })
+    }
     return Response.json({ error: 'Номер уже занят' }, { status: 409 })
   }
+
+  const fresh = await db.user.findUnique({ where: { id: me.id }, select: { balance: true } })
+  return Response.json({ phone: serializePhone(phone), balance: fresh?.balance ?? me.balance - item.price })
 }
+
+class PhoneBuyError extends Error {}

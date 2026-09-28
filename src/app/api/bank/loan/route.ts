@@ -18,10 +18,12 @@ export async function POST(req: Request) {
     if (user.debt <= 0) return Response.json({ error: 'Долгов нет' }, { status: 400 })
     const pay = Math.min(amount, user.debt, user.balance)
     if (pay <= 0) return Response.json({ error: 'Недостаточно средств' }, { status: 400 })
-    await db.user.update({
-      where: { id: user.id },
+    // 59-a: атомарное списание: параллельные операции не уводят баланс/долг в минус
+    const dec = await db.user.updateMany({
+      where: { id: user.id, balance: { gte: pay }, debt: { gte: pay } },
       data: { balance: { decrement: pay }, debt: { decrement: pay } },
     })
+    if (dec.count === 0) return Response.json({ error: 'Недостаточно средств' }, { status: 400 })
     const loan = await db.loan.findFirst({
       where: { userId: user.id, status: { in: ['active', 'overdue'] } },
       orderBy: { takenAt: 'desc' },
@@ -59,10 +61,13 @@ export async function POST(req: Request) {
   const rate = rateForTerm(user.creditScore, days)
   const owed = Math.round(amount * (1 + rate / 100))
   const dueAt = new Date(Date.now() + days * 86_400_000)
-  await db.user.update({
-    where: { id: user.id },
+  // 59-a: атомарный «захват» права на кредит (debt: 0): два параллельных POST
+  // больше не выдают два кредита по одному устаревшему балансу долга
+  const claim = await db.user.updateMany({
+    where: { id: user.id, debt: 0 },
     data: { balance: { increment: amount }, debt: { increment: owed } },
   })
+  if (claim.count === 0) return Response.json({ error: 'Сначала погасите текущий кредит' }, { status: 400 })
   await db.loan.create({
     data: {
       userId: user.id, principal: amount, owed, rate,

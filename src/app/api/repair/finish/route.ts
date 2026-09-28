@@ -24,6 +24,13 @@ export async function POST(req: Request) {
   const score = Math.max(0, Math.min(100, Math.round(body.score)))
   const success = score >= 60
   const perfect = score >= 85
+  // 59-a: атомарный «захват» наряда: двойной POST с одним jobId больше не
+  // списывает запчасть дважды и не качает состояние дважды
+  const claim = await db.repairJob.updateMany({
+    where: { id: job.id, status: 'in_progress' },
+    data: { status: 'done', score, finishedAt: new Date() },
+  })
+  if (claim.count === 0) return Response.json({ error: 'Наряд уже закрыт' }, { status: 400 })
   const item = await db.item.findUnique({ where: { id: job.itemId } })
   if (!item || item.ownerId !== user.id) return Response.json({ error: 'Товар не найден' }, { status: 404 })
 
@@ -44,10 +51,15 @@ export async function POST(req: Request) {
         partWear = wearAvg
         // Изношенная деталь даёт меньше ценности
         valueAdd = Math.round(part.valueAdd * (1 - wearAvg / 200) * (perfect ? 1 : 0.7))
-        await db.partStock.update({
-          where: { userId_partKey: { userId: user.id, partKey: part.key } },
+        // 59-a: списание только при qty > 0 (гонка двух списаний)
+        const dec = await db.partStock.updateMany({
+          where: { userId: user.id, partKey: part.key, qty: { gt: 0 } },
           data: { qty: { decrement: 1 } },
         })
+        if (dec.count === 0) {
+          partWasted = true
+          valueAdd = 0
+        }
       }
     }
 
@@ -92,7 +104,7 @@ export async function POST(req: Request) {
 
     await db.repairJob.update({
       where: { id: job.id },
-      data: { status: 'done', score, finishedAt: new Date(), partWear },
+      data: { partWear },
     })
 
     const xp = (job.kind === 'repair' ? 18 : 15) + Math.round(score / 5)
@@ -115,7 +127,7 @@ export async function POST(req: Request) {
         createdAt: fresh.createdAt.toISOString(), listed: false,
       } : null,
       valueAdd,
-      partWasted: false,
+      partWasted,
       warrantyUntil: null,
       xp,
       message,
@@ -127,11 +139,11 @@ export async function POST(req: Request) {
     if (Math.random() < 0.4) {
       const stock = await stockMapFor(user.id)
       if ((stock.get(part.key)?.qty ?? 0) > 0) {
-        await db.partStock.update({
-          where: { userId_partKey: { userId: user.id, partKey: part.key } },
+        const dec = await db.partStock.updateMany({
+          where: { userId: user.id, partKey: part.key, qty: { gt: 0 } },
           data: { qty: { decrement: 1 } },
         })
-        partWasted = true
+        partWasted = dec.count > 0
       }
     }
   }
@@ -142,7 +154,7 @@ export async function POST(req: Request) {
 
   await db.repairJob.update({
     where: { id: job.id },
-    data: { status: 'done', score, finishedAt: new Date(), warrantyUntil },
+    data: { warrantyUntil },
   })
   return Response.json({
     ok: true,

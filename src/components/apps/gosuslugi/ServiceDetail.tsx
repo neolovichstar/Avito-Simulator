@@ -63,7 +63,7 @@ export default function ServiceDetail({
           type="button"
           onClick={() => (stage === 'info' ? onBack() : setStage('info'))}
           aria-label="Назад"
-          className="flex size-10 shrink-0 items-center justify-center rounded-full transition active:bg-black/[0.06]"
+          className="flex size-10 shrink-0 items-center justify-center rounded-full transition active:bg-neutral-200/60"
         >
           <ArrowLeft className="size-5 text-[#17181A]" strokeWidth={2.2} />
         </button>

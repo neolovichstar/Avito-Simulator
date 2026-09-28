@@ -1188,3 +1188,14 @@
 @media (prefers-reduced-motion: reduce) {
   .os-enter { animation: none; }
 }
+
+/* 59: ГОСТ-знак (GostPlate) — физический объект: в тёмной теме остаётся белым
+   с тёмными знаками (ремап .bg-white/.text-[#17181A] его не трогает). */
+.theme-dark .gost-plate,
+.theme-dark .gost-plate .bg-white {
+  background-color: #ffffff !important;
+}
+.theme-dark .gost-plate .text-\[\#17181A\] {
+  color: #17181a !important;
+}
+
