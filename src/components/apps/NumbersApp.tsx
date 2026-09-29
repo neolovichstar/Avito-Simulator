@@ -551,7 +551,7 @@ function RegionSheet({
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
         transition={{ type: 'spring', stiffness: 420, damping: 38 }}
-        className="absolute inset-x-0 bottom-0 z-30 flex max-h-[82%] flex-col rounded-t-[24px] bg-white pb-5 shadow-[0_-12px_40px_rgba(23,24,26,0.16)]"
+        className="absolute inset-x-0 bottom-0 z-30 flex max-h-[82%] flex-col rounded-t-[24px] bg-white pb-[max(20px,env(safe-area-inset-bottom))] shadow-[0_-12px_40px_rgba(23,24,26,0.16)]"
       >
         <div className="flex shrink-0 items-center justify-between px-5 pb-1 pt-4">
           <h2 className="text-[16px] font-semibold">Регион номера</h2>
@@ -1245,7 +1245,7 @@ function MarketDetail({
       </div>
 
       {/* покупка */}
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#F5F6F8] via-[#F5F6F8] to-transparent px-4 pb-4 pt-6">
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#F5F6F8] via-[#F5F6F8] to-transparent px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-6">
         <button
           type="button"
           onClick={onBuy}

@@ -243,6 +243,7 @@ export default function BankApp() {
       const os = useOS.getState()
       os.refreshSession(patch)
       os.pushToast('Банк', 'Операция выполнена')
+      sound.success()
       if (typeof res.debt === 'number') setLoanHistory(null) // статус договора в истории обновился
       await load()
       after?.()
@@ -1637,7 +1638,7 @@ export default function BankApp() {
                   <button
                     key={t.key}
                     type="button"
-                    onClick={() => setScreen(t.key)}
+                    onClick={() => { sound.tap(); setScreen(t.key) }}
                     aria-current={active ? 'page' : undefined}
                     className="flex min-h-[52px] flex-col items-center justify-center gap-1 transition"
                   >

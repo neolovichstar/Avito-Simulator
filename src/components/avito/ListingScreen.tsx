@@ -8,7 +8,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import {
   ChevronLeft, MapPin, Eye, Star, Truck, HandCoins, MessageSquare, ShoppingBag,
   TrendingDown, Zap, Loader2, PackageCheck, AlertTriangle, Clock, BadgeCheck, PenLine,
-  Flag, LineChart, ShieldCheck, ChevronRight, Ban, CircleSlash, Handshake,
+  Flag, LineChart, ShieldCheck, ChevronRight, Ban, CircleSlash, Handshake, CloudOff,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
@@ -21,7 +21,7 @@ import type { ListingDetailData, PricePointDTO } from '@/lib/types'
 import type { SpecItem } from '@/lib/specs'
 import { addViewed } from '@/lib/viewed'
 import { ConditionBadge } from './AvitoApp'
-import { Card, Overline, Skeleton } from './ui'
+import { Card, ErrorState, Overline, Skeleton } from './ui'
 
 // Галерея карточки товара: кадров из одной реальной фотографии нет в API,
 // поэтому «снимки» — декоративные кропы (деталь/ракурс) того же изображения, как на макете
@@ -209,11 +209,15 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
   }
   if (error && !data) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#F5F6F8] p-6 text-center">
-        <p className="text-sm text-red-600">{error}</p>
-        <button onClick={onBack} className="h-11 rounded-full bg-white px-5 text-sm font-semibold text-[#17181A] ring-1 ring-black/[0.08] transition-all active:scale-[0.98]">
-          Вернуться в ленту
-        </button>
+      <div className="h-full bg-[#F5F6F8]">
+        <ErrorState
+          icon={<CloudOff size={28} />}
+          note={error}
+          onRetry={() => void load()}
+          secondaryLabel="Вернуться в ленту"
+          onSecondary={onBack}
+          className="pt-16"
+        />
       </div>
     )
   }
@@ -260,7 +264,7 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
           <button
             onClick={onBack}
             aria-label="Назад"
-            className="absolute left-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#17181A] shadow-md transition-colors active:bg-neutral-200/60"
+            className="absolute left-3 top-3 z-10 flex size-11 items-center justify-center rounded-full bg-white text-[#17181A] shadow-md transition-colors active:bg-neutral-200/60 outline-none focus-visible:ring-2 focus-visible:ring-[#15803D]/50"
           >
             <ChevronLeft size={22} aria-hidden />
           </button>

@@ -23,12 +23,29 @@ async function hmac(secret: string, msg: string): Promise<string> {
   return toHex(await crypto.subtle.sign('HMAC', key, enc.encode(msg)))
 }
 
-/** Постоянно-временное сравнение hex-строк одинаковой длины. */
+/** Постоянно-временное сравнение hex-строк одинаковой длины (edge-safe). */
 function timingSafeHex(a: string, b: string): boolean {
   if (a.length !== b.length) return false
   let r = 0
   for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i)
   return r === 0
+}
+
+/**
+ * 61-c: сравнение секретных строк без утечки по времени, edge-совместимое
+ * (middleware бандлит этот модуль, node:crypto там недоступен).
+ * Обе строки сначала приводятся к SHA-256-дайджесту (устраняет утечку длины),
+ * затем дайджесты сравниваются побайтно без раннего выхода.
+ */
+export async function safeEqualStrings(a: string, b: string): Promise<boolean> {
+  const enc = new TextEncoder()
+  const [da, db] = await Promise.all([
+    crypto.subtle.digest('SHA-256', enc.encode(a)),
+    crypto.subtle.digest('SHA-256', enc.encode(b)),
+  ])
+  const ha = toHex(da)
+  const hb = toHex(db)
+  return timingSafeHex(ha, hb)
 }
 
 /** Создаёт одноразовую подписанную сессию (каждый вход — новый nonce). */

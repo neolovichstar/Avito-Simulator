@@ -1318,7 +1318,7 @@ function DetailScreen({
       </div>
 
       {/* покупка */}
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#F6F7F9] via-[#F6F7F9] to-transparent px-4 pb-4 pt-6">
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#F6F7F9] via-[#F6F7F9] to-transparent px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-6">
         <button
           type="button"
           onClick={onBuy}

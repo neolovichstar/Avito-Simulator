@@ -3,13 +3,13 @@
 // Страница продавца «Resale» — светлый минимализм:
 // белые карточки, зелёные звёзды, список объявлений и отзывы.
 import { useCallback, useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, Star, BadgeCheck, MapPin, Eye, ArrowRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Star, BadgeCheck, MapPin, Eye, ArrowRight, CloudOff } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { fmtNum, timeAgo } from '@/lib/format'
 import { UserAvatar } from '@/components/shared/UserAvatar'
 import type { SellerProfile, FeedListing } from '@/lib/types'
 import { ConditionBadge } from './AvitoApp'
-import { Card, EmptyState, Overline, ScreenTitle, Skeleton } from './ui'
+import { Card, EmptyState, ErrorState, Overline, ScreenTitle, Skeleton } from './ui'
 
 function Stars({ value }: { value: number }) {
   return (
@@ -37,6 +37,8 @@ export default function SellerScreen({ sellerId, onBack, onOpenListing }: {
   const [offset, setOffset] = useState(0)
   const [loadingListings, setLoadingListings] = useState(false)
   const [error, setError] = useState('')
+  // ручной ретрай: тик в зависимостях эффекта перезапускает загрузку профиля
+  const [reloadTick, setReloadTick] = useState(0)
 
   useEffect(() => {
     let alive = true
@@ -48,7 +50,7 @@ export default function SellerScreen({ sellerId, onBack, onOpenListing }: {
       .then((d) => { if (alive) setData(d) })
       .catch((e) => { if (alive) setError(e instanceof ApiError ? e.message : 'Не удалось загрузить профиль') })
     return () => { alive = false }
-  }, [sellerId])
+  }, [sellerId, reloadTick])
 
   const loadListings = useCallback(async (off: number) => {
     setLoadingListings(true)
@@ -69,12 +71,14 @@ export default function SellerScreen({ sellerId, onBack, onOpenListing }: {
     return (
       <div className="h-full overflow-y-auto bg-[#F5F6F8]">
         <Header onBack={onBack} title="Продавец" />
-        <div className="space-y-3 p-4 pt-8 text-center">
-          <p className="text-sm text-red-600">{error}</p>
-          <button onClick={onBack} className="h-11 rounded-full bg-[#14532D] px-6 font-bold text-[15px] text-white transition-all active:scale-[0.98]">
-            Вернуться
-          </button>
-        </div>
+        <ErrorState
+          icon={<CloudOff size={28} />}
+          note={error}
+          onRetry={() => setReloadTick((t) => t + 1)}
+          secondaryLabel="Вернуться"
+          onSecondary={onBack}
+          className="pt-6"
+        />
       </div>
     )
   }

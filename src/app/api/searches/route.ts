@@ -1,11 +1,16 @@
 import { db } from '@/lib/db'
 import { getSessionUser, unauthorized } from '@/lib/session'
 import { rateLimit } from '@/lib/ratelimit'
+import { rateLimit as slidingLimit, ipKey, tooMany } from '@/lib/rate-limit'
 import { stripEmoji } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: Request) {
+  // 61-c: мягкий лимит 120 req/мин на IP
+  const ipRl = slidingLimit(ipKey(req, 'searches'), { limit: 120, windowMs: 60_000 })
+  if (!ipRl.ok) return tooMany(ipRl.retryAfter)
+
   const user = await getSessionUser(req)
   if (!user) return unauthorized()
   const searches = await db.savedSearch.findMany({
@@ -24,6 +29,10 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  // 61-c: мягкий лимит 120 req/мин на IP + жёсткий 8/мин на юзера (ниже)
+  const ipRl = slidingLimit(ipKey(req, 'searches'), { limit: 120, windowMs: 60_000 })
+  if (!ipRl.ok) return tooMany(ipRl.retryAfter)
+
   const user = await getSessionUser(req)
   if (!user) return unauthorized()
   if (!rateLimit(`search-save:${user.id}`, 8, 60_000)) {

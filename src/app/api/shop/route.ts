@@ -93,7 +93,10 @@ export async function POST(req: Request) {
           ? ((r as Record<string, unknown>).invoice_link as string)
           : null
     if (!link) {
-      return Response.json({ error: 'Не удалось создать счёт. Попробуй позже', tgError: res.error ?? 'unknown' }, { status: 502 })
+      // 61-c: детали ошибки Telegram наружу не отдаём — описание/fetch-ошибка
+      // может содержать служебные данные (вплоть до URL с токеном бота)
+      console.error('[shop] createInvoiceLink failed:', res.error ?? 'unknown')
+      return Response.json({ error: 'Не удалось создать счёт. Попробуй позже' }, { status: 502 })
     }
 
     await db.starsPayment.create({

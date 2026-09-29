@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
+import { sound } from '@/lib/sound'
 import { fmtMoney, timeAgo } from '@/lib/format'
 import { getSocket } from '@/lib/use-realtime'
 import { CATEGORY_LABEL, CONDITION_LABEL } from '@/lib/catalog-types'
@@ -202,6 +203,7 @@ export default function AuctionApp() {
       const os = useOS.getState()
       os.refreshSession({ balance: res.balance })
       os.pushToast('Аукцион', 'Ставка принята')
+      sound.success()
       closePanel()
       await load()
     } catch (e) {
@@ -225,6 +227,7 @@ export default function AuctionApp() {
       const os = useOS.getState()
       os.refreshSession({ balance: res.balance })
       os.pushToast('Автоставка', res.fired ? `Сработала сразу: ставка ${fmtMoney(res.maxAmount)} или ниже` : `Потолок ${fmtMoney(res.maxAmount)} установлен`)
+      sound.success()
       closePanel()
       await load()
     } catch (e) {
@@ -834,7 +837,7 @@ export default function AuctionApp() {
           </div>
 
           {/* ---------- Нижний таб-бар ---------- */}
-          <TabBar active={tab} bidsCount={bidsCount} onSelect={setTab} />
+          <TabBar active={tab} bidsCount={bidsCount} onSelect={(k) => { sound.tap(); setTab(k) }} />
         </>
       )}
 

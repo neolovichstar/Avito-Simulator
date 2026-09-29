@@ -64,7 +64,7 @@ export function Chip({
       type="button"
       className={cn(
         'inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full px-4 text-[13px] transition-all active:scale-[0.97]',
-        'h-9',
+        'h-9 outline-none focus-visible:ring-2 focus-visible:ring-[#15803D]/50 focus-visible:ring-offset-1 focus-visible:ring-offset-[#F5F6F8]',
         active
           ? 'bg-[#14532D] font-semibold text-white shadow-[0_2px_10px_rgba(20,83,45,0.28)]'
           : 'bg-white font-medium text-black/70 ring-1 ring-black/[0.08]',
@@ -84,6 +84,7 @@ export function IconBtn({ className, children, ...rest }: ButtonHTMLAttributes<H
       type="button"
       className={cn(
         'flex size-11 shrink-0 items-center justify-center rounded-full text-[#17181A] transition-all active:scale-95 active:bg-neutral-200/60',
+        'outline-none focus-visible:ring-2 focus-visible:ring-[#15803D]/50',
         className,
       )}
       {...rest}
@@ -132,6 +133,7 @@ export function PrimaryButton({ className, children, ...rest }: ButtonHTMLAttrib
       className={cn(
         'flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#14532D] text-[15px] font-bold text-white',
         'shadow-[0_4px_14px_rgba(20,83,45,0.25)] transition-all active:scale-[0.98] active:bg-[#0F3F22]',
+        'outline-none focus-visible:ring-2 focus-visible:ring-[#15803D]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F5F6F8]',
         'disabled:opacity-40 disabled:shadow-none',
         className,
       )}
@@ -139,5 +141,55 @@ export function PrimaryButton({ className, children, ...rest }: ButtonHTMLAttrib
     >
       {children}
     </button>
+  )
+}
+
+/** Ошибка загрузки: иконка, сообщение и кнопка «Повторить» — единый стиль с EmptyState.
+ *  Ретрай — белая пилюля 44px; опциональная вторичная кнопка (например «Назад») — текстовая. */
+export function ErrorState({
+  icon,
+  title = 'Не удалось загрузить',
+  note,
+  retryLabel = 'Повторить',
+  onRetry,
+  secondaryLabel,
+  onSecondary,
+  className,
+}: {
+  icon?: ReactNode
+  title?: string
+  note?: string
+  retryLabel?: string
+  onRetry?: () => void
+  secondaryLabel?: string
+  onSecondary?: () => void
+  className?: string
+}) {
+  return (
+    <div className={cn('flex flex-col items-center px-8 py-12 text-center', className)}>
+      <div className="flex size-16 items-center justify-center rounded-[20px] bg-red-500/[0.07] text-red-500" aria-hidden>
+        {icon}
+      </div>
+      <p className="mt-3 text-[15px] font-semibold text-[#17181A]">{title}</p>
+      {note && <p className="mt-1 max-w-[260px] text-[13px] leading-relaxed text-[#17181A]/45">{note}</p>}
+      {onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-4 flex h-11 items-center justify-center rounded-full bg-white px-6 text-sm font-semibold text-[#17181A] ring-1 ring-black/[0.08] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all active:scale-[0.98] active:bg-neutral-200/60 outline-none focus-visible:ring-2 focus-visible:ring-[#15803D]/50"
+        >
+          {retryLabel}
+        </button>
+      )}
+      {onSecondary && secondaryLabel && (
+        <button
+          type="button"
+          onClick={onSecondary}
+          className="mt-2 flex h-11 items-center justify-center rounded-full px-5 text-sm font-semibold text-[#15803D] transition-opacity active:opacity-60 outline-none focus-visible:ring-2 focus-visible:ring-[#15803D]/50"
+        >
+          {secondaryLabel}
+        </button>
+      )}
+    </div>
   )
 }

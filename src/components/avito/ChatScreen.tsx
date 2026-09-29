@@ -6,7 +6,7 @@
 // Всё решение — в переписке: счёты, торг, ИИ-собеседник. Логика не тронута.
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import {
-  ChevronLeft, Send, Receipt, Loader2, Star, CheckCheck, Banknote, X, Phone, Truck, PackageCheck, CheckCircle2,
+  ChevronLeft, Send, Receipt, Loader2, Star, CheckCheck, Banknote, X, Phone, Truck, PackageCheck, CheckCircle2, CloudOff,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
@@ -20,6 +20,7 @@ import { UserAvatar } from '@/components/shared/UserAvatar'
 import { CONDITION_LABEL } from '@/lib/catalog-types'
 import { useDrag } from '@/lib/use-swipe'
 import type { ChatDetailData, ChatDeliveryDTO, ChatMessageDTO } from '@/lib/types'
+import { ErrorState } from './ui'
 
 // Тик 1с — прогресс посылки в чате живой
 function useTick(intervalMs = 1000): number {
@@ -337,11 +338,15 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
   }
   if (error && !chat) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#F5F6F8] p-6 text-center">
-        <p className="text-sm text-red-600">{error}</p>
-        <button onClick={onBack} className="h-11 rounded-full bg-white px-5 text-sm font-semibold text-[#17181A] ring-1 ring-black/[0.08] transition-all active:scale-[0.98]">
-          Назад
-        </button>
+      <div className="h-full bg-[#F5F6F8]">
+        <ErrorState
+          icon={<CloudOff size={28} />}
+          note={error}
+          onRetry={() => void load()}
+          secondaryLabel="Назад"
+          onSecondary={onBack}
+          className="pt-16"
+        />
       </div>
     )
   }
@@ -408,7 +413,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
       {/* шапка: назад, аватар, имя bold, рейтинг */}
       <div className="shrink-0 border-b border-black/[0.05] bg-white/95 backdrop-blur-md">
         <div className="flex items-center gap-1 px-2 py-1.5">
-          <button onClick={onBack} aria-label="Назад" className="flex h-10 w-10 items-center justify-center rounded-full text-[#17181A] transition-colors active:bg-neutral-200/60">
+          <button onClick={onBack} aria-label="Назад" className="flex size-11 items-center justify-center rounded-full text-[#17181A] transition-colors active:bg-neutral-200/60 outline-none focus-visible:ring-2 focus-visible:ring-[#15803D]/50">
             <ChevronLeft size={22} aria-hidden />
           </button>
           <UserAvatar name={chat.counterpart.displayName} className="h-10 w-10 rounded-full" />
@@ -538,7 +543,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
 
       {/* ввод: звонок + счёт + белая пилюля + зелёная круглая кнопка отправки.
           Звонок: бот-продавцу (26-d, ИИ-разговор) или живому игроку (27-e, P2P). */}
-      <div className="flex shrink-0 items-center gap-2 border-t border-black/[0.05] bg-[#F5F6F8] p-2.5">
+      <div className="flex shrink-0 items-center gap-2 border-t border-black/[0.05] bg-[#F5F6F8] px-2.5 pt-2.5 pb-[max(10px,env(safe-area-inset-bottom))]">
         {(chat.counterpart.isBot
           ? chat.role === 'buyer' && chat.listing.status !== 'sold'
           : true) && (

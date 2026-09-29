@@ -6,6 +6,7 @@ import { NextRequest } from 'next/server'
 import { execFile } from 'child_process'
 import { cache } from '@/lib/cache'
 import { rateLimit } from '@/lib/ratelimit'
+import { rateLimit as slidingLimit, ipKey, tooMany } from '@/lib/rate-limit'
 import { getSessionUser } from '@/lib/session'
 
 export const dynamic = 'force-dynamic'
@@ -225,6 +226,10 @@ async function search(q: string): Promise<SearchResult> {
 }
 
 export async function GET(req: NextRequest) {
+  // 61-c: мягкий лимит 120 req/мин на IP (внутри игры это «браузер» — дорого)
+  const ipRl = slidingLimit(ipKey(req, 'browse'), { limit: 120, windowMs: 60_000 })
+  if (!ipRl.ok) return tooMany(ipRl.retryAfter)
+
   const user = await getSessionUser(req)
   if (!user) return Response.json({ error: 'Не авторизован' }, { status: 401 })
 
@@ -240,9 +245,9 @@ export async function GET(req: NextRequest) {
     if (rawUrl) return Response.json(await fetchPage(rawUrl))
     return Response.json({ error: 'Нужен параметр url или q' }, { status: 400 })
   } catch (e) {
-    return Response.json(
-      { error: e instanceof Error && e.message ? e.message : 'Не удалось загрузить страницу' },
-      { status: 502 },
-    )
+    // 61-c: наружу — только безопасный текст; детали (в т.ч. адреса/ошибки
+    // внешних сервисов) — в лог сервера
+    console.error('[browse] failed:', e instanceof Error ? e.message : e)
+    return Response.json({ error: 'Не удалось загрузить страницу' }, { status: 502 })
   }
 }

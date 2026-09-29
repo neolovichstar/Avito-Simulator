@@ -1,13 +1,15 @@
-// Авторизация админ-панели, версия 2 (hardened):
+// Авторизация админ-панели, версия 3 (hardened, 61-c):
 //  • cookie resale_admin хранит подписанный HMAC-токен сессии (не сам ключ);
-//  • сравнение ключа — тайминг-безопасное;
+//  • сравнение ключа — константное по времени (SHA-256 дайджесты + побайтовое
+//    сравнение без раннего выхода; edge-совместимо, т.к. middleware бандлит
+//    этот модуль и node:crypto.timingSafeEqual там недоступен);
 //  • fail-closed: в production без ADMIN_KEY в env доступ закрыт полностью;
 //  • заголовок x-admin-key разрешён только для служебных вызовов (curl/CLI)
 //    в доверенной среде (dev) и при заданном ключе.
 
-import { ADMIN_COOKIE, SESSION_MAX_AGE, createSessionToken, verifySessionToken } from './admin-session'
+import { ADMIN_COOKIE, SESSION_MAX_AGE, createSessionToken, safeEqualStrings, verifySessionToken } from './admin-session'
 
-export { ADMIN_COOKIE, SESSION_MAX_AGE }
+export { ADMIN_COOKIE, SESSION_MAX_AGE, safeEqualStrings }
 export const DEFAULT_ADMIN_KEY = 'resale-admin-2025'
 
 export function getAdminKey(): { key: string; usingDefault: boolean } {
@@ -21,15 +23,8 @@ export function isLockedDown(): boolean {
   return getAdminKey().usingDefault && process.env.NODE_ENV === 'production'
 }
 
-function timingSafeEq(a: string, b: string): boolean {
-  if (a.length !== b.length) return false
-  let r = 0
-  for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i)
-  return r === 0
-}
-
-export function timingSafeEqExport(a: string, b: string): boolean {
-  return timingSafeEq(a, b)
+async function timingSafeEq(a: string, b: string): Promise<boolean> {
+  return safeEqualStrings(a, b)
 }
 
 function readCookie(cookieHeader: string, name: string): string {
@@ -53,7 +48,7 @@ export async function isAuthorized(req: Request): Promise<boolean> {
 
   // Служебный доступ по заголовку — только в dev (песочница/локально) и с реальным ключом
   const header = req.headers.get('x-admin-key')
-  if (header && !usingDefault && process.env.NODE_ENV !== 'production' && timingSafeEq(header, key)) return true
+  if (header && !usingDefault && process.env.NODE_ENV !== 'production' && (await timingSafeEq(header, key))) return true
 
   const cookie = readCookie(req.headers.get('cookie') ?? '', ADMIN_COOKIE)
   if (cookie && (await verifySessionToken(cookie, key))) return true

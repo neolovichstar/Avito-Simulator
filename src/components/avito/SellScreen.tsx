@@ -4,14 +4,14 @@
 // выбор вещи из инвентаря, превью с характеристиками, цена, описание
 // и тёмно-зелёная CTA «Опубликовать».
 import { useCallback, useEffect, useState } from 'react'
-import { ChevronLeft, Loader2, Tag, PackageOpen, TrendingUp, Info, ChevronRight } from 'lucide-react'
+import { ChevronLeft, Loader2, Tag, PackageOpen, TrendingUp, Info, ChevronRight, CloudOff } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
 import { fmtNum, fmtMoney } from '@/lib/format'
 import { CATEGORY_LABEL, CONDITION_LABEL } from '@/lib/catalog-types'
 import type { InventoryItemDTO } from '@/lib/types'
 import { ConditionBadge } from './AvitoApp'
-import { Card, EmptyState, Overline, ScreenTitle, Skeleton, cn } from './ui'
+import { Card, EmptyState, ErrorState, Overline, ScreenTitle, Skeleton, cn } from './ui'
 
 export default function SellScreen({ onDone }: { onDone: () => void }) {
   const [items, setItems] = useState<InventoryItemDTO[]>([])
@@ -83,6 +83,19 @@ export default function SellScreen({ onDone }: { onDone: () => void }) {
     )
   }
 
+  if (error && items.length === 0) {
+    return (
+      <div className="flex h-full flex-col bg-[#F5F6F8]">
+        <ErrorState
+          icon={<CloudOff size={28} />}
+          note={error}
+          onRetry={() => void load()}
+          className="pt-16"
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="flex h-full flex-col bg-[#F5F6F8] text-[#17181A]">
       {/* шапка */}
@@ -106,7 +119,17 @@ export default function SellScreen({ onDone }: { onDone: () => void }) {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 pt-1 [scrollbar-width:thin]">
-        {error && <div className="mb-3 rounded-[16px] bg-red-500/[0.08] p-3 text-sm text-red-600">{error}</div>}
+        {error && items.length > 0 && (
+          <div className="mb-3 flex items-center gap-2.5 rounded-[16px] bg-red-500/[0.08] p-2.5 pl-3 text-sm text-red-600">
+            <span className="min-w-0 flex-1 leading-snug">{error}</span>
+            <button
+              onClick={() => void load()}
+              className="h-9 shrink-0 rounded-full bg-white px-4 text-xs font-semibold text-red-600 ring-1 ring-red-500/20 transition-all active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-red-500/40"
+            >
+              Повторить
+            </button>
+          </div>
+        )}
 
         {!selected ? (
           items.length === 0 ? (

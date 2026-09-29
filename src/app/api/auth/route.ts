@@ -1,6 +1,6 @@
 import { db } from '@/lib/db'
 import { parseInitDataUser, signSession, validateInitData } from '@/lib/telegram'
-import { rateLimit } from '@/lib/ratelimit'
+import { rateLimit, ipKey, tooMany } from '@/lib/rate-limit'
 import { levelFromXp } from '@/lib/economy'
 
 export const dynamic = 'force-dynamic'
@@ -13,37 +13,42 @@ function stableHash(s: string): number {
 }
 
 export async function POST(req: Request) {
-  const ip = req.headers.get('x-forwarded-for') ?? 'local'
-  if (!rateLimit(`auth:${ip}`, 60, 60_000)) {
-    return Response.json({ error: 'Слишком часто. Подождите минуту' }, { status: 429 })
-  }
+  // 61-c: 30 req/мин на IP (скользящее окно) — анти-брутфорс initData/deviceId
+  const rl = rateLimit(ipKey(req, 'auth'), { limit: 30, windowMs: 60_000 })
+  if (!rl.ok) return tooMany(rl.retryAfter)
   const body = (await req.json().catch(() => ({}))) as {
     initData?: string | null
     deviceId?: string | null
     devName?: string
   }
+  // initData длиной ограничиваем ДО разбора: 8КБ хватит с запасом, 10МБ-строки
+  // не должны доходить до URLSearchParams
+  const initDataRaw = typeof body.initData === 'string' && body.initData.length <= 8192 ? body.initData : ''
   const botToken = process.env.BOT_TOKEN ?? ''
+  const isProd = process.env.NODE_ENV === 'production'
   const rawDeviceId = (body.deviceId ?? '').trim().slice(0, 64).replace(/[^a-zA-Z0-9-_]/g, '')
   let user: Awaited<ReturnType<typeof db.user.findUnique>> = null
 
   // 1. Пробуем Telegram initData
-  if (body.initData) {
+  if (initDataRaw) {
     let tg: ReturnType<typeof validateInitData> = null
     if (botToken) {
-      tg = validateInitData(body.initData, botToken)
-      if (!tg) {
-        // Подпись не сошлась (токен бота обновили в BotFather / открыли с чужого
-        // бота). НЕ бросаем игрока в безликий фолбэк — это игра, а не банк:
-        // принимаем профиль без проверки, иначе «профиль Telegram не работает».
-        console.warn('[auth] initData INVALID: hash mismatch — принимаем профиль без подписи')
-        tg = parseInitDataUser(body.initData)
-      }
+      // 61-c (ЗАКРЫТАЯ ДЫРА): раньше при неверной подписи профиль всё равно
+      // принимался — anyone мог выдать себя за ЧУЖОЙ telegram-аккаунт,
+      // подложив произвольный user.id. Теперь неподписанные/битые initData
+      // отклоняются ВСЕГДА: запрос падает в безопасный deviceId-фолбэк.
+      tg = validateInitData(initDataRaw, botToken)
+      if (!tg) console.warn('[auth] initData отклонён: подпись не сошлась (анти-имперсонация)')
+    } else if (isProd) {
+      // 61-c: fail-closed — в проде без BOT_TOKEN проверка подписи невозможна,
+      // значит неподписанные профили не принимаем (иначе снова имперсонация).
+      console.error('[auth] PRODUCTION без BOT_TOKEN: initData отклонён — задайте BOT_TOKEN в env')
+      tg = null
     } else {
-      // BOT_TOKEN не задан на этом сервере (деплой без секретов): строгая
-      // проверка подписи невозможна. Принимаем профиль без проверки, иначе
-      // ВСЕ Telegram-игроки получают безликого «Игрока» вместо своего профиля.
-      tg = parseInitDataUser(body.initData)
-      if (tg) console.warn('[auth] BOT_TOKEN не задан — initData принят БЕЗ проверки подписи; tgId:', tg.id)
+      // Dev-фолбэк (песочница без секретов): принимаем профиль без проверки,
+      // иначе ВСЕ Telegram-игроки получают безликого «Игрока».
+      tg = parseInitDataUser(initDataRaw)
+      if (tg) console.warn('[auth] DEV без BOT_TOKEN — initData принят БЕЗ проверки подписи; tgId:', tg.id)
     }
     if (tg) {
       const displayName = [tg.first_name, tg.last_name].filter(Boolean).join(' ') || 'Игрок'
@@ -103,7 +108,8 @@ export async function POST(req: Request) {
   if (!user) {
     // стабильный строковый хеш, чтобы кириллица/UUID не схлопывали аккаунты —
     // stableHash объявлен на уровне модуля
-    const devName = (body.devName ?? 'Игрок').slice(0, 24)
+    // 61-c: devName — только строка, trim + жёсткий срез (не даём 10МБ в БД)
+    const devName = (typeof body.devName === 'string' ? body.devName.trim().slice(0, 24) : '') || 'Игрок'
     const username = rawDeviceId
       ? `player_${stableHash(rawDeviceId).toString(36)}`
       : `player_${stableHash(devName).toString(36)}`

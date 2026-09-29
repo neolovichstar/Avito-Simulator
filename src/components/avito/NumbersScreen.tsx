@@ -9,11 +9,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useState } from 'react'
-import { Car, Phone, RefreshCw, Star, Trash2 } from 'lucide-react'
+import { Car, Phone, RefreshCw, Star, Trash2, CloudOff } from 'lucide-react'
 import { useOS } from '@/lib/store'
 import { api } from '@/lib/api'
 import PlateApp from '@/components/apps/PlateApp'
-import { Card, Overline, ScreenTitle, Skeleton, cn } from './ui'
+import { Card, ErrorState, Overline, ScreenTitle, Skeleton, cn } from './ui'
 
 interface PhoneRow {
   id: string
@@ -81,12 +81,15 @@ function PhonesPane() {
   const openApp = useOS((s) => s.openApp)
   const [rows, setRows] = useState<PhoneRow[] | null>(null)
   const [busy, setBusy] = useState(false)
+  // ошибка загрузки ≠ «номеров нет»: показываем ретрай вместо пустой заглушки
+  const [failed, setFailed] = useState(false)
 
   const load = useCallback(() => {
+    setFailed(false)
     api
       .phonesList()
       .then((r) => setRows(r.numbers as PhoneRow[]))
-      .catch(() => setRows([]))
+      .catch(() => { setRows([]); setFailed(true) })
   }, [])
 
   useEffect(load, [load])
@@ -149,10 +152,18 @@ function PhonesPane() {
           ))}
         </div>
       ) : rows.length === 0 ? (
-        <Card className="p-6 text-center">
-          <p className="text-[13.5px] font-semibold text-black/60">Номеров ещё нет</p>
-          <p className="mt-1 text-[12px] text-black/40">Крутите в приложении «Номера». Первый можно забрать бесплатно</p>
-        </Card>
+        failed ? (
+          <ErrorState
+            icon={<CloudOff size={28} />}
+            note="Не удалось загрузить номера"
+            onRetry={load}
+          />
+        ) : (
+          <Card className="p-6 text-center">
+            <p className="text-[13.5px] font-semibold text-black/60">Номеров ещё нет</p>
+            <p className="mt-1 text-[12px] text-black/40">Крутите в приложении «Номера». Первый можно забрать бесплатно</p>
+          </Card>
+        )
       ) : (
         <div className="space-y-2">
           {rows.map((p) => (

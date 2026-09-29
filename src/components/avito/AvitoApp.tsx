@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Car, Hash, Home, MessageCircle, Plus, Search, User } from 'lucide-react'
 import { api } from '@/lib/api'
+import { sound } from '@/lib/sound'
 import NotificationCenter from '@/components/os/NotificationCenter'
 import FeedScreen from './FeedScreen'
 import ListingScreen from './ListingScreen'
@@ -197,7 +198,7 @@ export default function AvitoApp() {
           {/* центральная зелёная круглая кнопка «Продать» */}
           <div className="relative flex flex-1 items-start justify-center" aria-hidden={top !== null}>
             <button
-              onClick={openSell}
+              onClick={() => { sound.tap(); openSell() }}
               disabled={top !== null}
               aria-label="Продать вещь"
               className={`-translate-y-4 flex size-[52px] items-center justify-center rounded-full bg-[#14532D] text-white shadow-[0_8px_20px_rgba(20,83,45,0.35)] transition-all active:scale-95 ${
@@ -239,7 +240,7 @@ function TabButton({ tab, active, badge, onClick }: {
   const Icon = tab.icon
   return (
     <button
-      onClick={onClick}
+      onClick={() => { sound.tap(); onClick() }}
       aria-label={tab.label}
       aria-current={active ? 'page' : undefined}
       className="relative flex h-16 flex-1 flex-col items-center justify-center gap-1 transition-colors active:bg-neutral-200/40"

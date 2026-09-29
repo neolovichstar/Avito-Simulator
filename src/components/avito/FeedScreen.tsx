@@ -6,7 +6,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   Search, SlidersHorizontal, Heart, Star, Zap, Bell, BellPlus, X, SearchX,
-  History, Activity, Scale, Handshake, ArrowUpDown, ChevronDown, MapPin,
+  History, Activity, Scale, Handshake, ArrowUpDown, ChevronDown, MapPin, CloudOff,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { CATEGORIES, CATEGORY_LABEL, CONDITION_LABEL, CONDITION_MULT } from '@/lib/catalog-types'
@@ -18,7 +18,7 @@ import { getViewed, clearViewed, type ViewedItem } from '@/lib/viewed'
 import { getSocket } from '@/lib/use-realtime'
 import { topMatches, fuzzyMatch, Highlight } from '@/lib/smart-search'
 import type { FeedListing, SavedSearchDTO, PulseItemDTO } from '@/lib/types'
-import { Card, Chip, EmptyState, Overline, Skeleton, cn } from './ui'
+import { Card, Chip, EmptyState, ErrorState, Overline, Skeleton, cn } from './ui'
 
 const FAV_KEY = 'avito_sim_favs'
 const RECENT_Q_KEY = 'resale_avito_recent_q_v1'
@@ -508,13 +508,28 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
           />
         )}
 
-        {error && (
-          <div className="mx-4 shrink-0 rounded-[16px] bg-red-500/[0.08] p-3 text-sm text-red-600">{error}</div>
+        {/* ошибка при уже загруженных данных: тихий inline-блок с ретраем */}
+        {error && items.length > 0 && (
+          <div className="mx-4 mb-1 flex shrink-0 items-center gap-2.5 rounded-[16px] bg-red-500/[0.08] p-2.5 pl-3 text-sm text-red-600">
+            <span className="min-w-0 flex-1 leading-snug">{error}</span>
+            <button
+              onClick={() => load(pageRef.current)}
+              className="h-9 shrink-0 rounded-full bg-white px-4 text-xs font-semibold text-red-600 ring-1 ring-red-500/20 transition-all active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-red-500/40"
+            >
+              Повторить
+            </button>
+          </div>
         )}
         {loading && items.length === 0 ? (
           <div className="grid grid-cols-2 content-start gap-3 px-4">
             {Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} />)}
           </div>
+        ) : error && items.length === 0 ? (
+          <ErrorState
+            icon={<CloudOff size={28} />}
+            note={error}
+            onRetry={() => load(pageRef.current)}
+          />
         ) : visibleItems.length === 0 ? (
           <EmptyState
             icon={<SearchX size={28} />}

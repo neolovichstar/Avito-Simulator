@@ -943,7 +943,7 @@ function ProfileScreen({ items }: { items: DeliveryDTO[] }) {
 // ---------- нижний таб-бар (макет: Доставки / Карта / История / Профиль) ----------
 function TabBar({ tab, onChange }: { tab: TabKey; onChange: (t: TabKey) => void }) {
   return (
-    <nav className="shrink-0 bg-white ring-1 ring-black/[0.05]" aria-label="Разделы доставок">
+    <nav className="shrink-0 bg-white pb-[env(safe-area-inset-bottom)] ring-1 ring-black/[0.05]" aria-label="Разделы доставок">
       <div className="grid grid-cols-4">
         {TABS.map((t) => {
           const on = tab === t.key
@@ -954,7 +954,7 @@ function TabBar({ tab, onChange }: { tab: TabKey; onChange: (t: TabKey) => void 
               type="button"
               role="tab"
               aria-selected={on}
-              onClick={() => onChange(t.key)}
+              onClick={() => { sound.tap(); onChange(t.key) }}
               className="flex h-[62px] flex-col items-center justify-center gap-0.5 transition active:scale-[0.97]"
               style={{ color: on ? GREEN : '#9CA3AF' }}
             >

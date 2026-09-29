@@ -2,7 +2,7 @@
 // Если последним отвечал админ (в течение 20 минут), ИИ молчит: чат ведёт админ.
 import { db } from '@/lib/db'
 import { getSessionUser, unauthorized } from '@/lib/session'
-import { rateLimit } from '@/lib/ratelimit'
+import { rateLimit, ipKey, tooMany } from '@/lib/rate-limit'
 import { supportAiReply, SUPPORT_ADMIN_ACTIVE_MS } from '@/lib/support-ai'
 
 export const dynamic = 'force-dynamic'
@@ -45,11 +45,15 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  // 61-c: 10 req/мин на IP ДО авторизации — мусорные/брутфорсящие запросы
+  // отсекаются до похода в БД (и 429 виден даже без токена, что нужно для QA)
+  const ipRl = rateLimit(ipKey(req, 'support'), { limit: 10, windowMs: 60_000 })
+  if (!ipRl.ok) return tooMany(ipRl.retryAfter)
+
   const me = await getSessionUser(req)
   if (!me) return unauthorized()
-  if (!rateLimit(`support:${me.id}`, 12, 60_000)) {
-    return Response.json({ error: 'Слишком часто. Подожди немного' }, { status: 429 })
-  }
+  const rl = rateLimit(`support-user:${me.id}`, { limit: 10, windowMs: 60_000 })
+  if (!rl.ok) return tooMany(rl.retryAfter)
 
   let body: { text?: string }
   try {

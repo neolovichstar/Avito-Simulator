@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { getSessionUser, unauthorized } from '@/lib/session'
 import { isOnline } from '@/lib/dto'
+import { rateLimit, tooMany } from '@/lib/rate-limit'
 import { personaOf, parseChatMeta } from '@/lib/chat-engine'
 import { CONDITION_MULT } from '@/lib/catalog-types'
 import { getCategoryMult } from '@/lib/engine'
@@ -67,8 +68,14 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const user = await getSessionUser(req)
   if (!user) return unauthorized()
+  // 61-c: 30 req/мин на юзера — открытие чата создаёт диалог + считает экономику бота
+  const rl = rateLimit(`chats-open:${user.id}`, { limit: 30, windowMs: 60_000 })
+  if (!rl.ok) return tooMany(rl.retryAfter)
   const body = (await req.json().catch(() => ({}))) as { listingId?: string }
-  if (!body.listingId) return Response.json({ error: 'listingId обязателен' }, { status: 400 })
+  // 61-c: id — строка разумной длины (не 10МБ и не число/объект)
+  if (!body.listingId || typeof body.listingId !== 'string' || body.listingId.length > 64) {
+    return Response.json({ error: 'listingId обязателен' }, { status: 400 })
+  }
   const listing = await db.listing.findUnique({ where: { id: body.listingId }, include: { seller: true } })
   if (!listing) return Response.json({ error: 'Объявление не найдено' }, { status: 404 })
   if (listing.sellerId === user.id) return Response.json({ error: 'Это ваше объявление' }, { status: 400 })

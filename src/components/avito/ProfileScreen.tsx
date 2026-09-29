@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   Loader2, Star, Package, Tag, Zap, Trash2, ChevronRight, MessageSquareText, Wallet,
-  TrendingUp, ShoppingBag, PenLine, BadgeCheck, Pencil, Swords, Heart, Truck, PackageCheck,
+  TrendingUp, ShoppingBag, PenLine, BadgeCheck, Pencil, Swords, Heart, Truck, PackageCheck, CloudOff,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
@@ -15,7 +15,7 @@ import { UserAvatar } from '@/components/shared/UserAvatar'
 import type { ProfileData, FeedListing, InventoryItemDTO, RivalsData, TransitItemDTO } from '@/lib/types'
 import { getFavs } from './FeedScreen'
 import { ConditionBadge } from './AvitoApp'
-import { Card, EmptyState, Overline, Skeleton, cn } from './ui'
+import { Card, EmptyState, ErrorState, Overline, Skeleton, cn } from './ui'
 
 const SUB_TABS = [
   { key: 'listings' as const, icon: Tag, label: 'Мои объявления' },
@@ -146,7 +146,16 @@ export default function ProfileScreen({ onOpenListing, onGoSell, onGoFavorites }
     )
   }
   if (error && !data) {
-    return <div className="h-full bg-[#F5F6F8] p-6 text-center text-sm text-red-600">{error}</div>
+    return (
+      <div className="h-full overflow-y-auto bg-[#F5F6F8]">
+        <ErrorState
+          icon={<CloudOff size={28} />}
+          note={error}
+          onRetry={() => void load()}
+          className="pt-16"
+        />
+      </div>
+    )
   }
   if (!data) return null
 

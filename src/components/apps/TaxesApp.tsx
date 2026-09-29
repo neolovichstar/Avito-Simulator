@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useOS } from '@/lib/store'
+import { sound } from '@/lib/sound'
 import { fmtMoney, fmtDateTime, initials } from '@/lib/format'
 import type { TaxBillDTO, TaxData } from '@/lib/types'
 
@@ -190,6 +191,7 @@ export default function TaxesApp() {
       const os = useOS.getState()
       os.refreshSession({ balance: res.balance, taxDebt: res.taxDebt })
       os.pushToast('Налоги', 'Задолженность погашена')
+      sound.success()
       await load()
     } catch (e) {
       setPayError(e instanceof ApiError ? e.message : 'Не удалось оплатить задолженность')
@@ -696,8 +698,8 @@ export default function TaxesApp() {
       {/* ===== НИЖНИЙ ТАБ-БАР (Сбер): белый, border-t #E8EAED, активный #21A03A ===== */}
       <nav className="relative z-10 shrink-0 border-t border-[#E8EAED] bg-white" aria-label="Навигация налогов">
         <div className="grid grid-cols-5 items-end px-1 pb-[max(8px,env(safe-area-inset-bottom))] pt-1.5">
-          <NavItem icon={Home} label="Главная" active={tab === 'home'} onClick={() => setTab('home')} />
-          <NavItem icon={ReceiptText} label="Чеки" active={tab === 'bills'} onClick={() => setTab('bills')} />
+          <NavItem icon={Home} label="Главная" active={tab === 'home'} onClick={() => { sound.tap(); setTab('home') }} />
+          <NavItem icon={ReceiptText} label="Чеки" active={tab === 'bills'} onClick={() => { sound.tap(); setTab('bills') }} />
           <div className="flex flex-col items-center">
             <button
               type="button"
@@ -709,8 +711,8 @@ export default function TaxesApp() {
             </button>
             <span className="mt-1 text-[10px] font-medium leading-none text-[#9AA0A8]">Продажа</span>
           </div>
-          <NavItem icon={Coins} label="Налоги" active={tab === 'taxes'} onClick={() => setTab('taxes')} />
-          <NavItem icon={MoreHorizontal} label="Прочее" active={tab === 'more'} onClick={() => setTab('more')} />
+          <NavItem icon={Coins} label="Налоги" active={tab === 'taxes'} onClick={() => { sound.tap(); setTab('taxes') }} />
+          <NavItem icon={MoreHorizontal} label="Прочее" active={tab === 'more'} onClick={() => { sound.tap(); setTab('more') }} />
         </div>
       </nav>
     </div>

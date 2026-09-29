@@ -2,10 +2,14 @@ import { db } from '@/lib/db'
 import { cache } from '@/lib/cache'
 import { CATEGORY_LABEL } from '@/lib/catalog-types'
 import type { MarketStats } from '@/lib/types'
+import { rateLimit, ipKey, tooMany } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(req: Request) {
+  // 61-c: мягкий лимит 120 req/мин на IP (эндпоинт публичный и закеширован на 20с)
+  const rl = rateLimit(ipKey(req, 'market'), { limit: 120, windowMs: 60_000 })
+  if (!rl.ok) return tooMany(rl.retryAfter)
   const data = await cache.getOrSet('market:stats', 20_000, async () => {
     const [online, activeListings, indexes, events] = await Promise.all([
       // РЕАЛЬНЫЙ онлайн: живые игроки за последние 3 минуты, без ботов

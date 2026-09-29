@@ -4,13 +4,13 @@
 // поиска, аватары 48, имя bold, сниппет, зелёный бейдж непрочитанных.
 // Живой: «печатает…» из realtime и черновики из localStorage.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Search, X, MessageCircle } from 'lucide-react'
+import { Search, X, MessageCircle, CloudOff } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { getSocket } from '@/lib/use-realtime'
 import { timeAgo } from '@/lib/format'
 import { UserAvatar } from '@/components/shared/UserAvatar'
 import type { ChatListItem } from '@/lib/types'
-import { Card, EmptyState, Overline, ScreenTitle, Skeleton, cn } from './ui'
+import { Card, EmptyState, ErrorState, Overline, ScreenTitle, Skeleton, cn } from './ui'
 
 export default function ChatsScreen({ onOpenChat }: { onOpenChat: (id: string) => void }) {
   const [items, setItems] = useState<ChatListItem[]>([])
@@ -136,7 +136,18 @@ export default function ChatsScreen({ onOpenChat }: { onOpenChat: (id: string) =
         </div>
       </div>
 
-      {error && <div className="m-4 rounded-[16px] bg-red-500/[0.08] p-3 text-sm text-red-600">{error}</div>}
+      {/* ошибка при уже загруженном списке: тихий inline-блок с ретраем (поллинг и так повторяет) */}
+      {error && items.length > 0 && (
+        <div className="m-4 flex items-center gap-2.5 rounded-[16px] bg-red-500/[0.08] p-2.5 pl-3 text-sm text-red-600">
+          <span className="min-w-0 flex-1 leading-snug">{error}</span>
+          <button
+            onClick={load}
+            className="h-9 shrink-0 rounded-full bg-white px-4 text-xs font-semibold text-red-600 ring-1 ring-red-500/20 transition-all active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-red-500/40"
+          >
+            Повторить
+          </button>
+        </div>
+      )}
       {loading ? (
         <div className="space-y-2 px-4">
           {Array.from({ length: 5 }).map((_, i) => (
@@ -149,6 +160,13 @@ export default function ChatsScreen({ onOpenChat }: { onOpenChat: (id: string) =
             </Card>
           ))}
         </div>
+      ) : error && items.length === 0 ? (
+        <ErrorState
+          icon={<CloudOff size={28} />}
+          note={error}
+          onRetry={load}
+          className="pt-16"
+        />
       ) : items.length === 0 ? (
         <EmptyState
           icon={<MessageCircle size={28} />}
