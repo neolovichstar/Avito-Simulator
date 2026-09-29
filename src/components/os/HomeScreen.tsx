@@ -719,12 +719,12 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
       const distPct = width > 0 ? dx / width : 0
       // вертикальный жест: вниз — библиотека, вверх из библиотеки — домой
       if (!horizRef.current && !dragActiveRef.current && !editRef.current) {
-        if (dy > 64 && page !== PAGES - 1) {
+        if ((dy > 56 || (dy > 26 && fling.vy > 0.5)) && page !== PAGES - 1) {
           if (el) { el.style.transition = SETTLE_EASE; el.style.transform = `translateX(${-(PAGES - 1) * (100 / PAGES)}%)` }
           setPage(PAGES - 1)
           return
         }
-        if (dy < -64 && page === PAGES - 1) {
+        if ((dy < -56 || (dy < -26 && fling.vy < -0.5)) && page === PAGES - 1) {
           if (el) { el.style.transition = SETTLE_EASE; el.style.transform = 'translateX(0%)' }
           setPage(0)
           return

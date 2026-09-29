@@ -116,8 +116,17 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* Убиваем нативные перехватчики вертикальных жестов: без этого браузер на
+     телефоне срывал свайпы на pull-to-refresh / bounce страницы — свайп
+     «доходил до середины и умирал» (pointercancel). */
+  html,
+  body {
+    overscroll-behavior: none;
+  }
   body {
     @apply bg-background text-foreground;
+    /* тапы без 300мс задержки double-tap-zoom; скроллы и пинч не трогаем */
+    touch-action: manipulation;
   }
 }
 

@@ -7,12 +7,14 @@
 //   • qs=false — Уведомления: живой список с разворачиванием и свайпом.
 // Светлый матовый минимализм (чб), тёмный вариант в тёмной теме ОС.
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
   BatteryFull, BatteryCharging, ChevronRight, Cloud, CloudLightning, CloudRain, CloudSun,
   Moon, MoonStar, Pause, Play, SkipBack, SkipForward, Snowflake, Sun, Timer, Wifi, WifiOff,
   Flashlight, RotateCw, Bluetooth, Volume2,
 } from 'lucide-react'
+import {
+  forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore, memo,
+} from 'react'
 import { useOS, type AppKey } from '@/lib/store'
 import { usePrefs } from '@/lib/prefs'
 import { useVolume } from '@/lib/volume'
@@ -31,13 +33,21 @@ const TXT_PRIMARY = 'text-[#111114]'
 const TXT_SECOND = 'text-[rgba(60,60,67,0.62)]'
 const TXT_TERTIARY = 'text-[rgba(60,60,67,0.35)]'
 
-function useClock(): Date | null {
+// Живые тики каждые 1000 мс только пока шторка ОТКРЫТА. Шторка смонтирована
+// всегда — раньше часы тикали и в закрытом состоянии, ре-рендеря всё дерево
+// ЦУ/уведомлений каждую секунду даже когда оно невидимо (лишняя работа
+// каждый тик батареи/онлайна страницы).
+function useClock(active: boolean): Date | null {
   const ts = useSyncExternalStore(
-    (onStoreChange) => {
-      const id = setInterval(onStoreChange, 1000)
-      return () => clearInterval(id)
-    },
-    () => Math.floor(Date.now() / 1000) * 1000,
+    useCallback(
+      (onStoreChange) => {
+        if (!active) return () => {}
+        const id = setInterval(onStoreChange, 1000)
+        return () => clearInterval(id)
+      },
+      [active],
+    ),
+    () => (active ? Math.floor(Date.now() / 1000) * 1000 : 0),
     () => 0,
   )
   return ts ? new Date(ts) : null
@@ -289,15 +299,33 @@ function MusicNoteGlyph({ dark }: { dark: boolean }) {
 }
 
 // ─── Шторка ──────────────────────────────────────────────────────────────────
-export default function Shade({
-  open, qs, onClose, onOpenApp,
-}: {
+
+/** Императивный API живого вытягивания шторки за палец (зоны статус-бара). */
+export interface ShadeHandle {
+  /** Начать жест вытягивания; false — шторка уже открыта, жест не наш. */
+  beginPull: (mode: 'notif' | 'qs') => boolean
+  /** Палец движется вниз: dy от старта жеста, px — шторка следует за ним. */
+  pullTo: (dy: number) => void
+  /** Палец отпущен: дорешиваем «открыть / отпустить» по дистанции и скорости. */
+  endPull: (dy: number, vy: number) => void
+}
+
+const PULL_DIST = 260 // px пальца — полное вытягивание шторки
+
+interface ShadeProps {
   open: boolean
   /** true — открыть сразу в центре управления (правая зона статус-бара) */
   qs?: boolean
   onClose: () => void
   onOpenApp: (app: AppKey) => void
-}) {
+  /** Жест вытягивания дошёл до «открыть» — страница ставит open+qs. */
+  onCommitOpen?: (mode: 'notif' | 'qs') => void
+}
+
+const ShadeImpl = forwardRef<ShadeHandle, ShadeProps>(function Shade(
+  { open, qs, onClose, onOpenApp, onCommitOpen },
+  ref,
+) {
   const flashlight = useOS((s) => s.flashlight)
   const setFlashlight = useOS((s) => s.setFlashlight)
   const dnd = useOS((s) => s.dnd)
@@ -313,7 +341,7 @@ export default function Shade({
   const toggleTheme = useOS((s) => s.toggleTheme)
   const volume = useVolume((s) => s.volume)
   const setVolume = useVolume((s) => s.setVolume)
-  const now = useClock()
+  const now = useClock(open)
   const dark = theme === 'dark'
   const w = useMemo(() => weatherNow(0), [])
 
@@ -324,11 +352,119 @@ export default function Shade({
 
   // Режим QS: открыть в центре управления, если шторку вызвали из правой зоны.
   const [expanded, setExpanded] = useState(!!qs)
+  const [pulling, setPulling] = useState(false)
   const [prevOpen, setPrevOpen] = useState(open)
   if (open !== prevOpen) {
     setPrevOpen(open)
     if (open) setExpanded(!!qs)
+    else setPulling(false) // закрыли обычным путём — сброс жеста (render-phase, без эффекта)
   }
+
+  // ─── Живое вытягивание за палец (зоны статус-бара, см. page.tsx) ───────────
+  // Шторка следует за пальцем от статус-бара: transform пишется прямо в DOM
+  // (без ре-рендеров), на отпускание решаем «открыть / отпустить» по дистанции
+  // и скорости флика.
+  const sectionRef = useRef<HTMLElement | null>(null)
+  const scrimRef = useRef<HTMLButtonElement | null>(null)
+  const settleTimer = useRef(0)
+  const openRef = useRef(open)
+  useEffect(() => {
+    openRef.current = open
+  }, [open])
+  useEffect(() => () => window.clearTimeout(settleTimer.current), [])
+  const pullModeRef = useRef<'notif' | 'qs'>('notif')
+  const onCommitOpenRef = useRef(onCommitOpen)
+  useEffect(() => {
+    onCommitOpenRef.current = onCommitOpen
+  })
+
+  // Сброс inline-стилей жеста: возвращаем управление CSS-классам
+  const clearPullStyles = useCallback(() => {
+    const el = sectionRef.current
+    const sc = scrimRef.current
+    if (el) {
+      el.style.transition = ''
+      el.style.transform = ''
+      el.style.willChange = ''
+    }
+    if (sc) {
+      sc.style.transition = ''
+      sc.style.opacity = ''
+    }
+  }, [])
+
+  const beginPull = useCallback(
+    (mode: 'notif' | 'qs'): boolean => {
+      if (openRef.current) return false // уже открыта — зона не при делах
+      window.clearTimeout(settleTimer.current)
+      pullModeRef.current = mode
+      setExpanded(mode === 'qs')
+      setPulling(true)
+      const el = sectionRef.current
+      const sc = scrimRef.current
+      if (el) {
+        el.style.transition = 'none'
+        el.style.transform = 'translateY(-102%)'
+        el.style.willChange = 'transform'
+      }
+      if (sc) {
+        sc.style.transition = 'none'
+        sc.style.opacity = '0'
+      }
+      return true
+    },
+    [],
+  )
+
+  const pullTo = useCallback((dy: number) => {
+    const el = sectionRef.current
+    if (!el) return
+    const p = Math.max(0, Math.min(1, dy / PULL_DIST))
+    // лёгкая «резинка» в начале: пальцу проще схватить шторку
+    const eased = p * (0.72 + 0.28 * p)
+    el.style.transform = `translateY(${(-102 + 102 * eased).toFixed(2)}%)`
+    const sc = scrimRef.current
+    if (sc) sc.style.opacity = (0.35 * eased).toFixed(3)
+  }, [])
+
+  const endPull = useCallback(
+    (dy: number, vy: number) => {
+      const el = sectionRef.current
+      const sc = scrimRef.current
+      // Это был просто тап — мгновенно отдаём управление CSS-классам,
+      // чтобы onClick открыл шторку штатным переходом без задержек.
+      if (Math.abs(dy) < 6 && Math.abs(vy) < 0.25) {
+        clearPullStyles()
+        setPulling(false)
+        return
+      }
+      const p = Math.max(0, Math.min(1, dy / PULL_DIST))
+      const commit = dy > 64 || (p > 0.18 && vy > 0.42)
+      if (el) {
+        el.style.transition = 'transform 380ms cubic-bezier(0.22, 1, 0.36, 1)'
+        el.style.transform = commit ? 'translateY(0%)' : 'translateY(-102%)'
+      }
+      if (sc) {
+        sc.style.transition = 'opacity 300ms ease'
+        sc.style.opacity = commit ? '1' : '0'
+      }
+      if (commit) {
+        sound.swipe()
+        onCommitOpenRef.current?.(pullModeRef.current)
+      }
+      settleTimer.current = window.setTimeout(() => {
+        clearPullStyles()
+        if (!commit) setPulling(false)
+      }, 420)
+    },
+    [clearPullStyles],
+  )
+
+  useImperativeHandle(
+    ref,
+    () => ({ beginPull, pullTo, endPull }),
+    [beginPull, pullTo, endPull],
+  )
 
   const toggleFlash = async () => {
     const next = !flashlight
@@ -363,10 +499,17 @@ export default function Shade({
       }
     },
   })
-  // iOS-поведение: свайп вверх из ЛЮБОГО свободного места (поля вокруг карточки,
-  // зона за граббером) закрывает шторку. Скролл-контейнеры и контролы защищены.
+  // iOS-поведение: свайп вверх из ЛЮБОГО свободного места закрывает шторку.
+  // УМНЫЙ ДЕТЕКТ: контролы защищены всегда; внутри data-shade-scroll жест
+  // остаётся нативному скроллу ТОЛЬКО когда списку есть куда скроллить —
+  // иначе (контент помещается) свайп вверх из карточки тоже закрывает.
   const sectionCloseDrag = useDrag({
-    ignoreWithin: 'button, input, [role="slider"], [data-shade-scroll]',
+    onStart: (e) => {
+      const t = e.target as Element | null
+      if (t?.closest?.('button, input, [role="slider"]')) return false
+      const sc = t?.closest?.('[data-shade-scroll]') as HTMLElement | null
+      if (sc && sc.scrollHeight > sc.clientHeight + 4) return false
+    },
     onEnd: (_dx, dy, fling) => {
       if (dy < -36 || fling.vy < -0.55) {
         sound.swipe()
@@ -395,13 +538,15 @@ export default function Shade({
   const BRIGHT_SPAN = 0.6
   const brightNorm = (brightness - BRIGHT_MIN) / BRIGHT_SPAN
 
-  // key для переигрывания вступительных анимаций
-  const animKey = open ? (expanded ? 'cc' : 'notif') : 'closed'
+  // key для переигрывания вступительных анимаций (стабилен во время жеста
+  // вытягивания, чтобы контент не перемонтировался в момент commit)
+  const animKey = open || pulling ? (expanded ? 'cc' : 'notif') : 'closed'
 
   return (
-    <div className={`pointer-events-none absolute inset-0 z-55 ${open ? '' : 'invisible'}`}>
+    <div className={`pointer-events-none absolute inset-0 z-55 ${open || pulling ? '' : 'invisible'}`}>
       {/* скрим */}
       <button
+        ref={scrimRef}
         type="button"
         aria-label="Закрыть шторку"
         tabIndex={open ? 0 : -1}
@@ -413,6 +558,7 @@ export default function Shade({
 
       {/* панель на весь экран; ЦУ живёт плавающей карточкой со скруглением 34px */}
       <section
+        ref={sectionRef}
         aria-label={expanded ? 'Центр управления' : 'Уведомления'}
         onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
         {...sectionCloseDrag}
@@ -430,8 +576,10 @@ export default function Shade({
           /* ─────────── ЦЕНТР УПРАВЛЕНИЯ ─────────── */
           <div
             key={animKey}
-            className={`sheet-rise mx-3 mb-3 mt-12 flex max-h-[calc(100%-60px)] min-h-0 flex-initial flex-col overflow-hidden rounded-[34px] shadow-2xl ring-1 backdrop-blur-3xl ${
-              dark ? 'bg-[#1B1D22]/[0.82] text-white ring-white/[0.10]' : `bg-white/70 ${TXT_PRIMARY} ring-black/[0.06]`
+            className={`sheet-rise mx-3 mb-3 mt-12 flex max-h-[calc(100%-60px)] min-h-0 flex-initial flex-col overflow-hidden rounded-[34px] shadow-2xl ring-1 ${
+              // вложенный backdrop-blur-3xl убран: секция уже блюрит фон, двойной
+              // блюр пересэмплируется каждый кадр жеста и просаживает fps на телефонах
+              dark ? 'bg-[#1B1D22]/[0.9] text-white ring-white/[0.10]' : `bg-white/[0.88] ${TXT_PRIMARY} ring-black/[0.06]`
             }`}
           >
             <div data-shade-scroll className="flex min-h-0 flex-initial flex-col overflow-y-auto px-3 pb-1 pt-2 [scrollbar-width:none]">
@@ -635,4 +783,9 @@ export default function Shade({
       </section>
     </div>
   )
-}
+})
+
+// memo: page.tsx ре-рендерится на тиках батареи/онлайна — шторка не должна
+// перевычислять своё дерево вместе с ними
+const Shade = memo(ShadeImpl)
+export default Shade

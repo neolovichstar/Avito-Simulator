@@ -81,11 +81,14 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   const timerRef = useRef(0)
   const [day, setDay] = useState<{ deals: number; net: number } | null>(null)
 
-  // свайп вверх с «следованиями за пальцем/мышью»: работает и на телефоне, и на ПК.
+  // Свайп вверх с «следованиями за пальцем/мышью»: работает и на телефоне, и на ПК.
   // Перф: transform/opacity пишутся напрямую в DOM (ref) — ре-рендера на каждый
-  // pointermove нет. Внутри списка уведомлений жест не стартует — там живёт
-  // нативный скролл (data-lock-scroll + touch-action: pan-y на корне).
+  // pointermove нет. УМНЫЙ ДЕТЕКТ списка уведомлений: если тап пришёл внутрь
+  // data-lock-scroll, но список НЕ скроллится (контент помещается) — жест
+  // разблокировки всё равно работает (раньше свайп «умирал» по всему центру
+  // экрана); если скроллится — остаётся нативному скроллу.
   const rootRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement | null>(null)
   const movedRef = useRef(false)
 
   // итоги дня — только для авторизованной сессии, один раз при монтировании
@@ -146,9 +149,16 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   }, [unlock])
 
   const { onPointerDown } = useDrag({
-    ignoreWithin: '[data-lock-scroll]',
-    onStart: () => {
-      if (leavingRef.current) return
+    onStart: (e) => {
+      if (leavingRef.current) return false
+      // тап внутри списка уведомлений: жёстко забираем жест на разблокировку
+      // только когда списку некуда скроллиться
+      const inList = (e.target as Element | null)?.closest?.('[data-lock-scroll]')
+      if (inList) {
+        const el = listRef.current ?? (inList as HTMLElement)
+        const scrollable = !!el && el.scrollHeight > el.clientHeight + 4
+        if (scrollable) return false // жест отдаём нативному скроллу
+      }
       movedRef.current = false
       const el = rootRef.current
       if (el) {
@@ -169,7 +179,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     onEnd: (_dx, dy, fling) => {
       const el = rootRef.current
       // флик вверх тоже разблокирует: короткий, но быстрый жест
-      if (!leavingRef.current && (dy < -70 || (dy < -30 && fling.vy < -0.4))) {
+      if (!leavingRef.current && (dy < -64 || (dy < -22 && fling.vy < -0.45))) {
         unlock()
         return
       }
@@ -287,7 +297,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
         )}
 
         {/* ─── Уведомления, итоги дня и медиа ─── */}
-        <div data-lock-scroll className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto [scrollbar-width:none]">
+        <div ref={listRef} data-lock-scroll className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto [scrollbar-width:none]">
           {unreadCount > 0 && (
             <p className={`text-center text-[13px] font-medium ${T.notifLabel}`}>Уведомления</p>
           )}

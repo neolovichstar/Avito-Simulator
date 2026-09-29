@@ -7,6 +7,11 @@
 //     стрелка-подсказка у края во время жеста «назад».
 // Работает и пальцем, и мышью (Pointer Events через useDrag).
 // Пилюля mix-blend-difference: сама становится тёмной на светлых экранах.
+//
+// Перф: пилюля и стрелка во время жеста обновляются НАПРЯМУЮ в DOM (ref) —
+// ни одного setState на pointermove (раньше каждый кадр жеста ре-рендерил
+// компонент и детей). React-состояние остаётся только для монтирования
+// стрелки «назад» (один раз на жест).
 
 import { useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
@@ -18,6 +23,9 @@ const RECENTS_DRAG = 20 // px вверх при медленном драге �
 const HOLD_MS = 320 // дольше — это «долгий драг» (недавние), короче — флик
 const BACK_THRESHOLD = 52 // px от бокового края для «назад»
 const PILL_BASE = 112 // ширина пилюли в покое, px (w-28 — как в Android 16)
+const PILL_STRETCH = 104 // прибавка ширины при полном вытягивании
+
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
 
 export default function GestureNav({
   onBack,
@@ -30,10 +38,10 @@ export default function GestureNav({
   onRecents: () => void
   canGoBack: boolean
 }) {
-  const [pillStretch, setPillStretch] = useState(0) // 0..1 — драг пилюли вверх
   const [backSide, setBackSide] = useState<null | 'left' | 'right'>(null)
-  const [backProgress, setBackProgress] = useState(0)
   const startedAt = useRef(0)
+  const pillRef = useRef<HTMLSpanElement>(null)
+  const arrowRef = useRef<HTMLSpanElement>(null)
 
   // ─── Нижняя зона: домой / недавние ─────────────────────────────────────────
   const bottom = useDrag({
@@ -41,12 +49,21 @@ export default function GestureNav({
       startedAt.current = Date.now()
     },
     onMove: (_dx, dy) => {
-      setPillStretch(Math.min(1, Math.max(0, -dy) / 64))
+      const el = pillRef.current
+      if (!el) return
+      const p = clamp01(-dy / 64)
+      el.style.transition = 'none' // во время жеста пилюля строго за пальцем
+      el.style.width = `${PILL_BASE + p * PILL_STRETCH}px`
     },
-    onEnd: (_dx, dy) => {
-      setPillStretch(0)
+    onEnd: (_dx, dy, fling) => {
+      const el = pillRef.current
+      if (el) {
+        el.style.transition = '' // вернуть CSS-переход на отпускании
+        el.style.width = `${PILL_BASE}px`
+      }
       const dt = Date.now() - startedAt.current
-      if (dy < -HOME_FLICK) {
+      const flick = dy < -HOME_FLICK || (dy < -24 && fling.vy < -0.55)
+      if (flick) {
         if (dt > HOLD_MS) {
           sound.pop()
           onRecents()
@@ -62,14 +79,18 @@ export default function GestureNav({
   })
 
   // ─── Боковые зоны: назад ───────────────────────────────────────────────────
+  const moveArrow = (progress: number) => {
+    const el = arrowRef.current
+    if (!el) return
+    el.style.opacity = String(0.35 + progress * 0.65)
+    el.style.transform = `translateY(-50%) scale(${0.8 + progress * 0.25})`
+  }
+
   const leftEdge = useDrag({
     onStart: () => setBackSide('left'),
-    onMove: (dx, _dy) => {
-      setBackProgress(Math.max(0, Math.min(1, dx / BACK_THRESHOLD)))
-    },
-    onEnd: (dx, _dy) => {
+    onMove: (dx) => moveArrow(clamp01(dx / BACK_THRESHOLD)),
+    onEnd: (dx) => {
       setBackSide(null)
-      setBackProgress(0)
       if (dx >= BACK_THRESHOLD && canGoBack) {
         sound.swipe()
         onBack()
@@ -78,20 +99,15 @@ export default function GestureNav({
   })
   const rightEdge = useDrag({
     onStart: () => setBackSide('right'),
-    onMove: (dx, _dy) => {
-      setBackProgress(Math.max(0, Math.min(1, -dx / BACK_THRESHOLD)))
-    },
-    onEnd: (dx, _dy) => {
+    onMove: (dx) => moveArrow(clamp01(-dx / BACK_THRESHOLD)),
+    onEnd: (dx) => {
       setBackSide(null)
-      setBackProgress(0)
       if (-dx >= BACK_THRESHOLD && canGoBack) {
         sound.swipe()
         onBack()
       }
     },
   })
-
-  const pillWidth = PILL_BASE + pillStretch * 104
 
   return (
     <>
@@ -109,8 +125,8 @@ export default function GestureNav({
         style={{ paddingBottom: 'calc(8px + env(safe-area-inset-bottom))' }}
       >
         <span
+          ref={pillRef}
           className="block h-1 w-28 rounded-full bg-white/40 mix-blend-difference transition-[width] duration-150 ease-[cubic-bezier(0.2,0,0,1)]"
-          style={{ width: pillWidth }}
         />
       </div>
 
@@ -118,17 +134,15 @@ export default function GestureNav({
       <div aria-hidden="true" className="absolute inset-y-10 left-0 z-[59] w-4 touch-none select-none" {...leftEdge} />
       <div aria-hidden="true" className="absolute inset-y-10 right-0 z-[59] w-4 touch-none select-none" {...rightEdge} />
 
-      {/* стрелка-подсказка жеста «назад» */}
+      {/* стрелка-подсказка жеста «назад» (монтируется раз на жест, стиль — из ref) */}
       {backSide && (
         <span
+          ref={arrowRef}
           aria-hidden="true"
           className={`absolute top-1/2 z-[60] flex size-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/12 ring-1 ring-white/25 backdrop-blur-md ${
             backSide === 'left' ? 'left-2' : 'right-2'
           }`}
-          style={{
-            opacity: 0.35 + backProgress * 0.65,
-            transform: `translateY(-50%) scale(${0.8 + backProgress * 0.25})`,
-          }}
+          style={{ opacity: 0.35 }}
         >
           {backSide === 'left' ? (
             <ChevronLeft className="size-5 text-white" />

@@ -36,14 +36,12 @@ function useClock(): Date | null {
 // ─── Карточка уведомления (M3 Expressive) ────────────────────────────────────
 // Одна и та же для непрочитанных и прочитанных; непрочитанные — ярче + точка.
 function NotifCard({
-  n, open, expanded, isDrag, dx, willDelete, tone = 'dark',
+  n, open, expanded, willDelete, tone = 'dark',
   onToggle, onPointerDown, onOpen,
 }: {
   n: NotificationDTO
   open: boolean
   expanded: boolean
-  isDrag: boolean
-  dx: number
   willDelete: boolean
   /** 'dark' — белые тексты на стекле, 'light' — графит на белой карточке */
   tone?: 'dark' | 'light'
@@ -104,12 +102,13 @@ function NotifCard({
         }
       }}
       style={{
-        transform: isDrag ? `translateX(${dx}px)` : undefined,
-        opacity: isDrag ? Math.max(0, 1 - Math.abs(dx) / 170) : undefined,
+        // transform/opacity во время свайпа пишутся напрямую в DOM
+        // (NotificationList.onMove) — здесь их не трогаем, чтобы React
+        // не затирал императивные стили при ре-рендере
         touchAction: 'pan-y',
       }}
       className={`relative cursor-pointer touch-pan-y select-none overflow-hidden rounded-[24px] px-4 py-3.5 outline-none ring-1 transition-[background-color,box-shadow] duration-200 focus-visible:ring-2 ${T.ring} ${T.card} ${
-        !isDrag && !willDelete ? T.active : ''
+        !willDelete ? T.active : ''
       }`}
     >
       <div className="flex items-start gap-3">
@@ -170,8 +169,12 @@ export function NotificationList({
   const markNotificationsRead = useOS((s) => s.markNotificationsRead)
   const removeNotification = useOS((s) => s.removeNotification)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [dragging, setDragging] = useState<{ id: string; dx: number } | null>(null)
-  const dragRef = useRef<{ id: string } | null>(null)
+  // Свайп-удаление без ре-рендеров на каждый кадр: карточка следует за пальцем
+  // через прямую запись transform/opacity в DOM; React-состояние — только
+  // «перешли порог удаления» (краснеет — 1-2 ре-рендера на жест).
+  const [willDeleteId, setWillDeleteId] = useState<string | null>(null)
+  const willDeleteRef = useRef(false)
+  const dragRef = useRef<{ id: string; el: HTMLElement } | null>(null)
   const suppressClick = useRef(false)
 
   const unreadItems = notifications.filter((n) => !n.readAt)
@@ -199,27 +202,50 @@ export function NotificationList({
   // Свайп-удаление: карточка следует за пальцем, дальше порога — краснеет и удаляется
   const { onPointerDown: onCardPointerDown } = useDrag({
     onStart: (e) => {
-      const id = (e.currentTarget as HTMLElement).dataset.notifId ?? ''
+      const el = e.currentTarget as HTMLElement
+      const id = el.dataset.notifId ?? ''
       if (!id) return
-      dragRef.current = { id }
-      setDragging({ id, dx: 0 })
+      dragRef.current = { id, el }
+      willDeleteRef.current = false
+      el.style.willChange = 'transform, opacity'
     },
     onMove: (dx) => {
-      if (!dragRef.current) return
-      setDragging({ id: dragRef.current.id, dx })
+      const cur = dragRef.current
+      if (!cur) return
+      const x = clampX(dx)
+      cur.el.style.transform = `translateX(${x}px)`
+      cur.el.style.opacity = String(Math.max(0, 1 - Math.abs(x) / 170))
+      const over = Math.abs(x) > SWIPE_DELETE
+      if (over !== willDeleteRef.current) {
+        willDeleteRef.current = over
+        setWillDeleteId(over ? cur.id : null)
+      }
     },
-    onEnd: (dx) => {
+    onEnd: (dx, _dy, fling) => {
       const cur = dragRef.current
       dragRef.current = null
-      setDragging(null)
       if (!cur) return
-      if (Math.abs(dx) > 12) {
+      // плавный возврат/затухание вместо мгновенного прыжка
+      cur.el.style.willChange = ''
+      cur.el.style.transition = 'transform 240ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease'
+      cur.el.style.transform = ''
+      cur.el.style.opacity = ''
+      window.setTimeout(() => {
+        cur.el.style.transition = ''
+      }, 260)
+      if (willDeleteRef.current) {
+        willDeleteRef.current = false
+        setWillDeleteId(null)
+      }
+      const x = Math.abs(clampX(dx))
+      if (x > 12 || Math.abs(fling.vx) > 0.5) {
         suppressClick.current = true
         setTimeout(() => {
           suppressClick.current = false
         }, 90)
       }
-      if (Math.abs(dx) > SWIPE_DELETE) dismiss(cur.id)
+      // порог дистанции ИЛИ короткий резкий флик в сторону
+      if (x > SWIPE_DELETE || (x > 40 && Math.abs(fling.vx) > 0.6)) dismiss(cur.id)
     },
   })
 
@@ -283,9 +309,7 @@ export function NotificationList({
               n={n}
               open={interactive}
               expanded={expandedId === n.id}
-              isDrag={dragging?.id === n.id}
-              dx={dragging?.id === n.id ? clampX(dragging.dx) : 0}
-              willDelete={dragging?.id === n.id && Math.abs(clampX(dragging.dx)) > SWIPE_DELETE}
+              willDelete={willDeleteId === n.id}
               tone={tone}
               onToggle={() => toggle(n.id)}
               onPointerDown={onCardPointerDown}
@@ -304,9 +328,7 @@ export function NotificationList({
               n={n}
               open={interactive}
               expanded={expandedId === n.id}
-              isDrag={dragging?.id === n.id}
-              dx={dragging?.id === n.id ? clampX(dragging.dx) : 0}
-              willDelete={dragging?.id === n.id && Math.abs(clampX(dragging.dx)) > SWIPE_DELETE}
+              willDelete={willDeleteId === n.id}
               tone={tone}
               onToggle={() => toggle(n.id)}
               onPointerDown={onCardPointerDown}

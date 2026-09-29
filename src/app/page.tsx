@@ -8,7 +8,8 @@ import { hydratePrefs } from '@/lib/prefs'
 import { hydrateVolume, initVolumeEngineBridge } from '@/lib/volume'
 import { api, getToken, setToken } from '@/lib/api'
 import { useRealtime } from '@/lib/use-realtime'
-import { useSwipe } from '@/lib/use-swipe'
+import { useDrag } from '@/lib/use-swipe'
+import type { ShadeHandle } from '@/components/os/Shade'
 import { initDeviceSensors } from '@/lib/device'
 import PhoneFrame from '@/components/os/PhoneFrame'
 import StatusBar from '@/components/os/StatusBar'
@@ -412,24 +413,45 @@ export default function Home() {
   // ---------- ЖЕСТЫ ШТОРКИ (как в настоящем Android): -----------------------
   // свайп вниз от ЛЕВОЙ половины верхнего края — уведомления,
   // от ПРАВОЙ половины — сразу полные быстрые настройки.
-  const notifSwipe = useSwipe({
-    threshold: 30,
-    onSwipe: (dir) => {
-      if (dir === 'down') {
-        setShadeQs(false)
-        setShadeOpen(true)
-      }
-    },
-  })
-  const controlSwipe = useSwipe({
-    threshold: 30,
-    onSwipe: (dir) => {
-      if (dir === 'down') {
-        setShadeQs(true)
-        setShadeOpen(true)
-      }
-    },
-  })
+  // Шторка СЛЕДУЕТ за пальцем (живое вытягивание через ShadeHandle),
+  // тап по зоне открывает как раньше.
+  const shadeRef = useRef<ShadeHandle | null>(null)
+  const pullArmed = useRef(false)
+  const suppressZoneClick = useRef(false)
+
+  const commitShade = useCallback((mode: 'notif' | 'qs') => {
+    setShadeQs(mode === 'qs')
+    setShadeOpen(true)
+  }, [])
+
+  const useZoneDrag = (mode: 'notif' | 'qs') =>
+    useDrag({
+      onStart: () => {
+        pullArmed.current = shadeRef.current?.beginPull(mode) ?? false
+      },
+      onMove: (_dx, dy) => {
+        if (pullArmed.current) shadeRef.current?.pullTo(dy)
+      },
+      onEnd: (_dx, dy, fling) => {
+        if (!pullArmed.current) return
+        pullArmed.current = false
+        // был настоящий драг — последующий click (сгенерится после pointerup)
+        // не должен заново открывать/переключать шторку
+        if (Math.abs(dy) > 6 || Math.abs(fling.vy) > 0.25) suppressZoneClick.current = true
+        shadeRef.current?.endPull(dy, fling.vy)
+      },
+    })
+  const notifPull = useZoneDrag('notif')
+  const qsPull = useZoneDrag('qs')
+
+  const zoneClick = (mode: 'notif' | 'qs') => () => {
+    if (suppressZoneClick.current) {
+      suppressZoneClick.current = false
+      return
+    }
+    setShadeQs(mode === 'qs')
+    setShadeOpen(true)
+  }
 
   // Стабильные колбэки: page.tsx ре-рендерится на тиках батареи/онлайна —
   // без useCallback ре-рендер страницы перевоссоздаёт дерево recents-слоёв.
@@ -557,10 +579,12 @@ export default function Home() {
 
         {/* системная шторка Android 17: QS-плитки + медиа + уведомления */}
         <Shade
+          ref={shadeRef}
           open={shadeOpen}
           qs={shadeQs}
           onClose={() => setShadeOpen(false)}
           onOpenApp={(a) => { setShadeOpen(false); openApp(a) }}
+          onCommitOpen={commitShade}
         />
         <ToastStack />
         {regionAsk && session && !locked && (
@@ -586,20 +610,21 @@ export default function Home() {
         )}
 
         {/* верхние зоны-жесты (как в настоящем телефоне): левая половина —
-            уведомления, правая — центр управления. Тап тоже работает. */}
+            уведомления, правая — центр управления. Шторка тянется за пальцем.
+            Тап тоже работает. Зоны 44px — под палец, не 32px. */}
         <div
           role="button"
           aria-label="Открыть уведомления"
-          className="absolute left-0 top-0 z-[59] h-8 w-1/2 touch-none outline-none focus-visible:ring-2 focus-visible:ring-white/50"
-          onPointerDown={notifSwipe.onPointerDown}
-          onClick={() => { setShadeQs(false); setShadeOpen(true) }}
+          className="absolute left-0 top-0 z-[59] h-10 w-1/2 touch-none outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+          onPointerDown={notifPull.onPointerDown}
+          onClick={zoneClick('notif')}
         />
         <div
           role="button"
           aria-label="Открыть быстрые настройки"
-          className="absolute right-0 top-0 z-[59] h-8 w-1/2 touch-none outline-none focus-visible:ring-2 focus-visible:ring-white/50"
-          onPointerDown={controlSwipe.onPointerDown}
-          onClick={() => { setShadeQs(true); setShadeOpen(true) }}
+          className="absolute right-0 top-0 z-[59] h-10 w-1/2 touch-none outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+          onPointerDown={qsPull.onPointerDown}
+          onClick={zoneClick('qs')}
         />
 
         {/* жестовая навигация: пилюля + свайпы от краёв (вместо кнопок).
