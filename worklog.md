@@ -2677,3 +2677,18 @@ Stage Summary:
 - ИИ отвечает до 9с вместо 90с, бюджет ×2.5, счёт сравнивается с ценой карточки
 - Выход в меню: тап по пилюле + подсказка при первом приложении; анлок с live-коммитом
 - Прод отстаёт на коммит bb8e15f — запушить, как только юзер даст свежий PAT
+---
+Task ID: 62-push
+Agent: main (Z.ai Code)
+Task: Получен «свежий» GitHub PAT от юзера — попытка пуша фиксов Task 62
+
+Work Log:
+- PAT сохранён в .env (GITHUB_PAT) + заменён в remote URL origin; длина 93 символа (структурно полный fine-grained)
+- git ls-remote прошёл (репо публичный → чтение без auth), НО: git push → «Invalid username or token»; GitHub API /user → 401 Bad credentials (оба хедера Bearer/token) → ТОКЕН НЕДЕЙСТВИТЕЛЕН (истёк или отозван). Второй мёртвый PAT подряд
+- Прод остаётся на bede379 (Task 61), деплой-бюджет не потрачен (push не прошёл)
+- Sanity после рестарта песочницы: dev-сервер был мёртв (порт 3000 не слушал, зомби-обёртки bun) → перезапущен; health {ok:true,db:up}; tsc 0 в src; рынок 140 объявлений; .env жив (DATABASE_URL+ADMIN_KEY+OPENROUTER+GITHUB_PAT)
+- QA-смоук на свежем сервере: agent-browser свайп-анлок (195,700→195,220) → дом-экран отрендерился (виджеты/иконки/док) — фиксы bb8e15f в дереве подтверждены (chat-engine:463 потолок Math.min(botLimit, listing.price))
+
+Stage Summary:
+- БЛОКЕР: пуш фиксов Task 62 (bb8e15f) ждёт ДЕЙСТВИТЕЛЬНО новый PAT от юзера (Contents: RW, repo Avito-Simulator); всё остальное готово и проверено
+- Юзеру нужны шаги: GitHub → Settings → Developer settings → Fine-grained tokens → Generate → Avito-Simulator → Contents: Read and write → Expiration 90d
