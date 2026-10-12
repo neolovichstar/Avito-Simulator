@@ -130,6 +130,13 @@ export const useOS = create<OSState>((set, get) => ({
   setSessionLoading: (v) => set({ sessionLoading: v }),
   openApp: (app) => {
     sound.tap()
+    // Первое открытие приложения: подсказка навигации — выход в меню не находили
+    try {
+      if (!localStorage.getItem('avito_sim_navhint_v1')) {
+        localStorage.setItem('avito_sim_navhint_v1', '1')
+        get().pushToast('Навигация', 'Смахните снизу вверх или коснитесь пилюли внизу — вернётесь на главный экран')
+      }
+    } catch { /* приватный режим — без подсказки */ }
     set((s) => ({
       currentApp: app,
       // keep-alive слои дороги (каждое живое приложение поллит и рендерится) —

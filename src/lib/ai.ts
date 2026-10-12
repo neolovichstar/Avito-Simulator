@@ -54,7 +54,7 @@ const MODEL_FALLBACK = process.env.OPENROUTER_MODEL_FALLBACK ?? 'mistralai/mistr
 // Лимит запросов к OpenRouter в сутки (у юзера тариф 1000/день — держим запас).
 // ИИ используется ТОЛЬКО в чатах-переговорах; всё остальное (аукционы, рынок,
 // win-back, открытия) — скрипты без LLM. Типовые согласия в чатах тоже без LLM.
-export const AI_DAILY_BUDGET = Number(process.env.AI_DAILY_LIMIT ?? 240)
+export const AI_DAILY_BUDGET = Number(process.env.AI_DAILY_LIMIT ?? 600)
 
 interface BudgetState { date: string; used: number }
 const gB = globalThis as unknown as { __avitoAiBudget?: BudgetState }
@@ -118,7 +118,7 @@ function buildSystemPrompt(ctx: NegotiationContext): string {
     : `Ты ПРОДАВЕЦ. Твой товар: "${ctx.listing.title}", состояние: ${ctx.listing.conditionLabel}, твоя цена: ${fmtMoney(ctx.listing.price)}.`
   const limitText = isBuyer
     ? `Твоя СКРЫТАЯ максимальная цена покупки: ${ctx.botLimit} руб. Ниже этой суммы не соглашайся, лучше откажись.`
-    : `Твоя СКРЫТАЯ минимальная цена продажи: ${ctx.botLimit} руб. Ниже неё не соглашайся, лучше откажись.`
+    : `Твоя СКРЫТАЯ минимальная цена продажи: ${ctx.botLimit} руб. Ниже неё не соглашайся, лучше откажись. ВАЖНО: твоя цена объявления ${fmtMoney(ctx.listing.price)} — потолок, требовать или выставлять счёт ВЫШЕ неё нельзя никогда.`
   const marketHint = `Реальная рыночная цена такого товара примерно ${fmtMoney(Math.round(ctx.listing.baseValue))}. ${ctx.marketNote ?? ''}`
   const chatPartner = isBuyer ? 'продавец' : 'покупатель'
   // память о собеседнике — личный опыт прошлых общения (персистентный, серверный)
@@ -197,7 +197,8 @@ export async function callOpenRouter(system: string, userContent: string, maxTok
   if (!key) return null
   const attempt = async (model: string): Promise<string | null> => {
     const controller = new AbortController()
-    const t = setTimeout(() => controller.abort(), 22_000)
+    // 9с: дольше — игрок уходит из чата, а ответ всё висит (было 22с × 2 модели × ретрай ≈ 90с тишины)
+    const t = setTimeout(() => controller.abort(), 9_000)
     try {
       const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
@@ -243,12 +244,13 @@ function ruleReply(ctx: NegotiationContext): { text: string; action: AiActionTyp
 
   // покупатель согласен на цену бота / продавец согласен
   const askedPrice = extractPrice(ctx.playerMessage)
+  // ПОТОЛОК: продавец никогда не называет сумму выше цены объявления
   let offer = isBuyer
     ? Math.max(ctx.botLimit, Math.round(ctx.listing.price * (1 - 0.08 - Math.random() * 0.09)))
-    : Math.min(ctx.botLimit, Math.round(ctx.listing.price * (1 + 0.06 + Math.random() * 0.07)))
+    : Math.min(ctx.botLimit, ctx.listing.price)
 
   if (askedPrice) {
-    const acceptable = isBuyer ? askedPrice <= ctx.botLimit : askedPrice >= ctx.botLimit
+    const acceptable = isBuyer ? askedPrice <= ctx.botLimit : askedPrice >= ctx.botLimit && askedPrice <= ctx.listing.price
     if (acceptable) {
       return {
         text: withTypos(
@@ -258,13 +260,13 @@ function ruleReply(ctx: NegotiationContext): { text: string; action: AiActionTyp
           p.typoRate,
         ),
         action: isBuyer ? 'accept' : 'invoice',
-        price: askedPrice,
-        newLimit: askedPrice,
+        price: Math.min(askedPrice, ctx.listing.price),
+        newLimit: Math.min(askedPrice, ctx.listing.price),
       }
     }
     const counter = isBuyer
       ? Math.min(ctx.botLimit, Math.round(askedPrice * 0.93))
-      : Math.max(ctx.botLimit, Math.round(askedPrice * (distrust ? 1.12 : 1.09)))
+      : Math.min(ctx.listing.price, Math.max(ctx.botLimit, Math.round(askedPrice * (distrust ? 1.12 : 1.09))))
     return {
       text: withTypos(
         isBuyer
@@ -279,7 +281,7 @@ function ruleReply(ctx: NegotiationContext): { text: string; action: AiActionTyp
   }
 
   if (msg.includes('согласен') || msg.includes('по рукам') || msg.includes('беру') || msg.includes('давай')) {
-    const price = isBuyer ? Math.min(offer, ctx.botLimit) : Math.max(offer, ctx.botLimit)
+    const price = isBuyer ? Math.min(offer, ctx.botLimit) : Math.min(Math.max(offer, ctx.botLimit), ctx.listing.price)
     return {
       text: withTypos('отлично, оформляем', p.typoRate),
       action: isBuyer ? 'accept' : 'invoice',
@@ -351,18 +353,25 @@ export async function aiNegotiate(ctx: NegotiationContext): Promise<AiReply> {
   let price = parsed.price
   let newLimit = ctx.botLimit
 
+  // ЖЁСТКИЙ ПОТОЛОК ПРОДАВЦА: цена на карточке — обещание. Бот-продавец НИКОГДА
+  // не предлагает и не выставляет счёт выше цены объявления (источник «купил дороже объявления»)
+  if (ctx.botRole === 'seller' && price !== null) price = Math.min(price, ctx.listing.price)
+
   if ((action === 'accept' || action === 'invoice') && price !== null) {
     const ok = ctx.botRole === 'buyer' ? price <= ctx.botLimit : price >= ctx.botLimit
     if (!ok) {
       // модель вышла за лимит — трактуем как предложение цены
       action = 'none'
-      newLimit = ctx.botRole === 'buyer' ? Math.max(newLimit, price) : Math.min(newLimit, price)
+      newLimit = ctx.botRole === 'buyer' ? Math.max(newLimit, price) : Math.min(Math.max(newLimit, price), ctx.listing.price)
     } else {
-      newLimit = price
+      newLimit = ctx.botRole === 'buyer' ? price : Math.min(price, ctx.listing.price)
     }
   } else if (price !== null) {
     // простое предложение — запоминаем как новую границу интереса
-    newLimit = ctx.botRole === 'buyer' ? Math.min(ctx.botLimit, Math.max(price, Math.round(ctx.botLimit * 0.9))) : Math.max(ctx.botLimit, Math.min(price, Math.round(ctx.botLimit * 1.1)))
+    // (у продавца граница не уползает выше цены объявления)
+    newLimit = ctx.botRole === 'buyer'
+      ? Math.min(ctx.botLimit, Math.max(price, Math.round(ctx.botLimit * 0.9)))
+      : Math.max(ctx.botLimit, Math.min(price, ctx.listing.price))
   }
 
   return { text: parsed.text, action, price, newLimit, source: 'ai' }

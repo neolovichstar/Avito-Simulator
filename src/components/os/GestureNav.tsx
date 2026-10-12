@@ -74,6 +74,10 @@ export default function GestureNav({
       } else if (dy < -RECENTS_DRAG && dt > HOLD_MS) {
         sound.pop()
         onRecents()
+      } else if (Math.abs(dy) < 8 && dt < 260) {
+        // тап по пилюле = домой (свайп, флик и тап — три способа)
+        sound.tap()
+        onHome()
       }
     },
   })

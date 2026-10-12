@@ -179,7 +179,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     onEnd: (_dx, dy, fling) => {
       const el = rootRef.current
       // флик вверх тоже разблокирует: короткий, но быстрый жест
-      if (!leavingRef.current && (dy < -64 || (dy < -22 && fling.vy < -0.45))) {
+      if (!leavingRef.current && (dy < -64 || (dy < -22 && fling.vy < -0.4))) {
         unlock()
         return
       }

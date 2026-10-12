@@ -460,7 +460,7 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
     if (!meta.finalDone) {
       // финальная уступка: открывает свою нижнюю границу один раз.
       // Память о лоуболере/кидале — уступка меньше (лимит ужесточён заранее).
-      const finalPrice = isBuyer ? Math.max(meta.botLimit, Math.round(meta.botLimit * 1.02)) : meta.botLimit
+      const finalPrice = isBuyer ? Math.max(meta.botLimit, Math.round(meta.botLimit * 1.02)) : Math.min(meta.botLimit, listing.price)
       const text = isBuyer
         ? `${pick(['ну окей, всё что есть', 'ладно, ты победил'])}: ${fmtMoney(finalPrice)}, больше не дам`
         : `${pick(['ладно, уговорил', 'всё, последняя цена'])}: ${fmtMoney(finalPrice)}. Устраивает — ставь счёт`
@@ -510,7 +510,13 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
   })
 
   // итоговый meta после раунда ИИ (раньше ветка инвойса затирала rounds/botLimit — фикс)
-  const metaAfterAi: ChatMeta = { ...meta, botLimit: reply.newLimit, rounds: meta.rounds + 1, lastOffer: reply.price ?? meta.lastOffer }
+  // botLimit/lastOffer продавца — не выше цены объявления (страховка от старых чатов и глюков ИИ)
+  const metaAfterAi: ChatMeta = {
+    ...meta,
+    botLimit: meta.botRole === 'seller' ? Math.min(reply.newLimit, listing.price) : reply.newLimit,
+    rounds: meta.rounds + 1,
+    lastOffer: reply.price ? (meta.botRole === 'seller' ? Math.min(reply.price, listing.price) : reply.price) : meta.lastOffer,
+  }
   const metaAiJson = JSON.stringify(metaAfterAi)
   await db.chat.update({ where: { id: chat.id }, data: { meta: metaAiJson } })
 
@@ -538,8 +544,11 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
       ...base,
       metaJson,
       text: reply.text,
-      extra: { kind: 'invoice', amount: reply.price, invoiceId },
-      sysText: `Счёт от продавца: ${fmtMoney(reply.price)}. Оплатите, чтобы получить товар.`,
+      extra: { kind: 'invoice', amount: Math.min(reply.price, listing.price), invoiceId },
+      sysText:
+        reply.price < listing.price
+          ? `Счёт от продавца: ${fmtMoney(Math.min(reply.price, listing.price))} — ниже цены объявления (${fmtMoney(listing.price)}). Оплатите, чтобы получить товар.`
+          : `Счёт от продавца: ${fmtMoney(listing.price)} — по цене объявления. Оплатите, чтобы получить товар.`,
     })
     return
   }
