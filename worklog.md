@@ -2692,3 +2692,21 @@ Work Log:
 Stage Summary:
 - БЛОКЕР: пуш фиксов Task 62 (bb8e15f) ждёт ДЕЙСТВИТЕЛЬНО новый PAT от юзера (Contents: RW, repo Avito-Simulator); всё остальное готово и проверено
 - Юзеру нужны шаги: GitHub → Settings → Developer settings → Fine-grained tokens → Generate → Avito-Simulator → Contents: Read and write → Expiration 90d
+---
+Task ID: 62-release
+Agent: main (Z.ai Code)
+Task: Свежий PAT от юзера + Supabase URL → пуш фиксов Task 62 и проверка прода
+
+Work Log:
+- Новый PAT валиден (api.github.com/user → neolovichstar, repo push:true) — прошлый «свежий» был мёртв, этот рабочий
+- PAT заменён в remote URL и .env; Supabase строка сохранена в .env (SUPABASE_DB_URL, прямое подключение 5432)
+- git push origin main: bede379..efa8a90 SUCCESS (efa8a90 = cron-worklog коммит поверх 4c1ff89; в пуше ушли оба фикса bb8e15f+4c1ff89)
+- Vercel деплой: коммит-статус efa8a90 → «Deployment has completed» (success); deployments-list lag, проверял через /commits/{sha}/status
+- Маркер фикса avito_sim_navhint_v1 найден в прод-бандле (/_next/static/chunks/e74ac07672c4fe08.js) — код bb8e15f на проде
+- Прод-проверки: health {ok:true,db:up,ms:967}; market 170 объявлений, боты онлайн; admin-auth {ok:true,usingDefault:false}; неизвестный API → 404
+
+Stage Summary:
+- ПРОДАКТ ОБНОВЛЁН: efa8a90 на проде, все фиксы Task 62 в бою (потолок цены в торге, ИИ ≤9с, тап-пилюля домой + navhint, живой анлок на полпути)
+- Деплой-бюджет: 2/4 сегодня (bede379, efa8a90)
+- Урок: Vercel-статус деплоя надёжнее проверять через /commits/{sha}/status, а не список deployments
+- Юзеру на заметку: прошлые PAT протухали — этот с нормальным сроком; если снова отвалится, смотреть Expiration в настройках токена
