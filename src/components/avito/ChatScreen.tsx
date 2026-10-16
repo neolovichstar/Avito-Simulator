@@ -15,6 +15,7 @@ import { useCall, startOsLiveCall } from '@/lib/call'
 import { ensureConnected } from '@/lib/live-call'
 import { botDigits, formatNumber } from '@/lib/phone'
 import { getSocket } from '@/lib/use-realtime'
+import { usePoll } from '@/lib/use-poll'
 import { fmtMoney, fmtTime } from '@/lib/format'
 import { UserAvatar } from '@/components/shared/UserAvatar'
 import { CONDITION_LABEL } from '@/lib/catalog-types'
@@ -230,7 +231,9 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
     if (chat && !chat.counterpart.isBot) void ensureConnected()
   }, [chat])
 
-  // realtime: подписка на канал чата + индикатор печати
+  // realtime: подписка на канал чата + индикатор печати + тихий HTTP-поллинг 8с
+  // (usePoll: тикает только в видимом документе — в свёрнутом TG WebView не дёргаем API)
+  usePoll(load, 8_000)
   useEffect(() => {
     const s = getSocket()
     if (!s) return
@@ -241,7 +244,9 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
       setChat((prev) => {
         if (!prev) return prev
         if (prev.messages.some((m) => m.id === d.message.id)) return prev
-        return { ...prev, messages: [...prev.messages, { ...d.message, mine: d.message.senderId === prev.messages[0]?.senderId && false }] }
+        // своё сообщение (послали с другого устройства/сокет-дубль) рисуем справа,
+        // чужое — слева: сверяем отправителя с сессией, а не с первым сообщением чата
+        return { ...prev, messages: [...prev.messages, { ...d.message, mine: d.message.senderId === useOS.getState().session?.id }] }
       })
       setTimeout(() => load(), 400)
     }
@@ -252,12 +257,10 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
     }
     s.on('chat:message', onMsg)
     s.on('typing', onTyping)
-    const t = setInterval(load, 8_000)
     return () => {
       s.off('chat:message', onMsg)
       s.off('typing', onTyping)
       s.emit('unsubscribe', { channels: [`chat:${id}`] })
-      clearInterval(t)
     }
   }, [id, load])
 
@@ -284,7 +287,7 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
 
   const sendInvoice = async () => {
     const a = Math.round(Number(invoiceAmount.replace(/\s/g, '')))
-    if (!Number.isFinite(a) || a < 0) { setMsg('Укажите сумму'); return }
+    if (!Number.isFinite(a) || a <= 0) { setMsg('Укажите сумму'); return }
     setInvoiceOpen(false)
     setSending(true)
     setMsg('')
@@ -470,7 +473,6 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
               </div>
             )
           }
-          const isMine = m.senderId === chat.messages.find((x) => x.mine)?.senderId || m.mine
           const mine = m.mine
           return (
             <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
@@ -610,9 +612,10 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
             />
             <button
               onClick={sendInvoice}
-              className="h-12 w-full rounded-full bg-[#14532D] text-[15px] font-bold text-white shadow-[0_4px_14px_rgba(20,83,45,0.25)] transition-all active:scale-[0.98]"
+              disabled={sending}
+              className="h-12 w-full rounded-full bg-[#14532D] text-[15px] font-bold text-white shadow-[0_4px_14px_rgba(20,83,45,0.25)] transition-all active:scale-[0.98] disabled:opacity-50"
             >
-              Отправить счёт
+              {sending ? <Loader2 size={16} className="mx-auto animate-spin" aria-hidden /> : 'Отправить счёт'}
             </button>
           </div>
         </div>

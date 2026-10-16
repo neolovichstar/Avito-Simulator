@@ -14,12 +14,14 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const user = await db.user.findUnique({ where: { id } })
   if (!user) return Response.json({ error: 'Игрок не найден' }, { status: 404 })
 
-  const balanceDelta = Number(body?.balanceDelta)
+  // 63-a2: дельта баланса — целое в разумных пределах (±1e9); NaN/Infinity/мусор → 0,
+  // админ-опечатка «+1e999» больше не даёт NaN/бесконечный инкремент в БД
+  const delta = Math.max(-1e9, Math.min(1e9, Math.round(Number(body?.balanceDelta) || 0)))
   const creditScore = Number(body?.creditScore)
   const taxDebtReset = !!body?.taxDebtReset
 
   const data: Record<string, unknown> = {}
-  if (Number.isFinite(balanceDelta) && balanceDelta !== 0) data.balance = { increment: Math.round(balanceDelta) }
+  if (delta !== 0) data.balance = { increment: delta }
   if (taxDebtReset) data.taxDebt = 0
   if (Number.isFinite(creditScore)) data.creditScore = Math.min(900, Math.max(300, Math.round(creditScore)))
 
@@ -27,20 +29,20 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   const updated = await db.user.update({ where: { id }, data })
 
-  if (Number.isFinite(balanceDelta) && balanceDelta !== 0) {
+  if (delta !== 0) {
     await db.transaction.create({
       data: {
         userId: id,
         type: 'admin',
-        amount: Math.round(balanceDelta),
+        amount: delta,
         note: 'Корректировка через админ-панель',
       },
     })
   }
 
   const changes: string[] = []
-  if (Number.isFinite(balanceDelta) && balanceDelta !== 0)
-    changes.push(`баланс ${balanceDelta > 0 ? '+' : ''}${Math.round(balanceDelta)} ₽`)
+  if (delta !== 0)
+    changes.push(`баланс ${delta > 0 ? '+' : ''}${delta} ₽`)
   if (taxDebtReset) changes.push('налоговый долг списан')
   if (Number.isFinite(creditScore)) changes.push(`кредитный скор → ${updated.creditScore}`)
   await logAdmin('user.update', 'user', id, `${user.displayName} (@${user.username}): ${changes.join(', ')}`)

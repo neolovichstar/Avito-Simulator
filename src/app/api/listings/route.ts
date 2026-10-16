@@ -17,8 +17,9 @@ export async function GET(req: Request) {
   const category = url.searchParams.get('category') ?? ''
   const sort = url.searchParams.get('sort') ?? 'new'
   const city = url.searchParams.get('city')?.slice(0, 40) ?? ''
-  const page = Math.max(1, Number(url.searchParams.get('page') ?? 1))
-  const limit = Math.min(40, Math.max(4, Number(url.searchParams.get('limit') ?? 20)))
+  // 63-a2: page/limit — только числа (мусор в query раньше давал NaN → 500 от Prisma)
+  const page = Math.max(1, Math.floor(Number(url.searchParams.get('page')) || 1))
+  const limit = Math.min(40, Math.max(4, Math.floor(Number(url.searchParams.get('limit')) || 20)))
   const mine = url.searchParams.get('mine') === '1'
 
   const user = await getSessionUser(req)
@@ -98,18 +99,35 @@ export async function POST(req: Request) {
   if (!Number.isFinite(price) || price < 0 || price > 10_000_000) {
     return Response.json({ error: 'Некорректная цена' }, { status: 400 })
   }
-  const title = (body.title?.trim() || item.title).slice(0, 100)
-  const description = (body.description?.trim() || `Продаю «${item.title}». Состояние: ${item.condition}.`).slice(0, 1000)
+  // 63-a2: title/description — только строки (не-строка раньше давал 500 на .trim)
+  const title = (String(body.title ?? '').trim() || item.title).slice(0, 100)
+  const description = (String(body.description ?? '').trim() || `Продаю «${item.title}». Состояние: ${item.condition}.`).slice(0, 1000)
 
-  const listing = await db.listing.create({
-    data: {
-      sellerId: user.id, itemId: item.id, itemKey: item.itemKey, title,
-      description, category: item.category, condition: item.condition,
-      price, baseValue: item.baseValue, image: item.image, city: user.city,
-    },
-    include: { seller: true },
-  })
+  // 63-a2: проверки занятости + создание под транзакцией — SQLite сериализует,
+  // два параллельных POST на одну вещь больше не создают второе объявление
+  let listing
+  try {
+    listing = await db.$transaction(async (tx) => {
+      const listed = await tx.listing.count({ where: { itemId: item.id, status: 'active' } })
+      if (listed > 0) throw new CreateListingError('Этот товар уже выставлен')
+      const inRepair = await tx.repairOrder.count({ where: { itemId: item.id, status: { in: ['in_progress', 'ready'] } } })
+      if (inRepair > 0) throw new CreateListingError('Товар сейчас в ремонте')
+      return tx.listing.create({
+        data: {
+          sellerId: user.id, itemId: item.id, itemKey: item.itemKey, title,
+          description, category: item.category, condition: item.condition,
+          price, baseValue: item.baseValue, image: item.image, city: user.city,
+        },
+        include: { seller: true },
+      })
+    })
+  } catch (err) {
+    if (err instanceof CreateListingError) return Response.json({ error: err.message }, { status: 400 })
+    throw err
+  }
   cache.invalidate('feed')
   void onListingCreated(listing)
   return Response.json({ listing: listingDTO(listing, user.id) })
 }
+
+class CreateListingError extends Error {}

@@ -222,6 +222,8 @@ export const api = {
   phonesMarket: () => req<{ items: PhoneMarketItem[] }>('/api/phones/market'),
   phonesMarketBuy: (digits: string) =>
     post<{ phone: { id: string; number: string; balance?: number }; balance: number }>('/api/phones/market', { digits }),
+  phonesSetMain: (phoneId: string) => post<{ ok: boolean }>('/api/phones/set-main', { id: phoneId }),
+  phonesRelease: (phoneId: string) => post<{ ok: boolean }>('/api/phones/release', { id: phoneId }),
   plateBuy: (o: { first: string; digits: string; letters: string; regionCode: string; regionName: string }) =>
     post<{ plate: CarPlateDTO; balance: number }>('/api/plates', o),
   plateSetMain: (id: string) => patch<{ ok: boolean }>(`/api/plates/${id}`, { isMain: true }),

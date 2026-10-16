@@ -39,8 +39,9 @@ export async function POST(req: Request) {
     return Response.json({ error: 'Слишком часто, подождите минуту' }, { status: 429 })
   }
   const body = (await req.json().catch(() => ({}))) as { query?: string; category?: string }
-  const query = stripEmoji((body.query ?? '').trim()).slice(0, 64)
-  const category = body.category?.trim().slice(0, 40) || null
+  const query = stripEmoji(String(body.query ?? '').trim()).slice(0, 64)
+  // 63-a2: category — только строка (не-строка раньше давал 500 на .trim)
+  const category = String(body.category ?? '').trim().slice(0, 40) || null
   if (!query && !category) {
     return Response.json({ error: 'Пустой поиск нельзя сохранить' }, { status: 400 })
   }

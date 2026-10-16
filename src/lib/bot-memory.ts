@@ -75,17 +75,23 @@ export async function updateBotMemory(
   fn: (entry: BotMemoryEntry) => void,
 ): Promise<BotMemoryEntry | null> {
   const run = async (): Promise<BotMemoryEntry | null> => {
-    const user = await db.user.findUnique({ where: { id: playerId }, select: { stats: true } })
-    if (!user) return null
-    let stats: Record<string, unknown> = {}
-    try { stats = JSON.parse(user.stats || '{}') as Record<string, unknown> } catch { stats = {} }
-    const map = parseMemoryMap(user.stats)
-    const entry = ensureEntry(map, botId)
-    fn(entry)
-    map[botId] = entry
-    stats.botMemory = map
-    await db.user.update({ where: { id: playerId }, data: { stats: JSON.stringify(stats) } })
-    return entry
+    // 63-a2: чтение-изменение-запись User.stats внутри интерактивной транзакции:
+    // SQLite сериализует — параллельные писатели stats (bumpStats/noteSignal/noteDeal)
+    // больше не затирают изменения друг друга. In-process цепочка ниже остаётся
+    // страховкой для Postgres (там транзакция сокращает окно гонки).
+    return db.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({ where: { id: playerId }, select: { stats: true } })
+      if (!user) return null
+      let stats: Record<string, unknown> = {}
+      try { stats = JSON.parse(user.stats || '{}') as Record<string, unknown> } catch { stats = {} }
+      const map = parseMemoryMap(user.stats)
+      const entry = ensureEntry(map, botId)
+      fn(entry)
+      map[botId] = entry
+      stats.botMemory = map
+      await tx.user.update({ where: { id: playerId }, data: { stats: JSON.stringify(stats) } })
+      return entry
+    })
   }
   const prev = g.__botMemChain ?? Promise.resolve()
   const next = prev.then(run, run)

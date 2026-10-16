@@ -37,18 +37,35 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return Response.json({ error: 'Бесплатные товары — только самовывоз' }, { status: 400 })
   }
 
-  // резерв доставки списывается сразу
+  // резерв доставки списывается сразу — атомарно (balance >= fee), 63-a2:
+  // гонка параллельных трат больше не уводит баланс в минус
   if (mode === 'courier') {
-    await db.user.update({ where: { id: user.id }, data: { balance: { decrement: DELIVERY_FEE } } })
+    const dec = await db.user.updateMany({
+      where: { id: user.id, balance: { gte: DELIVERY_FEE } },
+      data: { balance: { decrement: DELIVERY_FEE } },
+    })
+    if (dec.count === 0) {
+      return Response.json({ error: 'Не хватает на доставку' }, { status: 409 })
+    }
     await db.transaction.create({
       data: { userId: user.id, type: 'purchase', amount: -DELIVERY_FEE, note: `Доставка: ${listing.title}` },
     })
   }
 
-  const res = await completeSale({
-    listingId: listing.id, buyer: user, price: listing.price,
-    via: 'buy', mode,
-  })
+  let res: Awaited<ReturnType<typeof completeSale>>
+  try {
+    res = await completeSale({
+      listingId: listing.id, buyer: user, price: listing.price,
+      via: 'buy', mode,
+    })
+  } catch (e) {
+    // 63-a2: внешняя ошибка после списания резерва — возвращаем fee, не молча теряем деньги
+    console.error('[buy] completeSale failed:', e)
+    if (mode === 'courier') {
+      await db.user.update({ where: { id: user.id }, data: { balance: { increment: DELIVERY_FEE } } }).catch(() => {})
+    }
+    return Response.json({ error: 'Сделка не состоялась, попробуйте ещё раз' }, { status: 500 })
+  }
   if (!res.ok) {
     if (mode === 'courier') {
       await db.user.update({ where: { id: user.id }, data: { balance: { increment: DELIVERY_FEE } } })

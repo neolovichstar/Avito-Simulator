@@ -1,4 +1,6 @@
 import { db } from '@/lib/db'
+import { Prisma } from '@prisma/client'
+import { after } from 'next/server'
 import { getSessionUser, unauthorized } from '@/lib/session'
 import { rateLimit } from '@/lib/ratelimit'
 import { notifyUser, addXp, bumpQuests, bumpStats, checkAchievements } from '@/lib/deals'
@@ -42,9 +44,17 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return Response.json({ error: 'Вы уже оставили отзыв на эту сделку' }, { status: 400 })
   }
 
-  const review = await db.review.create({
-    data: { listingId: id, fromUserId: user.id, toUserId: listing.sellerId, rating, text: text || 'Без комментария' },
-  })
+  // 63-a2: unique(review_listing_from) — гонка двух POST ловится по P2002, а не 500
+  try {
+    await db.review.create({
+      data: { listingId: id, fromUserId: user.id, toUserId: listing.sellerId, rating, text: text || 'Без комментария' },
+    })
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      return Response.json({ error: 'Отзыв уже оставлен' }, { status: 400 })
+    }
+    throw e
+  }
 
   // рейтинг продавца
   await db.user.update({
@@ -82,8 +92,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
           `хм, не ожидал. ладно, бывает`,
         ]
     const replyText = phrases[Math.floor(Math.random() * phrases.length)]
-    setTimeout(() => {
-      db.review
+    // 63-a2: setTimeout умирал в serverless (инстанс замораживается после ответа) —
+    // after(...) из next/server держит инстанс живым, как botReply в messages/route.ts
+    after(async () => {
+      await new Promise((r) => setTimeout(r, 4000 + Math.random() * 8000))
+      await db.review
         .create({
           data: {
             listingId: id,
@@ -106,7 +119,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
           )
         })
         .catch(() => {})
-    }, 4000 + Math.random() * 8000)
+    })
   }
 
   const fresh = await db.user.findUnique({ where: { id: user.id } })

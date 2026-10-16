@@ -84,7 +84,13 @@ export async function POST(req: Request) {
     if (err instanceof PhoneBuyError) {
       return Response.json({ error: err.message, need: item.price }, { status: 402 })
     }
-    return Response.json({ error: 'Номер уже занят' }, { status: 409 })
+    // 63-a2: 409 «занят» только на P2002 (гонка двух покупателей одного номера);
+    // всё остальное — реальная ошибка: 500 + лог, а не ложный «занят»
+    if (typeof err === 'object' && err !== null && 'code' in err && (err as { code?: string }).code === 'P2002') {
+      return Response.json({ error: 'Номер уже занят' }, { status: 409 })
+    }
+    console.error('[phones/market] buy failed:', err)
+    return Response.json({ error: 'Не удалось купить номер, попробуйте ещё раз' }, { status: 500 })
   }
 
   const fresh = await db.user.findUnique({ where: { id: me.id }, select: { balance: true } })

@@ -11,7 +11,14 @@ export async function POST(req: Request) {
   if (!user) return unauthorized()
   const today = new Date().toISOString().slice(0, 10)
 
-  if (user.rerollDay === today) {
+  // 63-a2: CAS-захват права на замену — параллельные POST делают ОДИН reroll.
+  // rerollDay nullable: null = ещё не менял — поэтому OR с null (чистый `not` в SQL
+  // не матчит NULL-строки). Проигравший гонку получает 429.
+  const claim = await db.user.updateMany({
+    where: { id: user.id, OR: [{ rerollDay: null }, { rerollDay: { not: today } }] },
+    data: { rerollDay: today },
+  })
+  if (claim.count === 0) {
     return Response.json({ error: 'Замена уже использована — приходите завтра' }, { status: 429 })
   }
 
@@ -54,7 +61,7 @@ export async function POST(req: Request) {
       target: pick.target, reward: pick.reward, xpReward: pick.xpReward, day: today,
     },
   })
-  await db.user.update({ where: { id: user.id }, data: { rerollDay: today } })
+  // rerollDay уже проставлен CAS-захватом выше
 
   return Response.json({
     ok: true,

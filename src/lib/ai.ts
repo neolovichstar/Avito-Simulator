@@ -362,9 +362,11 @@ export async function aiNegotiate(ctx: NegotiationContext): Promise<AiReply> {
     if (!ok) {
       // модель вышла за лимит — трактуем как предложение цены
       action = 'none'
-      newLimit = ctx.botRole === 'buyer' ? Math.max(newLimit, price) : Math.min(Math.max(newLimit, price), ctx.listing.price)
+      // 63-a2: покупатель-бот НИКОГДА не поднимает лимит выше исходного раунда
+      // (Math.max дрейфовал бот-бюджет вверх за пределы botLimit)
+      newLimit = ctx.botRole === 'buyer' ? Math.min(newLimit, ctx.botLimit) : Math.min(Math.max(newLimit, price), ctx.listing.price)
     } else {
-      newLimit = ctx.botRole === 'buyer' ? price : Math.min(price, ctx.listing.price)
+      newLimit = ctx.botRole === 'buyer' ? Math.min(price, ctx.botLimit) : Math.min(price, ctx.listing.price)
     }
   } else if (price !== null) {
     // простое предложение — запоминаем как новую границу интереса

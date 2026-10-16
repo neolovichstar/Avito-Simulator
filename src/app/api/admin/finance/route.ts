@@ -80,17 +80,41 @@ export async function POST(req: Request) {
     const bill = await db.taxBill.findUnique({ where: { id }, include: { user: { select: { displayName: true } } } })
     if (!bill) return Response.json({ error: 'Счёт не найден' }, { status: 404 })
     if (bill.status === 'paid') return Response.json({ error: 'Счёт уже оплачен' }, { status: 400 })
-    await db.taxBill.update({ where: { id }, data: { status: 'paid', paidAt: new Date() } })
+    // 63-a2: CAS-захват счёта (status='unpaid') — гонка двух forgive не задваивает действия
+    const claim = await db.taxBill.updateMany({
+      where: { id, status: 'unpaid' },
+      data: { status: 'paid', paidAt: new Date() },
+    })
+    if (claim.count === 0) return Response.json({ error: 'Счёт уже оплачен' }, { status: 400 })
+    // 63-a2: прощение синхронизирует User.taxDebt (CAS: не уводим долг в минус)
+    await db.user.updateMany({
+      where: { id: bill.userId, taxDebt: { gte: bill.amount } },
+      data: { taxDebt: { decrement: bill.amount } },
+    })
     await logAdmin('tax.forgive', 'finance', id, `Налог ${bill.amount} ₽ списан (${bill.user.displayName}, причина: ${bill.reason})`)
     return Response.json({ ok: true })
   }
 
-  const loan = await db.loan.findUnique({ where: { id }, include: { user: { select: { displayName: true } } } })
+  const loan = await db.loan.findUnique({ where: { id }, include: { user: { select: { displayName: true, debt: true } } } })
   if (!loan) return Response.json({ error: 'Кредит не найден' }, { status: 404 })
   if (loan.status !== 'active' && loan.status !== 'overdue') {
     return Response.json({ error: 'Кредит уже закрыт' }, { status: 400 })
   }
-  await db.loan.update({ where: { id }, data: { status: 'repaid', repaidAt: new Date(), owed: 0 } })
+  // 63-a2: CAS-захват кредита (статус active/overdue) — гонка двух writeoff исключена
+  const loanClaim = await db.loan.updateMany({
+    where: { id, status: { in: ['active', 'overdue'] } },
+    data: { status: 'repaid', repaidAt: new Date(), owed: 0 },
+  })
+  if (loanClaim.count === 0) return Response.json({ error: 'Кредит уже закрыт' }, { status: 400 })
+  // 63-a2: списание кредита уменьшает и User.debt на min(loan.owed, user.debt) —
+  // иначе игрок после прощения оставался заблокированным по долгу (debt > 30к)
+  const cut = Math.min(loan.owed, loan.user.debt)
+  if (cut > 0) {
+    await db.user.updateMany({
+      where: { id: loan.userId, debt: { gte: cut } },
+      data: { debt: { decrement: cut } },
+    })
+  }
   await logAdmin('loan.writeoff', 'finance', id, `Кредит списан: остаток ${loan.owed} ₽ (${loan.user.displayName})`)
   return Response.json({ ok: true })
 }

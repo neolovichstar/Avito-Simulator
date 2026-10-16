@@ -642,6 +642,12 @@ export default function ListingScreen({ id, onBack, onOpenChat, onOpenSeller, on
                 <ShoppingBag size={17} aria-hidden />
                 {data.price === 0 ? 'Забрать даром' : `Купить за ${fmtNum(total)} ₽`}
               </button>
+              {/* на товар хватает, на доставку нет — кнопка задизейплена, объясняем почему */}
+              {!busy && balance < total && (
+                <p className="mt-2 text-center text-xs text-[#17181A]/45">
+                  Не хватает ~{fmtMoney(total - balance)} на доставку — выберите самовывоз или пополните счёт
+                </p>
+              )}
             </div>
           </div>
         </div>

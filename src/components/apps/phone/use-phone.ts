@@ -5,6 +5,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useOS } from '@/lib/store'
+import { usePoll } from '@/lib/use-poll'
 import {
   phoneReq,
   type CallDTO,
@@ -168,16 +169,16 @@ export function usePhone(): PhoneApi {
   }, [])
 
   // При отмене брони/покупке данные приходят из refresh; раз в 30с — страховка
-  // на случай истечения брони при открытом экране.
+  // на случай истечения брони при открытом экране. usePoll: в свёрнутом
+  // TG WebView API не дёргаем, при возврате — догоняем.
   const refreshRef = useRef(refresh)
   useEffect(() => {
     refreshRef.current = refresh
   })
   useEffect(() => {
     void refreshRef.current()
-    const id = setInterval(() => void refreshRef.current(), 30_000)
-    return () => clearInterval(id)
   }, [])
+  usePoll(() => void refreshRef.current(), 30_000)
 
   const owned = numbers.filter((n) => n.status === 'active')
   const reserves = numbers.filter((n) => n.status === 'reserved' && n.holdUntil)

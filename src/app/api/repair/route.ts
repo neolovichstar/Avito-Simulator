@@ -94,7 +94,14 @@ export async function POST(req: Request) {
   if (user.balance < cost) return Response.json({ error: `Нужно ${fmtMoney(cost)}. Недостаточно средств` }, { status: 400 })
 
   const minutes = repairMinutes()
-  await db.user.update({ where: { id: user.id }, data: { balance: { decrement: cost } } })
+  // 63-a2: атомарное списание (balance >= cost) — гонка параллельных трат не уводит баланс в минус
+  const dec = await db.user.updateMany({
+    where: { id: user.id, balance: { gte: cost } },
+    data: { balance: { decrement: cost } },
+  })
+  if (dec.count === 0) {
+    return Response.json({ error: `Нужно ${fmtMoney(cost)}. Недостаточно средств` }, { status: 400 })
+  }
   await db.transaction.create({
     data: { userId: user.id, type: 'purchase', amount: -cost, note: `Ремонт: ${item.title}` },
   })

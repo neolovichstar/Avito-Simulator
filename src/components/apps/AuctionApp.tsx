@@ -20,6 +20,7 @@ import { useOS } from '@/lib/store'
 import { sound } from '@/lib/sound'
 import { fmtMoney, timeAgo } from '@/lib/format'
 import { getSocket } from '@/lib/use-realtime'
+import { usePoll } from '@/lib/use-poll'
 import { CATEGORY_LABEL, CONDITION_LABEL } from '@/lib/catalog-types'
 import type { AuctionData, AuctionLotDTO } from '@/lib/types'
 import {
@@ -38,6 +39,19 @@ function useTick(intervalMs = 1000): number {
     () => Math.floor(Date.now() / intervalMs),
     () => 0,
   )
+}
+
+// избранное лотов: localStorage-персист (по образцу PlateApp loadFavs),
+// чтобы сердечки переживали перезапуск приложения и ОС
+const AUCTION_FAVS_KEY = 'auction_favs_v1'
+
+function loadAuctionFavs(): Set<string> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(AUCTION_FAVS_KEY) ?? '[]') as unknown
+    return new Set(Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string') : [])
+  } catch {
+    return new Set()
+  }
 }
 
 interface BidRow {
@@ -85,7 +99,7 @@ export default function AuctionApp() {
   const [liveBids, setLiveBids] = useState(0)
   // карточка лота + избранное (клиентские, поверх существующих данных)
   const [detailId, setDetailId] = useState<string | null>(null)
-  const [favs, setFavs] = useState<Set<string>>(() => new Set())
+  const [favs, setFavs] = useState<Set<string>>(() => loadAuctionFavs())
 
   useTick(1000) // живые таймеры лотов
 
@@ -114,14 +128,12 @@ export default function AuctionApp() {
     }
   }, [])
 
-  // Тихий refetch каждые 10 секунд, боты торгуются живьём
-  useEffect(() => {
-    const id = setInterval(() => {
-      void load(true)
-      if (openHist) void refreshHist(openHist)
-    }, 10000)
-    return () => clearInterval(id)
-  }, [load, openHist, refreshHist])
+  // Тихий refetch каждые 10 секунд, боты торгуются живьём.
+  // usePoll: в свёрнутом TG WebView API не дёргаем, при возврате — догоняем.
+  usePoll(() => {
+    void load(true)
+    if (openHist) void refreshHist(openHist)
+  }, 10_000)
 
   // realtime: чужая ставка прилетает мгновенно, без ожидания поллинга
   useEffect(() => {
@@ -256,6 +268,10 @@ export default function AuctionApp() {
       const next = new Set(prev)
       if (next.has(lotId)) next.delete(lotId)
       else next.add(lotId)
+      // персист: избранное лотов переживает перезапуск приложения/ОС
+      try {
+        localStorage.setItem(AUCTION_FAVS_KEY, JSON.stringify([...next]))
+      } catch { /* приватный режим — не беда */ }
       return next
     })
   }

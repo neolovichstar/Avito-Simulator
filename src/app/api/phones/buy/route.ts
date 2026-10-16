@@ -52,10 +52,13 @@ export async function POST(req: Request) {
           },
         })
       }
-      await tx.phoneNumber.update({
-        where: { id: phone.id },
+      // 63-a2: CAS-захват брони (status='reserved') — гонка двух «Забрать» платит один раз;
+      // проигравший получает 409 вместо активации уже активированного номера
+      const claim = await tx.phoneNumber.updateMany({
+        where: { id: phone.id, status: 'reserved' },
         data: { status: 'active', buyPrice: 0, holdUntil: null, reservedFor: null },
       })
+      if (claim.count === 0) throw new PhoneStateError('Номер уже не в брони')
       const hadMain = await tx.phoneNumber.findFirst({
         where: { userId: user.id, isMain: true, id: { not: phone.id } },
         select: { id: true },
@@ -82,9 +85,11 @@ export async function POST(req: Request) {
     })
   } catch (err) {
     if (err instanceof BuyError) return Response.json({ error: err.message }, { status: 400 })
+    if (err instanceof PhoneStateError) return Response.json({ error: err.message }, { status: 409 })
     console.error('phone buy failed:', err)
     return Response.json({ error: 'Не удалось выкупить номер' }, { status: 500 })
   }
 }
 
 class BuyError extends Error {}
+class PhoneStateError extends Error {}

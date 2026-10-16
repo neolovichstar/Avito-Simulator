@@ -17,7 +17,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return Response.json({ error: 'Слишком быстро. Бот ещё печатает' }, { status: 429 })
   }
   const body = (await req.json().catch(() => ({}))) as { text?: string; invoice?: number }
-  const text = body.text?.trim().slice(0, 400)
+  // 63-a2: text — только строка (число/объект в поле раньше давало 500 на .trim)
+  const text = typeof body.text === 'string' ? body.text.trim().slice(0, 400) : ''
   const invoice = body.invoice !== undefined ? Math.round(Number(body.invoice)) : undefined
   if (!text && !invoice) return Response.json({ error: 'Пустое сообщение' }, { status: 400 })
   if (invoice !== undefined && (!Number.isFinite(invoice) || invoice < 0 || invoice > 10_000_000)) {
@@ -64,7 +65,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   // человеческой паузой. botReply сам ставит ответ в очередь.
   if (counterpart.isBot) {
     after(async () => {
-      await botReply(chat.id, { text: text ?? undefined, invoice })
+      await botReply(chat.id, { text: text || undefined, invoice })
     })
   }
 

@@ -463,7 +463,14 @@ async function settleSaleDelivery(deliveryId: string): Promise<void> {
   const d = await db.delivery.findUnique({ where: { id: deliveryId } })
   if (!d || d.kind !== 'sale' || d.status === 'delivered' || d.status === 'returned') return
   const now = new Date()
-  await db.delivery.update({ where: { id: d.id }, data: { status: 'delivered', deliveredAt: now } })
+  // 63-a2: атомарный захват посылки ПЕРВЫМ делом (как returnDelivery/pickupDelivery):
+  // deliverDue() зовётся и из engine-тика, и лениво из GET /api/deliveries — без CAS
+  // двое платят деньги продавцу, налог и Transaction задваиваются
+  const claim = await db.delivery.updateMany({
+    where: { id: deliveryId, kind: 'sale', status: { notIn: ['delivered', 'returned'] } },
+    data: { status: 'delivered', deliveredAt: now },
+  })
+  if (claim.count === 0) return
   await db.user.update({ where: { id: d.userId }, data: { balance: { increment: d.price } } })
   // контрагент — покупатель: находим чат по лоту (единственное место, где покупатель известен)
   const chat = await db.chat.findFirst({ where: { listingId: d.listingId, buyerId: { not: d.userId } } })

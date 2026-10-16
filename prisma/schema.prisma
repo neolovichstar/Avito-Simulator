@@ -115,6 +115,8 @@ model Item {
   purchasePrice Int
   fromUserId    String?
   createdAt     DateTime @default(now())
+
+  @@index([ownerId])
 }
 
 model Chat {
@@ -128,6 +130,12 @@ model Chat {
   createdAt     DateTime @default(now())
 
   messages Message[]
+
+  // 63-a2: один чат на пару «объявление + покупатель + продавец» — findFirst+create-гонка даёт P2002, а не дубль
+  @@unique([listingId, buyerId, sellerId], map: "chat_listing_buyer_seller")
+  @@index([buyerId, lastMessageAt])
+  @@index([sellerId, lastMessageAt])
+  @@index([listingId])
 }
 
 model Message {
@@ -174,6 +182,11 @@ model Review {
   rating     Int
   text       String
   createdAt  DateTime @default(now())
+
+  // 63-a2: один отзыв на сделку от каждого автора
+  @@unique([listingId, fromUserId], map: "review_listing_from")
+  @@index([listingId])
+  @@index([toUserId])
 }
 
 model TaxBill {
@@ -186,6 +199,8 @@ model TaxBill {
   createdAt DateTime  @default(now())
   dueAt     DateTime
   paidAt    DateTime?
+
+  @@index([userId, status])
 }
 
 model Loan {
@@ -199,6 +214,8 @@ model Loan {
   status    String    @default("active") // active | repaid | overdue
   takenAt   DateTime  @default(now())
   repaidAt  DateTime?
+
+  @@index([userId, status])
 }
 
 model Notification {
@@ -212,6 +229,8 @@ model Notification {
   tgSentAt  DateTime? // когда уведомление ушло в Telegram (поллер бота)
   dedupeKey String?   @unique // атомарная защита от дублей: гонки тиков/бонусов создают одну нотификацию
   createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
 }
 
 model MarketIndex {
@@ -243,6 +262,8 @@ model RepairOrder {
   startedAt     DateTime  @default(now())
   readyAt       DateTime
   doneAt        DateTime?
+
+  @@index([itemId, status])
 }
 
 model Delivery {
@@ -265,6 +286,9 @@ model Delivery {
   createdAt       DateTime  @default(now())
   eta             DateTime
   deliveredAt     DateTime?
+
+  @@index([userId, status])
+  @@index([listingId])
 }
 
 model AuctionLot {
@@ -297,6 +321,9 @@ model AuctionBid {
   userName  String
   amount    Int
   createdAt DateTime   @default(now())
+
+  @@index([lotId])
+  @@index([userId])
 }
 
 // Автоставка игрока на аукционе (прокси-ставки как на eBay):
@@ -330,6 +357,8 @@ model SavedSearch {
   query     String
   category  String?
   createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Complaint {
@@ -425,6 +454,8 @@ model PhoneNumber {
   buyPrice    Int       @default(0) // цена выкупа брони (для reserved)
   isMain      Boolean   @default(false) // основной номер профиля
   createdAt   DateTime  @default(now())
+
+  @@index([userId, status])
 }
 
 // Журнал звонков: входящие/исходящие/пропущенные, длительность, статус.
@@ -440,6 +471,8 @@ model CallLog {
   durationSec Int      @default(0)
   aiPersonaId String? // если звонили продавцу-боту
   createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 // ───────────────────────── Мастерская (запчасти и ремонт) ─────────────────────────

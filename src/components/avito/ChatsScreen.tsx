@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Search, X, MessageCircle, CloudOff } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { getSocket } from '@/lib/use-realtime'
+import { usePoll } from '@/lib/use-poll'
 import { timeAgo } from '@/lib/format'
 import { UserAvatar } from '@/components/shared/UserAvatar'
 import type { ChatListItem } from '@/lib/types'
@@ -39,9 +40,9 @@ export default function ChatsScreen({ onOpenChat }: { onOpenChat: (id: string) =
 
   useEffect(() => {
     load()
-    const t = setInterval(load, 10_000)
-    return () => clearInterval(t)
   }, [load])
+  // поллинг списка чатов — только в видимом документе (usePoll)
+  usePoll(load, 10_000)
 
   // черновики: читаем localStorage после каждой загрузки списка (и по фокусу окна)
   const idsKey = useMemo(() => items.map((c) => c.id).join(','), [items])

@@ -25,18 +25,32 @@ export async function POST(req: Request) {
     return Response.json({ error: `Нужно ${fmtMoney(tool.price)}. Недостаточно средств` }, { status: 400 })
   }
 
-  await db.$transaction(async (tx) => {
-    await tx.user.update({ where: { id: user.id }, data: { balance: { decrement: tool.price } } })
-    await tx.transaction.create({
-      data: { userId: user.id, type: 'purchase', amount: -tool.price, note: `Инструмент: ${tool.title}` },
+  // 63-a2: атомарное списание (balance >= price) внутри транзакции — гонка не уводит баланс в минус
+  try {
+    await db.$transaction(async (tx) => {
+      const dec = await tx.user.updateMany({
+        where: { id: user.id, balance: { gte: tool.price } },
+        data: { balance: { decrement: tool.price } },
+      })
+      if (dec.count === 0) {
+        throw new ToolBuyError(`Нужно ${fmtMoney(tool.price)}. Недостаточно средств`)
+      }
+      await tx.transaction.create({
+        data: { userId: user.id, type: 'purchase', amount: -tool.price, note: `Инструмент: ${tool.title}` },
+      })
+      await tx.workshopTool.upsert({
+        where: { userId_toolKey: { userId: user.id, toolKey: tool.key } },
+        create: { userId: user.id, toolKey: tool.key, durability: tool.uses },
+        update: { durability: { increment: tool.uses } },
+      })
     })
-    await tx.workshopTool.upsert({
-      where: { userId_toolKey: { userId: user.id, toolKey: tool.key } },
-      create: { userId: user.id, toolKey: tool.key, durability: tool.uses },
-      update: { durability: { increment: tool.uses } },
-    })
-  })
+  } catch (err) {
+    if (err instanceof ToolBuyError) return Response.json({ error: err.message }, { status: 400 })
+    throw err
+  }
 
   const fresh = await db.user.findUnique({ where: { id: user.id }, select: { balance: true } })
   return Response.json({ ok: true, balance: fresh?.balance ?? user.balance, tools: await toolsDto(user.id) })
 }
+
+class ToolBuyError extends Error {}

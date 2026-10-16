@@ -13,6 +13,12 @@ import type { InventoryItemDTO } from '@/lib/types'
 import { ConditionBadge } from './AvitoApp'
 import { Card, EmptyState, ErrorState, Overline, ScreenTitle, Skeleton, cn } from './ui'
 
+// Лимиты публикации = серверные (POST /api/listings): цена ≤ 10 000 000,
+// description slice(0, 1000), title slice(0, 100) — в форме title берётся
+// из названия вещи инвентаря, отдельного поля нет.
+const PRICE_CAP = 10_000_000
+const DESC_MAX = 1000
+
 export default function SellScreen({ onDone }: { onDone: () => void }) {
   const [items, setItems] = useState<InventoryItemDTO[]>([])
   const [loading, setLoading] = useState(true)
@@ -211,6 +217,10 @@ export default function SellScreen({ onDone }: { onDone: () => void }) {
                     className="h-full w-full bg-transparent text-[16px] font-bold text-[#17181A] outline-none placeholder:text-[#17181A]/30"
                   />
                 </div>
+                {/* мягкий UI-кап: сервер отклоняет цену выше 10 000 000 (ошибка в msg при публикации) */}
+                {Number.isFinite(Number(price)) && price !== '' && Number(price) > PRICE_CAP && (
+                  <p className="mt-1.5 text-xs font-medium text-amber-700" role="status">Максимум 10 000 000 ₽</p>
+                )}
                 <div className="mt-2 flex gap-2">
                   {[0.85, 0.95, 1.05].map((k) => (
                     <button
@@ -232,9 +242,11 @@ export default function SellScreen({ onDone }: { onDone: () => void }) {
                   value={desc}
                   onChange={(e) => setDesc(e.target.value)}
                   rows={3}
+                  maxLength={DESC_MAX}
                   placeholder="Расскажите про состояние, комплект, причину продажи..."
                   className="w-full resize-none rounded-[14px] bg-neutral-200/50 p-3 text-sm text-[#17181A] outline-none placeholder:text-[#17181A]/30 focus:ring-1 focus:ring-black/[0.12]"
                 />
+                <p className="mt-0.5 text-right text-[11px] tabular-nums text-black/35">{desc.length}/{DESC_MAX}</p>
               </div>
             </Card>
 

@@ -1,6 +1,5 @@
 import { db } from '@/lib/db'
-// Если REALTIME_SECRET на сервере не задан (напр. Vercel), принимаем канонический дефолт
-const EXPECTED_SECRET = process.env.REALTIME_SECRET ?? 'avito-sim-rt-2024-secret'
+import { serviceOk } from '@/lib/telegram-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,10 +9,6 @@ export const dynamic = 'force-dynamic'
 // раз в 20 с опрашивает этот роут и рассылает неотправленное, потом подтверждает.
 // GET  → { chats: [{ chatId, displayName, items: [{ id, kind, title, body, createdAt }] }] }
 // POST { ids } → пометить tgSentAt (бот подтвердил доставку)
-function serviceOk(req: Request): boolean {
-  const secret = req.headers.get('x-service-secret')
-  return !!secret && secret === EXPECTED_SECRET
-}
 
 // Старше суток — в Telegram не шлём (мусор при перезаходе), только в приложении
 const MAX_AGE_MS = 24 * 60 * 60 * 1000
@@ -21,7 +16,7 @@ const MAX_AGE_MS = 24 * 60 * 60 * 1000
 const PER_CHAT_LIMIT = 15
 
 export async function GET(req: Request) {
-  if (!serviceOk(req)) return Response.json({ error: 'forbidden' }, { status: 403 })
+  if (!(await serviceOk(req))) return Response.json({ error: 'forbidden' }, { status: 403 })
   const cutoff = new Date(Date.now() - MAX_AGE_MS)
   const links = await db.telegramLink.findMany({
     select: { chatId: true, user: { select: { id: true, displayName: true } } },
@@ -49,7 +44,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  if (!serviceOk(req)) return Response.json({ error: 'forbidden' }, { status: 403 })
+  if (!(await serviceOk(req))) return Response.json({ error: 'forbidden' }, { status: 403 })
   const body = (await req.json().catch(() => null)) as { ids?: string[] } | null
   if (!Array.isArray(body?.ids) || body.ids.length === 0) {
     return Response.json({ error: 'Нужен массив ids' }, { status: 400 })

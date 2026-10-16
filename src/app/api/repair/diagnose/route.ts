@@ -25,19 +25,33 @@ export async function POST(req: Request) {
 
   const faults = diagnose(item, item.condition)
 
-  await db.$transaction(async (tx) => {
-    await tx.user.update({ where: { id: user.id }, data: { balance: { decrement: fee } } })
-    await tx.transaction.create({
-      data: { userId: user.id, type: 'purchase', amount: -fee, note: `Диагностика: ${item.title}` },
+  // 63-a2: атомарное списание (balance >= fee) внутри транзакции — гонка не уводит баланс в минус
+  try {
+    await db.$transaction(async (tx) => {
+      const dec = await tx.user.updateMany({
+        where: { id: user.id, balance: { gte: fee } },
+        data: { balance: { decrement: fee } },
+      })
+      if (dec.count === 0) {
+        throw new DiagnoseError(`Диагностика стоит ${fmtMoney(fee)}. Недостаточно средств`)
+      }
+      await tx.transaction.create({
+        data: { userId: user.id, type: 'purchase', amount: -fee, note: `Диагностика: ${item.title}` },
+      })
+      await tx.repairJob.create({
+        data: {
+          userId: user.id, itemId: item.id, kind: 'diagnose', status: 'done',
+          faults: JSON.stringify(faults), cost: fee, finishedAt: new Date(),
+        },
+      })
     })
-    await tx.repairJob.create({
-      data: {
-        userId: user.id, itemId: item.id, kind: 'diagnose', status: 'done',
-        faults: JSON.stringify(faults), cost: fee, finishedAt: new Date(),
-      },
-    })
-  })
+  } catch (err) {
+    if (err instanceof DiagnoseError) return Response.json({ error: err.message }, { status: 400 })
+    throw err
+  }
 
   const fresh = await db.user.findUnique({ where: { id: user.id }, select: { balance: true } })
   return Response.json({ ok: true, balance: fresh?.balance ?? user.balance, faults })
 }
+
+class DiagnoseError extends Error {}

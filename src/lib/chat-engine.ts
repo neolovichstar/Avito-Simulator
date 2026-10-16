@@ -511,9 +511,10 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
 
   // итоговый meta после раунда ИИ (раньше ветка инвойса затирала rounds/botLimit — фикс)
   // botLimit/lastOffer продавца — не выше цены объявления (страховка от старых чатов и глюков ИИ)
+  // 63-a2: botLimit покупателя — не выше исходного лимита раунда (никакого дрейфа вверх)
   const metaAfterAi: ChatMeta = {
     ...meta,
-    botLimit: meta.botRole === 'seller' ? Math.min(reply.newLimit, listing.price) : reply.newLimit,
+    botLimit: meta.botRole === 'seller' ? Math.min(reply.newLimit, listing.price) : Math.min(reply.newLimit, meta.botLimit),
     rounds: meta.rounds + 1,
     lastOffer: reply.price ? (meta.botRole === 'seller' ? Math.min(reply.price, listing.price) : reply.price) : meta.lastOffer,
   }

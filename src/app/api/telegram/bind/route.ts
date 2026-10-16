@@ -1,19 +1,14 @@
 import { db } from '@/lib/db'
 import { rateLimit } from '@/lib/ratelimit'
-// Если REALTIME_SECRET на сервере не задан (напр. Vercel), принимаем канонический дефолт
-const EXPECTED_SECRET = process.env.REALTIME_SECRET ?? 'avito-sim-rt-2024-secret'
+import { serviceOk } from '@/lib/telegram-auth'
 
 export const dynamic = 'force-dynamic'
 
 // Сервисный роут: его вызывает мини-сервис бота (:3004) с секретом REALTIME_SECRET.
 // POST { code, chatId, tgUsername } — привязать Telegram-чат к аккаунту по коду.
-function serviceOk(req: Request): boolean {
-  const secret = req.headers.get('x-service-secret')
-  return !!secret && secret === EXPECTED_SECRET
-}
 
 export async function POST(req: Request) {
-  if (!serviceOk(req)) return Response.json({ error: 'forbidden' }, { status: 403 })
+  if (!(await serviceOk(req))) return Response.json({ error: 'forbidden' }, { status: 403 })
   const body = (await req.json().catch(() => null)) as
     | { code?: string; chatId?: string; tgUsername?: string }
     | null

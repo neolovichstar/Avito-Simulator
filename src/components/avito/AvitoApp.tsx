@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Car, Hash, Home, MessageCircle, Plus, Search, User } from 'lucide-react'
 import { api } from '@/lib/api'
 import { sound } from '@/lib/sound'
+import { usePoll } from '@/lib/use-poll'
 import NotificationCenter from '@/components/os/NotificationCenter'
 import FeedScreen from './FeedScreen'
 import ListingScreen from './ListingScreen'
@@ -44,22 +45,21 @@ export default function AvitoApp() {
     } catch { /* ignore */ }
   }, [])
 
+  // поллинг непрочитанных: тикает только в видимом документе (usePoll),
+  // первый вызов — через 600мс, как и раньше
+  usePoll(refreshUnread, 12_000)
   useEffect(() => {
-    const t = setInterval(refreshUnread, 12_000)
     const first = setTimeout(refreshUnread, 600)
-    return () => {
-      clearInterval(t)
-      clearTimeout(first)
-    }
+    return () => clearTimeout(first)
   }, [refreshUnread])
 
   const push = (v: View) => setStack((s) => [...s, v])
   const pop = () => {
-    setStack((s) => {
-      const wasChat = s[s.length - 1]?.type === 'chat'
-      if (wasChat) setTimeout(refreshUnread, 0)
-      return s.slice(0, -1)
-    })
+    // side-effect вне setState-апдейтера: апдейтеры должны быть чистыми
+    // (StrictMode зовёт их дважды — setTimeout внутри плодил бы лишние вызовы)
+    const wasChat = stack[stack.length - 1]?.type === 'chat'
+    setStack((s) => s.slice(0, -1))
+    if (wasChat) setTimeout(refreshUnread, 0)
   }
   const reset = () => setStack([])
   const openListing = (id: string) => push({ type: 'listing', id })

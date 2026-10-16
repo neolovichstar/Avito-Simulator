@@ -16,7 +16,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { animate, AnimatePresence, motion, useMotionValue, useTransform, type AnimationPlaybackControls } from 'framer-motion'
 import {
-  BadgeCheck, Bell, Check, ChevronDown, ChevronLeft, ChevronRight, Crown, Dices, Heart, Loader2,
+  BadgeCheck, Bell, Check, ChevronDown, ChevronLeft, ChevronRight, CloudOff, Crown, Dices, Heart, Loader2,
   MapPin, Phone, Search, ShieldCheck, SlidersHorizontal, Star, Timer, UserRound, Wallet, X,
 } from 'lucide-react'
 import { REGIONS, RESERVE_HOURS, isGoldCode, reserveSecondsLeft } from '@/lib/phone'
@@ -25,6 +25,8 @@ import { api } from '@/lib/api'
 import { fmtMoney } from '@/lib/format'
 import { sound } from '@/lib/sound'
 import { useOS } from '@/lib/store'
+import { usePoll } from '@/lib/use-poll'
+import { ErrorState } from '@/components/avito/ui'
 import {
   fmtCountdown,
   phoneReq,
@@ -189,11 +191,11 @@ function useNumbers(): NumbersApi {
   }, [])
 
   // Первая загрузка + страховочный поллинг: таймеры брони и чужие списания.
+  // usePoll: в свёрнутом TG WebView API не дёргаем, при возврате — догоняем.
   useEffect(() => {
     void refresh()
-    const id = setInterval(() => void refresh(), 30_000)
-    return () => clearInterval(id)
   }, [refresh])
+  usePoll(() => void refresh(), 30_000)
 
   const owned = numbers.filter((p) => p.status === 'active')
   const reserves = numbers.filter((p) => p.status === 'reserved' && p.holdUntil)
@@ -709,19 +711,23 @@ function MarketRow({
 /** Витрина: категории + «Рекомендуем». */
 function MarketHome({
   loading,
+  failed,
   items,
   category,
   favs,
   onCategory,
+  onRetry,
   onSearch,
   onOpen,
   onFav,
 }: {
   loading: boolean
+  failed: boolean
   items: PhoneMarketItem[]
   category: PhoneMarketItem['category'] | 'all'
   favs: string[]
   onCategory: (c: PhoneMarketItem['category'] | 'all') => void
+  onRetry: () => void
   onSearch: () => void
   onOpen: (i: PhoneMarketItem) => void
   onFav: (digits: string) => void
@@ -790,6 +796,13 @@ function MarketHome({
           <div className="h-[76px] animate-pulse rounded-[20px] bg-white" />
           <div className="h-[76px] animate-pulse rounded-[20px] bg-white" />
         </div>
+      ) : failed && shown.length === 0 ? (
+        <ErrorState
+          icon={<CloudOff size={28} />}
+          note="Не удалось загрузить витрину номеров"
+          onRetry={onRetry}
+          className="mt-4"
+        />
       ) : shown.length === 0 ? (
         <p className="mt-8 text-center text-[13px] text-gray-400">В этой категории пусто — загляните завтра.</p>
       ) : (
@@ -1298,6 +1311,8 @@ export default function NumbersApp() {
   // витрина
   const [items, setItems] = useState<PhoneMarketItem[]>([])
   const [mLoading, setMLoading] = useState(true)
+  // ошибка сети ≠ «в этой категории пусто»: отдельный флаг → ErrorState с ретраем
+  const [mFailed, setMFailed] = useState(false)
   const [favs, setFavs] = useState<string[]>([])
   const [buying, setBuying] = useState(false)
   const [toast, setToast] = useState('')
@@ -1324,11 +1339,13 @@ export default function NumbersApp() {
   }, [])
 
   const loadMarket = useCallback(async () => {
+    setMFailed(false)
     try {
       const r = await api.phonesMarket()
       setItems(r.items)
     } catch {
-      /* сеть моргнула */
+      /* сеть моргнула — показываем ретрай вместо пустой заглушки */
+      setMFailed(true)
     } finally {
       setMLoading(false)
     }
@@ -1559,10 +1576,12 @@ export default function NumbersApp() {
           ) : tab === 'home' ? (
             <MarketHome
               loading={mLoading}
+              failed={mFailed}
               items={items}
               category={category}
               favs={favs}
               onCategory={setCategory}
+              onRetry={loadMarket}
               onSearch={() => setTab('search')}
               onOpen={setDetail}
               onFav={toggleFav}

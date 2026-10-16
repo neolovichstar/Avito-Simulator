@@ -20,7 +20,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  BarChart3, Bell, Check, ChevronDown, ChevronLeft, ChevronRight, Crown, Dices, Eye, Flame,
+  BarChart3, Bell, Check, ChevronDown, ChevronLeft, ChevronRight, CloudOff, Crown, Dices, Eye, Flame,
   Gem, Heart, MapPin, Search, ShieldCheck, SlidersHorizontal, Star, Trash2, UserRound, X,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
@@ -31,6 +31,7 @@ import { fmtMoney } from '@/lib/format'
 import { sound } from '@/lib/sound'
 import { useOS } from '@/lib/store'
 import { GostPlate } from '@/components/plates/GostPlate'
+import { ErrorState } from '@/components/avito/ui'
 
 const GREEN = '#12894B'
 const CAPS = 'text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400'
@@ -229,6 +230,8 @@ export default function PlateApp({ embedded = false }: { embedded?: boolean }) {
   const [detail, setDetail] = useState<PlateMarketItemDTO | null>(null)
   const [items, setItems] = useState<PlateMarketItemDTO[]>([])
   const [loading, setLoading] = useState(true)
+  // ошибка сети ≠ «ничего не найдено»: отдельный флаг → ErrorState с ретраем
+  const [failed, setFailed] = useState(false)
   const [favs, setFavs] = useState<string[]>([])
   const [toast, setToast] = useState('')
 
@@ -263,12 +266,14 @@ export default function PlateApp({ embedded = false }: { embedded?: boolean }) {
   }, [])
 
   const load = useCallback(async () => {
+    setFailed(false)
     try {
       const [m, p] = await Promise.all([api.platesMarket(), api.plates()])
       setItems(m.items)
       setMine(p.plates)
     } catch {
-      /* сеть моргнула */
+      /* сеть моргнула — показываем ретрай вместо пустой заглушки */
+      setFailed(true)
     } finally {
       setLoading(false)
     }
@@ -490,11 +495,13 @@ export default function PlateApp({ embedded = false }: { embedded?: boolean }) {
           ) : tab === 'home' ? (
             <HomeTab
               loading={loading}
+              failed={failed}
               items={items}
               filtered={filtered}
               chip={chip}
               favs={favs}
               onChip={(c) => { sound.tap(); setChip(c) }}
+              onRetry={load}
               onSearch={() => { sound.tap(); setTab('search') }}
               onOpen={setDetail}
               onFav={toggleFav}
@@ -703,21 +710,25 @@ function TabBtn({ label, active, icon, onClick }: { label: string; active: boole
 
 function HomeTab({
   loading,
+  failed,
   items,
   filtered,
   chip,
   favs,
   onChip,
+  onRetry,
   onSearch,
   onOpen,
   onFav,
 }: {
   loading: boolean
+  failed: boolean
   items: PlateMarketItemDTO[]
   filtered: PlateMarketItemDTO[]
   chip: Chip
   favs: string[]
   onChip: (c: Chip) => void
+  onRetry: () => void
   onSearch: () => void
   onOpen: (i: PlateMarketItemDTO) => void
   onFav: (key: string) => void
@@ -778,6 +789,13 @@ function HomeTab({
           <div className="h-[196px] animate-pulse rounded-[20px] bg-white" />
           <div className="h-[196px] animate-pulse rounded-[20px] bg-white" />
         </div>
+      ) : failed && filtered.length === 0 ? (
+        <ErrorState
+          icon={<CloudOff size={28} />}
+          note="Не удалось загрузить витрину знаков"
+          onRetry={onRetry}
+          className="mt-4"
+        />
       ) : filtered.length === 0 ? (
         <div className="mt-8 flex flex-col items-center gap-2 text-center">
           <Search className="size-8 text-[#C4C8CF]" aria-hidden />

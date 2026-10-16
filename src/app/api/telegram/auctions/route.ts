@@ -1,13 +1,11 @@
 import { db } from '@/lib/db'
-// Если REALTIME_SECRET на сервере не задан (напр. Vercel), принимаем канонический дефолт
-const EXPECTED_SECRET = process.env.REALTIME_SECRET ?? 'avito-sim-rt-2024-secret'
+import { serviceOk } from '@/lib/telegram-auth'
 
 export const dynamic = 'force-dynamic'
 
 // Сервисный роут для бота: активные лоты аукциона (команда /lots).
 export async function GET(req: Request) {
-  const secret = req.headers.get('x-service-secret')
-  if (!secret || secret !== EXPECTED_SECRET) {
+  if (!(await serviceOk(req))) {
     return Response.json({ error: 'forbidden' }, { status: 403 })
   }
   const lots = await db.auctionLot.findMany({

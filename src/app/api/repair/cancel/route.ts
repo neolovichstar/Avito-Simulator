@@ -15,6 +15,14 @@ export async function POST(req: Request) {
   if (!job || job.userId !== user.id) return Response.json({ error: 'Наряд не найден' }, { status: 404 })
   if (job.status !== 'in_progress') return Response.json({ error: 'Наряд уже закрыт' }, { status: 400 })
 
+  // 63-a2: CAS-захват наряда: гонка cancel-vs-finish (finish захватывает в 'done')
+  // больше не даёт двойной возврат денег/прочности инструмента
+  const claim = await db.repairJob.updateMany({
+    where: { id: job.id, userId: user.id, status: 'in_progress' },
+    data: { status: 'cancelled', finishedAt: new Date() },
+  })
+  if (claim.count === 0) return Response.json({ error: 'Наряд уже закрыт' }, { status: 409 })
+
   await db.$transaction(async (tx) => {
     if (job.cost > 0) {
       await tx.user.update({ where: { id: user.id }, data: { balance: { increment: job.cost } } })
@@ -29,7 +37,6 @@ export async function POST(req: Request) {
         data: { durability: { increment: 1 } },
       })
     }
-    await tx.repairJob.update({ where: { id: job.id }, data: { status: 'cancelled', finishedAt: new Date() } })
   })
 
   const fresh = await db.user.findUnique({ where: { id: user.id }, select: { balance: true } })

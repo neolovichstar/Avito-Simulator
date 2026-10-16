@@ -33,32 +33,45 @@ export async function POST(req: Request) {
     return Response.json({ error: 'Недостаточно средств на счёте' }, { status: 400 })
   }
 
-  // атомарное списание (защита от гонки двух параллельных оплат)
-  const dec = await db.user.updateMany({
-    where: { id: user.id, balance: { gte: amount } },
-    data: { balance: { decrement: amount } },
-  })
-  if (dec.count === 0) {
-    return Response.json({ error: 'Недостаточно средств на счёте' }, { status: 400 })
+  // 63-a2: весь flow (перечитать stats → маркер → списание → записать stats) в одной
+  // транзакции: SQLite сериализует и двойная оплата невозможна, на Postgres гонка
+  // сокращается радикально (маркер и списание видят одно состояние)
+  const paidAt = now.toISOString()
+  try {
+    await db.$transaction(async (tx) => {
+      const txUser = await tx.user.findUnique({
+        where: { id: user.id },
+        select: { balance: true, stats: true },
+      })
+      if (!txUser) throw new FinePayError('Недостаточно средств на счёте')
+      const txStats = parseGosStats(txUser.stats)
+      if (txStats.gosFinesPaid?.[fineId]) throw new FinePayError('Штраф уже оплачен')
+      const dec = await tx.user.updateMany({
+        where: { id: user.id, balance: { gte: amount } },
+        data: { balance: { decrement: amount } },
+      })
+      if (dec.count === 0) throw new FinePayError('Недостаточно средств на счёте')
+      const merged = txStats
+      merged.gosFinesPaid = { ...(merged.gosFinesPaid ?? {}), [fineId]: { a: amount, t: paidAt } }
+      merged.gosFinesPaidTotal = (merged.gosFinesPaidTotal ?? 0) + amount
+      await tx.user.update({ where: { id: user.id }, data: { stats: JSON.stringify(merged) } })
+      await tx.transaction.create({
+        data: {
+          userId: user.id,
+          type: 'tax',
+          amount: -amount,
+          note: `Штраф: ${fine.title}`,
+        },
+      })
+    })
+  } catch (err) {
+    if (err instanceof FinePayError) {
+      return Response.json({ error: err.message }, { status: 400 })
+    }
+    throw err
   }
 
-  const paidAt = now.toISOString()
   const fresh = await db.user.findUnique({ where: { id: user.id } })
-  const merged = parseGosStats(fresh?.stats)
-  merged.gosFinesPaid = { ...(merged.gosFinesPaid ?? {}), [fineId]: { a: amount, t: paidAt } }
-  merged.gosFinesPaidTotal = (merged.gosFinesPaidTotal ?? 0) + amount
-  await db.user
-    .update({ where: { id: user.id }, data: { stats: JSON.stringify(merged) } })
-    .catch(() => {})
-
-  await db.transaction.create({
-    data: {
-      userId: user.id,
-      type: 'tax',
-      amount: -amount,
-      note: `Штраф: ${fine.title}`,
-    },
-  })
 
   void notifyUser(
     user.id,
@@ -69,3 +82,5 @@ export async function POST(req: Request) {
 
   return Response.json({ ok: true, fineId, amount, balance: fresh?.balance ?? user.balance, paidAt })
 }
+
+class FinePayError extends Error {}

@@ -49,8 +49,11 @@ async function command<T = unknown>(args: (string | number)[]): Promise<T | null
 }
 
 /**
- * Персистентный rate-limit на Upstash (INCR + EXPIRE).
- * Если Redis выключен/недоступен — прозрачно падает на in-memory rateLimit.
+ * Персистентный rate-limit на Upstash.
+ * 63-a2: атомарное открытие окна — SET NX EX: TTL гарантированно ставится вместе
+ * с первым инкрементом (старый INCR + fire-and-forget EXPIRE терял EXPIRE при
+ * сетевом сбое → вечный 429 по ключу). Если ключ уже есть (SET NX не взял) —
+ * честный INCR, TTL у ключа уже стоит. Redis недоступен → фолбэк на память.
  */
 export async function redisLimit(
   key: string,
@@ -62,13 +65,18 @@ export async function redisLimit(
     return rateLimit(key, max, windowMs)
   }
   const windowSec = Math.max(1, Math.ceil(windowMs / 1000))
-  const n = await command<number>(['INCR', `rl:${key}`])
+  const k = `rl:${key}`
+  // SET NX: вернёт 'OK' если окно открыли мы (TTL поставлен атомарно), null —
+  // если ключ уже существует ИЛИ Redis недоступен (различим следующим INCR)
+  const created = await command<0 | 1 | string>(['SET', k, '1', 'NX', 'EX', windowSec])
+  if (created === 'OK') return 1 <= max
+  // ключ уже есть или Redis упал: INCR отличит живой Redis от упавшего
+  const n = await command<number>(['INCR', k])
   if (n === null) {
     // Redis недоступен — фолбэк на память, сервис не страдает
     const { rateLimit } = await import('@/lib/ratelimit')
     return rateLimit(key, max, windowMs)
   }
-  if (n === 1) void command(['EXPIRE', `rl:${key}`, windowSec])
   return n <= max
 }
 

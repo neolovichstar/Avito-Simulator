@@ -31,6 +31,7 @@ import { fmtMoney, fmtDateTime, fmtTime, timeAgo } from '@/lib/format'
 import { CONDITION_LABEL, CONDITION_MULT } from '@/lib/catalog-types'
 import { useOS } from '@/lib/store'
 import { sound } from '@/lib/sound'
+import { usePoll } from '@/lib/use-poll'
 import type { DeliveryDTO } from '@/lib/types'
 import GameMap from '@/components/delivery/GameMap'
 
@@ -1004,13 +1005,9 @@ export default function DeliveryApp() {
     void load()
   }, [load])
 
-  // Тихий refetch каждые 5 секунд: доставки приходят в реальном времени
-  useEffect(() => {
-    const id = setInterval(() => {
-      void load(true)
-    }, 5000)
-    return () => clearInterval(id)
-  }, [load])
+  // Тихий refetch каждые 5 секунд: доставки приходят в реальном времени.
+  // usePoll: в свёрнутом TG WebView API не дёргаем, при возврате — догоняем.
+  usePoll(() => void load(true), 5_000)
 
   const items = data ?? []
   // Хронологический порядок: новые сверху

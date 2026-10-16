@@ -97,12 +97,11 @@ function PhonesPane() {
   const setMain = async (id: string) => {
     setBusy(true)
     try {
-      await fetch('/api/phones/set-main', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      })
+      const res = await api.phonesSetMain(id)
+      if (!res.ok) throw new Error()
       load()
+    } catch {
+      useOS.getState().pushToast('Resale', 'Не удалось закрепить номер основным')
     } finally {
       setBusy(false)
     }
@@ -111,12 +110,11 @@ function PhonesPane() {
   const release = async (id: string) => {
     setBusy(true)
     try {
-      await fetch('/api/phones/release', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      })
+      const res = await api.phonesRelease(id)
+      if (!res.ok) throw new Error()
       load()
+    } catch {
+      useOS.getState().pushToast('Resale', 'Не удалось отпустить номер')
     } finally {
       setBusy(false)
     }

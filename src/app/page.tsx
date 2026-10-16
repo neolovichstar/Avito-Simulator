@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { RefreshCw, WifiOff } from 'lucide-react'
+import { RefreshCw, WifiOff, Loader2 } from 'lucide-react'
 import { useOS, type AppKey, WALLPAPER_TOP } from '@/lib/store'
 import { isLightWallpaper } from '@/lib/wallpapers'
 import { hydratePrefs } from '@/lib/prefs'
@@ -81,7 +81,7 @@ function getDeviceId(): string | null {
 const LIGHT_APPS: Partial<Record<AppKey, true>> = { avito: true, bank: true, taxes: true, auction: true, repair: true, career: true, delivery: true, leaderboard: true, music: true, gosuslugi: true, numbers: true }
 
 // Экран «нет связи с сервером» — показывается после 3 неудачных попыток авторизации.
-function OfflineScreen({ onRetry, compact = false }: { onRetry: () => void; compact?: boolean }) {
+function OfflineScreen({ onRetry, checking = false, compact = false }: { onRetry: () => void; checking?: boolean; compact?: boolean }) {
   return (
     <div
       role="alert"
@@ -97,12 +97,14 @@ function OfflineScreen({ onRetry, compact = false }: { onRetry: () => void; comp
           Прогресс сохранён, а товары ждут. Проверьте интернет и попробуйте ещё раз
         </p>
       </div>
+      {/* busy-гейт: двойной тап не запускает параллельные doAuth (гонка сессий) */}
       <button
         onClick={onRetry}
-        className="press inline-flex min-h-[44px] items-center gap-2 rounded-2xl bg-emerald-500 px-6 text-xs font-bold text-neutral-950 shadow-lg shadow-emerald-500/25 active:scale-[0.98]"
+        disabled={checking}
+        className="press inline-flex min-h-[44px] items-center gap-2 rounded-2xl bg-emerald-500 px-6 text-xs font-bold text-neutral-950 shadow-lg shadow-emerald-500/25 active:scale-[0.98] disabled:opacity-60"
       >
-        <RefreshCw className="size-4" aria-hidden />
-        Повторить подключение
+        {checking ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <RefreshCw className="size-4" aria-hidden />}
+        {checking ? 'Проверяем…' : 'Повторить подключение'}
       </button>
     </div>
   )
@@ -265,6 +267,22 @@ export default function Home() {
     console.error('[auth] сервер недоступен после 3 попыток', lastErr)
     setAuthError(true)
   }, [setSession, setNotifications, setOnline, pushToast, applyTelegramChrome])
+
+  // Ретрай с OfflineScreen: busy-гейт по образцу claimingBonus — двойной тап
+  // не должен запускать параллельные doAuth (гонка setSession/setToken).
+  const retryingAuth = useRef(false)
+  const [authBusy, setAuthBusy] = useState(false)
+  const retryAuth = useCallback(async () => {
+    if (retryingAuth.current) return
+    retryingAuth.current = true
+    setAuthBusy(true)
+    try {
+      await doAuth()
+    } finally {
+      retryingAuth.current = false
+      setAuthBusy(false)
+    }
+  }, [doAuth])
 
   useEffect(() => {
     if (authTried.current) return
@@ -494,7 +512,7 @@ export default function Home() {
         <OrientationGate />
         {!session ? (
           authError ? (
-            <OfflineScreen onRetry={doAuth} />
+            <OfflineScreen onRetry={retryAuth} checking={authBusy} />
           ) : (
             <div className="fixed inset-0 flex flex-col items-center justify-center gap-3" style={{ backgroundImage: 'linear-gradient(180deg,#08120d,#030705)' }}>
               <div className="h-10 w-10 animate-spin rounded-full border-2 border-emerald-400/20 border-t-emerald-300/80" />
@@ -554,7 +572,7 @@ export default function Home() {
         <div className={`absolute inset-0 top-10 bottom-6 overflow-hidden ${lightChrome || (locked && wallLight) ? 'bg-[#F1F2F5]' : 'bg-black'} ${theme === 'dark' ? 'theme-dark' : ''}`}>
           {!session ? (
             authError ? (
-              <OfflineScreen compact onRetry={doAuth} />
+              <OfflineScreen compact onRetry={retryAuth} checking={authBusy} />
             ) : (
               <div className="h-full flex flex-col items-center justify-center gap-3" style={{ backgroundImage: 'linear-gradient(180deg,#08120d,#030705)' }}>
                 <div className="w-10 h-10 rounded-full border-2 border-emerald-400/20 border-t-emerald-300/80 animate-spin" />

@@ -1,4 +1,5 @@
 import { db } from '@/lib/db'
+import { Prisma } from '@prisma/client'
 import { getSessionUser, unauthorized } from '@/lib/session'
 import { isOnline } from '@/lib/dto'
 import { rateLimit, tooMany } from '@/lib/rate-limit'
@@ -84,8 +85,10 @@ export async function POST(req: Request) {
     where: { listingId: listing.id, buyerId: user.id, sellerId: listing.sellerId },
   })
 
+  // ---------- ПАМЯТЬ (28-a): продавец-бот знает свою историю с этим игроком ----------
+  // мета бота считается ДО транзакции: внутри — только чистая БД-гонка findFirst→create
+  let botMetaJson: string | null = null
   if (!chat && listing.seller.isBot) {
-    // ---------- ПАМЯТЬ (28-a): продавец-бот знает свою историю с этим игроком ----------
     const memory = await getBotMemoryEntry(user.id, listing.seller.id)
     const cooldown = hasActiveCooldown(memory)
     const persona = personaOf(listing.seller)
@@ -113,21 +116,41 @@ export async function POST(req: Request) {
     // пишет игрок (как на настоящем Авито). Бот отвечает уже на сообщение
     // игрока — с живой паузой (см. botReply). Холодный opener при кулдауне
     // памяти бот пришлёт сам в ответ на первое сообщение.
-    chat = await db.chat.create({
-      data: {
-        listingId: listing.id, buyerId: user.id, sellerId: listing.sellerId,
-        meta: JSON.stringify({
-          botRole: 'seller', botLimit: limit, rounds: 0,
-          patience: cooldown ? Math.max(1, persona.patience - 2) : persona.patience,
-          cold: cooldown,
-        }),
-      },
-    })
-  } else if (!chat) {
-    chat = await db.chat.create({
-      data: { listingId: listing.id, buyerId: user.id, sellerId: listing.sellerId, meta: JSON.stringify({}) },
+    botMetaJson = JSON.stringify({
+      botRole: 'seller', botLimit: limit, rounds: 0,
+      patience: cooldown ? Math.max(1, persona.patience - 2) : persona.patience,
+      cold: cooldown,
     })
   }
+
+  if (!chat) {
+    // 63-a2: create под транзакцией + unique(chat_listing_buyer_seller): двойной тап
+    // «Написать» / два устройства создают ОДИН чат; проигравший гонку получает P2002
+    try {
+      chat = await db.$transaction(async (tx) => {
+        const existing = await tx.chat.findFirst({
+          where: { listingId: listing.id, buyerId: user.id, sellerId: listing.sellerId },
+        })
+        if (existing) return existing
+        return tx.chat.create({
+          data: {
+            listingId: listing.id, buyerId: user.id, sellerId: listing.sellerId,
+            meta: botMetaJson ?? '{}',
+          },
+        })
+      })
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        // параллельный запрос успел создать чат первым — перечитываем и отдаём его (200)
+        chat = await db.chat.findFirst({
+          where: { listingId: listing.id, buyerId: user.id, sellerId: listing.sellerId },
+        })
+      } else {
+        throw e
+      }
+    }
+  }
+  if (!chat) return Response.json({ error: 'Не удалось открыть чат' }, { status: 500 })
 
   const messages = await db.message.findMany({
     where: { chatId: chat.id },

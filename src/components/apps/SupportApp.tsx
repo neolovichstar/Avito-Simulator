@@ -20,6 +20,7 @@ import type { SupportTicketDTO, SupportTicketMsgDTO, SupportMsgDTO } from '@/lib
 import { fmtMoney } from '@/lib/format'
 import { sound } from '@/lib/sound'
 import { useOS } from '@/lib/store'
+import { usePoll } from '@/lib/use-poll'
 
 // ── палитра макета ──
 const GREEN = '#12894B'
@@ -254,9 +255,9 @@ function ChatScreen({
 
   useEffect(() => {
     void load()
-    const t = setInterval(() => void load(), 20_000)
-    return () => clearInterval(t)
   }, [load])
+  // поллинг треда тикета — только в видимом документе (usePoll)
+  usePoll(() => void load(), 20_000)
 
   const send = useCallback(
     async (raw?: string) => {
@@ -861,9 +862,9 @@ function GeneralChatScreen() {
 
   useEffect(() => {
     void load()
-    const t = setInterval(() => void load(), 20_000)
-    return () => clearInterval(t)
   }, [load])
+  // поллинг общего чата — только в видимом документе (usePoll)
+  usePoll(() => void load(), 20_000)
 
   const send = useCallback(async () => {
     const body = text.trim()
@@ -1026,14 +1027,12 @@ export default function SupportApp() {
     }
   }, [])
 
+  // первый вызов сразу, дальше — поллинг только в видимом документе (usePoll)
   useEffect(() => {
     const first = setTimeout(() => void loadTickets(), 0)
-    const t = setInterval(() => void loadTickets(), 20_000)
-    return () => {
-      clearTimeout(first)
-      clearInterval(t)
-    }
+    return () => clearTimeout(first)
   }, [loadTickets])
+  usePoll(() => void loadTickets(), 20_000)
 
   const unreadTotal = useMemo(() => tickets.reduce((s, t) => s + t.unread, 0), [tickets])
 

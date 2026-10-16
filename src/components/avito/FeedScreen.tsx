@@ -190,27 +190,34 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
     try { await api.deleteSavedSearch(id) } catch { loadSaved() }
   }
 
+  const seqRef = useRef(0)
   const load = useCallback(async (page = 1) => {
+    // гонка фильтров: медленный ответ старого запроса не должен перезаписать
+    // свежий — каждый вызов получает номер, устаревшие ответы отбрасываются
+    const seq = ++seqRef.current
     setLoading(true)
     setError('')
     pageRef.current = page
     try {
       if (favoritesMode) {
         const ids = getFavs()
-        if (!ids.length) { setItems([]); setTotal(0); return }
+        if (!ids.length) { if (seqRef.current === seq) { setItems([]); setTotal(0) } return }
         const all = await Promise.all(ids.slice(0, 40).map((id) => api.listing(id).catch(() => null)))
         const ok = all.filter(Boolean) as FeedListing[]
+        if (seqRef.current !== seq) return
         setItems(ok)
         setTotal(ok.length)
         return
       }
       const res = await api.feed({ q: query, category, city, sort, page, limit: 20 })
+      if (seqRef.current !== seq) return
       setItems((prev) => (page === 1 ? res.items : [...prev, ...res.items]))
       setTotal(res.total)
     } catch (e) {
+      if (seqRef.current !== seq) return
       setError(e instanceof ApiError ? e.message : 'Не удалось загрузить ленту')
     } finally {
-      setLoading(false)
+      if (seqRef.current === seq) setLoading(false)
     }
   }, [query, category, city, sort, favoritesMode])
 
@@ -219,8 +226,14 @@ export default function FeedScreen({ onOpenListing, favoritesMode, searchMode, o
   const onFav = useCallback((id: string) => {
     setFavs((prev) => {
       const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-      // синк на сервер (не блокирует UI)
-      void import('@/lib/api').then(({ api }) => api.favToggle(id, next.includes(id)).catch(() => {}))
+      // синк на сервер (не блокирует UI); при ошибке откатываем оптимистичное сердце
+      void import('@/lib/api')
+        .then(({ api }) => api.favToggle(id, next.includes(id)))
+        .catch(() => {
+          setFavs((cur) => (next.includes(id)
+            ? cur.filter((x) => x !== id) // было «включили» — откатываем к выключенному
+            : cur.includes(id) ? [...cur, id] : cur)) // было «выключили» — возвращаем
+        })
       return next
     })
   }, [])
