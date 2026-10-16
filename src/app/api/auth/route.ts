@@ -44,11 +44,17 @@ export async function POST(req: Request) {
       // значит неподписанные профили не принимаем (иначе снова имперсонация).
       console.error('[auth] PRODUCTION без BOT_TOKEN: initData отклонён — задайте BOT_TOKEN в env')
       tg = null
-    } else {
+    } else if (process.env.ALLOW_UNSIGNED_INITDATA === '1') {
       // Dev-фолбэк (песочница без секретов): принимаем профиль без проверки,
       // иначе ВСЕ Telegram-игроки получают безликого «Игрока».
+      // 64-b/H1: путь закрыт флагом окружения — без ALLOW_UNSIGNED_INITDATA=1
+      // неподписанные initData отклоняются даже в деве (fail-closed).
       tg = parseInitDataUser(initDataRaw)
-      if (tg) console.warn('[auth] DEV без BOT_TOKEN — initData принят БЕЗ проверки подписи; tgId:', tg.id)
+      if (tg) console.warn('[auth] DEV без BOT_TOKEN (ALLOW_UNSIGNED_INITDATA=1) — initData принят БЕЗ проверки подписи; tgId:', tg.id)
+    } else {
+      // 64-b/H1: флаг не задан — неподписанный initData не принимается нигде
+      console.warn('[auth] неподписанный initData отклонён (ALLOW_UNSIGNED_INITDATA не задан)')
+      tg = null
     }
     if (tg) {
       const displayName = [tg.first_name, tg.last_name].filter(Boolean).join(' ') || 'Игрок'

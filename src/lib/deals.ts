@@ -113,34 +113,44 @@ export async function bumpQuests(userId: string, kind: QuestKind, delta = 1) {
 }
 
 export async function checkAchievements(userId: string) {
-  const user = await db.user.findUnique({ where: { id: userId } })
-  if (!user || user.isBot) return
-  const stats = parseStats(user.stats)
-  const inventoryCount = await db.item.count({ where: { ownerId: userId } })
-  // 59-a: битый achievements (ручная правка/старая миграция) не должен ронять 500-м
-  // все пути, где вызывается checkAchievements (покупка, ставка, квест)
-  let nowHave: Set<string>
-  try {
-    nowHave = new Set<string>(JSON.parse(user.achievements || '[]') as string[])
-  } catch {
-    nowHave = new Set<string>()
+  // 64-F1 (H-4): запись ачивок была read-modify-write без защиты — два параллельных
+  // вызова (покупка + квест) читали одинаковый JSON и оба начисляли награду.
+  // Фикс CAS-retry без смены схемы: achievements — это String, поэтому equals
+  // сравнивает строку целиком; пишем ТОЛЬКО если JSON не изменился с чтения,
+  // иначе перечитываем и считаем заново (до 3 попыток, потом тихо выходим —
+  // следующий checkAchievements доначислит недостающее).
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const user = await db.user.findUnique({ where: { id: userId } })
+    if (!user || user.isBot) return
+    const stats = parseStats(user.stats)
+    const inventoryCount = await db.item.count({ where: { ownerId: userId } })
+    // 59-a: битый achievements (ручная правка/старая миграция) не должен ронять 500-м
+    // все пути, где вызывается checkAchievements (покупка, ставка, квест)
+    let nowHave: Set<string>
+    try {
+      nowHave = new Set<string>(JSON.parse(user.achievements || '[]') as string[])
+    } catch {
+      nowHave = new Set<string>()
+    }
+    const should = new Set(achievedIds(stats, user.level, user.balance, inventoryCount))
+    const unlocked = ACHIEVEMENTS.filter((a) => should.has(a.id) && !nowHave.has(a.id))
+    if (!unlocked.length) return
+    const ids = [...nowHave, ...unlocked.map((a) => a.id)]
+    const reward = unlocked.reduce((s, a) => s + a.reward, 0)
+    const upd = await db.user.updateMany({
+      where: { id: userId, achievements: user.achievements },
+      data: { achievements: JSON.stringify(ids), balance: { increment: reward } },
+    })
+    if (upd.count === 0) continue // гонку выиграл параллельный писатель — перечитываем
+    await db.transaction.create({
+      data: { userId, type: 'sale', amount: reward, note: `Достижения: ${unlocked.map((a) => a.title).join(', ')}` },
+    })
+    for (const a of unlocked) {
+      await notifyUser(userId, 'system', `🏆 Достижение: ${a.title}`, `${a.desc}. Награда ${fmtMoney(a.reward)}`)
+    }
+    await bumpStats(userId, { })
+    return
   }
-  const should = new Set(achievedIds(stats, user.level, user.balance, inventoryCount))
-  const unlocked = ACHIEVEMENTS.filter((a) => should.has(a.id) && !nowHave.has(a.id))
-  if (!unlocked.length) return
-  const ids = [...nowHave, ...unlocked.map((a) => a.id)]
-  const reward = unlocked.reduce((s, a) => s + a.reward, 0)
-  await db.user.update({
-    where: { id: userId },
-    data: { achievements: JSON.stringify(ids), balance: { increment: reward } },
-  })
-  await db.transaction.create({
-    data: { userId, type: 'sale', amount: reward, note: `Достижения: ${unlocked.map((a) => a.title).join(', ')}` },
-  })
-  for (const a of unlocked) {
-    await notifyUser(userId, 'system', `🏆 Достижение: ${a.title}`, `${a.desc}. Награда ${fmtMoney(a.reward)}`)
-  }
-  await bumpStats(userId, { })
 }
 
 function personaTrust(personaId: string | null): number {
@@ -369,14 +379,16 @@ export async function completeSale(opts: {
       },
     })
     await db.chat.update({ where: { id: opts.chatId }, data: { lastMessageAt: new Date() } })
-    await emitTo(`chat:${opts.chatId}`, 'chat:message', {
+    const sysDto = {
       chatId: opts.chatId,
       message: {
         id: sys.id, senderType: 'system', senderId: 'system', senderName: 'Система',
         kind: 'system', text: sys.text, amount: null, invoiceId: null, paid: null,
         createdAt: sys.createdAt.toISOString(), mine: false,
       },
-    })
+    }
+    await emitTo(`user:${opts.buyer.id}`, 'chat:message', sysDto)
+    await emitTo(`user:${seller.id}`, 'chat:message', sysDto)
   }
 
   // уведомления

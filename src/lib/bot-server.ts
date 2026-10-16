@@ -498,8 +498,9 @@ async function handleCommand(msg: TgMessage): Promise<void> {
     }
     const lines = [`${emo(EMOJI.chartUp, '📈')} <b>Аукцион · активные лоты</b>`, '']
     for (const l of data.lots) {
-      lines.push(`${emo(EMOJI.tag, '🏷')} <b>${l.title}</b>`)
-      lines.push(`${fmtMoney(l.currentBid)} · ${l.bids} ставок · лидер ${l.leader} · конец через ${l.endsInMin} мин`)
+      // 64-c/L2: title/leader — пользовательский контент, экранируем (HTML-инъекция)
+      lines.push(`${emo(EMOJI.tag, '🏷')} <b>${escHtml(l.title)}</b>`)
+      lines.push(`${fmtMoney(l.currentBid)} · ${l.bids} ставок · лидер ${escHtml(l.leader)} · конец через ${l.endsInMin} мин`)
       lines.push('')
     }
     lines.push(`${emo(EMOJI.arrowUp, '🔼')} Ставки — в приложении Аукцион в игре.`)

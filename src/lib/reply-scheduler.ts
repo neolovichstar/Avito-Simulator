@@ -81,8 +81,16 @@ export async function queueBotReply(chatId: string, metaJson: string, pending: P
 
   // «печатает…» — за 4.5 с до сообщения (длинные паузы: игрок видит, что бот
   // появился и отвечает, а не молчит до последнего)
+  // 64-c/C2: typing — обоим участникам чата на личные user-каналы (комнаты
+  // chat:<id> упразднены); каналы считаем один раз при постановке в очередь
+  const chatRow = await db.chat.findUnique({ where: { id: chatId }, select: { buyerId: true, sellerId: true } })
+  const typingChannels = chatRow
+    ? [`user:${chatRow.buyerId}`, `user:${chatRow.sellerId}`]
+    : []
   const entry: TimerEntry = { delivery: undefined as unknown as NodeJS.Timeout }
-  const burst = () => void emitTo(`chat:${chatId}`, 'typing', { chatId, name: pending.senderName })
+  const burst = () => {
+    for (const ch of typingChannels) void emitTo(ch, 'typing', { chatId, name: pending.senderName })
+  }
   const typingIn = delay - 4500
   if (typingIn > 400) {
     entry.typingStart = setTimeout(() => {

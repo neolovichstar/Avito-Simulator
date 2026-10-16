@@ -58,20 +58,29 @@ const DEVICE_KEY = 'avito_sim_device_id'
 // Стабильный id этого браузера/телефона для фолбэк-входа без Telegram.
 // Сервер ключует девиант-аккаунт по нему, поэтому прогресс больше не
 // «сбрасывается»: у каждого устройства — свой постоянный профиль.
+// M7-64b: если localStorage недоступен (приватный режим) — раньше вернули бы
+// null и ВСЕ такие клиенты получили общий аккаунт «Игрок». Теперь каждый
+// получает свой ЭФЕМЕРНЫЙ id в памяти (живёт до перезагрузки страницы).
+let ephemeralDeviceId: string | null = null
+
+function genDeviceId(): string {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2) + Date.now().toString(36)
+}
+
 function getDeviceId(): string | null {
   if (typeof window === 'undefined') return null
   try {
     let id = localStorage.getItem(DEVICE_KEY)
     if (!id) {
-      id =
-        typeof crypto !== 'undefined' && 'randomUUID' in crypto
-          ? crypto.randomUUID()
-          : Math.random().toString(36).slice(2) + Date.now().toString(36)
+      id = genDeviceId()
       localStorage.setItem(DEVICE_KEY, id)
     }
     return id
   } catch {
-    return null // приватный режим — сервер создаст общий dev-аккаунт, как раньше
+    if (!ephemeralDeviceId) ephemeralDeviceId = genDeviceId()
+    return ephemeralDeviceId
   }
 }
 
@@ -298,11 +307,25 @@ export default function Home() {
   useEffect(() => {
     const onOnline = () => {
       if (useOS.getState().session) return
-      doAuth()
+      retryAuth() // L1-64b: через busy-гейт, напрямую doAuth() звать нельзя
     }
     window.addEventListener('online', onOnline)
     return () => window.removeEventListener('online', onOnline)
-  }, [doAuth])
+  }, [retryAuth])
+
+  // ---------- СЕССИЯ ПРОТУХЛА (401): тот же экран оффлайна, что после неудачного doAuth ----------
+  // api.ts ловит bearer-401 (кроме входа), чистит токен и шлёт одно событие.
+  // Здесь: на локе не дёргаемся; если сессии уже нет — путь doAuth не наш.
+  useEffect(() => {
+    const onUnauthorized = () => {
+      const os = useOS.getState()
+      if (os.locked || !os.session) return
+      setSession(null)
+      setAuthError(true) // OfflineScreen с кнопкой retryAuth — дублировать логику не нужно
+    }
+    window.addEventListener('resale:unauthorized', onUnauthorized)
+    return () => window.removeEventListener('resale:unauthorized', onUnauthorized)
+  }, [setSession])
 
   // ---------- REALTIME ----------
   useRealtime(session?.id, {
@@ -601,7 +624,12 @@ export default function Home() {
           open={shadeOpen}
           qs={shadeQs}
           onClose={() => setShadeOpen(false)}
-          onOpenApp={(a) => { setShadeOpen(false); openApp(a) }}
+          onOpenApp={(a) => {
+            // M2-64b: из шторки поверх локскрина приложения «из-под замка» не открываем
+            if (useOS.getState().locked) return
+            setShadeOpen(false)
+            openApp(a)
+          }}
           onCommitOpen={commitShade}
         />
         <ToastStack />
@@ -643,6 +671,19 @@ export default function Home() {
           className="absolute right-0 top-0 z-[59] h-10 w-1/2 touch-none outline-none focus-visible:ring-2 focus-visible:ring-white/50"
           onPointerDown={qsPull.onPointerDown}
           onClick={zoneClick('qs')}
+        />
+
+        {/* M1-64b: колокольчик статус-бара. Зоны-жесты (z-[59]) перекрывают
+            StatusBar (z-40) — родная кнопка в шапке мёртвая. Тап-таргет выше зон:
+            тап открывает центр уведомлений (как onBell), драг тянет шторку.
+            Тонкий таргет ровно над колокольчиком (~44px) — остальной статус-бар
+            по-прежнему обслуживают зоны (свайп шторки работает). */}
+        <button
+          type="button"
+          aria-label="Открыть уведомления"
+          className="absolute right-0 top-0 z-[60] flex h-10 w-12 items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+          onPointerDown={(e) => { e.stopPropagation(); notifPull.onPointerDown(e) }}
+          onClick={(e) => { e.stopPropagation(); zoneClick('notif')() }}
         />
 
         {/* жестовая навигация: пилюля + свайпы от краёв (вместо кнопок).

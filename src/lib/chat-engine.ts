@@ -412,27 +412,34 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
     const lastBotMsg = history.filter((h) => h.senderType === 'bot').at(-1)
     if (lastBotMsg) {
       if (!isBuyer) {
-        // бот-продавец выставляет счёт ровно на обещанную цену
-        const invoiceId = `inv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
-        const metaJson = JSON.stringify({ ...meta, invoicePending: true })
-        await db.chat.update({ where: { id: chat.id }, data: { meta: metaJson } })
-        await queueReply({
-          ...base,
-          metaJson,
-          text: `${pickAgree()} ${fmtMoney(meta.lastOffer)}. Ставлю счёт${memory?.flags.includes('scammer') ? ', оплата вперёд' : ''}`,
-          extra: { kind: 'invoice', amount: meta.lastOffer, invoiceId },
-          sysText: `Счёт от продавца: ${fmtMoney(meta.lastOffer)}. Оплатите, чтобы получить товар.`,
+        // 64-c/H1: страховка — счёт по lastOffer выставляем ТОЛЬКО если он не
+        // ниже скрытого минимума продавца (демотированная цена из старого meta)
+        // и не выше цены объявления (потолок Task 62). Иначе — обычный ответ:
+        // ИИ/правила пересчитают корректную цену, счёт не выставится.
+        if (meta.lastOffer >= meta.botLimit && meta.lastOffer <= listing.price) {
+          // бот-продавец выставляет счёт ровно на обещанную цену
+          const invoiceId = `inv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
+          const metaJson = JSON.stringify({ ...meta, invoicePending: true })
+          await db.chat.update({ where: { id: chat.id }, data: { meta: metaJson } })
+          await queueReply({
+            ...base,
+            metaJson,
+            text: `${pickAgree()} ${fmtMoney(meta.lastOffer)}. Ставлю счёт${memory?.flags.includes('scammer') ? ', оплата вперёд' : ''}`,
+            extra: { kind: 'invoice', amount: meta.lastOffer, invoiceId },
+            sysText: `Счёт от продавца: ${fmtMoney(meta.lastOffer)}. Оплатите, чтобы получить товар.`,
+          })
+          return
+        }
+      } else {
+        // бот-покупатель платит игроку-продавцу сразу
+        const res = await completeSale({
+          listingId: listing.id, buyer: bot, price: meta.lastOffer, via: 'chat', chatId: chat.id,
         })
-        return
-      }
-      // бот-покупатель платит игроку-продавцу сразу
-      const res = await completeSale({
-        listingId: listing.id, buyer: bot, price: meta.lastOffer, via: 'chat', chatId: chat.id,
-      })
-      if (res.ok) {
-        await onDealCompleted({ listing, buyerBotId: bot.id, player, price: meta.lastOffer })
-        await queueReply({ ...base, metaJson: chat.meta, text: `${pickAgree()} оплатил, глянь` })
-        return
+        if (res.ok) {
+          await onDealCompleted({ listing, buyerBotId: bot.id, player, price: meta.lastOffer })
+          await queueReply({ ...base, metaJson: chat.meta, text: `${pickAgree()} оплатил, глянь` })
+          return
+        }
       }
     }
   }
@@ -512,11 +519,19 @@ async function botReplyCore(chatId: string, playerMsg: { text?: string; invoice?
   // итоговый meta после раунда ИИ (раньше ветка инвойса затирала rounds/botLimit — фикс)
   // botLimit/lastOffer продавца — не выше цены объявления (страховка от старых чатов и глюков ИИ)
   // 63-a2: botLimit покупателя — не выше исходного лимита раунда (никакого дрейфа вверх)
+  // 64-c/H1: ЖЁСТКИЙ ИНВАРИАНТ — lastOffer продавца никогда ниже его минимума:
+  // демотированный accept (обход botLimit) не оставляет в meta цену ниже botLimit,
+  // иначе scripted fast-path на «согласен» выставил бы счёт по демотированной цене
+  const newBotLimit = meta.botRole === 'seller' ? Math.min(reply.newLimit, listing.price) : Math.min(reply.newLimit, meta.botLimit)
   const metaAfterAi: ChatMeta = {
     ...meta,
-    botLimit: meta.botRole === 'seller' ? Math.min(reply.newLimit, listing.price) : Math.min(reply.newLimit, meta.botLimit),
+    botLimit: newBotLimit,
     rounds: meta.rounds + 1,
-    lastOffer: reply.price ? (meta.botRole === 'seller' ? Math.min(reply.price, listing.price) : reply.price) : meta.lastOffer,
+    lastOffer: reply.price
+      ? meta.botRole === 'seller'
+        ? Math.max(newBotLimit, Math.min(reply.price, listing.price))
+        : reply.price
+      : meta.lastOffer,
   }
   const metaAiJson = JSON.stringify(metaAfterAi)
   await db.chat.update({ where: { id: chat.id }, data: { meta: metaAiJson } })
@@ -621,16 +636,22 @@ async function saveAndEmit(
       invoiceId: m.invoiceId, paid: m.paid, createdAt: m.createdAt.toISOString(), mine: false,
     },
   }
-  await emitTo(`chat:${chatId}`, 'chat:message', dto)
+  // 64-c/C2: приватные каналы user:* обоим участникам (комнаты chat:<id>
+  // упразднены — подписка на чужой chat-канал была чтением чужих чатов)
   if (chat) {
+    await emitTo(`user:${chat.buyerId}`, 'chat:message', dto)
+    await emitTo(`user:${chat.sellerId}`, 'chat:message', dto)
     const playerUserId = chat.buyerId === bot.id ? chat.sellerId : chat.buyerId
-    await emitTo(`user:${playerUserId}`, 'chat:message', dto)
     const isInvoice = m.kind === 'invoice'
-    await db.notification.create({
+    const notif = await db.notification.create({
       data: {
         userId: playerUserId, kind: 'message', title: bot.displayName,
         body: isInvoice ? `Счёт на ${fmtMoney(m.amount ?? 0)}` : m.text.slice(0, 80),
       },
+    })
+    // 64-c/M3: тост в реальном времени — эмим с РЕАЛЬНЫМ id созданной Notification
+    await emitTo(`user:${playerUserId}`, 'notify', {
+      id: notif.id, kind: notif.kind, title: notif.title, body: notif.body, readAt: null, createdAt: notif.createdAt.toISOString(),
     })
   }
 }
@@ -639,27 +660,44 @@ async function saveSystem(chatId: string, text: string) {
   const m = await db.message.create({
     data: { chatId, senderType: 'system', senderId: 'system', senderName: 'Система', kind: 'system', text },
   })
-  await emitTo(`chat:${chatId}`, 'chat:message', {
+  // 64-c/C2: система-сообщение — обоим участникам на личные user-каналы
+  const chat = await db.chat.findUnique({ where: { id: chatId }, select: { buyerId: true, sellerId: true } })
+  if (!chat) return
+  const dto = {
     chatId,
     message: {
       id: m.id, senderType: 'system', senderId: 'system', senderName: 'Система',
       kind: 'system', text: m.text, amount: null, invoiceId: null, paid: null,
       createdAt: m.createdAt.toISOString(), mine: false,
     },
-  })
+  }
+  await emitTo(`user:${chat.buyerId}`, 'chat:message', dto)
+  await emitTo(`user:${chat.sellerId}`, 'chat:message', dto)
 }
 
 // Игрок оплатил счёт бота-продавца: сделка → индекс цен + память продавца об игроке
 export async function payInvoice(chatId: string, invoiceId: string, player: User) {
+  const chat = await db.chat.findUnique({ where: { id: chatId } })
+  if (!chat) return { ok: false as const, error: 'Чат не найден' }
+  // 64-c/C1 (эксплойт «купить за 1₽»): платить счёт может ТОЛЬКО участник чата…
+  if (player.id !== chat.buyerId && player.id !== chat.sellerId) {
+    return { ok: false as const, error: 'Нет доступа' }
+  }
   const invoice = await db.message.findFirst({
     where: { chatId, invoiceId, kind: 'invoice', paid: null },
   })
   if (!invoice) return { ok: false as const, error: 'Счёт не найден или уже оплачен' }
   if (invoice.amount === null) return { ok: false as const, error: 'Счёт повреждён' }
+  // …НЕ автор счёта (раньше игрок создавал себе счёт на 1₽ и «покупал» товар сам),
+  if (invoice.senderId === player.id) return { ok: false as const, error: 'Нельзя оплатить свой счёт' }
+  // …ТОЛЬКО покупатель (инвойс — инструмент продажи, а не перевода денег),
+  if (player.id !== chat.buyerId) return { ok: false as const, error: 'Счёт может оплатить только покупатель' }
+  // …и сумма счёта обязана быть в разумных пределах (мусор из БД/старых чатов не проходит)
+  if (!Number.isFinite(invoice.amount) || invoice.amount <= 0 || invoice.amount > 10_000_000) {
+    return { ok: false as const, error: 'Некорректная сумма счёта' }
+  }
   if (player.balance < invoice.amount) return { ok: false as const, error: 'Недостаточно средств на счету' }
 
-  const chat = await db.chat.findUnique({ where: { id: chatId } })
-  if (!chat) return { ok: false as const, error: 'Чат не найден' }
   const listing = await db.listing.findUnique({ where: { id: chat.listingId } })
   if (!listing || listing.status !== 'active') return { ok: false as const, error: 'Товар уже продан' }
 

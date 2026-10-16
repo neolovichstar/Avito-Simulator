@@ -32,17 +32,52 @@ export class ApiError extends Error {
   }
 }
 
+// Таймаут запроса (H2-64b): без него мёртвая сеть вешала «Загрузку системы…»
+// навсегда. AbortSignal.timeout есть не во всех WebView — там живём как раньше.
+const REQ_TIMEOUT_MS = 15_000
+function timeoutSignal(): AbortSignal | undefined {
+  if (typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal) {
+    return AbortSignal.timeout(REQ_TIMEOUT_MS)
+  }
+  return undefined
+}
+
+// 401 (H2-64b): токен мёртв. Одноразовый гвард-флаг (окно 3с) — шторм
+// параллельных 401-ответов шлёт ОДНО событие, а повторный 401 спустя время
+// (напр. после разблокировки) снова рабочает.
+const UNAUTH_WINDOW_MS = 3_000
+let lastUnauthorizedAt = 0
+
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    ...init,
-    headers: {
-      'content-type': 'application/json',
-      authorization: `Bearer ${getToken()}`,
-      ...(init?.headers ?? {}),
-    },
-  })
+  let res: Response
+  try {
+    res = await fetch(path, {
+      ...init,
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${getToken()}`,
+        ...(init?.headers ?? {}),
+      },
+      // чужой signal (если когда-нибудь передадут) не перетираем
+      signal: init?.signal ?? timeoutSignal(),
+    })
+  } catch {
+    // сеть отвалилась или истёк таймаут — понятная ошибка вместо вечного лоадера
+    throw new ApiError(0, 'Сеть недоступна')
+  }
   const data = (await res.json().catch(() => ({}))) as T & { error?: string }
-  if (!res.ok) throw new ApiError(res.status, data?.error ?? `Ошибка ${res.status}`)
+  if (!res.ok) {
+    // 401 у bearer-запроса (кроме самого входа): токен больше не действителен —
+    // убираем его и зовём приложение сбросить сессию (см. page.tsx).
+    if (res.status === 401 && !path.startsWith('/api/auth')) {
+      setToken('')
+      if (Date.now() - lastUnauthorizedAt > UNAUTH_WINDOW_MS) {
+        lastUnauthorizedAt = Date.now()
+        window.dispatchEvent(new CustomEvent('resale:unauthorized'))
+      }
+    }
+    throw new ApiError(res.status, data?.error ?? `Ошибка ${res.status}`)
+  }
   return data
 }
 
@@ -323,7 +358,21 @@ export interface SupportTicketMsgDTO {
   createdAt: string
 }
 
-// Ссылка на скачивание CSV-истории операций (токен в query — для прямой ссылки)
-export function exportCsvUrl(): string {
-  return `/api/export/csv?token=${encodeURIComponent(getToken())}`
+// CSV-выписка (M5-64b): качаем через Bearer-заголовок — токен сессии больше не
+// светится в URL/истории браузера/логах. Роут /api/export/csv принимает Bearer.
+export async function exportCsv(): Promise<Blob> {
+  let res: Response
+  try {
+    res = await fetch('/api/export/csv', {
+      headers: { authorization: `Bearer ${getToken()}` },
+      signal: timeoutSignal(),
+    })
+  } catch {
+    throw new ApiError(0, 'Сеть недоступна')
+  }
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { error?: string }
+    throw new ApiError(res.status, data?.error ?? `Ошибка ${res.status}`)
+  }
+  return res.blob()
 }

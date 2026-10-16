@@ -75,13 +75,25 @@ function timingSafeHex(a: string, b: string): boolean {
   return crypto.timingSafeEqual(ab, bb)
 }
 
-// Подпись сессионного токена (HMAC), без внешних зависимостей
-const SECRET = process.env.SESSION_SECRET ?? 'avito-sim-session-secret-v1'
+// Подпись сессионного токена (HMAC), без внешних зависимостей.
+// 64-b/C1: дефолт 'avito-sim-session-secret-v1' позволял подделать сессию
+// ЛЮБОГО игрока (userId публичны через лидерборд). Теперь: env → в production
+// без env — эфемерный случайный секрет за процесс (сессии протухают на холодном
+// старте, но подделать подпись невозможно); дефолт остался только для дева.
+const SESSION_SECRET = (() => {
+  const fromEnv = process.env.SESSION_SECRET
+  if (fromEnv) return fromEnv
+  if (process.env.NODE_ENV === 'production') {
+    console.warn('[auth] SESSION_SECRET not set — sessions are ephemeral this process')
+    return crypto.randomUUID()
+  }
+  return 'avito-sim-session-secret-v1'
+})()
 
 export function signSession(userId: string): string {
   const exp = Date.now() + 30 * 86_400_000
   const payload = `${userId}.${exp}`
-  const sig = crypto.createHmac('sha256', SECRET).update(payload).digest('base64url')
+  const sig = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('base64url')
   return `${Buffer.from(payload).toString('base64url')}.${sig}`
 }
 
@@ -90,7 +102,7 @@ export function verifySession(token: string): string | null {
     const [p64, sig] = token.split('.')
     if (!p64 || !sig) return null
     const payload = Buffer.from(p64, 'base64url').toString()
-    const expected = crypto.createHmac('sha256', SECRET).update(payload).digest('base64url')
+    const expected = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('base64url')
     // 61-c: сравнение подписи — постоянное по времени, не === по строкам
     const sigBuf = Buffer.from(sig, 'utf8')
     const expBuf = Buffer.from(expected, 'utf8')

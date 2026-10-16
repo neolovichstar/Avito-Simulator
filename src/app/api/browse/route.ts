@@ -4,6 +4,7 @@
 // GET /api/browse?q=<поиск>          -> { kind:'search', query, results }
 import { NextRequest } from 'next/server'
 import { execFile } from 'child_process'
+import { promises as dnsPromises } from 'node:dns'
 import { cache } from '@/lib/cache'
 import { rateLimit } from '@/lib/ratelimit'
 import { rateLimit as slidingLimit, ipKey, tooMany } from '@/lib/rate-limit'
@@ -38,7 +39,7 @@ function curlFetch(url: string, timeoutSec = 12): Promise<{ status: number; body
     execFile(
       'curl',
       [
-        '-sS', '-L', '--compressed', '--max-time', String(timeoutSec),
+        '-sS', '-L', '--max-redirs', '3', '--compressed', '--max-time', String(timeoutSec),
         '-A', UA,
         '-H', 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         '-H', 'accept-language: ru-RU,ru;q=0.9,en;q=0.7',
@@ -56,6 +57,54 @@ function curlFetch(url: string, timeoutSec = 12): Promise<{ status: number; body
       },
     )
   })
+}
+
+// ─── SSRF-гард (64-F1, H-2) ─────────────────────────────────────────────────
+// curlFetch ходит по ЛЮБОМУ url из запроса и читает ответ — без гарда это SSRF:
+// http://127.0.0.1:3000/api/*, метаданные облака (169.254.169.254) и т.п.
+// Перед fetch резолвим хост через dns.lookup(all) и блокируем приватные/
+// loopback/link-local сети (все адреса ответа — иначе round-robin DNS обходит
+// проверку по одному адресу). Редиректы ограничены (--max-redirs 3, -L сохранён
+// для UX игровых сайтов); локальных фейковых страниц через /api/browse нет —
+// мок-страницы браузера рендерятся на клиенте, allowlist не нужен.
+
+class BrowseHostError extends Error {}
+
+function isPrivateIp(ip: string): boolean {
+  // IPv4-mapped IPv6: ::ffff:10.0.0.1 (dotted) и ::ffff:a00:1 (hex) — блокируем целиком
+  const mapped = ip.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i)
+  const v4 = mapped ? mapped[1] : /^[0-9.]+$/.test(ip) && ip.includes('.') ? ip : null
+  if (v4) {
+    const [a, b] = v4.split('.').map(Number)
+    if (a === 0 || a === 10 || a === 127) return true // 0/8, 10/8, 127/8
+    if (a === 100 && b >= 64 && b <= 127) return true // 100.64/10 (CGNAT)
+    if (a === 169 && b === 254) return true // 169.254/16 link-local (метаданные облака)
+    if (a === 172 && b >= 16 && b <= 31) return true // 172.16/12
+    if (a === 192 && b === 168) return true // 192.168/16
+    if (a >= 224) return true // multicast 224/4 + reserved 240/4
+    return false
+  }
+  const lower = ip.toLowerCase()
+  if (lower === '::' || lower === '::1') return true // unspecified + loopback
+  if (lower.startsWith('::ffff:')) return true // IPv4-mapped (hex-форма)
+  if (/^f[cd]/.test(lower)) return true // fc00::/7 unique local
+  if (/^fe[89ab]/.test(lower)) return true // fe80::/10 link-local
+  return false
+}
+
+async function assertPublicHost(url: URL): Promise<void> {
+  let host = url.hostname
+  if (host.startsWith('[') && host.endsWith(']')) host = host.slice(1, -1)
+  let addrs: { address: string; family: number }[]
+  try {
+    addrs = await dnsPromises.lookup(host, { all: true })
+  } catch {
+    throw new BrowseHostError('Недоступный адрес')
+  }
+  if (!addrs.length) throw new BrowseHostError('Недоступный адрес')
+  for (const a of addrs) {
+    if (isPrivateIp(a.address)) throw new BrowseHostError('Недоступный адрес')
+  }
 }
 
 function decodeEntities(s: string): string {
@@ -120,6 +169,9 @@ async function fetchPage(rawUrl: string): Promise<PageResult> {
     throw new Error('Некорректный адрес')
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('Поддерживаются только http/https')
+
+  // SSRF-гард ДО кеша: даже закешированный ответ не должен обходить проверку хоста
+  await assertPublicHost(url)
 
   const key = `browse:page:${url.toString()}`
   return cache.getOrSet(key, 5 * 60_000, async () => {
@@ -245,6 +297,11 @@ export async function GET(req: NextRequest) {
     if (rawUrl) return Response.json(await fetchPage(rawUrl))
     return Response.json({ error: 'Нужен параметр url или q' }, { status: 400 })
   } catch (e) {
+    // 64-F1 (H-2): приватный/нерезолвящийся хост — это не «страница не загрузилась»,
+    // а запрещённый адрес: отдаём 400, не 502
+    if (e instanceof BrowseHostError) {
+      return Response.json({ error: 'Недоступный адрес' }, { status: 400 })
+    }
     // 61-c: наружу — только безопасный текст; детали (в т.ч. адреса/ошибки
     // внешних сервисов) — в лог сервера
     console.error('[browse] failed:', e instanceof Error ? e.message : e)

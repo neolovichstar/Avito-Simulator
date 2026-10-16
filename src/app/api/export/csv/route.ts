@@ -29,9 +29,13 @@ export async function GET(req: Request) {
     take: 2000,
   })
 
-  // CSV с BOM, разделитель «;» — Excel на русской локали открывает сразу красиво
+  // CSV с BOM, разделитель «;» — Excel на русской локали открывает сразу красиво.
+  // M6-64b: защита от CSV formula injection — значение, начинающееся с
+  // = + - @ или таба, Excel/LibreOffice может исполнить как формулу
+  // (=HYPERLINK(..., -2+1...). Префикс "'" делает ячейку текстом.
   const esc = (v: string | number | null) => {
-    const s = String(v ?? '')
+    let s = String(v ?? '')
+    if (/^[=+\-@\t]/.test(s)) s = "'" + s
     return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
   }
   const rows: string[] = [

@@ -12,14 +12,25 @@ export async function POST(req: Request) {
   if (!Number.isFinite(amount) || amount < 100) return Response.json({ error: 'Минимум 100 ₽' }, { status: 400 })
 
   if (body.op === 'top') {
+    // 64-F1 (M-2): depositAt = момент ПЕРВОГО пополнения вклада. Раньше каждое
+    // пополнение сбрасывало depositAt → проценты не начислялись никогда.
+    // Читаем актуальный вклад (сессия может быть устаревшей): если вклад уже
+    // открыт (>0) — depositAt не трогаем, только если раньше был 0.
+    const cur = await db.user.findUnique({ where: { id: user.id }, select: { deposit: true } })
+    const hadDeposit = (cur?.deposit ?? 0) > 0
     // 59-a: атомарные списание/пополнение: гонка с тратами баланса не уводит счёт в минус
     const dec = await db.user.updateMany({
       where: { id: user.id, balance: { gte: amount } },
-      data: { balance: { decrement: amount }, deposit: { increment: amount }, depositAt: new Date() },
+      data: {
+        balance: { decrement: amount },
+        deposit: { increment: amount },
+        // depositAt только при открытии вклада (первое пополнение)
+        ...(hadDeposit ? {} : { depositAt: new Date() }),
+      },
     })
     if (dec.count === 0) return Response.json({ error: 'Недостаточно средств на счету' }, { status: 400 })
     await db.transaction.create({ data: { userId: user.id, type: 'deposit', amount: -amount, note: 'Пополнение вклада' } })
-    if (user.deposit === 0) {
+    if (!hadDeposit) {
       await bumpStats(user.id, { deposits: 1 })
       await bumpQuests(user.id, 'deposit')
     }

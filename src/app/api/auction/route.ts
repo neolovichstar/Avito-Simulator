@@ -75,14 +75,12 @@ export async function POST(req: Request) {
     return Response.json({ error: res.error }, { status: 400 })
   }
 
-  // вернуть деньги предыдущему лидеру-игроку (в т.ч. себе при повышении своей ставки)
+  // вернуть деньги предыдущему лидеру-игроку — РЕФАНД УЖЕ ВНУТРИ транзакции
+  // placeAuctionBid (64-F1, L-4); здесь остаётся только уведомление
   if (res.prevBidderId && res.prevBid) {
     const prev = await db.user.findUnique({ where: { id: res.prevBidderId }, select: { id: true, isBot: true } })
-    if (prev && !prev.isBot) {
-      await db.user.update({ where: { id: prev.id }, data: { balance: { increment: res.prevBid } } })
-      if (prev.id !== user.id) {
-        await notifyUser(prev.id, 'market', 'Вас перебили на аукционе', `Лот «${current.title}» теперь ${fmtMoney(amount)}. Деньги возвращены на счёт.`)
-      }
+    if (prev && !prev.isBot && prev.id !== user.id) {
+      await notifyUser(prev.id, 'market', 'Вас перебили на аукционе', `Лот «${current.title}» теперь ${fmtMoney(amount)}. Деньги возвращены на счёт.`)
     }
   }
   await bumpStats(user.id, { bids: 1 })

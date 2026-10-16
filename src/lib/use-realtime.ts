@@ -1,12 +1,33 @@
 'use client'
 
-// Realtime-подключение к socket.io через шлюз (XTransformPort=3003)
+// Realtime-подключение к socket.io через шлюз (XTransformPort=3003).
+// 64-b/C2 + 64-c/C2: сокет аутентифицируется bearer-токеном сессии
+// (socket.io option auth: { token }) — uid больше НЕ передаётся клиентом:
+// сервер проверяет токен через /api/mini-auth и сам джойнит 'global' и
+// `user:${uid}` из ответа API. Подписки на чужие каналы сервер отклоняет.
 import { useEffect, useRef } from 'react'
 import { io, type Socket } from 'socket.io-client'
+import { getToken } from '@/lib/api'
 import { useOS } from '@/lib/store'
 import type { ChatMessageDTO, NotificationDTO } from '@/lib/types'
 
 let socket: Socket | null = null
+
+// 64-c/M2: реестр желаемых доп-каналов (переживает reconnect). subscribeChannels
+// регистрирует канал и эмитит 'subscribe' немедленно; на каждом 'connect' хук
+// пере-эмитит subscribe по ВСЕМ зарегистрированным каналам — подписки больше
+// не теряются после обрыва связи.
+const gRt = globalThis as typeof globalThis & { __avitoRtChannels?: Set<string> }
+function wantedChannels(): Set<string> {
+  if (!gRt.__avitoRtChannels) gRt.__avitoRtChannels = new Set()
+  return gRt.__avitoRtChannels
+}
+
+export function subscribeChannels(sock: Socket, channels: string[]): void {
+  const list = channels.filter((c) => typeof c === 'string' && c.length > 0)
+  for (const c of list) wantedChannels().add(c)
+  if (list.length) sock.emit('subscribe', { channels: list })
+}
 
 export function getSocket(): Socket | null {
   return socket
@@ -30,10 +51,12 @@ export function useRealtime(userId: string | null | undefined, handlers: Realtim
       transports: ['polling', 'websocket'],
       forceNew: true,
       reconnection: true,
-      reconnectionAttempts: 10,
+      reconnectionAttempts: Infinity, // 64-c/L5: не умирать после 10 попыток
       reconnectionDelay: 2000,
+      reconnectionDelayMax: 5000,
       timeout: 8000,
-      query: { uid: userId },
+      // 64-c/C2: bearer-токен сессии вместо query.uid — uid определяет сервер
+      auth: { token: getToken() },
     })
     socket = s
     // отладочный доступ (QA): window.__avitoSocket
@@ -44,7 +67,9 @@ export function useRealtime(userId: string | null | undefined, handlers: Realtim
     const os = useOS.getState
 
     s.on('connect', () => {
-      s.emit('subscribe', { channels: ['global', `user:${userId}`] })
+      // сервер сам джойнит 'global' и user:<uid>; явный subscribe нужен для
+      // пере-подписки ВСЕХ зарегистрированных каналов после reconnect (M2)
+      subscribeChannels(s, ['global', `user:${userId}`])
     })
 
     s.on('online', (d: { online: number }) => os().setOnline(d.online))
@@ -63,6 +88,10 @@ export function useRealtime(userId: string | null | undefined, handlers: Realtim
     return () => {
       s.disconnect()
       socket = null
+      // личные каналы прежнего юзера не должны пере-подписаться после релогина
+      for (const c of [...wantedChannels()]) {
+        if (c.startsWith('user:')) wantedChannels().delete(c)
+      }
     }
   }, [userId])
 }

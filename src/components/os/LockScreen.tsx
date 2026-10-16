@@ -105,10 +105,11 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     }
   }, [session])
 
-  // чистим таймер при размонтировании
+  // чистим таймер при размонтировании. L2-64b: читаем ref В САМОМ cleanup —
+  // раньше значение захватывалось в момент маунта (0), и реальный таймер
+  // анлока не отменялся.
   useEffect(() => {
-    const t = timerRef.current
-    return () => window.clearTimeout(t)
+    return () => window.clearTimeout(timerRef.current)
   }, [])
 
   // Разблокировка: свайп / тап / клавиша — никаких паролей, это смартфон в игре
@@ -277,7 +278,12 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
       )}
       {lightTone && <div aria-hidden="true" className="absolute inset-0 bg-white/5" />}
 
-      <div className="relative z-10 flex h-full flex-col px-5 pb-4 pt-14">
+      {/* M8-64b: нижний отступ с учётом safe-area — шорткаты (фонарик/камера)
+          не должны залезать под жест-зону пилюли на девайсах с вырезами */}
+      <div
+        className="relative z-10 flex h-full flex-col px-5 pb-4 pt-14"
+        style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
+      >
         {/* ─── Дата + тонкие часы по макету ─── */}
         <div className="shrink-0 text-center" suppressHydrationWarning>
           <p className={`text-[16px] font-medium ${T.date}`}>

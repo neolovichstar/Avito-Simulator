@@ -5,6 +5,7 @@ import { getCategoryMult } from '@/lib/engine'
 import { CONDITION_MULT } from '@/lib/catalog-types'
 import { specsFor } from '@/lib/specs'
 import { cache } from '@/lib/cache'
+import { rateLimit } from '@/lib/ratelimit'
 import { recordPricePoint } from '@/lib/market-hooks'
 import { onPlayerPriceDrop } from '@/lib/price-war'
 import { blockedIds } from '@/lib/blocked'
@@ -84,6 +85,11 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const user = await getSessionUser(req)
   if (!user) return unauthorized()
+  // 64-F1 (L-11): без лимита спам цены рождал тысячи PricePoint и дёргал ботов
+  // (война цен) — 10 изменений в минуту достаточно для живого торга
+  if (!rateLimit(`price:${user.id}`, 10, 60_000)) {
+    return Response.json({ error: 'Слишком часто — подождите минуту' }, { status: 429 })
+  }
   const { id } = await ctx.params
 
   const listing = await db.listing.findUnique({ where: { id }, include: { seller: true } })

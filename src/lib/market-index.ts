@@ -320,9 +320,10 @@ export async function marketPulseData(): Promise<MarketPulseData> {
   const byKey = new Map<string, PulseItemDTO>()
 
   // a) движения за час из истории цен (честная динамика объявлений)
+  // 64-F1 (L-12): take 500 — окно часа без лимита читало всю таблицу
   const since = new Date(now - 60 * 60_000)
   const points = await db.pricePoint
-    .findMany({ where: { createdAt: { gt: since } }, orderBy: { createdAt: 'asc' } })
+    .findMany({ where: { createdAt: { gt: since } }, orderBy: { createdAt: 'asc' }, take: 500 })
     .catch(() => [])
   if (points.length >= 2) {
     const mid = since.getTime() + 30 * 60_000

@@ -26,12 +26,12 @@ import { useOS, type AppKey, type WidgetKey } from '@/lib/store'
 import { wallpaperById, wallpaperClass } from '@/lib/wallpapers'
 import { api } from '@/lib/api'
 import { useDrag } from '@/lib/use-swipe'
+import { createTtlCache } from '@/lib/widget-cache'
 import { fmtDeg, weatherNow, type Condition } from '@/lib/weather'
 import AppIcon from './AppIcon'
 import AppInfoSheet from './AppInfoSheet'
 import MiniPlayer from './MiniPlayer'
 import { APP_TILE, DEFAULT_DOCK, DEFAULT_GRID, LIB_CHIPS, LIB_SECTIONS, type LibChip } from './app-logos'
-import type { CareerData, DeliveryDTO } from '@/lib/types'
 
 // ─── Раскладка домашнего экрана ──────────────────────────────────────────────
 const LAYOUT_KEY = 'avito_sim_home_layout_v2'
@@ -201,33 +201,49 @@ function WeatherWidget({ dark, onOpenApp, enterDelay }: { dark: boolean; onOpenA
 }
 
 // ─── Виджет «Сегодня»: дата + живые строки дня ───────────────────────────────
+// M4-64b: HomeScreen размонтируется при открытии приложения — без кэша каждый
+// возврат домой дёргал 3 запроса (карьера + доставки + лидерборд). Module-level
+// TTL-кэш 60с: возврат домой мгновенно рисует кэш и не фетчит.
+interface DayWidgetData {
+  quest: { progress: number; target: number; reward: number } | null
+  delivery: { status: string } | null
+  myPlace: number | null
+}
+const dayDataCache = createTtlCache<DayWidgetData>()
+
 function useDayData() {
-  const [quest, setQuest] = useState<{ progress: number; target: number; reward: number } | null>(null)
-  const [delivery, setDelivery] = useState<{ status: string } | null>(null)
-  const [myPlace, setMyPlace] = useState<number | null>(null)
+  // ленивая инициализация из TTL-кэша: возврат домой рисует кэш мгновенно,
+  // без setState в эффекте (каскадного рендера нет)
+  const [data, setData] = useState<DayWidgetData>(
+    () => dayDataCache.get() ?? { quest: null, delivery: null, myPlace: null },
+  )
   useEffect(() => {
+    if (dayDataCache.get()) return // свежий кэш уже отдан при инициализации
     let alive = true
-    api.career().then((c: CareerData) => {
+    void Promise.allSettled([api.career(), api.deliveries(), api.leaderboard()]).then(([c, d, b]) => {
       if (!alive) return
-      const q = c.quests.find((x) => !x.claimed && x.progress > 0) ?? c.quests.find((x) => !x.claimed)
-      if (q) setQuest({ progress: Math.min(q.progress, q.target), target: q.target, reward: q.reward })
-    }).catch(() => {})
-    api.deliveries().then((d: { items: DeliveryDTO[] }) => {
-      if (!alive) return
-      const act = d.items.find((x) => x.status === 'collecting' || x.status === 'in_transit' || x.status === 'arrived')
-      if (act) {
-        const label = act.status === 'collecting' ? 'Собираем' : act.status === 'in_transit' ? 'В пути' : 'Прибыл!'
-        setDelivery({ status: label })
+      const next: DayWidgetData = { quest: null, delivery: null, myPlace: null }
+      if (c.status === 'fulfilled') {
+        const q = c.value.quests.find((x) => !x.claimed && x.progress > 0) ?? c.value.quests.find((x) => !x.claimed)
+        if (q) next.quest = { progress: Math.min(q.progress, q.target), target: q.target, reward: q.reward }
       }
-    }).catch(() => {})
-    api.leaderboard().then((b) => {
-      if (!alive) return
-      const me = b.balance.findIndex((r) => r.isMe)
-      setMyPlace(me >= 0 ? me + 1 : null)
-    }).catch(() => {})
+      if (d.status === 'fulfilled') {
+        const act = d.value.items.find((x) => x.status === 'collecting' || x.status === 'in_transit' || x.status === 'arrived')
+        if (act) {
+          const label = act.status === 'collecting' ? 'Собираем' : act.status === 'in_transit' ? 'В пути' : 'Прибыл!'
+          next.delivery = { status: label }
+        }
+      }
+      if (b.status === 'fulfilled') {
+        const me = b.value.balance.findIndex((r) => r.isMe)
+        next.myPlace = me >= 0 ? me + 1 : null
+      }
+      dayDataCache.set(next)
+      setData(next)
+    })
     return () => { alive = false }
   }, [])
-  return { quest, delivery, myPlace }
+  return data
 }
 
 function TodayWidget({
@@ -695,7 +711,20 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
   }, [edit, drag, armed])
 
   const pages = useDrag({
-    onStart: () => {
+    onStart: (e) => {
+      // M3-64b: жест начался внутри скроллящегося контейнера (список библиотеки,
+      // чипы категорий) — отдаём нативному скроллу, иначе палец листает страницы
+      // вместо списка (раньше это «лечили» touch-none, который ломал сам скролл).
+      const sc = (e.target as Element | null)?.closest?.('[data-scrollable]') as HTMLElement | null
+      if (
+        sc &&
+        (sc.scrollTop > 0 ||
+          sc.scrollTop + sc.clientHeight < sc.scrollHeight ||
+          sc.scrollLeft > 0 ||
+          sc.scrollLeft + sc.clientWidth < sc.scrollWidth)
+      ) {
+        return false
+      }
       horizRef.current = false
       movedRef.current = false
       const el = trackRef.current
@@ -1421,7 +1450,11 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
       )}
 
       {/* ─── Панели (свайп влево/вправо, вниз — библиотека) ─── */}
-      <div className="relative z-10 flex-1 touch-none overflow-hidden" onPointerDown={pages.onPointerDown} onClickCapture={guardClick}>
+      {/* touch-none убран (M3-64b): он блокировал нативный скролл списка библиотеки.
+          Свайпы живут на pointer-событиях useDrag и без него; touch-pan-y оставляет
+          горизонтальные жесты за нами, overscroll-none не пускает цепочку в
+          pull-to-refresh браузера. Конфликт со скроллом решает гард в onStart. */}
+      <div className="relative z-10 flex-1 touch-pan-y overscroll-none overflow-hidden" onPointerDown={pages.onPointerDown} onClickCapture={guardClick}>
         <div ref={trackRef} className="flex h-full w-[300%]" style={trackStyle}>
           {/* Панель 1: виджеты + сетка */}
           <section className="flex h-full w-1/3 flex-col" aria-label="Главный экран" aria-hidden={page !== 0}>
@@ -1468,8 +1501,8 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
                   <MicGlyph dark={dark} />
                 )}
               </div>
-              {/* чипы категорий */}
-              <div className="mt-2 flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
+              {/* чипы категорий (горизонтальный скролл — см. гард data-scrollable) */}
+              <div data-scrollable className="mt-2 flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
                 {LIB_CHIPS.map((c) => {
                   const on = libChip === c.key
                   return (
@@ -1497,7 +1530,7 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
               </div>
             </div>
 
-            <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-2 [scrollbar-width:none]">
+            <div data-scrollable className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-none px-4 pb-2 [scrollbar-width:none]">
               {foundApps ? (
                 <div className={`rounded-[24px] p-3 ring-1 backdrop-blur-xl ${dark ? 'bg-[#1B1D22]/[0.70] ring-white/[0.10] shadow-[0_12px_32px_rgba(0,0,0,0.4)]' : `bg-white/80 ring-black/[0.04] ${GLASS_CARD}`}`}>
                   {foundApps.length === 0 ? (

@@ -231,13 +231,14 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
     if (chat && !chat.counterpart.isBot) void ensureConnected()
   }, [chat])
 
-  // realtime: подписка на канал чата + индикатор печати + тихий HTTP-поллинг 8с
-  // (usePoll: тикает только в видимом документе — в свёрнутом TG WebView не дёргаем API)
+  // realtime: события приходят на личном user-канале (сервер джойнит его сам
+  // после auth, 64-c/C2) — подписок на chat:<id> больше нет, фильтруем по
+  // chatId локально. + тихий HTTP-поллинг 8с (usePoll: тикает только в видимом
+  // документе — в свёрнутом TG WebView не дёргаем API)
   usePoll(load, 8_000)
   useEffect(() => {
     const s = getSocket()
     if (!s) return
-    s.emit('subscribe', { channels: [`chat:${id}`] })
     const onMsg = (d: { chatId: string; message: ChatMessageDTO }) => {
       if (d.chatId !== id) return
       setTyping(false)
@@ -260,7 +261,6 @@ export default function ChatScreen({ id, onBack }: { id: string; onBack: () => v
     return () => {
       s.off('chat:message', onMsg)
       s.off('typing', onTyping)
-      s.emit('unsubscribe', { channels: [`chat:${id}`] })
     }
   }, [id, load])
 

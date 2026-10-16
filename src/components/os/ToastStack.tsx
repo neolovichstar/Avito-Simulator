@@ -97,12 +97,15 @@ export default function ToastStack({ variant = 'phone' }: { variant?: 'phone' | 
               }}
               onClick={() => {
                 if (suppressClick.current) return
+                // M2-64b: на локскрине тост виден, но тап не открывает приложение
+                if (useOS.getState().locked) return
                 dropToast(t.id)
                 openApp(openAppForToast(meta.openApp))
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault()
+                  if (useOS.getState().locked) return
                   dropToast(t.id)
                   openApp(openAppForToast(meta.openApp))
                 }

@@ -21,7 +21,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const text = typeof body.text === 'string' ? body.text.trim().slice(0, 400) : ''
   const invoice = body.invoice !== undefined ? Math.round(Number(body.invoice)) : undefined
   if (!text && !invoice) return Response.json({ error: 'Пустое сообщение' }, { status: 400 })
-  if (invoice !== undefined && (!Number.isFinite(invoice) || invoice < 0 || invoice > 10_000_000)) {
+  // 64-c/C1: счёт — строго положительный и в разумном пределе (0₽-счёт раньше проходил с текстом)
+  if (invoice !== undefined && (!Number.isFinite(invoice) || invoice <= 0 || invoice > 10_000_000)) {
     return Response.json({ error: 'Некорректная сумма счёта' }, { status: 400 })
   }
 
@@ -53,7 +54,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       invoiceId: msg.invoiceId, paid: msg.paid, createdAt: msg.createdAt.toISOString(), mine: true,
     },
   }
-  await emitTo(`chat:${chat.id}`, 'chat:message', dto)
+  // 64-c/C2: обоим участникам на личные user-каналы (комнаты chat:<id> упразднены)
+  await emitTo(`user:${user.id}`, 'chat:message', dto)
   await emitTo(`user:${counterpartId}`, 'chat:message', dto)
 
   await bumpStats(user.id, { chat: 1 })

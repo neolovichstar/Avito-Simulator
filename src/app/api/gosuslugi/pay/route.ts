@@ -36,9 +36,22 @@ export async function POST(req: Request) {
   // 63-a2: весь flow (перечитать stats → маркер → списание → записать stats) в одной
   // транзакции: SQLite сериализует и двойная оплата невозможна, на Postgres гонка
   // сокращается радикально (маркер и списание видят одно состояние)
+  // 64-F1 (M-6): ИДЕМПОТЕНТНОСТЬ по Transaction — маркер в User.stats терялся при
+  // параллельных оплатах РАЗНЫХ штрафов (оба читали stats без своих маркеров,
+  // второй write затирал маркер первого). В Transaction нет поля fineId, но
+  // запись оплаты различима набором (userId + type 'tax' + note «Штраф: <title>» +
+  // сумма + локальный день начисления: buildGosFines детерминирован per день,
+  // все title в FINE_POOL уникальны, внутри дня title не повторяются).
   const paidAt = now.toISOString()
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const fineNote = `Штраф: ${fine.title}`
   try {
     await db.$transaction(async (tx) => {
+      const dupe = await tx.transaction.findFirst({
+        where: { userId: user.id, type: 'tax', note: fineNote, amount: -amount, createdAt: { gte: dayStart } },
+        select: { id: true },
+      })
+      if (dupe) throw new FinePayError('Штраф уже оплачен')
       const txUser = await tx.user.findUnique({
         where: { id: user.id },
         select: { balance: true, stats: true },
@@ -60,7 +73,7 @@ export async function POST(req: Request) {
           userId: user.id,
           type: 'tax',
           amount: -amount,
-          note: `Штраф: ${fine.title}`,
+          note: fineNote,
         },
       })
     })

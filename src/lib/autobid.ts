@@ -60,17 +60,14 @@ export async function fireAutoBids(lotId: string): Promise<boolean> {
       continue
     }
 
-    // если лидером был другой игрок — возвращаем его резерв
+    // если лидером был другой игрок — его резерв уже возвращён ВНУТРИ
+    // транзакции placeAuctionBid (64-F1, L-4); здесь остаётся уведомление
     if (res.prevBidderId && res.prevBid) {
       const prev = await db.user.findUnique({
         where: { id: res.prevBidderId },
         select: { id: true, isBot: true },
       })
       if (prev && !prev.isBot && prev.id !== ab.userId) {
-        await db.user.update({
-          where: { id: prev.id },
-          data: { balance: { increment: res.prevBid } },
-        })
         await notifyUser(
           prev.id,
           'market',

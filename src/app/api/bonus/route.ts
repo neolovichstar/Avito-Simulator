@@ -28,10 +28,15 @@ export async function GET(req: Request) {
   if (!user) return unauthorized()
   const today = dayKey()
   const claimedToday = user.lastBonusAt ? dayKey(user.lastBonusAt) === today : false
-  // если вчера был бонус — серия продолжится, иначе начнётся с 1
-  const nextStreak = user.lastBonusAt
-    ? (dayKey(user.lastBonusAt) === yesterdayKey() ? user.bonusStreak + 1 : 1)
-    : 1
+  // 64-F1 (L-13): превью СЛЕДУЮЩЕЙ награды. Если сегодня уже забрано — завтра серия
+  // продолжится (bonusStreak + 1), а не сбросится на 1: раньше сразу после клейма
+  // превью показывало базовые 250 вместо следующей ступени.
+  // Если вчера был бонус (а сегодня ещё не забран) — серия тоже продолжится.
+  const nextStreak = claimedToday
+    ? user.bonusStreak + 1
+    : user.lastBonusAt
+      ? (dayKey(user.lastBonusAt) === yesterdayKey() ? user.bonusStreak + 1 : 1)
+      : 1
   return Response.json({
     claimedToday,
     streak: user.lastBonusAt ? user.bonusStreak : 0,

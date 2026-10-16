@@ -14,6 +14,26 @@ export async function recordPricePoint(itemKey: string, price: number): Promise<
   }
 }
 
+// ─── Ретеншн PricePoint (64-F1, L-12) ────────────────────────────────────────
+// Точек ~17-20k/сутки (каждое объявление/смена цены), таблица росла бесконечно.
+// Раз в час чистим всё старше 7 дней. Гвард по последнему запуску в module-глобале,
+// чтобы движок мог звать функцию на каждом тике без лишних запросов.
+const PRICEPOINT_KEEP_MS = 7 * 24 * 3600_000
+const PRICEPOINT_SWEEP_INTERVAL_MS = 3600_000
+
+const gHook = globalThis as unknown as { __pricePointSweepAt?: number }
+
+export async function pricePointRetention(): Promise<void> {
+  const now = Date.now()
+  if (gHook.__pricePointSweepAt && now - gHook.__pricePointSweepAt < PRICEPOINT_SWEEP_INTERVAL_MS) return
+  gHook.__pricePointSweepAt = now
+  try {
+    await db.pricePoint.deleteMany({ where: { createdAt: { lt: new Date(now - PRICEPOINT_KEEP_MS) } } })
+  } catch {
+    // чистка не критична
+  }
+}
+
 export async function notifySavedSearches(listing: {
   sellerId: string
   title: string

@@ -18,33 +18,57 @@ export async function POST(req: Request) {
     if (user.debt <= 0) return Response.json({ error: 'Долгов нет' }, { status: 400 })
     const pay = Math.min(amount, user.debt, user.balance)
     if (pay <= 0) return Response.json({ error: 'Недостаточно средств' }, { status: 400 })
-    // 59-a: атомарное списание: параллельные операции не уводят баланс/долг в минус
-    const dec = await db.user.updateMany({
-      where: { id: user.id, balance: { gte: pay }, debt: { gte: pay } },
-      data: { balance: { decrement: pay }, debt: { decrement: pay } },
-    })
-    if (dec.count === 0) return Response.json({ error: 'Недостаточно средств' }, { status: 400 })
-    const loan = await db.loan.findFirst({
-      where: { userId: user.id, status: { in: ['active', 'overdue'] } },
-      orderBy: { takenAt: 'desc' },
-    })
-    if (loan) {
-      const owedLeft = Math.max(0, loan.owed - pay)
-      await db.loan.update({
-        where: { id: loan.id },
-        data: { owed: owedLeft, status: owedLeft === 0 ? 'repaid' : loan.status, repaidAt: owedLeft === 0 ? new Date() : null },
+
+    // 64-F1 (M-4): раньше CAS-списание и апдейт loan.owed были разнесены —
+    // краш/параллельный запрос между ними расходовал debt и loan.owed.
+    // Весь flow атомарен в $transaction: CAS-списание → loan → Transaction →
+    // (при полном погашении) рейтинг-буст.
+    class RepayError extends Error {}
+    let boostedScore: number | null = null
+    try {
+      await db.$transaction(async (tx) => {
+        // 59-a/64-F1: атомарное списание: параллельные операции не уводят баланс/долг в минус
+        const dec = await tx.user.updateMany({
+          where: { id: user.id, balance: { gte: pay }, debt: { gte: pay } },
+          data: { balance: { decrement: pay }, debt: { decrement: pay } },
+        })
+        if (dec.count === 0) throw new RepayError('Недостаточно средств')
+        const loan = await tx.loan.findFirst({
+          where: { userId: user.id, status: { in: ['active', 'overdue'] } },
+          orderBy: { takenAt: 'desc' },
+        })
+        if (loan) {
+          const owedLeft = Math.max(0, loan.owed - pay)
+          await tx.loan.update({
+            where: { id: loan.id },
+            data: { owed: owedLeft, status: owedLeft === 0 ? 'repaid' : loan.status, repaidAt: owedLeft === 0 ? new Date() : null },
+          })
+        }
+        await tx.transaction.create({
+          data: { userId: user.id, type: 'repay', amount: -pay, note: 'Погашение кредита' },
+        })
+        const fresh = await tx.user.findUnique({ where: { id: user.id } })
+        if (fresh && fresh.debt === 0) {
+          // аккуратное погашение повышает кредитный рейтинг
+          // 64-F1 (L-10): буст +40 только если кредит держали >= 72 часов —
+          // иначе схема «взял → сразу погасил» фармила рейтинг по кругу.
+          // Если активного loan-а нет (легаси) — возраст не подтверждён, буста нет.
+          const heldMs = loan ? Date.now() - loan.takenAt.getTime() : -1
+          if (heldMs >= 72 * 3_600_000) {
+            const newScore = Math.min(850, fresh.creditScore + 40)
+            await tx.user.update({ where: { id: fresh.id }, data: { creditScore: newScore } })
+            boostedScore = newScore
+          }
+        }
       })
+    } catch (err) {
+      if (err instanceof RepayError) return Response.json({ error: err.message }, { status: 400 })
+      throw err
     }
-    await db.transaction.create({
-      data: { userId: user.id, type: 'repay', amount: -pay, note: 'Погашение кредита' },
-    })
+    if (boostedScore !== null) {
+      await notifyUser(user.id, 'system', '🏦 Кредит закрыт', `Долг погашен полностью. Кредитный рейтинг повышен: ${boostedScore}. Лимит и ставка улучшились.`)
+    }
     const fresh = await db.user.findUnique({ where: { id: user.id } })
-    if (fresh && fresh.debt === 0) {
-      // аккуратное погашение повышает кредитный рейтинг
-      const newScore = Math.min(850, fresh.creditScore + 40)
-      await db.user.update({ where: { id: fresh.id }, data: { creditScore: newScore } })
-      await notifyUser(user.id, 'system', '🏦 Кредит закрыт', `Долг погашен полностью. Кредитный рейтинг повышен: ${newScore}. Лимит и ставка улучшились.`)
-    }
     return Response.json({ ok: true, balance: fresh?.balance ?? user.balance, debt: fresh?.debt ?? 0 })
   }
 

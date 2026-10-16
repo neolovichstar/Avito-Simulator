@@ -9,7 +9,7 @@ import { ensureDailyQuests } from '@/lib/quest-engine'
 import { botOpener, winBackSweep, sweepPendingReplies } from '@/lib/chat-engine'
 import { auctionStep } from '@/lib/economy'
 import { emitTo } from '@/lib/realtime-emit'
-import { onListingCreated, notifyPriceDrop } from '@/lib/market-hooks'
+import { onListingCreated, notifyPriceDrop, pricePointRetention } from '@/lib/market-hooks'
 import { getItemIndex, recordSale } from '@/lib/market-index'
 import { noteDeal } from '@/lib/bot-memory'
 import { botComebackOffers } from '@/lib/price-war'
@@ -474,11 +474,13 @@ async function botsTick(tick: number) {
           kind: 'text', text: opener.text,
         },
       })
-      await db.notification.create({
+      // 64-F1 (M3-64c): эмитим РЕАЛЬНЫЙ id созданной нотификации — раньше карточка
+      // приходила клиенту с фейковым local_${m.id} и не читалась/не удалялась на сервере
+      const n = await db.notification.create({
         data: { userId: pl.sellerId, kind: 'message', title: bot.displayName, body: m.text.slice(0, 80) },
       })
       await emitTo(`user:${pl.sellerId}`, 'notify', {
-        id: `local_${m.id}`, kind: 'message', title: bot.displayName, body: m.text.slice(0, 80), readAt: null, createdAt: m.createdAt.toISOString(),
+        id: n.id, kind: n.kind, title: n.title, body: n.body, readAt: null, createdAt: n.createdAt.toISOString(),
       })
       break
     }
@@ -533,11 +535,11 @@ async function auctionTick(tick: number) {
         lotId: lot.id, bidderId: bot.id, bidderName: bot.displayName, amount: nextBid, reserve: false,
       })
       if (!placed.ok) continue
-      // вернуть деньги игроку, которого перебили
+      // вернуть деньги игроку, которого перебили — РЕФАНД УЖЕ ВНУТРИ транзакции
+      // placeAuctionBid (64-F1, L-4); здесь остаётся только уведомление
       if (placed.prevBidderId && placed.prevBid) {
         const prev = await db.user.findUnique({ where: { id: placed.prevBidderId } })
         if (prev && !prev.isBot) {
-          await db.user.update({ where: { id: prev.id }, data: { balance: { increment: placed.prevBid } } })
           await notifyUser(prev.id, 'market', '🔨 Вас перебили на аукционе', `Лот «${lot.title}» уходит за ${fmtMoney(nextBid)}. Ставка возвращена на счёт.`)
         }
       }
@@ -579,7 +581,13 @@ async function auctionTick(tick: number) {
       await bumpQuests(winner.id, 'auction_win')
       await checkAchievements(winner.id)
     } else {
-      await db.user.update({ where: { id: winner.id }, data: { balance: { decrement: lot.currentBid } } })
+      // 64-F1 (L-3): бот-победитель платит только с достаточным балансом —
+      // безусловный decrement уводил бота в минус. Если денег нет — не списываем:
+      // бот вернётся к живости presence-тиком (пополнение бедных)
+      await db.user.updateMany({
+        where: { id: winner.id, balance: { gte: lot.currentBid } },
+        data: { balance: { decrement: lot.currentBid } },
+      })
     }
     await db.item.create({
       data: {
@@ -619,10 +627,13 @@ async function financeTick() {
     where: { isBot: false, taxDebt: { gt: 0 }, taxPenaltyAt: { lt: new Date(Date.now() - 86_400_000) } },
   })
   for (const u of debtors) {
-    const penalty = Math.round(u.taxDebt * 0.1)
+    // 64-F1 (M-3): пеня 10% в день без капа = софт-лок (долг рос геометрически).
+    // Кап пени 2 500 ₽/день и общий потолок налогового долга 50 000 ₽.
+    const penalty = Math.min(Math.round(u.taxDebt * 0.1), 2500)
+    const newDebt = Math.min(u.taxDebt + penalty, 50_000)
     await db.user.update({
       where: { id: u.id },
-      data: { taxDebt: { increment: penalty }, taxPenaltyAt: new Date() },
+      data: { taxDebt: newDebt, taxPenaltyAt: new Date() },
     })
     await db.taxBill.create({
       data: { userId: u.id, amount: penalty, reason: 'Пеня 10% за просрочку налога', dueAt: new Date(Date.now() + 86_400_000) },
@@ -697,6 +708,9 @@ export async function tickAll() {
     await presenceTick()
     if (tick % 8 === 0) await ensureDailyQuestsAll()
     if (tick % 40 === 0) await leaderboardTick()
+    // 64-F1 (L-12): ретеншн PricePoint (старше 7 дней) — гвард внутри держит
+    // частоту раз в час, вызывать можно на каждом тике
+    await pricePointRetention()
   } catch (e) {
     console.error('[engine] tick error:', e)
   } finally {

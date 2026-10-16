@@ -11,7 +11,10 @@ function csv(rows: (string | number | boolean | null)[][]): string {
     .map((r) =>
       r
         .map((c) => {
-          const s = c == null ? '' : String(c)
+          let s = c == null ? '' : String(c)
+          // M6-64b: CSV formula injection — ведущие = + - @ \t в Excel/LibreOffice
+          // исполняются как формула; префикс "'" делает ячейку текстом.
+          if (/^[=+\-@\t]/.test(s)) s = "'" + s
           return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
         })
         .join(';'),

@@ -75,6 +75,23 @@ export async function placeAuctionBid(params: {
       if (claim.count === 0) {
         throw new Error('LOT_CHANGED')
       }
+      // 64-F1 (L-4): рефанд предыдущего лидера-игрока ВНУТРИ транзакции ставки.
+      // Раньше рефанд шёл после транзакции — краш между ставкой и возвратом
+      // терял резерв навсегда. Денег у игрока-лидера резерв всегда есть (он
+      // резервировались его ставкой reserve=true), поэтому рефандим по isBot.
+      // Уведомления вызовы делают снаружи по prevBidderId/prevBid.
+      if (lot.currentBidderId && lot.currentBid) {
+        const prev = await tx.user.findUnique({
+          where: { id: lot.currentBidderId },
+          select: { id: true, isBot: true },
+        })
+        if (prev && !prev.isBot) {
+          await tx.user.update({
+            where: { id: prev.id },
+            data: { balance: { increment: lot.currentBid } },
+          })
+        }
+      }
       const fresh = await tx.auctionLot.findUniqueOrThrow({ where: { id: lot.id } })
       return {
         ok: true as const,

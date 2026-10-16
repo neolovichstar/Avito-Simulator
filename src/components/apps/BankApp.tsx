@@ -23,7 +23,7 @@ import {
   Gavel, Home, Info, Landmark, Loader2, Mic, PenLine, PiggyBank, PieChart, QrCode, Receipt,
   Search, Send, ShieldCheck, ShoppingBag, Smartphone, Sprout, Truck, Wifi, X, type LucideIcon,
 } from 'lucide-react'
-import { api, ApiError, exportCsvUrl } from '@/lib/api'
+import { api, ApiError, exportCsv } from '@/lib/api'
 import { useOS } from '@/lib/store'
 import { fmtMoney, fmtNum } from '@/lib/format'
 import { TX_TYPE_LABEL } from '@/lib/types'
@@ -117,6 +117,7 @@ export default function BankApp() {
   const [histFilter, setHistFilter] = useState<HistFilter>('all')
   const [histSearch, setHistSearch] = useState(false)
   const [histQ, setHistQ] = useState('')
+  const [csvBusy, setCsvBusy] = useState(false)
   // ===== Аналитика =====
   const [analyticsMode, setAnalyticsMode] = useState<'out' | 'in'>('out')
   const [monthIdx, setMonthIdx] = useState(0)
@@ -141,6 +142,28 @@ export default function BankApp() {
       setLoading(false)
     }
   }, [])
+
+  // M5-64b: CSV выписка через Bearer-запрос (exportCsv) — токен сессии больше
+  // не светится в URL. Скачивание: blob → временная ссылка → revoke.
+  const downloadCsv = useCallback(async () => {
+    if (csvBusy) return
+    setCsvBusy(true)
+    try {
+      const blob = await exportCsv()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'resale-export.csv'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      pushToast('Resale', e instanceof ApiError ? e.message : 'Не удалось скачать выписку')
+    } finally {
+      setCsvBusy(false)
+    }
+  }, [csvBusy, pushToast])
 
   useEffect(() => {
     load()
@@ -913,15 +936,16 @@ export default function BankApp() {
                       <h1 className="text-[26px] font-bold tracking-tight text-[#17181A]">История</h1>
                       <div className="flex items-center gap-2">
                         {data.transactions.length > 0 && (
-                          <a
-                            href={exportCsvUrl()}
-                            download
+                          <button
+                            type="button"
+                            onClick={downloadCsv}
+                            disabled={csvBusy}
                             aria-label="Скачать историю операций в CSV"
-                            className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-[#0E7A3D]/10 px-3 text-[11px] font-semibold text-[#0E7A2B] outline-none transition-colors hover:bg-[#0E7A3D]/20 focus-visible:ring-2 focus-visible:ring-[#21A038]/40"
+                            className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-[#0E7A3D]/10 px-3 text-[11px] font-semibold text-[#0E7A2B] outline-none transition-colors hover:bg-[#0E7A3D]/20 focus-visible:ring-2 focus-visible:ring-[#21A038]/40 disabled:opacity-60"
                           >
-                            <FileDown className="size-3.5" aria-hidden="true" />
+                            {csvBusy ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : <FileDown className="size-3.5" aria-hidden="true" />}
                             CSV
-                          </a>
+                          </button>
                         )}
                         <button
                           type="button"

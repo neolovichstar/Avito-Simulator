@@ -115,10 +115,12 @@ export default function GestureNav({
 
   return (
     <>
-      {/* невидимая нижняя зона жеста (пилюля внутри — просто отрисовка) */}
+      {/* невидимая нижняя зона жеста (пилюля внутри — просто отрисовка).
+          h-6 вместо h-9 (M8-64b): зона z-[60] перекрывала нижние шорткаты
+          локскрина (фонарик/камера) — тапы по их нижней кромке умирали. */}
       <div
         aria-hidden="true"
-        className="absolute inset-x-0 bottom-0 z-[60] h-9 touch-none select-none"
+        className="absolute inset-x-0 bottom-0 z-[60] h-6 touch-none select-none"
         style={{ bottom: 'env(safe-area-inset-bottom)' }}
         {...bottom}
       />

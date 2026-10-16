@@ -23,9 +23,9 @@ import { sound } from '@/lib/sound'
 import { useDrag } from '@/lib/use-swipe'
 import { usePlayer } from '@/lib/player'
 import { api } from '@/lib/api'
+import { createTtlCache } from '@/lib/widget-cache'
 import { fmtDeg, weatherNow, type Condition } from '@/lib/weather'
 import { NotificationList } from './NotificationCenter'
-import type { CareerData, DeliveryDTO } from '@/lib/types'
 
 // Токены 55-b (карточка-стекло / тексты) — как в HomeScreen.
 const GLASS_CARD = 'shadow-[0_10px_30px_-12px_rgba(10,10,15,0.14)]'
@@ -163,30 +163,48 @@ function CondGlyph({ cond, className }: { cond: Condition; className: string }) 
 }
 
 // ─── Задачи дня (реальные: квест, посылка, топ) ──────────────────────────────
+// M4-64b: шторка пересобирается на каждом открытии — без кэша это 3 запроса
+// КАЖДЫЙ раз. Module-level TTL-кэш 60с: повторное открытие ЦУ мгновенно
+// рисует кэш и не фетчит.
+interface TasksWidgetData {
+  quest: { title: string; progress: number; target: number } | null
+  delivery: string | null
+  place: number | null
+}
+const tasksCache = createTtlCache<TasksWidgetData>()
+
 function useTasks() {
-  const [quest, setQuest] = useState<{ title: string; progress: number; target: number } | null>(null)
-  const [delivery, setDelivery] = useState<string | null>(null)
-  const [place, setPlace] = useState<number | null>(null)
+  // ленивая инициализация из TTL-кэша: повторное открытие ЦУ рисует кэш мгновенно,
+  // без setState в эффекте (каскадного рендера нет)
+  const [data, setData] = useState<TasksWidgetData>(
+    () => tasksCache.get() ?? { quest: null, delivery: null, place: null },
+  )
   useEffect(() => {
+    if (tasksCache.get()) return // свежий кэш уже отдан при инициализации
     let alive = true
-    api.career().then((c: CareerData) => {
+    void Promise.allSettled([api.career(), api.deliveries(), api.leaderboard()]).then(([c, d, b]) => {
       if (!alive) return
-      const q = c.quests.find((x) => !x.claimed && x.progress > 0) ?? c.quests.find((x) => !x.claimed)
-      if (q) setQuest({ title: q.title, progress: Math.min(q.progress, q.target), target: q.target })
-    }).catch(() => {})
-    api.deliveries().then((d: { items: DeliveryDTO[] }) => {
-      if (!alive) return
-      const act = d.items.find((x) => x.status === 'collecting' || x.status === 'in_transit' || x.status === 'arrived')
-      if (act) setDelivery(act.status === 'collecting' ? 'Собираем посылку' : act.status === 'in_transit' ? 'Посылка в пути' : 'Посылка прибыла')
-    }).catch(() => {})
-    api.leaderboard().then((b) => {
-      if (!alive) return
-      const me = b.balance.findIndex((r) => r.isMe)
-      setPlace(me >= 0 ? me + 1 : null)
-    }).catch(() => {})
+      const next: TasksWidgetData = { quest: null, delivery: null, place: null }
+      if (c.status === 'fulfilled') {
+        const q = c.value.quests.find((x) => !x.claimed && x.progress > 0) ?? c.value.quests.find((x) => !x.claimed)
+        if (q) next.quest = { title: q.title, progress: Math.min(q.progress, q.target), target: q.target }
+      }
+      if (d.status === 'fulfilled') {
+        const act = d.value.items.find((x) => x.status === 'collecting' || x.status === 'in_transit' || x.status === 'arrived')
+        if (act) {
+          next.delivery = act.status === 'collecting' ? 'Собираем посылку' : act.status === 'in_transit' ? 'Посылка в пути' : 'Посылка прибыла'
+        }
+      }
+      if (b.status === 'fulfilled') {
+        const me = b.value.balance.findIndex((r) => r.isMe)
+        next.place = me >= 0 ? me + 1 : null
+      }
+      tasksCache.set(next)
+      setData(next)
+    })
     return () => { alive = false }
   }, [])
-  return { quest, delivery, place }
+  return data
 }
 
 function TasksCard({ dark, onOpenApp }: { dark: boolean; onOpenApp: (a: AppKey) => void }) {

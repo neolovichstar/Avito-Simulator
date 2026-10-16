@@ -125,6 +125,11 @@ export async function POST(req: Request) {
         where: { userId: me.id, status: 'pending', createdAt: { gt: new Date(Date.now() - 48 * 3600_000) } },
         orderBy: { createdAt: 'asc' },
       })
+      // 64-F1 (M-1): chargeId уже занят прошлой оплатой → tx нельзя матчить второй раз
+      // (второй навсегда оставался pending). Собираем все использованные chargeId
+      // и пополняем множество по ходу цикла.
+      const usedRows = await db.starsPayment.findMany({ where: { chargeId: { not: null } }, select: { chargeId: true } })
+      const used = new Set<string>(usedRows.flatMap((r) => (r.chargeId ? [r.chargeId] : [])))
       const tgId = me.telegramId ? Number(me.telegramId) : NaN
       // 59-a: накапливаем косметику между итерациями: раньше каждая выдача
       // перезаписывала cosmetics от устаревшего снимка и теряла предыдущую
@@ -132,6 +137,7 @@ export async function POST(req: Request) {
       for (const p of pendings) {
         const tx = txs.find(
           (t) =>
+            !used.has(t.id) &&
             t.amount === p.stars &&
             t.source?.type === 'user' &&
             Number(t.source?.user?.id ?? NaN) === tgId &&
@@ -146,6 +152,7 @@ export async function POST(req: Request) {
         } catch {
           continue // chargeId уже занят другой оплатой
         }
+        used.add(tx.id)
         cosmeticsRaw = grantCosmetics(cosmeticsRaw, p.sku)
         await db.user.update({
           where: { id: me.id },

@@ -1,4 +1,5 @@
 import { db } from '@/lib/db'
+import { Prisma } from '@prisma/client'
 import { getSessionUser, unauthorized } from '@/lib/session'
 import { rateLimit } from '@/lib/ratelimit'
 import { bumpQuests } from '@/lib/deals'
@@ -36,11 +37,16 @@ export async function POST(req: Request) {
     await db.favorite.deleteMany({ where: { userId: user.id, listingId } })
     return Response.json({ ok: true, on: false })
   }
-  const created = await db.favorite.upsert({
-    where: { userId_listingId: { userId: user.id, listingId } },
-    create: { userId: user.id, listingId },
-    update: {},
-  })
+  // 64-F1 (M-5): раньше upsert с update:{} возвращал строку и при УЖЕ существующем
+  // избранном — квест «fav» фармился повторными нажатиями. Явный create + P2002:
+  // квест бампится только когда избранное реально создано этой попыткой.
+  let created = false
+  try {
+    await db.favorite.create({ data: { userId: user.id, listingId } })
+    created = true
+  } catch (e) {
+    if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002')) throw e
+  }
   if (created) {
     try {
       await bumpQuests(user.id, 'fav')

@@ -179,7 +179,6 @@ async function botComplaintDefense(
       invoiceId: m.invoiceId, paid: m.paid, createdAt: m.createdAt.toISOString(), mine: false,
     },
   }
-  await emitTo(`chat:${chat.id}`, 'chat:message', dto)
   await emitTo(`user:${complainantId}`, 'chat:message', dto)
   await notifyUser(complainantId, 'message', bot.displayName, m.text.slice(0, 80))
 }

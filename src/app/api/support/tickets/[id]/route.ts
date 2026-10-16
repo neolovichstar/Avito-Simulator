@@ -142,7 +142,11 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return Response.json({ error: 'bad json' }, { status: 400 })
   }
 
-  const status = body.action === 'reopen' ? 'open' : 'closed'
+  // 64-c/L3: whitelist действий — раньше ЛЮБОЙ action (кроме 'reopen') закрывал тикет.
+  // Допустимые статусы модели: open | answered | closed.
+  const action = typeof body.action === 'string' ? body.action : ''
+  const status = action === 'close' ? 'closed' : action === 'reopen' ? 'open' : null
+  if (!status) return Response.json({ error: 'Неизвестное действие' }, { status: 400 })
   const updated = await db.supportTicket.update({ where: { id: ticket.id }, data: { status } })
   return Response.json({ ok: true, status: updated.status })
 }

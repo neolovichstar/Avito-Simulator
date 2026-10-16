@@ -8,6 +8,7 @@ import { Crown, FileText, Gavel, Heart, Trophy, User } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { fmtMoney, fmtNum } from '@/lib/format'
+import { auctionStep } from '@/lib/economy'
 import { CATEGORY_LABEL, CONDITION_LABEL } from '@/lib/catalog-types'
 import { UserAvatar } from '@/components/shared/UserAvatar'
 import type { AuctionLotDTO } from '@/lib/types'
@@ -20,8 +21,14 @@ export const PLATE = '#F6E7D4'
 // Лот считается «заканчивающимся» за час до финала: красный таймер + бейдж
 export const ENDING_MS = 60 * 60 * 1000
 
+// Шаг ставки — СТРОГО серверная формула (L1-64a): auctionStep(startPrice) =
+// round(0.02*startPrice / 50)*50, минимум 100 (src/lib/economy.ts, так же
+// считает auction-core при валидации). Раньше здесь был «сырой»
+// round(0.02*currentBid) — подсказка «минимальная ставка» получалась ниже
+// реальной, и сервер отклонял ставку. economy.ts — чистая функция без
+// серверных зависимостей, безопасно тянется в клиентский бандл.
 export function bidStep(lot: AuctionLotDTO): number {
-  return Math.max(100, Math.round((lot.currentBid ?? lot.startPrice) * 0.02))
+  return auctionStep(lot.startPrice)
 }
 
 export function minBid(lot: AuctionLotDTO): number {

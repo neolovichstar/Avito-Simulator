@@ -362,6 +362,10 @@ export async function aiNegotiate(ctx: NegotiationContext): Promise<AiReply> {
     if (!ok) {
       // модель вышла за лимит — трактуем как предложение цены
       action = 'none'
+      // 64-c/H1: демотированное согласие не должно оставлять цену за пределом
+      // лимита — клампим к границе (согласился на 2500 при минимуме 5000 →
+      // естественный контроффер 5000, а не утечка цены в lastOffer)
+      price = ctx.botRole === 'buyer' ? Math.min(price, ctx.botLimit) : Math.max(ctx.botLimit, price)
       // 63-a2: покупатель-бот НИКОГДА не поднимает лимит выше исходного раунда
       // (Math.max дрейфовал бот-бюджет вверх за пределы botLimit)
       newLimit = ctx.botRole === 'buyer' ? Math.min(newLimit, ctx.botLimit) : Math.min(Math.max(newLimit, price), ctx.listing.price)

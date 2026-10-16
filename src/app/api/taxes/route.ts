@@ -45,10 +45,13 @@ export async function POST(req: Request) {
   })
   if (dec.count === 0) return Response.json({ error: 'Недостаточно средств на счету' }, { status: 400 })
   // пометить счета оплаченными
+  // 64-F1 (L-7): частичная оплата не помечает «paid» счёт, на который денег
+  // не хватило — если остаток меньше суммы счёта, останавливаемся ДО пометки
   const unpaid = await db.taxBill.findMany({ where: { userId: user.id, status: 'unpaid' }, orderBy: { createdAt: 'asc' } })
   let left = pay
   for (const b of unpaid) {
     if (left <= 0) break
+    if (left < b.amount) break
     await db.taxBill.update({
       where: { id: b.id },
       data: { status: 'paid', paidAt: new Date() },

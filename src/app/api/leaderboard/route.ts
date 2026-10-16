@@ -27,9 +27,14 @@ export async function GET(req: Request) {
 
   const rows = (await cache.getOrSet('lb:all', 20_000, async () => {
     // ТОЛЬКО реальные игроки: боты-NPC в лидерах не участвуют (демо-игроков больше нет)
+    // 64-F1 (L-8): take без orderBy = недетерминированная выборка. Метрики deals/profit
+    // живут в stats JSON (в БД не отсортировать), поэтому детерминизм обеспечиваем
+    // orderBy balance desc → xp desc → id: топ по балансу честный, остальные метрики
+    // считаются по этому же фиксированному набору из 400 строк.
     const users = await db.user.findMany({
       where: { isBot: false },
       select: { id: true, isBot: true, displayName: true, photoUrl: true, balance: true, xp: true, stats: true, lastSeenAt: true },
+      orderBy: [{ balance: 'desc' }, { xp: 'desc' }, { id: 'asc' }],
       take: 400,
     })
     const mapped = users.map((u) => {

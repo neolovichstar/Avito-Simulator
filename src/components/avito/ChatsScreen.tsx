@@ -63,12 +63,12 @@ export default function ChatsScreen({ onOpenChat }: { onOpenChat: (id: string) =
     return () => window.removeEventListener('focus', readDrafts)
   }, [items, draftsTick])
 
-  // realtime: слушаем typing и приход сообщений по каналам всех видимых чатов
+  // realtime: typing и приход сообщений приходят на личном user-канале
+  // (сервер джойнит его сам после auth, 64-c/C2) — подписок на chat:<id>
+  // больше нет, события фильтруются по chatId из payload
   useEffect(() => {
     const s = getSocket()
     if (!s || !idsKey) return
-    const channels = idsKey.split(',').map((id) => `chat:${id}`)
-    s.emit('subscribe', { channels })
     const stopTyping = (chatId: string) => {
       clearTimeout(typingTimers.current[chatId])
       setTyping((prev) => {
@@ -93,7 +93,6 @@ export default function ChatsScreen({ onOpenChat }: { onOpenChat: (id: string) =
     return () => {
       s.off('typing', onTyping)
       s.off('chat:message', onMsg)
-      s.emit('unsubscribe', { channels })
       Object.values(typingTimers.current).forEach(clearTimeout)
       typingTimers.current = {}
     }
