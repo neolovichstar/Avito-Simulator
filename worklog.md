@@ -2767,3 +2767,25 @@ Stage Summary:
 - Готово: все 16 пунктов аудита — двойные выплаты/списания/выкупы закрыты CAS/транзакциями (deals, repair ×5, buy-fee, gosuslugi, phones ×2, finance, reroll), telegram-секрет timing-safe в одном хелпере, redisLimit атомарный с fail-open, дубли чатов/отзывов закрыты уникальами в ОБОИХ схемах + P2002-путями, валидация входа и buyer-лимит торга без дрейфа
 - Схема применена к дев-БД (db:push чисто, дублей не было — проверено SQL-скриптом), Prisma Client перегенерирован; tsc 0 в src, eslint 0
 - Отложено/бэклог (по ТЗ НЕ делал): engine.ts financeTick CAS (serverless-гипотетика), частичные уникальные индексы на Listing; нюансы: reroll сжигает дневную замену при невалидном теле после CAS-захвата (семантика по ТЗ), stats-писатели вне bot-memory (bumpStats) остались вне транзакций — на SQLite ок, для Postgres потенциально отдельный тикет
+---
+Task ID: 63
+Agent: main (Z.ai Code)
+Task: Охота на баги по запросу юзера («ищи еще баги и исправляй все что можно») — двойной аудит + фиксы + релиз 095b528
+
+Work Log:
+- ДВА параллельных аудита (Explore): 63-a API (92 роута, схемы, движки денег) и 63-b UI (все компоненты/OS-слой). Итог: 20+ находок API (1 CRITICAL, 3 HIGH, 15 MED/LOW) + 14+ находок UI (1 HIGH, 6 MED)
+- CRITICAL подтверждён и закрыт: settleSaleDelivery (deals.ts) платила продавцу ДВАЖДЫ (гонка engine-тика 15с и ленивого тика GET /api/deliveries без CAS) → CAS-захват updateMany как в returnDelivery
+- Параллельные fix-агенты: 63-a2 (16 API-фиксов: CAS в 5 repair-роутах+cancel, timing-safe telegram-auth.ts, redis SET NX EX, buy-fee CAS с рефандом, уникальные Chat/Review + P2002, gosuslugi/phones/admin-finance транзакции, buyer-limit clamp, валидация ввода, reroll-claim, balanceDelta clamp, after() для отзывов, bot-memory tx) и 63-b2 (14 UI-фиксов: Bearer для set-main/release, mine-пузырь чата, seq-гейт ленты, ремап /70-/80, ErrorState Plate/Numbers, usePoll c document.hidden на 10 поллерах, invoice 0₽, хинт нехватки на доставку, капы продажи, персист избранного аукциона, откат сердца, busy-гейт офлайна, AvitoApp pop())
+- Схема: @@unique Chat(listingId,buyerId,sellerId) + Review(listingId,fromUserId) + 16 индексов в ОБОИХ schema-файлах; дев-db:push прошёл (дублей в деве не было)
+- ИНФРА-УРОК: db:push на sqlite ПЕРЕПИСАЛ db/custom.db (07:58) → фид 0 объявлений, seed заново (24 бота/122 объявления). Учтено на будущее: после db:push — пересеять
+- ПРОД-СХЕМА (Supabase): прямой хост IPv6-only (песочница без IPv6) → session pooler aws-1-eu-west-3.pooler.supabase.com:5432 (юзер postgres.<ref>); найдено 2 ЖИВЫХ дубля чатов (баг подтверждён продой!) → dedupe (2 чата+16 сообщений удалены, оставлены новейшие) → prisma db push --accept-data-loss → 17 индексов + 2 UNIQUE-индекса подтверждены pg_indexes
+- E2E QA (agent-browser): анлок live-commit на полпути ✓, онбординг региона ✓, лента 123 объявления ✓, карточка ✓, чат ИИ: ответ ~1с, мой пузырь СПРАВА (фикс mine), торг 7 475 → мин. 6 534 (потолок ниже цены!) → счёт РОВНО 6 534 «Оплатить 6 534» → оплата прошла → «Сделка состоялась», посылка собирается ✓
+- Релиз: коммит 095b528 → push efa8a90..095b528 (деплой 3/4); прод-проверка: /api/listings?page=abc → 200 (старый код давал 500 — маркер нового кода), health ok db:up 422ms
+
+Stage Summary:
+- Деньги: двойные выплаты/двойные оплаты/минус-балансы закрыты на 8 путях (deliveries, repair×5, buy-fee, gosuslugi, phones, чат-инвойс с потолком)
+- Дубли: чаты и отзывы защищены уникальными ключами на дев+прод (продовые 2 дубля вычищены)
+- Батарея/трафик: 10 поллеров спят в фоне (document.hidden), мгновенный догон при возврате
+- Тёмная тема: инвойсы читаемы (/70-/80 ремап); UI-глитчи пузырей/ленты убраны
+- Мёртвые кнопки номеров ожили (Bearer); легаси-файлы удалены повторно (воскресали из отката снапшота)
+- БЭКЛОГ: частичный unique-индекс Listing(itemId) WHERE status=active (Postgres partial index — нужен raw SQL миграции), engine financeTick CAS на serverless, системный back-жест внутрь стеков приложений, use-poll на SupportApp третьем поллере
