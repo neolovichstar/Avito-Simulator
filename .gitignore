@@ -70,3 +70,4 @@ dev.log
 shots/
 upload/
 tool-results/
+/0[0-9]-*.png
