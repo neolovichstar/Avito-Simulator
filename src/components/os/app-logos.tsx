@@ -412,7 +412,7 @@ export const APP_TILE: Record<AppKey, { label: string; background: string; image
   delivery: {
     label: 'Доставки',
     background: 'linear-gradient(155deg, #D8721C 0%, #A85110 52%, #6B3208 100%)',
-    image: '/img/apps/delivery.png?v=4',
+    image: '/img/apps/delivery.png?v=5',
     icon: <DeliveryLogo />,
   },
   leaderboard: {
@@ -478,13 +478,13 @@ export const APP_TILE: Record<AppKey, { label: string; background: string; image
   numbers: {
     label: 'Номера',
     background: 'linear-gradient(155deg, #6C48C0 0%, #4E3096 52%, #321E63 100%)',
-    image: '/img/apps/numbers.png?v=4',
+    image: '/img/apps/numbers.png?v=5',
     icon: <NumbersLogo />,
   },
   plates: {
     label: 'Автономера',
     background: 'linear-gradient(155deg, #4C5563 0%, #333B47 52%, #1D232C 100%)',
-    image: '/img/apps/plates.png?v=4',
+    image: '/img/apps/plates.png?v=5',
     icon: <PlatesLogo />,
   },
   support: {

@@ -16,6 +16,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'http'
 import { existsSync, readFileSync } from 'fs'
 import { dirname, join } from 'path'
+import { safeEqualStrings } from './admin-session'
 
 // Подтянуть корневой .env (мини-сервис — отдельный проект, bun грузит только свой .env)
 function loadRootEnv(): void {
@@ -34,7 +35,13 @@ function loadRootEnv(): void {
 loadRootEnv()
 
 const PORT = 3004
+// Секрет /send и x-service-secret к Next API. Без REALTIME_SECRET остаётся
+// канонический дефолт (прод-совместимость, warn ниже) — задайте переменную,
+// иначе дефолт известен из репо и /send открыт тому, кто до него дотянется.
 const SECRET = process.env.REALTIME_SECRET ?? 'avito-sim-rt-2024-secret'
+if (!process.env.REALTIME_SECRET) {
+  console.warn('[tg-bot] REALTIME_SECRET not set — /send works on the public default secret (insecure)')
+}
 const TOKEN = process.env.BOT_TOKEN ?? ''
 const API = `https://api.telegram.org/bot${TOKEN}`
 
@@ -761,20 +768,30 @@ export function startTelegramBot(): void {
 
       if (url === '/send' && req.method === 'POST') {
         let body = ''
-        req.on('data', (c: Buffer) => (body += c.toString()))
+        let overflow = false
+        req.on('data', (c: Buffer) => {
+          body += c.toString()
+          // лимит тела: без него локальный/соседний процесс может раздуть память
+          if (body.length > 16_384) {
+            overflow = true
+            sendJson(res, 413, { error: 'payload too large' })
+            req.destroy()
+          }
+        })
         req.on('end', async () => {
+          if (overflow) return
           try {
             const { secret, chatId, text, welcome } = JSON.parse(body) as { secret?: string; chatId?: string; text?: string; welcome?: boolean }
-            if (secret !== SECRET) return sendJson(res, 403, { error: 'forbidden' })
-            if (!chatId) return sendJson(res, 400, { error: 'chatId required' })
+            if (typeof secret !== 'string' || !(await safeEqualStrings(secret, SECRET))) return sendJson(res, 403, { error: 'forbidden' })
+            if (!chatId || typeof chatId !== 'string' || chatId.length > 64) return sendJson(res, 400, { error: 'chatId required' })
             if (!TOKEN) return sendJson(res, 503, { error: 'BOT_TOKEN missing' })
             if (welcome) {
               const w = await sendWelcome(chatId)
               console.log(`[tg-bot] welcome(/send) → ${chatId}: ${w && w.ok ? 'OK' : w?.description ?? 'no response'}`)
               return sendJson(res, 200, { ok: Boolean(w && w.ok) })
             }
-            if (!text) return sendJson(res, 400, { error: 'text required' })
-            const tgRes = await sendSmart(chatId, text)
+            if (!text || typeof text !== 'string') return sendJson(res, 400, { error: 'text required' })
+            const tgRes = await sendSmart(chatId, text.slice(0, 4096))
             console.log(`[tg-bot] send → ${chatId}: ${tgRes && tgRes.ok ? 'OK' : tgRes?.description ?? 'no response'}`)
             sendJson(res, 200, { ok: true })
           } catch {
@@ -795,8 +812,8 @@ export function startTelegramBot(): void {
       console.error('[tg-bot] server error', e)
     })
 
-    server.listen(PORT, () => {
-      console.log(`[tg-bot] listening on :${PORT} (inside next-server), token ${TOKEN ? 'OK' : 'MISSING'}`)
+    server.listen(PORT, '127.0.0.1', () => {
+      console.log(`[tg-bot] listening on 127.0.0.1:${PORT} (inside next-server), token ${TOKEN ? 'OK' : 'MISSING'}`)
       void setupBot()
       void pollLoop()
       void pendingLoop()

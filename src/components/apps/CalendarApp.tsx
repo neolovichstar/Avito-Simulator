@@ -25,7 +25,20 @@ function loadEvents(): EventsMap {
     const raw = localStorage.getItem(LS_KEY)
     if (!raw) return {}
     const parsed: unknown = JSON.parse(raw)
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed as EventsMap
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    // Санитизация: ключ — дата YYYY-MM-DD, значения — массивы строк.
+    // Повреждённые данные (например { '2026-01-01': 'текст' }) раньше падали
+    // на dayEvents.map и ломали всё приложение.
+    const out: EventsMap = {}
+    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(k) || !Array.isArray(v)) continue
+      const arr = v
+        .filter((x): x is string => typeof x === 'string')
+        .map((s) => s.slice(0, 200))
+        .slice(0, 50)
+      if (arr.length > 0) out[k] = arr
+    }
+    return out
   } catch {
     /* повреждённые данные — начинаем с пустого календаря */
   }

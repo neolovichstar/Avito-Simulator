@@ -48,7 +48,7 @@ type MenuTarget = MenuTargetBase & { x: number; y: number }
 
 const DOCK_MAX = 4
 const PAGE0_SLOTS = 16 // виджеты + сетка 4×4
-const PAGES = 3 // две страницы сетки + библиотека
+const PAGES = 2 // две страницы сетки; библиотека — оверлей (свайп снизу вверх)
 const FOLDER_MAX = 9
 const HOLD_MS = 300
 const MERGE_MS = 380 // сколько держать иконку над другой, чтобы «слиплись»
@@ -657,6 +657,10 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
   const [extracting, setExtracting] = useState(false) // тянем иконку из открытой папки наружу
   const [libChip, setLibChip] = useState<LibChip>('all')
   const [libQuery, setLibQuery] = useState('')
+  // Библиотека — полноэкранный оверлей: открытие свайпом снизу вверх,
+  // закрытие — свайпом сверху вниз (панель следует за пальцем) или Esc.
+  const [libOpen, setLibOpen] = useState(false)
+  const [libClosing, setLibClosing] = useState(false)
 
   const day = useDayData()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -688,6 +692,8 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
     (a: AppKey) => {
       setOpenFolderId(null)
       setFolderClosing(false)
+      setLibOpen(false)
+      setLibClosing(false)
       onOpenApp(a)
     },
     [onOpenApp],
@@ -697,6 +703,70 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
     const r = rootRef.current?.getBoundingClientRect()
     setMenu({ ...target, x: clientX - (r?.left ?? 0), y: clientY - (r?.top ?? 0) })
   }, [])
+
+  // ─── Библиотека-оверлей: закрытие (Esc / сильный свайп вниз / запуск приложения) ───
+  const libPanelRef = useRef<HTMLDivElement>(null)
+  const libBackdropRef = useRef<HTMLDivElement>(null)
+  const closeLib = useCallback(() => {
+    if (libClosing) return
+    setLibClosing(true)
+    const el = libPanelRef.current
+    if (el) {
+      el.style.transition = 'transform 250ms cubic-bezier(0.32, 0.72, 0, 1)'
+      el.style.transform = 'translate3d(0, 100%, 0)'
+    }
+    const bd = libBackdropRef.current
+    if (bd) {
+      bd.style.transition = 'opacity 250ms ease'
+      bd.style.opacity = '0'
+    }
+    window.setTimeout(() => {
+      setLibOpen(false)
+      setLibClosing(false)
+    }, 260)
+  }, [libClosing])
+
+  // Живой драг закрытия: панель следует за пальцем вниз, отпустил —
+  // уехала (сильный свайп) или вернулась (недотянул). Из прокрученного
+  // списка и чипов жест отдаётся нативному скроллу.
+  const libHorizRef = useRef(false)
+  const libDrag = useDrag({
+    onStart: (e) => {
+      if (libClosing) return false
+      const sc = (e.target as Element | null)?.closest?.('[data-scrollable]') as HTMLElement | null
+      if (sc) {
+        if (sc.dataset.scrollable === 'x') return false // чипы категорий — нативный скролл
+        if (sc.scrollTop > 0) return false // список прокручен — нативный скролл
+      }
+      libHorizRef.current = false
+    },
+    onMove: (dx, dy) => {
+      if (libClosing) return
+      if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.4) libHorizRef.current = true
+      if (libHorizRef.current || dy <= 0) return
+      const el = libPanelRef.current
+      if (el) {
+        el.style.transition = 'none'
+        el.style.transform = `translate3d(0, ${dy}px, 0)`
+      }
+      const bd = libBackdropRef.current
+      if (bd) bd.style.opacity = String(Math.max(0.3, 1 - dy / 480))
+    },
+    onEnd: (dx, dy, fling) => {
+      if (libHorizRef.current) return
+      if (dy > 110 || (dy > 44 && fling.vy > 0.6)) {
+        closeLib()
+        return
+      }
+      const el = libPanelRef.current
+      if (el && dy > 0) {
+        el.style.transition = 'transform 260ms cubic-bezier(0.32, 0.72, 0, 1)'
+        el.style.transform = 'translate3d(0, 0px, 0)'
+        const bd = libBackdropRef.current
+        if (bd) bd.style.opacity = '1'
+      }
+    },
+  })
 
   // ─── Свайп страниц (transform в DOM напрямую, 120 fps) ─────────────────────
   const trackRef = useRef<HTMLDivElement>(null)
@@ -728,7 +798,7 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
       horizRef.current = false
       movedRef.current = false
       const el = trackRef.current
-      halfRef.current = (el?.offsetWidth ?? 3) / 3
+      halfRef.current = (el?.offsetWidth ?? 2) / PAGES
       if (el) el.style.transition = 'none'
     },
     onMove: (dx, dy) => {
@@ -746,18 +816,10 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
       const el = trackRef.current
       const width = halfRef.current
       const distPct = width > 0 ? dx / width : 0
-      // вертикальный жест: вниз — библиотека, вверх из библиотеки — домой
+      // вертикальный жест: свайп снизу вверх — открыть библиотеку-оверлей
       if (!horizRef.current && !dragActiveRef.current && !editRef.current) {
-        if ((dy > 56 || (dy > 26 && fling.vy > 0.5)) && page !== PAGES - 1) {
-          if (el) { el.style.transition = SETTLE_EASE; el.style.transform = `translateX(${-(PAGES - 1) * (100 / PAGES)}%)` }
-          setPage(PAGES - 1)
-          return
-        }
-        if ((dy < -56 || (dy < -26 && fling.vy < -0.5)) && page === PAGES - 1) {
-          if (el) { el.style.transition = SETTLE_EASE; el.style.transform = 'translateX(0%)' }
-          setPage(0)
-          return
-        }
+        if (dy < -56 || (dy < -26 && fling.vy < -0.5)) setLibOpen(true)
+        return // вертикальные жесты страницы не листают
       }
       const goNext = page < PAGES - 1 && horizRef.current && (dx <= -56 || distPct <= -0.3 || (dx < -20 && fling.vx < -0.55))
       const goPrev = page > 0 && horizRef.current && (dx >= 56 || distPct >= 0.3 || (dx > 20 && fling.vx > 0.55))
@@ -962,7 +1024,7 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
       // ── Автопролистывание страниц у краёв ──
       const vw = window.innerWidth
       const dir: -1 | 0 | 1 = ev.clientX < 34 ? -1 : ev.clientX > vw - 34 ? 1 : 0
-      const canFlip = dir !== 0 && pageRef.current + dir >= 0 && pageRef.current + dir <= PAGES - 2
+      const canFlip = dir !== 0 && pageRef.current + dir >= 0 && pageRef.current + dir <= PAGES - 1
       if (canFlip && flipDir.current !== dir) {
         flipDir.current = dir
         const d = dir // фиксируем направление: апдейтер React выполнится позже
@@ -1312,11 +1374,12 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
       if (menu) setMenu(null)
       else if (info) setInfo(null)
       else if (openFolderId && !folderClosing) closeFolderSoon()
+      else if (libOpen && !libClosing) closeLib()
       else if (edit) setEdit(false)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [menu, info, openFolderId, folderClosing, edit])
+  }, [menu, info, openFolderId, folderClosing, edit, libOpen, libClosing, closeLib])
 
   // ─── Слоты сетки/дока ──────────────────────────────────────────────────────
   const page0Items = layout.grid.slice(0, PAGE0_SLOTS)
@@ -1449,15 +1512,15 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
         </button>
       )}
 
-      {/* ─── Панели (свайп влево/вправо, вниз — библиотека) ─── */}
+      {/* ─── Панели (свайп влево/вправо; свайп снизу вверх — библиотека-оверлей) ─── */}
       {/* touch-none убран (M3-64b): он блокировал нативный скролл списка библиотеки.
           Свайпы живут на pointer-событиях useDrag и без него; touch-pan-y оставляет
           горизонтальные жесты за нами, overscroll-none не пускает цепочку в
           pull-to-refresh браузера. Конфликт со скроллом решает гард в onStart. */}
       <div className="relative z-10 flex-1 touch-pan-y overscroll-none overflow-hidden" onPointerDown={pages.onPointerDown} onClickCapture={guardClick}>
-        <div ref={trackRef} className="flex h-full w-[300%]" style={trackStyle}>
+        <div ref={trackRef} className="flex h-full w-[200%]" style={trackStyle}>
           {/* Панель 1: виджеты + сетка */}
-          <section className="flex h-full w-1/3 flex-col" aria-label="Главный экран" aria-hidden={page !== 0}>
+          <section className="flex h-full w-1/2 flex-col" aria-label="Главный экран" aria-hidden={page !== 0}>
             <div className="flex items-stretch gap-2.5 px-4">
               <WeatherWidget dark={dark} onOpenApp={openAppFromHome} enterDelay={entrance ? 0 : undefined} />
               <TodayWidget dark={dark} widgets={widgets} online={online} day={day} onOpenApp={openAppFromHome} enterDelay={entrance ? 32 : undefined} />
@@ -1469,98 +1532,13 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
           </section>
 
           {/* Панель 2: продолжение сетки */}
-          <section className="flex h-full w-1/3 flex-col" aria-label="Вторая страница" aria-hidden={page !== 1}>
+          <section className="flex h-full w-1/2 flex-col" aria-label="Вторая страница" aria-hidden={page !== 1}>
             <div className="mt-2 grid grid-cols-4 content-start gap-x-2 gap-y-[18px] px-4">
               {page1Items.map((item, i) => renderSlot(item, 'grid', PAGE0_SLOTS + i, false))}
             </div>
             <div className="flex-1" />
           </section>
 
-          {/* Панель 3: Библиотека приложений */}
-          <section className="flex h-full w-1/3 flex-col" aria-label="Библиотека приложений" aria-hidden={page !== 2}>
-            <div className="px-4">
-              <div
-                className={`flex h-11 items-center gap-2.5 rounded-full px-4 outline-none ring-1 transition-colors ${
-                  dark ? 'bg-[#1B1D22]/[0.70] ring-white/[0.12] backdrop-blur-xl' : 'bg-white/75 ring-black/[0.04] backdrop-blur-xl'
-                }`}
-              >
-                <Search className={`size-4 shrink-0 ${dark ? 'text-white/60' : TXT_TERTIARY}`} aria-hidden="true" />
-                <input
-                  value={libQuery}
-                  onChange={(e) => setLibQuery(e.target.value)}
-                  placeholder="Поиск приложений"
-                  aria-label="Поиск приложений"
-                  className={`min-w-0 flex-1 bg-transparent text-[13px] font-medium outline-none placeholder:text-[rgba(60,60,67,0.35)] ${dark ? 'text-white' : 'text-neutral-800'}`}
-                  onPointerDown={(e) => e.stopPropagation()}
-                />
-                {libQuery ? (
-                  <button type="button" aria-label="Очистить" onClick={() => setLibQuery('')} className="shrink-0 outline-none">
-                    <X className={`size-4 ${dark ? 'text-white/50' : TXT_TERTIARY}`} aria-hidden="true" />
-                  </button>
-                ) : (
-                  <MicGlyph dark={dark} />
-                )}
-              </div>
-              {/* чипы категорий (горизонтальный скролл — см. гард data-scrollable) */}
-              <div data-scrollable className="mt-2 flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
-                {LIB_CHIPS.map((c) => {
-                  const on = libChip === c.key
-                  return (
-                    <button
-                      key={c.key}
-                      type="button"
-                      aria-pressed={on}
-                      onClick={() => setLibChip(c.key)}
-                      className="flex h-11 shrink-0 items-center outline-none transition-transform duration-150 active:scale-95"
-                    >
-                      <span
-                        className={`flex h-9 items-center rounded-full px-4 text-[13px] font-semibold transition-colors duration-150 ${
-                          on
-                            ? dark ? 'bg-white text-neutral-900 shadow-[0_4px_14px_rgba(255,255,255,0.18)]' : 'bg-black text-white'
-                            : dark
-                              ? 'bg-white/[0.09] text-white/75 ring-1 ring-white/[0.10]'
-                              : 'bg-white/75 text-[rgba(60,60,67,0.62)] ring-1 ring-black/[0.04] backdrop-blur-xl'
-                        }`}
-                      >
-                        {c.label}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div data-scrollable className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-none px-4 pb-2 [scrollbar-width:none]">
-              {foundApps ? (
-                <div className={`rounded-[24px] p-3 ring-1 backdrop-blur-xl ${dark ? 'bg-[#1B1D22]/[0.70] ring-white/[0.10] shadow-[0_12px_32px_rgba(0,0,0,0.4)]' : `bg-white/80 ring-black/[0.04] ${GLASS_CARD}`}`}>
-                  {foundApps.length === 0 ? (
-                    <p className={`py-6 text-center text-[13px] font-medium ${dark ? 'text-white/40' : TXT_TERTIARY}`}>Ничего не найдено</p>
-                  ) : (
-                    <div className="grid grid-cols-4 gap-x-2 gap-y-4">
-                      {foundApps.map((a, i) => libIcon(a))}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                visibleSections.map((s) => (
-                  <div key={s.key} className={`rounded-[24px] p-3 ring-1 backdrop-blur-xl ${dark ? 'bg-[#1B1D22]/[0.70] ring-white/[0.10] shadow-[0_12px_32px_rgba(0,0,0,0.4)]' : `bg-white/80 ring-black/[0.04] ${GLASS_CARD}`}`}>
-                    <div className="flex items-center justify-between px-1 pb-1.5">
-                      <p className={`text-[16px] font-semibold ${dark ? 'text-white' : TXT_PRIMARY}`}>{s.title}</p>
-                      <ChevronRight className={`size-4 ${dark ? 'text-white/40' : TXT_TERTIARY}`} aria-hidden="true" />
-                    </div>
-                    <div className="grid grid-cols-4 gap-x-2 gap-y-4">
-                      {s.apps.map((a) => libIcon(a))}
-                    </div>
-                  </div>
-                ))
-              )}
-              {foundApps && foundApps.length === 0 && (
-                <p className={`pb-2 text-center text-[11px] ${dark ? 'text-white/40' : TXT_TERTIARY}`}>
-                  Свайп вверх вернёт на главный экран
-                </p>
-              )}
-            </div>
-          </section>
         </div>
       </div>
 
@@ -1615,6 +1593,118 @@ function HomeScreen({ onOpenApp }: { onOpenApp: (app: AppKey) => void }) {
           onClose={closeFolderSoon}
           onRename={(name) => renameFolder(openFolderItem.id, name)}
         />
+      )}
+
+      {/* ─── Библиотека приложений: оверлей поверх лончера ───
+          Открытие — свайп снизу вверх по домашнему экрану, закрытие —
+          свайп сверху вниз (панель следует за пальцем) или Esc. */}
+      {libOpen && (
+        <div
+          className="absolute inset-0 z-[64]"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Библиотека приложений"
+          onClickCapture={guardClick}
+        >
+          <div
+            ref={libBackdropRef}
+            aria-hidden="true"
+            className="sheet-fade absolute inset-0"
+            style={{
+              background: dark ? 'rgba(8, 10, 14, 0.55)' : 'rgba(28, 30, 36, 0.35)',
+              backdropFilter: 'blur(28px) saturate(1.4)',
+              WebkitBackdropFilter: 'blur(28px) saturate(1.4)',
+            }}
+          />
+          <div
+            ref={libPanelRef}
+            className="os-lib-in absolute inset-0 flex flex-col pt-12"
+            onPointerDown={libDrag.onPointerDown}
+          >
+            <div className="px-4">
+              <div
+                className={`flex h-11 items-center gap-2.5 rounded-full px-4 outline-none ring-1 transition-colors ${
+                  dark ? 'bg-[#1B1D22]/[0.70] ring-white/[0.12] backdrop-blur-xl' : 'bg-white/75 ring-black/[0.04] backdrop-blur-xl'
+                }`}
+              >
+                <Search className={`size-4 shrink-0 ${dark ? 'text-white/60' : TXT_TERTIARY}`} aria-hidden="true" />
+                <input
+                  value={libQuery}
+                  onChange={(e) => setLibQuery(e.target.value)}
+                  placeholder="Поиск приложений"
+                  aria-label="Поиск приложений"
+                  className={`min-w-0 flex-1 bg-transparent text-[13px] font-medium outline-none placeholder:text-[rgba(60,60,67,0.35)] ${dark ? 'text-white' : 'text-neutral-800'}`}
+                  onPointerDown={(e) => e.stopPropagation()}
+                />
+                {libQuery ? (
+                  <button type="button" aria-label="Очистить" onClick={() => setLibQuery('')} className="shrink-0 outline-none">
+                    <X className={`size-4 ${dark ? 'text-white/50' : TXT_TERTIARY}`} aria-hidden="true" />
+                  </button>
+                ) : (
+                  <MicGlyph dark={dark} />
+                )}
+              </div>
+              {/* чипы категорий (горизонтальный скролл — libDrag отдаёт нативу) */}
+              <div data-scrollable="x" className="mt-2 flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
+                {LIB_CHIPS.map((c) => {
+                  const on = libChip === c.key
+                  return (
+                    <button
+                      key={c.key}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => setLibChip(c.key)}
+                      className="flex h-11 shrink-0 items-center outline-none transition-transform duration-150 active:scale-95"
+                    >
+                      <span
+                        className={`flex h-9 items-center rounded-full px-4 text-[13px] font-semibold transition-colors duration-150 ${
+                          on
+                            ? dark ? 'bg-white text-neutral-900 shadow-[0_4px_14px_rgba(255,255,255,0.18)]' : 'bg-black text-white'
+                            : dark
+                              ? 'bg-white/[0.09] text-white/75 ring-1 ring-white/[0.10]'
+                              : 'bg-white/75 text-[rgba(60,60,67,0.62)] ring-1 ring-black/[0.04] backdrop-blur-xl'
+                        }`}
+                      >
+                        {c.label}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div data-scrollable="y" className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-none px-4 pb-2 [scrollbar-width:none]">
+              {foundApps ? (
+                <div className={`rounded-[24px] p-3 ring-1 backdrop-blur-xl ${dark ? 'bg-[#1B1D22]/[0.70] ring-white/[0.10] shadow-[0_12px_32px_rgba(0,0,0,0.4)]' : `bg-white/80 ring-black/[0.04] ${GLASS_CARD}`}`}>
+                  {foundApps.length === 0 ? (
+                    <p className={`py-6 text-center text-[13px] font-medium ${dark ? 'text-white/40' : TXT_TERTIARY}`}>Ничего не найдено</p>
+                  ) : (
+                    <div className="grid grid-cols-4 gap-x-2 gap-y-4">
+                      {foundApps.map((a, i) => libIcon(a))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                visibleSections.map((s) => (
+                  <div key={s.key} className={`rounded-[24px] p-3 ring-1 backdrop-blur-xl ${dark ? 'bg-[#1B1D22]/[0.70] ring-white/[0.10] shadow-[0_12px_32px_rgba(0,0,0,0.4)]' : `bg-white/80 ring-black/[0.04] ${GLASS_CARD}`}`}>
+                    <div className="flex items-center justify-between px-1 pb-1.5">
+                      <p className={`text-[16px] font-semibold ${dark ? 'text-white' : TXT_PRIMARY}`}>{s.title}</p>
+                      <ChevronRight className={`size-4 ${dark ? 'text-white/40' : TXT_TERTIARY}`} aria-hidden="true" />
+                    </div>
+                    <div className="grid grid-cols-4 gap-x-2 gap-y-4">
+                      {s.apps.map((a) => libIcon(a))}
+                    </div>
+                  </div>
+                ))
+              )}
+              {foundApps && foundApps.length === 0 && (
+                <p className={`pb-2 text-center text-[11px] ${dark ? 'text-white/40' : TXT_TERTIARY}`}>
+                  Свайп вниз закроет библиотеку
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ─── Призрак перетаскиваемой иконки ─── */}

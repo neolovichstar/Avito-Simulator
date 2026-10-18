@@ -23,9 +23,15 @@ function loadNotes(): Note[] {
     if (!raw) return []
     const parsed: unknown = JSON.parse(raw)
     if (Array.isArray(parsed)) {
-      return parsed.filter(
-        (n): n is Note => !!n && typeof n === 'object' && typeof (n as Note).text === 'string',
-      )
+      // id обязателен (иначе key=undefined → коллизии React и потеря правок),
+      // длина ограничена — перегруженный LS не подвесит рендер списка.
+      return parsed
+        .filter(
+          (n): n is Note =>
+            !!n && typeof n === 'object' && typeof (n as Note).id === 'string' && typeof (n as Note).text === 'string',
+        )
+        .map((n) => ({ id: n.id.slice(0, 64), text: n.text.slice(0, 50_000), updatedAt: Number(n.updatedAt) || 0 }))
+        .slice(0, 500)
     }
   } catch {
     /* повреждённые данные — начинаем с пустого списка */

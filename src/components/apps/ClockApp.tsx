@@ -5,7 +5,7 @@
 // интервалы/тайм-ауты запускаются только из обработчиков нажатий.
 // Визуал — M3 Expressive: пилюли в нижней навигации, круглые кнопки управления, тональные карточки.
 
-import { useSyncExternalStore, useState } from 'react'
+import { useSyncExternalStore, useState, useRef, type RefObject } from 'react'
 import {
   Flag,
   Globe2,
@@ -17,12 +17,28 @@ import {
 } from 'lucide-react'
 import { sound } from '@/lib/sound'
 
-// Тик каждые intervalMs мс: снимок квантуется, чтобы getSnapshot был стабильным
-function useTick(intervalMs: number): number {
+// Тик каждые intervalMs мс: снимок квантуется, чтобы getSnapshot был стабильным.
+// Приложение живёт в keep-alive слое (visibility:hidden в «Недавних») — пока слой
+// не виден, onStoreChange не дёргаем: иначе скрытые вкладки ререндерились
+// вслепую (секундомер — 20 рендеров/с в фоне). checkVisibility учитывает
+// visibility:hidden предков; при возврате видимости тик догоняет за ≤ interval.
+function useTick(intervalMs: number, rootRef?: RefObject<HTMLElement | null>): number {
   return useSyncExternalStore(
     (onStoreChange) => {
-      const id = setInterval(onStoreChange, intervalMs)
-      return () => clearInterval(id)
+      const id = setInterval(() => {
+        if (document.hidden) return
+        const el = rootRef?.current
+        if (el && typeof el.checkVisibility === 'function' && !el.checkVisibility({ visibilityProperty: true })) return
+        onStoreChange()
+      }, intervalMs)
+      const onVis = () => {
+        if (!document.hidden) onStoreChange()
+      }
+      document.addEventListener('visibilitychange', onVis)
+      return () => {
+        clearInterval(id)
+        document.removeEventListener('visibilitychange', onVis)
+      }
     },
     () => Math.floor(Date.now() / intervalMs) * intervalMs,
     () => 0,
@@ -71,8 +87,8 @@ function FlagDot({ kind }: { kind: 'uk' | 'us' | 'jp' }) {
   )
 }
 
-function WorldTab() {
-  const tick = useTick(1000)
+function WorldTab({ rootRef }: { rootRef: RefObject<HTMLDivElement | null> }) {
+  const tick = useTick(1000, rootRef)
   const now = tick ? new Date(tick) : null
 
   return (
@@ -123,8 +139,8 @@ function fmtSw(ms: number): string {
   return `${pad2(m)}:${pad2(s)},${pad2(cs)}`
 }
 
-function StopwatchTab() {
-  const tick = useTick(50)
+function StopwatchTab({ rootRef }: { rootRef: RefObject<HTMLDivElement | null> }) {
+  const tick = useTick(50, rootRef)
   const [running, setRunning] = useState(false)
   const [startedAt, setStartedAt] = useState(0)
   const [acc, setAcc] = useState(0)
@@ -245,8 +261,8 @@ function StopwatchTab() {
 
 const PRESETS = [1, 3, 5, 10, 25]
 
-function TimerTab() {
-  const tick = useTick(250)
+function TimerTab({ rootRef }: { rootRef: RefObject<HTMLDivElement | null> }) {
+  const tick = useTick(250, rootRef)
   const [minutes, setMinutes] = useState(5)
   const [endsAt, setEndsAt] = useState<number | null>(null)
   const [done, setDone] = useState(false)
@@ -379,22 +395,25 @@ const TABS: { key: ClockTab; label: string; icon: typeof Globe2 }[] = [
 
 export default function ClockApp() {
   const [tab, setTab] = useState<ClockTab>('world')
+  // Общий реф корня: useTick проверяет через него реальную видимость слоя,
+  // чтобы три таба не рендерились вслепую в свёрнутом/фоновом состоянии.
+  const rootRef = useRef<HTMLDivElement>(null)
 
   return (
-    <div className="flex h-full flex-col bg-[linear-gradient(180deg,#07130D,#050D09)] text-white">
+    <div ref={rootRef} className="flex h-full flex-col bg-[linear-gradient(180deg,#07130D,#050D09)] text-white">
       <header className="flex h-14 shrink-0 items-center gap-3 px-5">
         <h1 className="text-[26px] font-bold tracking-[-0.02em]">Часы</h1>
       </header>
 
       {/* Вкладки остаются смонтированными (hidden): секундомер и таймер не сбрасываются при переключении */}
       <div className={'flex min-h-0 flex-1 flex-col ' + (tab === 'world' ? '' : 'hidden')}>
-        <WorldTab />
+        <WorldTab rootRef={rootRef} />
       </div>
       <div className={'flex min-h-0 flex-1 flex-col ' + (tab === 'stopwatch' ? '' : 'hidden')}>
-        <StopwatchTab />
+        <StopwatchTab rootRef={rootRef} />
       </div>
       <div className={'flex min-h-0 flex-1 flex-col ' + (tab === 'timer' ? '' : 'hidden')}>
-        <TimerTab />
+        <TimerTab rootRef={rootRef} />
       </div>
 
       <nav

@@ -1210,3 +1210,19 @@
   color: #17181a !important;
 }
 
+
+/* ─── Библиотека приложений: оверлей поверх лончера (Task 66) ───
+   Открытие — свайп снизу вверх: панель въезжает снизу.
+   fill: backwards — после анимации inline-стили драга работают.
+   Закрытие — живой драг за пальцем (inline transform в HomeScreen). */
+@keyframes os-lib-in {
+  from { transform: translate3d(0, 100%, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+.os-lib-in {
+  animation: os-lib-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .os-lib-in { animation-duration: 0.01s; }
+}

@@ -20,9 +20,29 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'http'
+import { existsSync, readFileSync } from 'fs'
+import { dirname, join } from 'path'
 import { Server, type Socket } from 'socket.io'
 
+// Подтянуть корневой .env (мини-сервис — отдельный проект, bun грузит только свой .env)
+function loadRootEnv(): void {
+  const metaDir = (import.meta as unknown as { dir?: string }).dir
+  const here = typeof metaDir === 'string' ? metaDir : process.cwd()
+  const candidates = [join(dirname(here), '..', '.env'), join(process.cwd(), '.env')]
+  for (const p of candidates) {
+    if (!existsSync(p)) continue
+    for (const line of readFileSync(p, 'utf8').split('\n')) {
+      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/)
+      if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '')
+    }
+    break
+  }
+}
+loadRootEnv()
+
 const PORT = 3303 // ЖЁСТКО: фронт ходит через io('/?XTransformPort=3303')
+// Секрет сервисных эндпоинтов диагностики (/presence с деталями) — как у realtime
+const SERVICE_SECRET = process.env.REALTIME_SECRET ?? ''
 const MAIN_APP = process.env.MAIN_APP_URL ?? 'http://127.0.0.1:3000'
 const AUTH_TTL_MS = 5 * 60 * 1000 // кэш проверки токена — 5 минут
 const AUTH_TIMEOUT_MS = 10_000 // не представился за 10с — отваливаем
@@ -138,9 +158,18 @@ httpServer.prependListener('request', (req: IncomingMessage, res: ServerResponse
     sendJson(res, 200, { ok: true, online: online.size, calls: inCall.size / 2 })
     return
   }
-  // /presence — внутренняя диагностика реестра
-  const users = [...online.values()].map((u) => ({ userId: u.userId, name: u.name, sockets: u.sockets.size }))
-  sendJson(res, 200, { online: online.size, users, calls: inCall.size / 2 })
+  // /presence — внутренняя диагностика реестра. Раньше список онлайн-юзеров
+  // (userId + имя) отдавался БЕЗ авторизации — presence-leak: кто угодно
+  // через :3303/presence видел, кто сейчас онлайн. Теперь детали — только
+  // с сервисным секретом; публично — лишь безличные счётчики.
+  const authorized =
+    SERVICE_SECRET !== '' && (req.headers['x-service-secret'] ?? '') === SERVICE_SECRET
+  if (authorized) {
+    const users = [...online.values()].map((u) => ({ userId: u.userId, name: u.name, sockets: u.sockets.size }))
+    sendJson(res, 200, { online: online.size, users, calls: inCall.size / 2 })
+  } else {
+    sendJson(res, 200, { online: online.size, calls: inCall.size / 2 })
+  }
 })
 
 /** Все сокеты юзера (все вкладки) — личная комната `user:{id}`. */
@@ -328,8 +357,8 @@ io.on('connection', (socket: Socket) => {
   })
 })
 
-httpServer.listen(PORT, () => {
-  LOG(`call-service (socket.io signaling) listening on :${PORT}`)
+httpServer.listen(PORT, '127.0.0.1', () => {
+  LOG(`call-service (socket.io signaling) listening on 127.0.0.1:${PORT}`)
 })
 
 // Graceful shutdown
